@@ -1,9 +1,11 @@
-//
+#if !defined(pch)
+#define pch
 
 // libraries includes
 #include <iostream>
 #include <algorithm>
 
 // user includes
-#include "window_system/window.hpp"
+#include <gtkmm.h>
 
+#endif

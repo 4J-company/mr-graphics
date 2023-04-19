@@ -1,34 +1,37 @@
 #if !defined(__window_hpp_)
 #define __window_hpp_
 
-#include <gtkmm.h>
+#include "pch.hpp"
 
 namespace window_system
 {
-  class window_system
+  // forward declaration
+  class window;
+
+  // window system class declaration (includes Gtk::Application instance)
+  class application 
   {
+    friend class window;
+
   private:
-    Gtk::Application _app;
-
+    inline static auto handle = Gtk::Application::create("org.gtkmm.examples.base");
   public:
-    window_system() = default;
-  };
+    application( int argc, char **argv )
+    {
+      handle->make_window_and_run<window>(argc, argv);
+    }
+  }; // end of 'window_system' class
 
-  class window 
+  // window class declaration (handles single window)
+  class window : public Gtk::Window 
   {
   private:
     size_t _width = 0, _height = 0;
+    Gtk::Button _button;
 
   public:
-    // default constructor
-    window() = default;
-
-    // size-based constructor
-    // arguments:
-    //   - size:
-    //       size_t width, height
-    window( size_t width, size_t height );
-  };
+    window( size_t width = 640, size_t height = 480 );
+  }; // end of 'window' class
 }
 
 #endif // __window_hpp_

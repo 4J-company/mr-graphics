@@ -1,6 +1,7 @@
-#include <pch.hpp>
+#include <system.hpp>
 
-int main( void )
+int main(int argc, char* argv[])
 {
-  return 0;   
+  window_system::application App {argc, argv};
+  return 0;  
 }
