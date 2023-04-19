@@ -5,23 +5,6 @@
 
 namespace window_system
 {
-  // forward declaration
-  class window;
-
-  // window system class declaration (includes Gtk::Application instance)
-  class application 
-  {
-    friend class window;
-
-  private:
-    inline static auto handle = Gtk::Application::create("org.gtkmm.examples.base");
-  public:
-    application( int argc, char **argv )
-    {
-      handle->make_window_and_run<window>(argc, argv);
-    }
-  }; // end of 'window_system' class
-
   // window class declaration (handles single window)
   class window : public Gtk::Window 
   {
@@ -32,6 +15,38 @@ namespace window_system
   public:
     window( size_t width = 640, size_t height = 480 );
   }; // end of 'window' class
+
+  // window system class declaration (includes Gtk::Application instance)
+  class application : public Gtk::Application 
+  {
+    friend class window;
+
+  private:
+    inline static application *handle = nullptr;
+
+    void on_activate() override
+    {
+      // start up signaled 
+      // create window
+      static window *Win = new window();
+    }
+  public:
+    application( int argc, char **argv ) : Gtk::Application("org.gtkmm.examples.application", Gio::Application::Flags::HANDLES_OPEN)
+    {
+      try 
+      {
+        if (handle == nullptr)
+          handle = this;
+        else
+          throw std::exception();
+        run(argc, argv);
+      }
+      catch (...)
+      {
+        std::cout << "can't create second applicaiotn instance" << std::endl;
+      }
+    }
+  }; // end of 'window_system' class
 }
 
 #endif // __window_hpp_

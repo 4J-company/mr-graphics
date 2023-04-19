@@ -4,6 +4,7 @@
 // libraries includes
 #include <iostream>
 #include <algorithm>
+#include <exception>
 
 // user includes
 #include <gtkmm.h>
