@@ -6,8 +6,12 @@ link_directories(${GTKMM_LIBRARY_DIRS})
 
 # subsystems includes
 
-set(SOURCE_FILES main.cpp window_system/window.cpp window_system/window.hpp pch.hpp)
+set(SOURCE_FILES main.cpp pch.hpp)
 add_executable(${CMAKE_PROJECT_NAME} ${SOURCE_FILES})
+
+add_subdirectory(renderer)
+add_subdirectory(window_system)
+
 target_link_libraries(${CMAKE_PROJECT_NAME} ${GTKMM_LIBRARIES})
 
 target_precompile_headers(${CMAKE_PROJECT_NAME} PRIVATE pch.hpp)

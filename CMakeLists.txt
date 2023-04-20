@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.25)
 project(desktop_app)
 
 set(CXX_STANDARD C++23)
