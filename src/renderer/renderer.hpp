@@ -3,20 +3,12 @@
 
 #include "pch.hpp"
 
+#include "command_unit/command_unit.hpp"
+#include "window_context/window_context.hpp"
+
 namespace ter
-{  class command_unit
-  {
-    friend class application;
-
-  private:
-    vk::CommandPool _cmd_pool;
-    std::array<vk::CommandBuffer, 3> _cmd_buffer;
-
-  public:
-    command_unit() = default;
-  };
-
-  class application
+{
+  class application : window_system::application
   {
   private:
     vk::Instance _instance;
@@ -26,7 +18,7 @@ namespace ter
 #endif
 
   public:
-    application();
+    application( int argc, char **argv );
     ~application();
 
     [[no_discard]] std::unique_ptr<command_unit> create_command_unit();

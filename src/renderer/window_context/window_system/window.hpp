@@ -33,18 +33,10 @@ namespace window_system
   public:
     application( int argc, char **argv ) : Gtk::Application("org.gtkmm.examples.application", Gio::Application::Flags::HANDLES_OPEN)
     {
-      try 
-      {
-        if (handle == nullptr)
-          handle = this;
-        else
-          throw std::exception();
-        run(argc, argv);
-      }
-      catch (...)
-      {
-        std::cout << "can't create second applicaiotn instance" << std::endl;
-      }
+       if (handle != nullptr)
+         std::cout << "can't create second applicaiotn instance" << std::endl;
+       handle = this;
+       run(argc, argv);
     }
   }; // end of 'window_system' class
 }

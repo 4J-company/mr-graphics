@@ -1,4 +1,4 @@
-#include "window_system/window.hpp"
+#include "window.hpp"
 
 // size-based constructor
 // arguments:

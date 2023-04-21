@@ -1,17 +1,20 @@
 find_package(PkgConfig)
 pkg_check_modules(GTKMM gtkmm-4.0)
 
-include_directories(${GTKMM_INCLUDE_DIRS} ${CMAKE_CURRENT_LIST_DIR})
-link_directories(${GTKMM_LIBRARY_DIRS})
+target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
+  ${GTKMM_INCLUDE_DIRS} ${CMAKE_CURRENT_LIST_DIR})
+target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
+  ${GTKMM_LIBRARY_DIRS})
 
 # subsystems includes
 
-set(SOURCE_FILES main.cpp pch.hpp)
-add_executable(${CMAKE_PROJECT_NAME} ${SOURCE_FILES})
+target_sources(${CMAKE_PROJECT_NAME} PRIVATE
+  ${CMAKE_CURRENT_LIST_DIR}/main.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/pch.hpp)
 
 add_subdirectory(renderer)
-add_subdirectory(window_system)
 
 target_link_libraries(${CMAKE_PROJECT_NAME} ${GTKMM_LIBRARIES})
 
-target_precompile_headers(${CMAKE_PROJECT_NAME} PRIVATE pch.hpp)
+target_precompile_headers(${CMAKE_PROJECT_NAME} PRIVATE 
+  ${CMAKE_CURRENT_LIST_DIR}/pch.hpp)

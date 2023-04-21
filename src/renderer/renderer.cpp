@@ -1,7 +1,7 @@
 #include "renderer.hpp"
 
 // ter::application class defualt constructor (initializes vulkan instance, device ...)
-ter::application::application()
+ter::application::application( int argc, char **argv ) : window_system::application(argc, argv)
 {
   vk::ApplicationInfo app_info {
     /* name */           "First triangle",
