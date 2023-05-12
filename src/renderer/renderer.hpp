@@ -8,15 +8,18 @@
 
 namespace ter {
 class application : window_system::application {
+  friend class window_context;
+
 private:
   vk::Instance _instance;
   vk::Device _device;
+  vk::PhysicalDevice _phys_device;
 #if __DEBUG
   vk::DebugUtilsMessengerEXT _dbg_messenger;
 #endif
 
 public:
-  application(int argc, char **argv);
+  application();
   ~application();
 
   [[no_discard]] std::unique_ptr<command_unit> create_command_unit();

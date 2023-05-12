@@ -4,26 +4,26 @@
 #include "pch.hpp"
 #include "window_system/window.hpp"
 
-namespace ter
-{
-  class application;
+namespace ter {
+class application;
 
-  class window_context
-  {
-    friend class application;
+class window_context {
+  friend class application;
 
-  private:
-    vk::SwapchainKHR _swapchain;
-    vk::UniqueSurfaceKHR _surface;
+private:
+  inline static const uint32_t num_of_sc_images = 3;
 
-    window_context( window_system::window *window, vk::Instance instance );
+  vk::SwapchainKHR _swapchain;
+  vk::UniqueSurfaceKHR _surface;
+  std::array<vk::Image, num_of_sc_images> _sc_images;
 
-  public:
-    window_context( void ) = default;
+  window_context(window_system::window *window, const application &app);
 
-    void resize( size_t width, size_t height );
-  };
-}
+public:
+  window_context(void) = default;
+
+  void resize(size_t width, size_t height);
+};
+} // namespace ter
 
 #endif
-

@@ -1,4 +1,4 @@
 # cross-platform-app
 
-## a simple vulkan.hpp + gtkmm model renderer
+## a simple vulkan.hpp + glfw model renderer
 
