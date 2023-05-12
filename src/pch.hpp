@@ -1,30 +1,28 @@
-#if !defined(pch)
+#ifndef pch
 #define pch
 
 // libraries includes
-#include <functional>
 #include <algorithm>
+#include <array>
+#include <cassert>
+#include <deque>
 #include <exception>
 #include <execution>
-#include <iostream>
-#include <cassert>
-#include <ranges>
-#include <memory>
-#include <vector>
-#include <string>
-#include <thread>
+#include <functional>
 #include <future>
-#include <mutex>
-#include <array>
-#include <queue>
-#include <deque>
+#include <iostream>
 #include <list>
 #include <map>
+#include <memory>
+#include <mutex>
+#include <queue>
+#include <ranges>
 #include <set>
+#include <string>
+#include <thread>
+#include <vector>
 
 // user includes
-#include <gtkmm.h>
 #include <vulkan/vulkan.hpp>
 
-#define __DEBUG 0
-#endif
+#endif // __pch_

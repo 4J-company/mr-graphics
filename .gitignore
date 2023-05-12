@@ -34,3 +34,4 @@
 # Build files directory
 build/
 
+.cache/clangd/index

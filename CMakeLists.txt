@@ -4,6 +4,8 @@ project(cross-platform-app)
 set(CXX_STANDARD C++23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 set(ASSET_DIR bin)
 
 add_custom_target(copy_assets
