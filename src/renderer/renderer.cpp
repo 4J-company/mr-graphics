@@ -1,5 +1,4 @@
 #include "renderer.hpp"
-#include <GLFW/glfw3.h>
 
 // ter::application class defualt constructor (initializes vulkan instance,
 // device ...)
@@ -41,11 +40,6 @@ ter::application::application() {
       static_cast<uint32_t>(graphicsQueueFamilyIndex), 1, &queuePriority);
   _device = _phys_device.createDevice(
       vk::DeviceCreateInfo(vk::DeviceCreateFlags(), device_queue_ci));
-
-  // define extensions
-  // create physical device
-  // create logical device
-  // create queues (multiple ?)
 } // end of 'ter::application::application' function
 
 ter::application::~application() {

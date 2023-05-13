@@ -17,6 +17,7 @@ class window {
 private:
   size_t _width, _height;
   GLFWwindow *_window = nullptr;
+  std::thread _thread;
 
 public:
   window(size_t width, size_t height);

@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <cstdlib>
+#include <cstring>
 #include <deque>
 #include <exception>
 #include <execution>
@@ -26,5 +28,7 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 #include <vulkan/vulkan.hpp>
+
+#define __DEBUG 0
 
 #endif // __pch_

@@ -22,7 +22,7 @@ public:
   application();
   ~application();
 
-  [[no_discard]] std::unique_ptr<command_unit> create_command_unit();
+  [[nodiscard]] std::unique_ptr<command_unit> create_command_unit();
 };
 } // namespace ter
 

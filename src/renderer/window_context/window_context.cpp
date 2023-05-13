@@ -1,5 +1,4 @@
 #include "window_context.hpp"
-#include <vulkan/vulkan_handles.hpp>
 
 ter::window_context::window_context(window_system::window *window,
                                     const application &app) {
@@ -13,7 +12,7 @@ ter::window_context::window_context(window_system::window *window,
   std::vector<vk::SurfaceFormatKHR> formats =
       app._phys_device.getSurfaceFormatsKHR(surface_handle);
   assert(!formats.empty());
-  vk::Format format = (formats[0].format == vk::Format::eUndefined)
+  _swapchain_format = (formats[0].format == vk::Format::eUndefined)
                           ? vk::Format::eB8G8R8A8Unorm
                           : formats[0].format;
 
@@ -57,7 +56,8 @@ ter::window_context::window_context(window_system::window *window,
           : vk::CompositeAlphaFlagBitsKHR::eOpaque;
 
   vk::SwapchainCreateInfoKHR swapChainCreateInfo(
-      vk::SwapchainCreateFlagsKHR(), surface_handle, num_of_sc_images, format,
+      vk::SwapchainCreateFlagsKHR(), surface_handle,
+      framebuffer::num_of_presentable_images, _swapchain_format,
       vk::ColorSpaceKHR::eSrgbNonlinear, swapchainExtent, 1,
       vk::ImageUsageFlagBits::eColorAttachment, vk::SharingMode::eExclusive, {},
       preTransform, compositeAlpha, swapchainPresentMode, true, nullptr);
@@ -69,16 +69,27 @@ ter::window_context::window_context(window_system::window *window,
 
   _swapchain = app._device.createSwapchainKHR(swapChainCreateInfo);
 
-  std::vector<vk::Image> swapChainImages =
-      app._device.getSwapchainImagesKHR(_swapchain);
-
-  std::vector<vk::ImageView> imageViews;
-  imageViews.reserve(swapChainImages.size());
-  vk::ImageViewCreateInfo imageViewCreateInfo(
-      {}, {}, vk::ImageViewType::e2D, format, {},
-      {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
-  for (auto image : swapChainImages) {
-    imageViewCreateInfo.image = image;
-    imageViews.push_back(app._device.createImageView(imageViewCreateInfo));
-  }
+  std::memcpy(_framebuffer._swapchain_images.data(),
+              app._device.getSwapchainImagesKHR(_swapchain).data(),
+              framebuffer::num_of_presentable_images);
 }
+ter::framebuffer::framebuffer(const vk::Format &image_format,
+                              const vk::Device &device) {
+  vk::ImageViewCreateInfo imageViewCreateInfo(
+      {}, {}, vk::ImageViewType::e2D, image_format, {},
+      {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
+  std::array<int, framebuffer::num_of_presentable_images>
+      indexes; // indexes of images passed
+  std::iota(indexes.begin(), indexes.end(),
+            framebuffer::num_of_presentable_images); // filling indexes
+
+  std::for_each(std::execution::par, indexes.begin(), indexes.end(),
+                [=, &imageViewCreateInfo](int index) {
+                  // create image view
+                  imageViewCreateInfo.image = _swapchain_images[index];
+                  _swapchain_images_views[index] =
+                      device.createImageView(imageViewCreateInfo);
+                });
+}
+
+ter::framebuffer::~framebuffer() {}
