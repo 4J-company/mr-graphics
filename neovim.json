@@ -1,1 +1,0 @@
-{"cmake":{"target":"model-renderer","args":{"configure":["-D","CMAKE_EXPORT_COMPILE_COMMANDS=1","-G","Ninja"]},"build_dir":"{cwd}\/build\/{os}-{build_type}","cmd":"cmake","dap_name":"lldb","build_type":"Debug"},"cargo":{"dap_name":"lldb"}}
