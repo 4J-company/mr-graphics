@@ -25,8 +25,8 @@
 #include <vector>
 
 // user includes
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
+#include <CrossWindow/CrossWindow.h>
+#include <CrossWindow/Graphics.h>
 #include <vulkan/vulkan.hpp>
 
 #define __DEBUG 0
