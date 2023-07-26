@@ -31,4 +31,7 @@
 
 #define __DEBUG 0
 
+// WinAPI macros undefined
+#undef max(a,b)
+
 #endif // __pch_

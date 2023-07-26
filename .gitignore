@@ -33,5 +33,7 @@
 
 # Build files directory
 build/
+out/
+.vs/
 
 .cache/clangd/index
