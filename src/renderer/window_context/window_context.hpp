@@ -1,19 +1,21 @@
-#if !defined(wnd_ctx)
-#define wnd_ctx
+#if !defined(__window_context_hpp_)
+#define __window_context_hpp_
 
 #include "pch.hpp"
 #include "window_system/window.hpp"
 
-namespace ter {
+namespace ter 
+{
 class application;
 class window_context;
 
-class framebuffer {
+class framebuffer 
+{
   friend class window_context;
 
 public:
   inline static const uint32_t num_of_presentable_images = 3,
-                               num_of_gbuffers = 1;
+                               num_of_gbuffers = 1;                 
 
 private:
   std::array<vk::Image, num_of_presentable_images> _swapchain_images;
@@ -31,7 +33,8 @@ public:
   void resize(size_t width, size_t height);
 };
 
-class window_context {
+class window_context 
+{
   friend class application;
 
 private:
@@ -49,4 +52,4 @@ public:
   void resize(size_t width, size_t height);
 };
 } // namespace ter
-#endif
+#endif // __window_context_hpp_

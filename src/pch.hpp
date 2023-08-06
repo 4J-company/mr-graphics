@@ -1,5 +1,5 @@
-#ifndef pch
-#define pch
+#ifndef __pch_hpp_
+#define __pch_hpp_
 
 // libraries includes
 #include <algorithm>
@@ -25,13 +25,14 @@
 #include <vector>
 
 // user includes
+#define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
 #include <CrossWindow/CrossWindow.h>
 #include <CrossWindow/Graphics.h>
 #include <vulkan/vulkan.hpp>
 
-#define __DEBUG 0
+#define __DEBUG false
 
 // WinAPI macros undefined
 #undef max(a,b)
 
-#endif // __pch_
+#endif // __pch_hpp_
