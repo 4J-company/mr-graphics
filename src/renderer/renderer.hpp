@@ -1,5 +1,5 @@
-#if !defined(renderer)
-#define renderer
+#if !defined(__renderer_hpp_)
+#define __renderer_hpp_
 
 #include "pch.hpp"
 
@@ -26,4 +26,4 @@ public:
 };
 } // namespace ter
 
-#endif
+#endif // __renderer_hpp_

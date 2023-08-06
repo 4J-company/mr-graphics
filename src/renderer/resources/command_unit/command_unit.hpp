@@ -1,5 +1,5 @@
-#if !defined(cmd_unit)
-#define cmd_unit
+#if !defined(__command_unit_hpp_)
+#define __command_unit_hpp_
 
 #include "pch.hpp"
 
@@ -18,4 +18,4 @@ namespace ter
   };
 }
 
-#endif
+#endif // __command_unit_hpp_
