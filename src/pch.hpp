@@ -33,6 +33,6 @@
 #define __DEBUG false
 
 // WinAPI macros undefined
-#undef max(a,b)
+#undef max(a, b)
 
 #endif // __pch_hpp_

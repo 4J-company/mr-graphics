@@ -1,21 +1,29 @@
 #if !defined(__command_unit_hpp_)
-#define __command_unit_hpp_
+  #define __command_unit_hpp_
 
-#include "pch.hpp"
+  #include "pch.hpp"
 
 namespace ter
 {
-  class command_unit
+  class CommandUnit
   {
-    friend class application;
+    friend class Application;
 
   private:
     vk::CommandPool _cmd_pool;
     std::array<vk::CommandBuffer, 3> _cmd_buffer;
 
   public:
-    command_unit() = default;
+    CommandUnit() = default;
+    ~CommandUnit();
+
+    // move semantics
+    CommandUnit(CommandUnit &&other) noexcept = default;
+    CommandUnit &operator=(CommandUnit &&other) noexcept = default;
+
+    // record
+    void record(/* callable, args[] */);
   };
-}
+} // namespace ter
 
 #endif // __command_unit_hpp_

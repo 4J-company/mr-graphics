@@ -5,37 +5,37 @@
 
 namespace ter
 {
-  class window_context;
+  class WindowContext;
 } // namespace ter
 
 namespace window_system
 {
-  class application;
+  class Application;
 
-  class window
+  class Window
   {
-    friend class application;
-    friend class ter::window_context;
-    
+    friend class Application;
+    friend class ter::WindowContext;
+
   private:
     size_t _width, _height;
     xwin::Window _window;
     xwin::EventQueue _event_queue;
     std::thread _thread;
-    
+
   public:
-    window(size_t width, size_t height);
+    Window(size_t width, size_t height);
 
     xwin::Window *get_xwindow() { return &_window; }
-    
-    ~window();
+
+    ~Window();
   };
-  
-  class application
+
+  class Application
   {
   public:
-    application();
-    ~application();
+    Application();
+    ~Application();
   };
 } // namespace window_system
 #endif // __window_context_hpp_

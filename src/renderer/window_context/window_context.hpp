@@ -1,55 +1,32 @@
 #if !defined(__window_context_hpp_)
-#define __window_context_hpp_
+  #define __window_context_hpp_
 
-#include "pch.hpp"
-#include "window_system/window.hpp"
+  #include "pch.hpp"
+  #include "resources/resources.hpp"
+  #include "window_system/window.hpp"
 
-namespace ter 
+namespace ter
 {
-class application;
-class window_context;
+  class Application;
 
-class framebuffer 
-{
-  friend class window_context;
+  class WindowContext
+  {
+    friend class Application;
 
-public:
-  inline static const uint32_t num_of_presentable_images = 3,
-                               num_of_gbuffers = 1;                 
+  private:
+    vk::SwapchainKHR _swapchain;
+    vk::Format _swapchain_format;
+    vk::UniqueSurfaceKHR _surface;
 
-private:
-  std::array<vk::Image, num_of_presentable_images> _swapchain_images;
-  std::array<vk::ImageView, num_of_presentable_images> _swapchain_images_views;
+    Framebuffer _framebuffer;
 
-  std::array<vk::Image, num_of_gbuffers> _gbuffers;
-  std::array<vk::ImageView, num_of_gbuffers> _gbuffers_views;
+  public:
+    WindowContext(window_system::Window *window, const Application &app);
 
-public:
-  framebuffer() = default;
-  framebuffer(const vk::Format &image_format, const vk::Device &device);
+    WindowContext() = default;
+    ~WindowContext() = default;
 
-  ~framebuffer();
-
-  void resize(size_t width, size_t height);
-};
-
-class window_context 
-{
-  friend class application;
-
-private:
-  vk::SwapchainKHR _swapchain;
-  vk::Format _swapchain_format;
-  vk::UniqueSurfaceKHR _surface;
-
-  framebuffer _framebuffer;
-
-public:
-  window_context(window_system::window *window, const application &app);
-
-  window_context() = default;
-
-  void resize(size_t width, size_t height);
-};
+    void resize(size_t width, size_t height);
+  };
 } // namespace ter
 #endif // __window_context_hpp_
