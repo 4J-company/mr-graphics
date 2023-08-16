@@ -1,4 +1,3 @@
-#include "CrossWindow/Common/Event.h"
 #if !defined(__texture_hpp_)
   #define __texture_hpp_
 

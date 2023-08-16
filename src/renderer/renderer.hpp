@@ -16,7 +16,7 @@ namespace ter
     vk::Instance _instance;
     vk::Device _device;
     vk::PhysicalDevice _phys_device;
-  #if __DEBUG
+  #if DEBUG
     vk::DebugUtilsMessengerEXT _dbg_messenger;
   #endif
 

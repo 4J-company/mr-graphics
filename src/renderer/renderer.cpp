@@ -12,7 +12,7 @@ ter::Application::Application()
 
   _instance = vk::createInstance(inst_ci);
 
-#if __DEBUG
+#if DEBUG
   debugUtilsMessenger = _instance.createDebugUtilsMessengerEXT(vk::su::makeDebugUtilsMessengerCreateInfoEXT());
 #endif
 
@@ -39,7 +39,7 @@ ter::Application::Application()
 ter::Application::~Application()
 {
   _device.destroy();
-#if __DEBUG
+#if DEBUG
   _instance.destroyDebugUtilsMessengerEXT(_dbg_messenger);
 #endif
   _instance.destroy();

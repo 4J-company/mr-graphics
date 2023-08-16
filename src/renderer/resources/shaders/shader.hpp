@@ -1,5 +1,3 @@
-#include <vulkan/vulkan_handles.hpp>
-#include <vulkan/vulkan_structs.hpp>
 #if !defined(__shader_hpp_)
   #define __shader_hpp_
 

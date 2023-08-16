@@ -1,4 +1,3 @@
-#include "resources/texture/sampler/sampler.hpp"
 #if !defined(__descriptor_hpp_)
   #define __descriptor_hpp_
 
@@ -29,4 +28,4 @@ namespace ter
   };
 } // namespace ter
 
-#endif __descriptor_hpp_
+#endif // __descriptor_hpp_

@@ -1,5 +1,3 @@
-#include "CrossWindow/XCB/XCBWindow.h"
-#include "window_context.hpp"
 #if !defined(__framebuffer_hpp_)
   #define __framebuffer_hpp_
 

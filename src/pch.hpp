@@ -30,8 +30,6 @@
 #include <CrossWindow/Graphics.h>
 #include <vulkan/vulkan.hpp>
 
-#define __DEBUG false
-
 // WinAPI macros undefined
 #undef max(a, b)
 
