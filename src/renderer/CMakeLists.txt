@@ -37,5 +37,8 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
   ${CMAKE_CURRENT_LIST_DIR}/resources/texture/sampler/sampler.cpp
   ${CMAKE_CURRENT_LIST_DIR}/resources/texture/texture.hpp
   ${CMAKE_CURRENT_LIST_DIR}/resources/texture/texture.cpp
+
+  ${CMAKE_CURRENT_LIST_DIR}/timer/timer.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/timer/timer.cpp
  )
 target_precompile_headers(${CMAKE_PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_LIST_DIR}/renderer.hpp)

@@ -4,6 +4,7 @@
   #include "pch.hpp"
 
   #include "resources/resources.hpp"
+  #include "timer/timer.hpp"
   #include "window_context/window_context.hpp"
 
 namespace ter
