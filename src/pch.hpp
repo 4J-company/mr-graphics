@@ -37,10 +37,12 @@
 // WinAPI macros undefined
 #undef max(a, b)
 
+
 namespace ter 
 { 
   using uint = unsigned int; 
   using byte = unsigned char; 
 }
+
 
 #endif // __pch_hpp_
