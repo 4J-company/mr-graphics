@@ -1,7 +1,9 @@
-#if !defined(__image_hpp_)
-  #define __image_hpp_
+#ifndef __image_hpp_
+#define __image_hpp_
 
-  #include "pch.hpp"
+#include "pch.hpp"
+
+#include "vulkan_application.hpp"
 
 namespace ter
 {
@@ -26,12 +28,17 @@ namespace ter
     Image(Image &&other) = default;
     Image &operator=(Image &&other) = default;
 
-    Image(std::string_view filename);
-    Image(vk::Image image);
+    Image(VulkanApplication &va, uint width, uint height, vk::Format format, vk::Image image);
 
     void switch_layout(vk::ImageLayout layout);
     void copy_to_host() const;
     void get_pixel(const vk::Extent2D &coords) const;
+
+  private:
+    void craete_image_view(VulkanApplication &va);
+
+  public:
+    const vk::ImageView & get_image_view() const { return _image_view; }
   };
 } // namespace ter
 

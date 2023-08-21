@@ -25,14 +25,22 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <fstream>
 
 // user includes
 #define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
+#define VULKAN_HPP_NO_EXCEPTIONS
 #include <CrossWindow/CrossWindow.h>
 #include <CrossWindow/Graphics.h>
 #include <vulkan/vulkan.hpp>
 
 // WinAPI macros undefined
 #undef max(a, b)
+
+namespace ter 
+{ 
+  using uint = unsigned int; 
+  using byte = unsigned char; 
+}
 
 #endif // __pch_hpp_

@@ -14,19 +14,26 @@ namespace ter
     friend class Application;
 
   private:
+  public:
     vk::SwapchainKHR _swapchain;
     vk::Format _swapchain_format;
-    vk::UniqueSurfaceKHR _surface;
+    vk::SurfaceKHR _surface;
+    vk::Extent2D _extent;
 
-    Framebuffer _framebuffer;
+    std::array<Framebuffer, Framebuffer::max_presentable_images> _framebuffers;
+
+    window_system::Window *_window;
 
   public:
-    WindowContext(window_system::Window *window, const Application &app);
+    WindowContext(window_system::Window *window, Application &app);
+    void create_framebuffers(Application &app);
 
     WindowContext() = default;
     ~WindowContext() = default;
 
     void resize(size_t width, size_t height);
+
+    vk::Format get_swapchain_format() const { return _swapchain_format; }
   };
 } // namespace ter
 #endif // __window_context_hpp_
