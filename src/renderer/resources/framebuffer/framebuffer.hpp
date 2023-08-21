@@ -23,7 +23,8 @@ namespace ter
 
     vk::Framebuffer _framebuffer;
 
-    std::array<Image, max_presentable_images> _swapchain_images;
+    uint _width, _height;
+    Image _swapchain_image;
     std::array<Image, max_gbuffers> _gbuffers;
 
     Viewport _viewport;
@@ -32,10 +33,16 @@ namespace ter
     Framebuffer() = default;
     ~Framebuffer() = default;
 
+    Framebuffer(VulkanApplication &va, uint width, uint height, vk::Format swapchain_format, vk::Image image);
+
     Framebuffer(Framebuffer &&other) noexcept = default;
     Framebuffer &operator=(Framebuffer &&other) noexcept = default;
 
     void resize(size_t width, size_t height);
+
+    void set_viewport(vk::CommandBuffer cmd_buffer) const;
+
+    const vk::Framebuffer & get_framebuffer() const { return _framebuffer; }
   };
 } // namespace ter
 

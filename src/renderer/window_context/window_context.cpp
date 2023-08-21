@@ -1,33 +1,36 @@
 #include "window_context.hpp"
 
-ter::WindowContext::WindowContext(window_system::Window *window, const Application &app)
+ter::WindowContext::WindowContext(window_system::Window *window, Application &app) : _window(window)
 {
-  vk::Instance inst;
-  vk::SurfaceKHR surface_handle = xgfx::createSurface(window->get_xwindow(), inst);
+  /// REAL SHIT BELOW
+  app._window_contexts.push_back(this);
 
-  _surface = vk::UniqueSurfaceKHR(surface_handle);
+  _surface = xgfx::createSurface(window->get_xwindow(), app.get_instance());
 
   size_t universal_queue_family_id = 0;
 
-  std::vector<vk::SurfaceFormatKHR> formats = app._phys_device.getSurfaceFormatsKHR(surface_handle);
-  assert(!formats.empty());
+  std::vector<vk::SurfaceFormatKHR> formats;
+  vk::Result result;
+  std::tie(result, formats) = app._phys_device.getSurfaceFormatsKHR(_surface);
+  assert(result == vk::Result::eSuccess && !formats.empty());
   _swapchain_format = (formats[0].format == vk::Format::eUndefined) ? vk::Format::eB8G8R8A8Unorm : formats[0].format;
 
-  vk::SurfaceCapabilitiesKHR surface_capabilities = app._phys_device.getSurfaceCapabilitiesKHR(surface_handle);
-  vk::Extent2D swapchain_extent;
-  if (surface_capabilities.currentExtent.width == std::numeric_limits<uint32_t>::max())
+  vk::SurfaceCapabilitiesKHR surface_capabilities;
+  std::tie(result, surface_capabilities) = app._phys_device.getSurfaceCapabilitiesKHR(_surface);
+  assert(result == vk::Result::eSuccess);
+  if (surface_capabilities.currentExtent.width == std::numeric_limits<uint>::max())
   {
     // If the surface size is undefined, the size is set to the size of the
     // images requested.
-    swapchain_extent.width =
+    _extent.width =
         std::clamp(static_cast<uint32_t>(window->_width), surface_capabilities.minImageExtent.width,
                    surface_capabilities.maxImageExtent.width);
-    swapchain_extent.height =
+    _extent.height =
         std::clamp(static_cast<uint32_t>(window->_height), surface_capabilities.minImageExtent.height,
                    surface_capabilities.maxImageExtent.height);
   }
   else // If the surface size is defined, the swap chain size must match
-    swapchain_extent = surface_capabilities.currentExtent;
+    _extent = surface_capabilities.currentExtent;
 
   // The FIFO present mode is guaranteed by the spec to be supported
   vk::PresentModeKHR swapchain_present_mode = vk::PresentModeKHR::eMailbox;
@@ -46,30 +49,41 @@ ter::WindowContext::WindowContext(window_system::Window *window, const Applicati
       ? vk::CompositeAlphaFlagBitsKHR::eInherit
       : vk::CompositeAlphaFlagBitsKHR::eOpaque;
 
-  vk::SwapchainCreateInfoKHR swapchain_create_info {.flags = {},
-                                                    .surface = surface_handle,
-                                                    .minImageCount = Framebuffer::max_presentable_images,
-                                                    .imageFormat = _swapchain_format,
-                                                    .imageColorSpace = vk::ColorSpaceKHR::eSrgbNonlinear,
-                                                    .imageExtent = swapchain_extent,
-                                                    .imageArrayLayers = 1,
-                                                    .imageUsage = vk::ImageUsageFlagBits::eColorAttachment,
-                                                    .imageSharingMode = vk::SharingMode::eExclusive,
-                                                    .queueFamilyIndexCount = {},
-                                                    .pQueueFamilyIndices = {},
-                                                    .preTransform = pre_transform,
-                                                    .compositeAlpha = composite_alpha,
-                                                    .presentMode = swapchain_present_mode,
-                                                    .clipped = true,
-                                                    .oldSwapchain = nullptr};
+  /// _swapchain_format = vk::Format::eB8G8R8A8Srgb; // ideal, we have eB8G8R8A8Unorm
+  vk::SwapchainCreateInfoKHR swapchain_create_info
+  {
+    .flags = {},
+    .surface = _surface,
+    .minImageCount = Framebuffer::max_presentable_images,
+    .imageFormat = _swapchain_format,
+    .imageColorSpace = vk::ColorSpaceKHR::eSrgbNonlinear,
+    .imageExtent = _extent,
+    .imageArrayLayers = 1,
+    .imageUsage = vk::ImageUsageFlagBits::eColorAttachment,
+    .imageSharingMode = vk::SharingMode::eExclusive,
+    .queueFamilyIndexCount = {},
+    .pQueueFamilyIndices = {},
+    .preTransform = pre_transform,
+    .compositeAlpha = composite_alpha,
+    .presentMode = swapchain_present_mode,
+    .clipped = true,
+    .oldSwapchain = nullptr
+  };
 
   uint32_t indeces[1] {static_cast<uint32_t>(universal_queue_family_id)};
-
   swapchain_create_info.queueFamilyIndexCount = 1;
   swapchain_create_info.pQueueFamilyIndices = indeces;
 
-  _swapchain = app._device.createSwapchainKHR(swapchain_create_info);
+  std::tie(result, _swapchain) = app._device.createSwapchainKHR(swapchain_create_info);
+  assert(result == vk::Result::eSuccess);
+}
 
-  std::memcpy(_framebuffer._swapchain_images.data(), app._device.getSwapchainImagesKHR(_swapchain).data(),
-              Framebuffer::max_presentable_images);
+void ter::WindowContext::create_framebuffers(Application &app)
+{
+  vk::Result result;
+  std::vector<vk::Image> swampchain_images;
+  std::tie(result, swampchain_images) = app._device.getSwapchainImagesKHR(_swapchain);
+
+  for (uint i = 0; i < Framebuffer::max_presentable_images; i++)
+    _framebuffers[i] = Framebuffer(app, _extent.width, _extent.height, _swapchain_format, swampchain_images[i]);
 }

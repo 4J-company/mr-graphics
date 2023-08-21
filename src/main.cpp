@@ -5,6 +5,10 @@ void xmain(int argc, const char **argv)
 {
   ter::Application App;
 
-  auto a = std::make_unique<window_system::Window>(800, 600);
-  auto b = std::make_unique<ter::WindowContext>(a.get(), App);
+  auto wnd = std::make_unique<window_system::Window>(800, 600);
+  auto wnd_ctx = std::make_unique<ter::WindowContext>(wnd.get(), App);
+
+  // TMP theme
+  App.create_render_resourses();
+  while (true) App.render();
 }
