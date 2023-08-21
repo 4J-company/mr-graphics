@@ -58,7 +58,7 @@ namespace ter
     void compile();
 
     // load sources
-    std::vector<byte> load(uint shd);
+    std::vector<char> load(uint shd); // TODO : byte type on linux
 
   public:
     std::array<vk::PipelineShaderStageCreateInfo, max_shader_modules> & get_stages() { return _stages; }

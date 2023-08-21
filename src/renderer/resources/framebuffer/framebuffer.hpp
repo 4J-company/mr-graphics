@@ -1,15 +1,15 @@
 #if !defined(__framebuffer_hpp_)
-  #define __framebuffer_hpp_
+#define __framebuffer_hpp_
 
-  #include "pch.hpp"
-  #include "resources/images/image.hpp"
+#include "pch.hpp"
+#include "resources/images/image.hpp"
 
 namespace ter
 {
   struct Viewport
   {
-    vk::Viewport viewport;
-    vk::Rect2D scissors;
+    vk::Viewport viewport {};
+    vk::Rect2D scissors {};
   };
 
   class WindowContext;

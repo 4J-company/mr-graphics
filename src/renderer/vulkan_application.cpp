@@ -3,13 +3,13 @@
 VKAPI_ATTR VkBool32 VKAPI_CALL ter::VulkanApplication::DebugCallback( VkDebugUtilsMessageSeverityFlagBitsEXT MessageSeverity,
                                                                       VkDebugUtilsMessageTypeFlagsEXT MessageType,
                                                                       const VkDebugUtilsMessengerCallbackDataEXT *CallbackData,
-                                                                      VOID *UserData )
+                                                                      void *UserData )
 {
   if (MessageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
   {
-    SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 12);
+    // SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 12);
     std::cout << "validation layer: " << CallbackData->pMessage << '\n' << std::endl;
-    SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 7);
+    // SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 7);
   }
   return VK_FALSE;
 }
@@ -17,10 +17,15 @@ VKAPI_ATTR VkBool32 VKAPI_CALL ter::VulkanApplication::DebugCallback( VkDebugUti
 // ter::application class defualt constructor (initializes vulkan instance, device ...)
 ter::VulkanApplication::VulkanApplication()
 {
-  std::vector<const CHAR *> extension_names;
-  std::vector<const CHAR *> layers_names;
+  std::vector<const char *> extension_names;
+  std::vector<const char *> layers_names;
   extension_names.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
+
+#ifdef WIN_32
   extension_names.push_back(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
+#else
+  extension_names.push_back(VK_KHR_XCB_SURFACE_EXTENSION_NAME);
+#endif
 
   if constexpr (1) 
   {

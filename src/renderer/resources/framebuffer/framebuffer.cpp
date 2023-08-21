@@ -28,8 +28,9 @@ ter::Framebuffer::Framebuffer(VulkanApplication &va, uint width, uint height, vk
   _viewport.viewport.minDepth = 0.0f;
   _viewport.viewport.maxDepth = 1.0f;
 
-  _viewport.scissors.offset = {0, 0};
-  _viewport.scissors.extent = {width, height};
+  // memset(&_viewport.scissors.offset, 0, sizeof(vk::Offset2D));
+  _viewport.scissors.offset.setX(0).setY(0);
+  _viewport.scissors.extent.setWidth(width).setHeight(height);
 }
 
 void ter::Framebuffer::set_viewport(vk::CommandBuffer cmd_buffer) const

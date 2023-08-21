@@ -15,10 +15,10 @@ ter::Shader::Shader(VulkanApplication &va, std::string_view filename) : _path(fi
   std::array<int, max_shader_modules> shd_types;
   std::iota(shd_types.begin(), shd_types.end(), 0);
 
-  for_each(std::execution::seq, shd_types.begin(), shd_types.end(), 
-    [&]( INT shd )
+  std::for_each(std::execution::seq, shd_types.begin(), shd_types.end(), 
+    [&]( int shd )
     {
-      auto sourse = load(shd);
+      std::vector<char> sourse = load(shd);
       if (sourse.size() == 0)
         return;
 
@@ -49,7 +49,7 @@ ter::Shader::~Shader()
 
 void ter::Shader::compile() {}
 
-std::vector<byte> ter::Shader::load(uint shd)
+std::vector<char> ter::Shader::load(uint shd)
 {
   std::string project_path = "Z:/megarender2/"; /// TODO : project path
 
@@ -70,6 +70,7 @@ std::vector<byte> ter::Shader::load(uint shd)
       auto file_glsl = project_path + ShaderDir + "shader." + ShaderType;
       auto file_spv = project_path + ShaderDir + ShaderType + ".spv";
 
+      /*
       // Get files data
       struct stat stat_glsl, stat_spv, stat_includes;
       stat(file_glsl.c_str(), &stat_glsl);
@@ -79,10 +80,11 @@ std::vector<byte> ter::Shader::load(uint shd)
       // Compile shader if it was updated
       if (is_file_present(file_glsl) && ((stat_glsl.st_mtime > stat_spv.st_mtime) || (stat_includes.st_mtime > stat_spv.st_mtime))) // compute shader present & updated
         execute_cmd("X:\\VulkanSDK\\Bin\\glslc -Ibin/shaders/includes " + file_glsl + " -o " + file_spv + "\n");
+      */
     };
   std::string shader_dir = "bin/shaders/" + _path + '/';
 
-  static const CHAR *shader_type_names[] = { "vert", "frag", "geom", "tesc", "tese", "comp" };
+  static const char *shader_type_names[] = { "vert", "frag", "geom", "tesc", "tese", "comp" };
   std::string file_type = shader_type_names[shd];
 
   /// compile_shd(shader_dir, file_type); TODO : compile  
@@ -95,8 +97,8 @@ std::vector<byte> ter::Shader::load(uint shd)
   /// if (file_type == "tesc" || file_type == "tese")
   ///   IsTessStageActive = TRUE;
 
-  INT len = (INT)shader_file.tellg();
-  std::vector<byte> sourse(len);
+  int len = (int)shader_file.tellg();
+  std::vector<char> sourse(len);
   shader_file.seekg(0);
   shader_file.read(reinterpret_cast<char *>(sourse.data()), len);
   shader_file.close();

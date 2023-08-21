@@ -38,7 +38,7 @@ namespace ter
     static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback( VkDebugUtilsMessageSeverityFlagBitsEXT MessageSeverity,
                                                           VkDebugUtilsMessageTypeFlagsEXT MessageType,
                                                           const VkDebugUtilsMessengerCallbackDataEXT *CallbackData,
-                                                          VOID *UserData );
+                                                          void *UserData );
   };
 }
 
