@@ -5,7 +5,7 @@
 
 namespace ter
 {
-  class ComputePipeline : Pipeline
+  class ComputePipeline : public Pipeline
   {
   private:
     uint32_t _subpass;

@@ -3,8 +3,8 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_LIST_DI
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE 
   ${CMAKE_CURRENT_LIST_DIR}/window_context/window_context.cpp 
   ${CMAKE_CURRENT_LIST_DIR}/window_context/window_context.hpp
-  ${CMAKE_CURRENT_LIST_DIR}/window_context/window_system/window.cpp
-  ${CMAKE_CURRENT_LIST_DIR}/window_context/window_system/window.hpp)
+  ${CMAKE_CURRENT_LIST_DIR}/window_context/window.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/window_context/window.hpp)
 target_precompile_headers(${CMAKE_PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_LIST_DIR}/window_context/window_context.hpp)
 
 # render resources files
@@ -12,9 +12,6 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_LIST_DI
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE 
   ${CMAKE_CURRENT_LIST_DIR}/renderer.cpp 
   ${CMAKE_CURRENT_LIST_DIR}/renderer.hpp
-
-  ${CMAKE_CURRENT_LIST_DIR}/vulkan_application.cpp 
-  ${CMAKE_CURRENT_LIST_DIR}/vulkan_application.hpp
 
   ${CMAKE_CURRENT_LIST_DIR}/resources/attachment/attachment.hpp
   ${CMAKE_CURRENT_LIST_DIR}/resources/attachment/attachment.cpp

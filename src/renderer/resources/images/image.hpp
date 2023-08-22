@@ -28,17 +28,17 @@ namespace ter
     Image(Image &&other) = default;
     Image &operator=(Image &&other) = default;
 
-    Image(VulkanApplication &va, uint width, uint height, vk::Format format, vk::Image image);
+    Image(VulkanState state, uint width, uint height, vk::Format format, vk::Image image);
 
     void switch_layout(vk::ImageLayout layout);
     void copy_to_host() const;
     void get_pixel(const vk::Extent2D &coords) const;
 
   private:
-    void craete_image_view(VulkanApplication &va);
+    void craete_image_view(VulkanState state);
 
   public:
-    const vk::ImageView & get_image_view() const { return _image_view; }
+    const vk::ImageView &image_view() const { return _image_view; }
   };
 } // namespace ter
 

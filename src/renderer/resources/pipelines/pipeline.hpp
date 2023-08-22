@@ -1,10 +1,11 @@
+#include <vulkan/vulkan_handles.hpp>
 #if !defined(__pipeline_hpp_)
-#define __pipeline_hpp_
+  #define __pipeline_hpp_
 
-#include "pch.hpp"
-#include "resources/attachment/attachment.hpp"
-#include "resources/shaders/shader.hpp"
-#include "vulkan_application.hpp"
+  #include "pch.hpp"
+  #include "resources/attachment/attachment.hpp"
+  #include "resources/shaders/shader.hpp"
+  #include "vulkan_application.hpp"
 
 namespace ter
 {
@@ -22,6 +23,9 @@ namespace ter
   public:
     Pipeline() = default;
     ~Pipeline();
+
+    vk::Pipeline pipeline() const { return _pipeline; }
+    vk::PipelineLayout layout() const { return _layout; }
 
     virtual void apply(vk::CommandBuffer cmd_buffer) const;
   };

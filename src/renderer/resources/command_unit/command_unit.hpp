@@ -1,27 +1,24 @@
+#include <vulkan/vulkan_handles.hpp>
 #if !defined(__command_unit_hpp_)
-#define __command_unit_hpp_
+  #define __command_unit_hpp_
 
-#include "pch.hpp"
+  #include "pch.hpp"
 
-#include "vulkan_application.hpp"
+  #include "vulkan_application.hpp"
 
 namespace ter
 {
   class CommandUnit
   {
-    friend class Application;
-
   private:
-  public:
     vk::CommandPool _cmd_pool;
-    // std::array<vk::CommandBuffer, 3> _cmd_buffers;
     vk::CommandBuffer _cmd_buffer;
 
   public:
     CommandUnit() = default;
     ~CommandUnit();
 
-    CommandUnit(VulkanApplication &va);
+    CommandUnit(VulkanState va);
 
     // move semantics
     CommandUnit(CommandUnit &&other) noexcept = default;
@@ -29,8 +26,10 @@ namespace ter
 
     void begin();
     void end();
-    // record
-    void record(/* callable, args[] */);
+
+    std::tuple<vk::CommandBuffer *, uint> submit_info() { return {&_cmd_buffer, 1}; }
+
+    vk::CommandBuffer *operator->() { return &_cmd_buffer; }
   };
 } // namespace ter
 

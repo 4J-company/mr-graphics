@@ -12,6 +12,8 @@
 #include <deque>
 #include <exception>
 #include <execution>
+#include <filesystem>
+#include <fstream>
 #include <functional>
 #include <future>
 #include <iostream>
@@ -25,7 +27,6 @@
 #include <string>
 #include <thread>
 #include <vector>
-#include <fstream>
 
 // user includes
 #define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
@@ -37,12 +38,10 @@
 // WinAPI macros undefined
 #undef max(a, b)
 
-
-namespace ter 
-{ 
-  using uint = unsigned int; 
-  using byte = unsigned char; 
-}
-
+namespace ter
+{
+  using uint = unsigned int;
+  using byte = unsigned char;
+} // namespace ter
 
 #endif // __pch_hpp_

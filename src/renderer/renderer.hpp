@@ -1,46 +1,38 @@
 #if !defined(__renderer_hpp_)
-#define __renderer_hpp_
+  #define __renderer_hpp_
 
-#include "pch.hpp"
+  #include "pch.hpp"
 
-#include "vulkan_application.hpp"
-#include "resources/resources.hpp"
-#include "timer/timer.hpp"
-#include "window_context/window_context.hpp"
+  #include "resources/resources.hpp"
+  #include "timer/timer.hpp"
+  #include "vulkan_application.hpp"
+  #include "window_context/window.hpp"
 
 namespace ter
 {
-  class Application : public window_system::Application, public VulkanApplication
+  class Application : private wnd::Application
   {
+  private:
+    VulkanState state;
+
   public:
-    friend class WindowContext;
-
-    CommandUnit _cmd_unit;
-    std::vector<WindowContext *> _window_contexts;
-
     Application();
     ~Application();
 
-    [[nodiscard]] std::unique_ptr<CommandUnit> create_command_unit();
-    [[nodiscard]] std::unique_ptr<Buffer> create_buffer();
+    // resource creators
+    [[nodiscard]] std::unique_ptr<CommandUnit> create_command_unit() const;
+    [[nodiscard]] std::unique_ptr<Buffer> create_buffer() const;
+    [[nodiscard]] std::unique_ptr<Shader> create_shader() const;
+    [[nodiscard]] std::unique_ptr<Pipeline> create_graphics_pipeline() const;
+    [[nodiscard]] std::unique_ptr<Pipeline> create_compute_pipeline() const;
 
-    vk::Instance & get_instance() { return _instance; }
+    // window creator
+    [[nodiscard]] std::unique_ptr<wnd::Window> create_window(size_t width, size_t height) const;
 
     /// REAL SHIT BELOW
-    Shader _shader;
-    GraphicsPipeline _pipeline;
-
     vk::Semaphore _image_available_semaphore;
     vk::Semaphore _render_rinished_semaphore;
     vk::Fence _fence;
-
-    void create_render_resourses();
-    void render();
-  };
-
-  class triangle_redner
-  {
-  public:
   };
 } // namespace ter
 
