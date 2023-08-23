@@ -6,7 +6,7 @@
   #include "resources/images/image.hpp"
   #include "resources/texture/sampler/sampler.hpp"
 
-namespace ter
+namespace mr
 {
   class Descriptor
   {
@@ -26,6 +26,6 @@ namespace ter
 
     void apply();
   };
-} // namespace ter
+} // namespace mr
 
 #endif // __descriptor_hpp_

@@ -2,7 +2,7 @@
 #include <filesystem>
 #include <fstream>
 
-ter::Shader::Shader(VulkanState state, std::string_view filename) : _path(filename)
+mr::Shader::Shader(VulkanState state, std::string_view filename) : _path(filename)
 {
   static const vk::ShaderStageFlagBits stage_bits[] = {vk::ShaderStageFlagBits::eVertex,
                                                        vk::ShaderStageFlagBits::eFragment,
@@ -35,20 +35,20 @@ ter::Shader::Shader(VulkanState state, std::string_view filename) : _path(filena
 }
 
 /*
-ter::Shader::~Shader()
+mr::Shader::~Shader()
 {
   /// TODO: destroy shader modules
 }
 */
 
-void ter::Shader::compile(ShaderStages stage)
+void mr::Shader::compile(ShaderStages stage)
 {
   static const char *shader_type_names[] = {"vert", "frag", "geom", "tesc", "tese", "comp"};
   std::string stage_type = shader_type_names[(int)stage];
   std::system(("glslc *." + stage_type + " -o " + stage_type + ".spv").c_str());
 }
 
-std::vector<char> ter::Shader::load(ShaderStages stage)
+std::vector<char> mr::Shader::load(ShaderStages stage)
 {
   static const char *shader_type_names[] = {"vert", "frag", "geom", "tesc", "tese", "comp"};
   std::filesystem::path stage_file_path = _path;
@@ -67,4 +67,4 @@ std::vector<char> ter::Shader::load(ShaderStages stage)
   return source;
 }
 
-void ter::Shader::reload() {}
+void mr::Shader::reload() {}

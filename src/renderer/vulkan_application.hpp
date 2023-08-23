@@ -4,7 +4,7 @@
 
   #include "pch.hpp"
 
-namespace ter
+namespace mr
 {
   class VulkanState
   {
@@ -24,6 +24,6 @@ namespace ter
     vk::RenderPass render_pass() const { return _render_pass; }
     vk::Queue queue() const { return _queue; }
   };
-} // namespace ter
+} // namespace mr
 
 #endif // __vulkan_application_hpp_

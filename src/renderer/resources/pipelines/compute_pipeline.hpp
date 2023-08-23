@@ -3,7 +3,7 @@
 
   #include "resources/pipelines/pipeline.hpp"
 
-namespace ter
+namespace mr
 {
   class ComputePipeline : public Pipeline
   {
@@ -22,5 +22,5 @@ namespace ter
     ComputePipeline(ComputePipeline &&other) noexcept = default;
     ComputePipeline &operator=(ComputePipeline &&other) noexcept = default;
   };
-} // namespace ter
+} // namespace mr
 #endif // __compute_pipeline_hpp_

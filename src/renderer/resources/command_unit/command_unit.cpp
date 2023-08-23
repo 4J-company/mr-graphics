@@ -1,9 +1,9 @@
 #include "resources/command_unit/command_unit.hpp"
 
 // destructor
-ter::CommandUnit::~CommandUnit() {}
+mr::CommandUnit::~CommandUnit() {}
 
-ter::CommandUnit::CommandUnit(VulkanState state)
+mr::CommandUnit::CommandUnit(VulkanState state)
 {
   vk::CommandPoolCreateInfo pool_create_info {
       .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
@@ -20,14 +20,11 @@ ter::CommandUnit::CommandUnit(VulkanState state)
   state.device().allocateCommandBuffers(&cmd_buffer_alloc_info, &_cmd_buffer);
 }
 
-void ter::CommandUnit::begin()
+void mr::CommandUnit::begin()
 {
   _cmd_buffer.reset();
   vk::CommandBufferBeginInfo begin_info {}; /// .flags = 0, .pInheritanceInfo = nullptr, };
   _cmd_buffer.begin(begin_info);
 }
 
-void ter::CommandUnit::end()
-{
-  _cmd_buffer.end();
-}
+void mr::CommandUnit::end() { _cmd_buffer.end(); }

@@ -1,6 +1,6 @@
 #include "resources/pipelines/graphics_pipeline.hpp"
 
-ter::GraphicsPipeline::GraphicsPipeline(VulkanState state, Shader *shader)
+mr::GraphicsPipeline::GraphicsPipeline(VulkanState state, Shader *shader)
 {
   _shader = shader;
 
@@ -72,7 +72,7 @@ ter::GraphicsPipeline::GraphicsPipeline(VulkanState state, Shader *shader)
   _layout = state.device().createPipelineLayout(pipeline_layout_create_info).value;
 
   vk::GraphicsPipelineCreateInfo pipeline_create_info {
-       // .stageCount = static_cast<uint>(_shader->get_stages().size()),
+      // .stageCount = static_cast<uint>(_shader->get_stages().size()),
       .stageCount = _shader->stage_number(),
       .pStages = _shader->get_stages().data(),
       .pVertexInputState = &vertex_input_create_info,
@@ -95,9 +95,9 @@ ter::GraphicsPipeline::GraphicsPipeline(VulkanState state, Shader *shader)
   _pipeline = pipelines[0];
 }
 
-void ter::GraphicsPipeline::apply(vk::CommandBuffer cmd_buffer) const
+void mr::GraphicsPipeline::apply(vk::CommandBuffer cmd_buffer) const
 {
   cmd_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics, _pipeline);
 }
 
-void ter::GraphicsPipeline::recompile() {}
+void mr::GraphicsPipeline::recompile() {}

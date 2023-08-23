@@ -5,7 +5,7 @@
 
   #include "vulkan_application.hpp"
 
-namespace ter
+namespace mr
 {
   class Shader
   {
@@ -65,6 +65,6 @@ namespace ter
     std::array<vk::PipelineShaderStageCreateInfo, max_shader_modules> &get_stages() { return _stages; }
     uint stage_number() { return _num_of_loaded_shaders; }
   };
-} // namespace ter
+} // namespace mr
 
 #endif // __shader_hpp_

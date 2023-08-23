@@ -3,7 +3,7 @@
 #include "resources/command_unit/command_unit.hpp"
 #include "resources/pipelines/graphics_pipeline.hpp"
 
-ter::WindowContext::WindowContext(wnd::Window *parent, VulkanState state) : _parent(parent)
+mr::WindowContext::WindowContext(wnd::Window *parent, VulkanState state) : _parent(parent)
 {
   _surface = xgfx::createSurface(_parent->xwindow_ptr(), state.instance());
 
@@ -82,7 +82,7 @@ ter::WindowContext::WindowContext(wnd::Window *parent, VulkanState state) : _par
   _swapchain = state.device().createSwapchainKHR(swapchain_create_info).value;
 }
 
-void ter::WindowContext::create_framebuffers(VulkanState state)
+void mr::WindowContext::create_framebuffers(VulkanState state)
 {
   std::vector<vk::Image> swampchain_images;
   swampchain_images = state.device().getSwapchainImagesKHR(_swapchain).value;
@@ -91,7 +91,7 @@ void ter::WindowContext::create_framebuffers(VulkanState state)
     _framebuffers[i] = Framebuffer(state, _extent.width, _extent.height, _swapchain_format, swampchain_images[i]);
 }
 
-void ter::WindowContext::render()
+void mr::WindowContext::render()
 {
   static CommandUnit command_unit {state};
   static vk::Semaphore _image_available_semaphore;
@@ -103,14 +103,14 @@ void ter::WindowContext::render()
   state.device().waitForFences(_fence, VK_TRUE, UINT64_MAX);
   state.device().resetFences(_fence);
 
-  ter::uint image_index = 0;
+  mr::uint image_index = 0;
 
   state.device().acquireNextImageKHR(_swapchain, UINT64_MAX, _image_available_semaphore, nullptr, &image_index);
 
   command_unit.begin();
 
   vk::ClearValue clear_color;
-  clear_color.setColor(vk::ClearColorValue(std::array<float, 4ULL>{0.f, 0.f, 0.f, 1.f})); // don't compile otherwise
+  clear_color.setColor(vk::ClearColorValue(std::array<float, 4ULL> {0.f, 0.f, 0.f, 1.f})); // don't compile otherwise
 
   vk::RenderPassBeginInfo render_pass_info {
       .renderPass = state.render_pass(),

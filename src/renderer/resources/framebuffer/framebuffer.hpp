@@ -5,7 +5,7 @@
   #include "pch.hpp"
   #include "resources/images/image.hpp"
 
-namespace ter
+namespace mr
 {
   struct Viewport
   {
@@ -45,6 +45,6 @@ namespace ter
     vk::Viewport viewport() const { return _viewport.viewport; }
     vk::Rect2D scissors() const { return _viewport.scissors; }
   };
-} // namespace ter
+} // namespace mr
 
 #endif // __framebuffer_hpp_

@@ -3,7 +3,7 @@
 
 void xmain(int argc, const char **argv)
 {
-  ter::Application App;
+  mr::Application App;
 
   auto wnd = App.create_window(800, 600);
 

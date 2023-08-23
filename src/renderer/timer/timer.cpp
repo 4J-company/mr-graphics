@@ -2,7 +2,7 @@
 
 /* Update timer data */
 
-template <std::floating_point T> void ter::Timer<T>::update()
+template <std::floating_point T> void mr::Timer<T>::update()
 {
   _global_time =
       std::chrono::duration<T>(std::chrono::high_resolution_clock::now().time_since_epoch()).count() - _init_time;

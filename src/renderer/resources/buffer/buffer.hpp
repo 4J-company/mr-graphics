@@ -3,7 +3,7 @@
 
   #include "pch.hpp"
 
-namespace ter
+namespace mr
 {
   class Buffer
   {
@@ -33,6 +33,6 @@ namespace ter
     // find memory tppe
     static uint32_t find_memory_type(uint32_t filter, vk::MemoryPropertyFlags properties);
   };
-} // namespace ter
+} // namespace mr
 
 #endif // __buffer_hpp_

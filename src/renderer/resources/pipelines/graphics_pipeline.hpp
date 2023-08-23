@@ -3,7 +3,7 @@
 
 #include "resources/pipelines/pipeline.hpp"
 
-namespace ter
+namespace mr
 {
   class GraphicsPipeline : public Pipeline
   {
@@ -31,5 +31,5 @@ namespace ter
 
     void apply(vk::CommandBuffer cmd_buffer) const override;
   };
-} // namespace ter
+} // namespace mr
 #endif // __graphics_pipeline_hpp_

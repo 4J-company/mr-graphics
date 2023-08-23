@@ -39,10 +39,10 @@
 // WinAPI macros undefined :(
 #undef max(a, b)
 
-namespace ter
+namespace mr
 {
   using uint = unsigned int;
   using byte = unsigned char;
-} // namespace ter
+} // namespace mr
 
 #endif // __pch_hpp_

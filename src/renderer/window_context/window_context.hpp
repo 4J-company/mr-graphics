@@ -11,7 +11,7 @@ namespace wnd
   class Window;
 } // namespace wnd
 
-namespace ter
+namespace mr
 {
   class WindowContext
   {
@@ -38,5 +38,5 @@ namespace ter
     void resize(size_t width, size_t height);
     void render();
   };
-} // namespace ter
+} // namespace mr
 #endif // __window_context_hpp_

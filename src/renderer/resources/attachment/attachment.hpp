@@ -1,7 +1,7 @@
 #if !defined(__attachment_hpp_)
   #define __attachment_hpp_
 
-namespace ter
+namespace mr
 {
   class Buffer;
   class Image;
@@ -31,6 +31,6 @@ namespace ter
     uint32_t offset;
     vk::ShaderStageFlags usage_flags;
   };
-} // namespace ter
+} // namespace mr
 
 #endif // __attachment_hpp_

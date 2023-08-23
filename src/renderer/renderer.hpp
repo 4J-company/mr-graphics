@@ -8,7 +8,7 @@
   #include "vulkan_application.hpp"
   #include "window_context/window.hpp"
 
-namespace ter
+namespace mr
 {
   class Application : private wnd::Application
   {
@@ -34,6 +34,6 @@ namespace ter
     vk::Semaphore _render_rinished_semaphore;
     vk::Fence _fence;
   };
-} // namespace ter
+} // namespace mr
 
 #endif // __renderer_hpp_
