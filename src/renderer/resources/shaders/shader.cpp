@@ -1,41 +1,35 @@
 #include "resources/shaders/shader.hpp"
+#include <filesystem>
+#include <fstream>
 
-ter::Shader::Shader(VulkanApplication &va, std::string_view filename) : _path(filename)
+ter::Shader::Shader(VulkanState state, std::string_view filename) : _path(filename)
 {
-  static const vk::ShaderStageFlagBits stage_bits[] =
-  {
-    vk::ShaderStageFlagBits::eVertex,
-    vk::ShaderStageFlagBits::eFragment,
-    vk::ShaderStageFlagBits::eGeometry,
-    vk::ShaderStageFlagBits::eTessellationControl,
-    vk::ShaderStageFlagBits::eTessellationEvaluation,
-    vk::ShaderStageFlagBits::eCompute
-  };
+  static const vk::ShaderStageFlagBits stage_bits[] = {vk::ShaderStageFlagBits::eVertex,
+                                                       vk::ShaderStageFlagBits::eFragment,
+                                                       vk::ShaderStageFlagBits::eGeometry,
+                                                       vk::ShaderStageFlagBits::eTessellationControl,
+                                                       vk::ShaderStageFlagBits::eTessellationEvaluation,
+                                                       vk::ShaderStageFlagBits::eCompute};
 
   std::array<int, max_shader_modules> shd_types;
   std::iota(shd_types.begin(), shd_types.end(), 0);
 
-  std::for_each(std::execution::seq, shd_types.begin(), shd_types.end(), 
-    [&]( int shd )
-    {
-      std::vector<char> sourse = load(shd);
-      if (sourse.size() == 0)
-        return;
+  std::for_each(std::execution::seq, shd_types.begin(), shd_types.end(), [&](int shd) {
+    std::vector<char> source = load((ShaderStages)shd);
+    if (source.size() == 0)
+      return;
 
-      _num_of_loaded_shaders++;
+    _num_of_loaded_shaders++;
 
-      vk::ShaderModuleCreateInfo create_info
-      {  
-        .codeSize = sourse.size(),
-        .pCode = reinterpret_cast<const uint *>(sourse.data())
-      };
+    vk::ShaderModuleCreateInfo create_info {.codeSize = source.size(),
+                                            .pCode = reinterpret_cast<const uint *>(source.data())};
 
       _modules[shd] = va.get_device().createShaderModule(create_info).value;
 
-      _stages[shd].stage = stage_bits[shd];
-      _stages[shd].module = _modules[shd];
-      _stages[shd].pName = "main";
-    });
+    _stages[shd].stage = stage_bits[shd];
+    _stages[shd].module = _modules[shd];
+    _stages[shd].pName = "main";
+  });
 }
 
 /*
@@ -45,63 +39,30 @@ ter::Shader::~Shader()
 }
 */
 
-void ter::Shader::compile() {}
-
-std::vector<char> ter::Shader::load(uint shd)
+void ter::Shader::compile(ShaderStages stage)
 {
-  std::string project_path = "Z:/megarender2/"; /// TODO : project path
+  static const char *shader_type_names[] = {"vert", "frag", "geom", "tesc", "tese", "comp"};
+  std::string stage_type = shader_type_names[(int)stage];
+  std::system(("glslc *." + stage_type + " -o " + stage_type + ".spv").c_str());
+}
 
-  static const auto is_file_present = 
-    []( const std::string &FileName )
-    {
-      std::ifstream test(FileName);
-      return test.good();
-    };
-  static const auto execute_cmd = 
-    [&]( const std::string &CommandString ) 
-    {
-      std::system(CommandString.c_str());
-    };
-  static const auto compile_shd = 
-    [&]( const std::string &ShaderDir, const std::string &ShaderType ) 
-    {
-      auto file_glsl = project_path + ShaderDir + "shader." + ShaderType;
-      auto file_spv = project_path + ShaderDir + ShaderType + ".spv";
+std::vector<char> ter::Shader::load(ShaderStages stage)
+{
+  static const char *shader_type_names[] = {"vert", "frag", "geom", "tesc", "tese", "comp"};
+  std::filesystem::path stage_file_path = _path;
 
-      /*
-      // Get files data
-      struct stat stat_glsl, stat_spv, stat_includes;
-      stat(file_glsl.c_str(), &stat_glsl);
-      stat(file_spv.c_str(), &stat_spv);
-      stat((project_path + "bin/shaders/includes").c_str(), &stat_includes);
-
-      // Compile shader if it was updated
-      if (is_file_present(file_glsl) && ((stat_glsl.st_mtime > stat_spv.st_mtime) || (stat_includes.st_mtime > stat_spv.st_mtime))) // compute shader present & updated
-        execute_cmd("X:\\VulkanSDK\\Bin\\glslc -Ibin/shaders/includes " + file_glsl + " -o " + file_spv + "\n");
-      */
-    };
-  std::string shader_dir = "bin/shaders/" + _path + '/';
-
-  static const char *shader_type_names[] = { "vert", "frag", "geom", "tesc", "tese", "comp" };
-  std::string file_type = shader_type_names[shd];
-
-  /// compile_shd(shader_dir, file_type); TODO : compile  
-
-  std::fstream shader_file(shader_dir + file_type + ".spv", std::fstream::in | std::ios::ate | std::ios::binary);
-
-  if (!shader_file)
+  // Stage path: PROJECT_PATH/bin/shaders/SHADER_NAME/SHADER_TYPE.spv
+  stage_file_path.append(shader_type_names[(int)stage]).append(".spv");
+  if (!std::filesystem::exists(stage_file_path))
     return {};
 
-  /// if (file_type == "tesc" || file_type == "tese")
-  ///   IsTessStageActive = TRUE;
-
-  int len = (int)shader_file.tellg();
-  std::vector<char> sourse(len);
-  shader_file.seekg(0);
-  shader_file.read(reinterpret_cast<char *>(sourse.data()), len);
-  shader_file.close();
-
-  return sourse;
+  std::fstream stage_file {stage_file_path, std::fstream::in | std::ios::ate | std::ios::binary};
+  int len = stage_file.tellg();
+  std::vector<char> source(len);
+  stage_file.seekg(0);
+  stage_file.read(reinterpret_cast<char *>(source.data()), len);
+  stage_file.close();
+  return source;
 }
 
 void ter::Shader::reload() {}

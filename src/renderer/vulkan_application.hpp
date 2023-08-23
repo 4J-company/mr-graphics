@@ -1,45 +1,29 @@
+#include <vulkan/vulkan_handles.hpp>
 #if !defined(__vulkan_application_hpp_)
-#define __vulkan_application_hpp_
+  #define __vulkan_application_hpp_
 
-#include "pch.hpp"
+  #include "pch.hpp"
 
 namespace ter
 {
-  class VulkanApplication 
+  class VulkanState
   {
-    friend class WindowContext;
-
   private:
-  protected:
-  public:
     vk::Instance _instance;
     vk::Device _device;
     vk::PhysicalDevice _phys_device;
-
-    vk::Queue _queue;
-#if DEBUG
-    vk::DebugUtilsMessengerEXT _dbg_messenger;
-#endif
-
     vk::RenderPass _render_pass;
-
-    VulkanApplication();
-    ~VulkanApplication();
-
-    void create_render_pass(vk::Format swapchain_format);
+    vk::Queue _queue;
 
   public:
-    const vk::Device & get_device() { return _device; }
-    const vk::RenderPass & get_render_pass() { return _render_pass; }
-    const vk::Instance & get_instance() { return _instance; }
+    VulkanState() = default;
 
-  private:
-    VkDebugUtilsMessengerEXT DebugMessenger;
-    static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback( VkDebugUtilsMessageSeverityFlagBitsEXT MessageSeverity,
-                                                          VkDebugUtilsMessageTypeFlagsEXT MessageType,
-                                                          const VkDebugUtilsMessengerCallbackDataEXT *CallbackData,
-                                                          void *UserData );
+    vk::Instance instance() const { return _instance; }
+    vk::PhysicalDevice phys_device() const { return _phys_device; }
+    vk::Device device() const { return _device; }
+    vk::RenderPass render_pass() const { return _render_pass; }
+    vk::Queue queue() const { return _queue; }
   };
-}
+} // namespace ter
 
 #endif // __vulkan_application_hpp_

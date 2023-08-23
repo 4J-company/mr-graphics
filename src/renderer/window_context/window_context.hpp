@@ -3,37 +3,40 @@
 
   #include "pch.hpp"
   #include "resources/resources.hpp"
-  #include "window_system/window.hpp"
+  #include "vulkan_application.hpp"
+
+namespace wnd
+{
+  // forward declaration
+  class Window;
+} // namespace wnd
 
 namespace ter
 {
-  class Application;
-
   class WindowContext
   {
-    friend class Application;
-
   private:
-  public:
     vk::SwapchainKHR _swapchain;
     vk::Format _swapchain_format;
     vk::SurfaceKHR _surface;
     vk::Extent2D _extent;
-
     std::array<Framebuffer, Framebuffer::max_presentable_images> _framebuffers;
 
-    window_system::Window *_window;
+    VulkanState state;
+
+    wnd::Window *_parent;
 
   public:
-    WindowContext(window_system::Window *window, Application &app);
-    void create_framebuffers(Application &app);
-
     WindowContext() = default;
+    WindowContext(wnd::Window *parent, VulkanState state);
+    WindowContext(WindowContext &&other) noexcept = default;
+    WindowContext &operator=(WindowContext &&other) noexcept = default;
+
     ~WindowContext() = default;
 
+    void create_framebuffers(VulkanState state);
     void resize(size_t width, size_t height);
-
-    vk::Format get_swapchain_format() const { return _swapchain_format; }
+    void render();
   };
 } // namespace ter
 #endif // __window_context_hpp_

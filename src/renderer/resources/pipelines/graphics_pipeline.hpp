@@ -5,7 +5,7 @@
 
 namespace ter
 {
-  class GraphicsPipeline : private Pipeline
+  class GraphicsPipeline : public Pipeline
   {
   private:
     uint _subpass;
@@ -18,15 +18,14 @@ namespace ter
     std::vector<vk::DynamicState> _dynamic_states;
     std::vector<vk::DescriptorSetLayout> _layouts_descriptors;
 
-
   public:
     GraphicsPipeline() = default;
     ~GraphicsPipeline() = default;
 
-    GraphicsPipeline(VulkanApplication &va, Shader *ShaderProgram);
+    GraphicsPipeline(VulkanState va, Shader *ShaderProgram);
 
     GraphicsPipeline(GraphicsPipeline &&other) noexcept = default;
-    GraphicsPipeline & operator=(GraphicsPipeline &&other) noexcept = default;
+    GraphicsPipeline &operator=(GraphicsPipeline &&other) noexcept = default;
 
     void recompile();
 

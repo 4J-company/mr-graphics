@@ -1,21 +1,20 @@
 #include "resources/images/image.hpp"
 
-ter::Image::Image(VulkanApplication &va, uint width, uint height, vk::Format format, vk::Image image)
-  : _image(image), _size({width, height}), _format(format)
+ter::Image::Image(VulkanState state, uint width, uint height, vk::Format format, vk::Image image)
+    : _image(image), _size({width, height}), _format(format)
 {
-  _aspect_flags = vk::ImageAspectFlagBits::eColor; 
-  craete_image_view(va);
+  _aspect_flags = vk::ImageAspectFlagBits::eColor;
+  craete_image_view(state);
 }
 
-void ter::Image::craete_image_view(VulkanApplication &va)
+void ter::Image::craete_image_view(VulkanState state)
 {
-  vk::ImageSubresourceRange range
-  {
-    .aspectMask = _aspect_flags,
-    .baseMipLevel = 0,
-    .levelCount = 1,
-    .baseArrayLayer = 0,
-    .layerCount = 1,
+  vk::ImageSubresourceRange range {
+      .aspectMask = _aspect_flags,
+      .baseMipLevel = 0,
+      .levelCount = 1,
+      .baseArrayLayer = 0,
+      .layerCount = 1,
   };
 
   vk::ImageViewCreateInfo create_info
@@ -29,6 +28,8 @@ void ter::Image::craete_image_view(VulkanApplication &va)
   };
 
   _image_view = va.get_device().createImageView(create_info).value;
+  std::tie(result, _image_view) = va.get_device().createImageView(create_info);
+  assert(result == vk::Result::eSuccess);
 }
 
 void ter::Image::switch_layout(vk::ImageLayout layout) {}
