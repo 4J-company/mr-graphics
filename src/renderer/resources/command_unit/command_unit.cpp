@@ -11,9 +11,7 @@ ter::CommandUnit::CommandUnit(VulkanApplication &va)
     .queueFamilyIndex = 0 /// TODO: correct index
   };
 
-  vk::Result result;
-  std::tie(result, _cmd_pool) = va.get_device().createCommandPool(pool_create_info);
-  assert(result == vk::Result::eSuccess);
+  _cmd_pool = va.get_device().createCommandPool(pool_create_info).value;
 
   vk::CommandBufferAllocateInfo cmd_buffer_alloc_info
   {
@@ -22,8 +20,7 @@ ter::CommandUnit::CommandUnit(VulkanApplication &va)
     .commandBufferCount = 1,
   };
   std::vector<vk::CommandBuffer> cmd_bufs;
-  std::tie(result, cmd_bufs) = va.get_device().allocateCommandBuffers(cmd_buffer_alloc_info);
-  assert(result == vk::Result::eSuccess);
+  cmd_bufs = va.get_device().allocateCommandBuffers(cmd_buffer_alloc_info).value;
   _cmd_buffer = cmd_bufs[0];
 }
 

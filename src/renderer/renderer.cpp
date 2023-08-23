@@ -16,13 +16,9 @@ void ter::Application::create_render_resourses()
 
   vk::SemaphoreCreateInfo semaphore_create_info {};
   vk::FenceCreateInfo fence_create_info { .flags = vk::FenceCreateFlagBits::eSignaled };
-  vk::Result result;
-  std::tie(result, _image_available_semaphore) = _device.createSemaphore(semaphore_create_info);
-  assert(result == vk::Result::eSuccess);
-  std::tie(result, _render_rinished_semaphore) = _device.createSemaphore(semaphore_create_info);
-  assert(result == vk::Result::eSuccess);
-  std::tie(result, _fence) = _device.createFence(fence_create_info);
-  assert(result == vk::Result::eSuccess);
+  _image_available_semaphore = _device.createSemaphore(semaphore_create_info).value;
+  _render_rinished_semaphore = _device.createSemaphore(semaphore_create_info).value;
+  _fence = _device.createFence(fence_create_info).value;
 
   _cmd_unit = CommandUnit(*this);
 
@@ -44,7 +40,8 @@ void ter::Application::render()
   _cmd_unit.begin();
 
   vk::ClearValue clear_color;
-  clear_color.setColor({0, 0, 0, 1});
+  // clear_color.setColor({0, 0, 0, 1});
+  clear_color.setColor(vk::ClearColorValue(std::array{0.f, 0.f, 0.f, 1.f}));
 
   vk::RenderPassBeginInfo render_pass_info
   {

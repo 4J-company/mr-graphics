@@ -79,8 +79,7 @@ ter::GraphicsPipeline::GraphicsPipeline(VulkanApplication &va, Shader *shader)
     .pPushConstantRanges = nullptr,
   };
 
-  vk::Result result;
-  std::tie(result, _layout) = va.get_device().createPipelineLayout(pipeline_layout_create_info);
+  _layout = va.get_device().createPipelineLayout(pipeline_layout_create_info).value;
 
   vk::GraphicsPipelineCreateInfo pipeline_create_info
   {
@@ -103,8 +102,7 @@ ter::GraphicsPipeline::GraphicsPipeline(VulkanApplication &va, Shader *shader)
   };
 
   std::vector<vk::Pipeline> pipelines;
-  std::tie(result, pipelines) = va.get_device().createGraphicsPipelines(nullptr, pipeline_create_info);
-  assert(result == vk::Result::eSuccess);
+  pipelines = va.get_device().createGraphicsPipelines(nullptr, pipeline_create_info).value;
   _pipeline = pipelines[0];
 }
 

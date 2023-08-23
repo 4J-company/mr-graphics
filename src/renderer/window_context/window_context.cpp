@@ -9,39 +9,52 @@ ter::WindowContext::WindowContext(window_system::Window *window, Application &ap
 
   size_t universal_queue_family_id = 0;
 
-  std::vector<vk::SurfaceFormatKHR> formats;
-  vk::Result result;
-  std::tie(result, formats) = app._phys_device.getSurfaceFormatsKHR(_surface);
-  assert(result == vk::Result::eSuccess && !formats.empty());
-  _swapchain_format = (formats[0].format == vk::Format::eUndefined) ? vk::Format::eB8G8R8A8Unorm : formats[0].format;
+  // Choose surface format
+  const auto avaible_formats = app._phys_device.getSurfaceFormatsKHR(_surface).value;
+  _swapchain_format = avaible_formats[0].format;
+  for (const auto format : avaible_formats)
+    if (format.format == vk::Format::eR8G8B8A8Unorm) // Prefered format
+    {
+      _swapchain_format = format.format;
+      break;
+    }
+    else if (format.format == vk::Format::eB8G8R8A8Unorm)
+      _swapchain_format = format.format;
 
+  // Choose surface extent
   vk::SurfaceCapabilitiesKHR surface_capabilities;
-  std::tie(result, surface_capabilities) = app._phys_device.getSurfaceCapabilitiesKHR(_surface);
-  assert(result == vk::Result::eSuccess);
+  surface_capabilities = app._phys_device.getSurfaceCapabilitiesKHR(_surface).value;
   if (surface_capabilities.currentExtent.width == std::numeric_limits<uint>::max())
   {
-    // If the surface size is undefined, the size is set to the size of the
-    // images requested.
+    // If the surface size is undefined, the size is set to the size of the images requested.
     _extent.width =
-        std::clamp(static_cast<uint32_t>(window->_width), surface_capabilities.minImageExtent.width,
-                   surface_capabilities.maxImageExtent.width);
+      std::clamp(static_cast<uint32_t>(window->_width), surface_capabilities.minImageExtent.width,
+                 surface_capabilities.maxImageExtent.width);
     _extent.height =
-        std::clamp(static_cast<uint32_t>(window->_height), surface_capabilities.minImageExtent.height,
-                   surface_capabilities.maxImageExtent.height);
+      std::clamp(static_cast<uint32_t>(window->_height), surface_capabilities.minImageExtent.height,
+                 surface_capabilities.maxImageExtent.height);
   }
   else // If the surface size is defined, the swap chain size must match
     _extent = surface_capabilities.currentExtent;
 
-  // The FIFO present mode is guaranteed by the spec to be supported
-  vk::PresentModeKHR swapchain_present_mode = vk::PresentModeKHR::eMailbox;
+  // Chosse surface present mode
+  const auto avaible_present_modes = app._phys_device.getSurfacePresentModesKHR(_surface).value;
+  const auto iter =
+    std::find(avaible_present_modes.begin(), avaible_present_modes.end(), vk::PresentModeKHR::eMailbox);
+  auto present_mode =
+    (iter != avaible_present_modes.end())
+      ? *iter
+      : vk::PresentModeKHR::eFifo; // FIFO is required to be supported (by spec)
 
+  // Choose surface transform
   vk::SurfaceTransformFlagBitsKHR pre_transform =
-      (surface_capabilities.supportedTransforms & vk::SurfaceTransformFlagBitsKHR::eIdentity)
+    (surface_capabilities.supportedTransforms & vk::SurfaceTransformFlagBitsKHR::eIdentity)
       ? vk::SurfaceTransformFlagBitsKHR::eIdentity
       : surface_capabilities.currentTransform;
 
+  // Choose composite alpha
   vk::CompositeAlphaFlagBitsKHR composite_alpha =
-      (surface_capabilities.supportedCompositeAlpha & vk::CompositeAlphaFlagBitsKHR::ePreMultiplied)
+    (surface_capabilities.supportedCompositeAlpha & vk::CompositeAlphaFlagBitsKHR::ePreMultiplied)
       ? vk::CompositeAlphaFlagBitsKHR::ePreMultiplied
       : (surface_capabilities.supportedCompositeAlpha & vk::CompositeAlphaFlagBitsKHR::ePostMultiplied)
       ? vk::CompositeAlphaFlagBitsKHR::ePostMultiplied
@@ -49,7 +62,6 @@ ter::WindowContext::WindowContext(window_system::Window *window, Application &ap
       ? vk::CompositeAlphaFlagBitsKHR::eInherit
       : vk::CompositeAlphaFlagBitsKHR::eOpaque;
 
-  /// _swapchain_format = vk::Format::eB8G8R8A8Srgb; // ideal, we have eB8G8R8A8Unorm
   vk::SwapchainCreateInfoKHR swapchain_create_info
   {
     .flags = {},
@@ -65,7 +77,7 @@ ter::WindowContext::WindowContext(window_system::Window *window, Application &ap
     .pQueueFamilyIndices = {},
     .preTransform = pre_transform,
     .compositeAlpha = composite_alpha,
-    .presentMode = swapchain_present_mode,
+    .presentMode = present_mode,
     .clipped = true,
     .oldSwapchain = nullptr
   };
@@ -74,15 +86,13 @@ ter::WindowContext::WindowContext(window_system::Window *window, Application &ap
   swapchain_create_info.queueFamilyIndexCount = 1;
   swapchain_create_info.pQueueFamilyIndices = indeces;
 
-  std::tie(result, _swapchain) = app._device.createSwapchainKHR(swapchain_create_info);
-  assert(result == vk::Result::eSuccess);
+  _swapchain = app._device.createSwapchainKHR(swapchain_create_info).value;
 }
 
 void ter::WindowContext::create_framebuffers(Application &app)
 {
-  vk::Result result;
   std::vector<vk::Image> swampchain_images;
-  std::tie(result, swampchain_images) = app._device.getSwapchainImagesKHR(_swapchain);
+  swampchain_images = app._device.getSwapchainImagesKHR(_swapchain).value;
 
   for (uint i = 0; i < Framebuffer::max_presentable_images; i++)
     _framebuffers[i] = Framebuffer(app, _extent.width, _extent.height, _swapchain_format, swampchain_images[i]);

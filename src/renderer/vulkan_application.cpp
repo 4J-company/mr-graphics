@@ -31,7 +31,7 @@ ter::VulkanApplication::VulkanApplication()
   {
     extension_names.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
     extension_names.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-    
+
     layers_names.push_back("VK_LAYER_KHRONOS_validation");
     layers_names.push_back("VK_LAYER_RENDERDOC_Capture");
   }
@@ -53,28 +53,25 @@ ter::VulkanApplication::VulkanApplication()
     .ppEnabledExtensionNames = extension_names.data(),
   };
 
-  // _instance = vk::createInstance(inst_ci);
-  vk::Result result;
-  std::tie(result, _instance) = vk::createInstance(inst_ci);
-  assert(result == vk::Result::eSuccess);
+  _instance = vk::createInstance(inst_ci).value;
 
   if constexpr (1)
   {
     VkDebugUtilsMessengerCreateInfoEXT debug_msgr_create_info {VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT};
 
-    debug_msgr_create_info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | 
-                                              VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | 
-                                              VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-    debug_msgr_create_info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | 
-                                          VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | 
-                                          VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+    // TODO
+    debug_msgr_create_info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT
+                                           | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT
+                                           | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+    debug_msgr_create_info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT
+                                       | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT
+                                       | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
     debug_msgr_create_info.pfnUserCallback = DebugCallback;
 
     auto create_debug_function = (PFN_vkCreateDebugUtilsMessengerEXT)_instance.getProcAddr("vkCreateDebugUtilsMessengerEXT");
-    VkResult result;
+    VkResult result = VK_ERROR_UNKNOWN;
     if (create_debug_function != nullptr)
       result = create_debug_function(_instance, &debug_msgr_create_info, nullptr, &DebugMessenger);
-
     assert(result == VK_SUCCESS);
   }
 
@@ -83,8 +80,7 @@ ter::VulkanApplication::VulkanApplication()
 #endif
 
   std::vector<vk::PhysicalDevice> phys_device_array;
-  std::tie(result, phys_device_array) = _instance.enumeratePhysicalDevices();
-  assert(result == vk::Result::eSuccess);
+  phys_device_array = _instance.enumeratePhysicalDevices().value;
   _phys_device = phys_device_array.front();
 
   // get the QueueFamilyProperties of the first PhysicalDevice
@@ -129,8 +125,7 @@ ter::VulkanApplication::VulkanApplication()
     .ppEnabledExtensionNames = extension_names.data(),
     .pEnabledFeatures = &required_features,
   };
-  std::tie(result, _device) = _phys_device.createDevice(create_info);
-  assert(result == vk::Result::eSuccess);
+  _device = _phys_device.createDevice(create_info).value;
 
   assert(graphics_queue_family_index == 0);
   _queue = _device.getQueue(graphics_queue_family_index, 0);
@@ -187,10 +182,8 @@ void ter::VulkanApplication::create_render_pass(vk::Format swapchain_format)
     .subpassCount = 1,
     .pSubpasses = &subpass,
     .dependencyCount = 1,
-    .pDependencies = &dependency,   
+    .pDependencies = &dependency,
   };
 
-  vk::Result result;
-  std::tie(result, _render_pass) = _device.createRenderPass(render_pass_create_info);
-  assert(result == vk::Result::eSuccess);
+  _render_pass = _device.createRenderPass(render_pass_create_info).value;
 }

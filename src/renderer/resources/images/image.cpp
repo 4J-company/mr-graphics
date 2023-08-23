@@ -27,10 +27,8 @@ void ter::Image::craete_image_view(VulkanApplication &va)
                    vk::ComponentSwizzle::eIdentity, vk::ComponentSwizzle::eIdentity},
     .subresourceRange = range
   };
-  
-  vk::Result result;
-  std::tie(result, _image_view) = va.get_device().createImageView(create_info);
-  assert(result == vk::Result::eSuccess);
+
+  _image_view = va.get_device().createImageView(create_info).value;
 }
 
 void ter::Image::switch_layout(vk::ImageLayout layout) {}

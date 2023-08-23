@@ -16,9 +16,7 @@ ter::Framebuffer::Framebuffer(VulkanApplication &va, uint width, uint height, vk
     .layers = 1,
   };
 
-  vk::Result result;
-  std::tie(result, _framebuffer) = va.get_device().createFramebuffer(framebuffer_create_info);
-  assert(result == vk::Result::eSuccess);
+  _framebuffer = va.get_device().createFramebuffer(framebuffer_create_info).value;
 
   _viewport.viewport.x = 0.0f;
   _viewport.viewport.y = 0.0f;

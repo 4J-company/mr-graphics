@@ -30,9 +30,7 @@ ter::Shader::Shader(VulkanApplication &va, std::string_view filename) : _path(fi
         .pCode = reinterpret_cast<const uint *>(sourse.data())
       };
 
-      vk::Result result;
-      std::tie(result, _modules[shd]) = va.get_device().createShaderModule(create_info);
-      assert(result == vk::Result::eSuccess);
+      _modules[shd] = va.get_device().createShaderModule(create_info).value;
 
       _stages[shd].stage = stage_bits[shd];
       _stages[shd].module = _modules[shd];
