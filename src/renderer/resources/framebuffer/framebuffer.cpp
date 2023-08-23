@@ -15,7 +15,7 @@ ter::Framebuffer::Framebuffer(VulkanState state, uint width, uint height, vk::Fo
       .layers = 1,
   };
 
-  _framebuffer = va.get_device().createFramebuffer(framebuffer_create_info).value;
+  _framebuffer = state.device().createFramebuffer(framebuffer_create_info).value;
 
   _viewport.viewport.x = 0.0f;
   _viewport.viewport.y = 0.0f;

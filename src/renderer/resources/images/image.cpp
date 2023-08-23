@@ -17,19 +17,14 @@ void ter::Image::craete_image_view(VulkanState state)
       .layerCount = 1,
   };
 
-  vk::ImageViewCreateInfo create_info
-  {
-    .image = _image,
-    .viewType = vk::ImageViewType::e2D,
-    .format = _format,
-    .components = {vk::ComponentSwizzle::eIdentity, vk::ComponentSwizzle::eIdentity, 
-                   vk::ComponentSwizzle::eIdentity, vk::ComponentSwizzle::eIdentity},
-    .subresourceRange = range
-  };
+  vk::ImageViewCreateInfo create_info {.image = _image,
+                                       .viewType = vk::ImageViewType::e2D,
+                                       .format = _format,
+                                       .components = {vk::ComponentSwizzle::eIdentity, vk::ComponentSwizzle::eIdentity,
+                                                      vk::ComponentSwizzle::eIdentity, vk::ComponentSwizzle::eIdentity},
+                                       .subresourceRange = range};
 
-  _image_view = va.get_device().createImageView(create_info).value;
-  std::tie(result, _image_view) = va.get_device().createImageView(create_info);
-  assert(result == vk::Result::eSuccess);
+  _image_view = state.device().createImageView(create_info).value;
 }
 
 void ter::Image::switch_layout(vk::ImageLayout layout) {}

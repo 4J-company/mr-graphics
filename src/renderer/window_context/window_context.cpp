@@ -10,24 +10,23 @@ ter::WindowContext::WindowContext(wnd::Window *parent, VulkanState state) : _par
   size_t universal_queue_family_id = 0;
 
   // Choose surface format
-  const auto avaible_formats = app._phys_device.getSurfaceFormatsKHR(_surface).value;
+  const auto avaible_formats = state.phys_device().getSurfaceFormatsKHR(_surface).value;
   _swapchain_format = avaible_formats[0].format;
   for (const auto format : avaible_formats)
-    if (format.format == vk::Format::eR8G8B8A8Unorm) // Prefered format
+    if (format.format == vk::Format::eB8G8R8A8Unorm) // Prefered format
     {
       _swapchain_format = format.format;
       break;
     }
-    else if (format.format == vk::Format::eB8G8R8A8Unorm)
+    else if (format.format == vk::Format::eR8G8B8A8Unorm)
       _swapchain_format = format.format;
 
   // Choose surface extent
   vk::SurfaceCapabilitiesKHR surface_capabilities;
-  surface_capabilities = app._phys_device.getSurfaceCapabilitiesKHR(_surface).value;
+  surface_capabilities = state.phys_device().getSurfaceCapabilitiesKHR(_surface).value;
   if (surface_capabilities.currentExtent.width == std::numeric_limits<uint>::max())
   {
-    // If the surface size is undefined, the size is set to the size of the
-    // images requested.
+    // If the surface size is undefined, the size is set to the size of the images requested.
     _extent.width = std::clamp(static_cast<uint32_t>(_parent->width()), surface_capabilities.minImageExtent.width,
                                surface_capabilities.maxImageExtent.width);
     _extent.height = std::clamp(static_cast<uint32_t>(_parent->height()), surface_capabilities.minImageExtent.height,
@@ -37,23 +36,21 @@ ter::WindowContext::WindowContext(wnd::Window *parent, VulkanState state) : _par
     _extent = surface_capabilities.currentExtent;
 
   // Chosse surface present mode
-  const auto avaible_present_modes = app._phys_device.getSurfacePresentModesKHR(_surface).value;
-  const auto iter =
-    std::find(avaible_present_modes.begin(), avaible_present_modes.end(), vk::PresentModeKHR::eMailbox);
-  auto present_mode =
-    (iter != avaible_present_modes.end())
+  const auto avaible_present_modes = state.phys_device().getSurfacePresentModesKHR(_surface).value;
+  const auto iter = std::find(avaible_present_modes.begin(), avaible_present_modes.end(), vk::PresentModeKHR::eMailbox);
+  auto present_mode = (iter != avaible_present_modes.end())
       ? *iter
       : vk::PresentModeKHR::eFifo; // FIFO is required to be supported (by spec)
 
   // Choose surface transform
   vk::SurfaceTransformFlagBitsKHR pre_transform =
-    (surface_capabilities.supportedTransforms & vk::SurfaceTransformFlagBitsKHR::eIdentity)
+      (surface_capabilities.supportedTransforms & vk::SurfaceTransformFlagBitsKHR::eIdentity)
       ? vk::SurfaceTransformFlagBitsKHR::eIdentity
       : surface_capabilities.currentTransform;
 
   // Choose composite alpha
   vk::CompositeAlphaFlagBitsKHR composite_alpha =
-    (surface_capabilities.supportedCompositeAlpha & vk::CompositeAlphaFlagBitsKHR::ePreMultiplied)
+      (surface_capabilities.supportedCompositeAlpha & vk::CompositeAlphaFlagBitsKHR::ePreMultiplied)
       ? vk::CompositeAlphaFlagBitsKHR::ePreMultiplied
       : (surface_capabilities.supportedCompositeAlpha & vk::CompositeAlphaFlagBitsKHR::ePostMultiplied)
       ? vk::CompositeAlphaFlagBitsKHR::ePostMultiplied
@@ -61,37 +58,34 @@ ter::WindowContext::WindowContext(wnd::Window *parent, VulkanState state) : _par
       ? vk::CompositeAlphaFlagBitsKHR::eInherit
       : vk::CompositeAlphaFlagBitsKHR::eOpaque;
 
-  vk::SwapchainCreateInfoKHR swapchain_create_info
-  {
-    .flags = {},
-    .surface = _surface,
-    .minImageCount = Framebuffer::max_presentable_images,
-    .imageFormat = _swapchain_format,
-    .imageColorSpace = vk::ColorSpaceKHR::eSrgbNonlinear,
-    .imageExtent = _extent,
-    .imageArrayLayers = 1,
-    .imageUsage = vk::ImageUsageFlagBits::eColorAttachment,
-    .imageSharingMode = vk::SharingMode::eExclusive,
-    .queueFamilyIndexCount = {},
-    .pQueueFamilyIndices = {},
-    .preTransform = pre_transform,
-    .compositeAlpha = composite_alpha,
-    .presentMode = present_mode,
-    .clipped = true,
-    .oldSwapchain = nullptr
-  };
+  vk::SwapchainCreateInfoKHR swapchain_create_info {.flags = {},
+                                                    .surface = _surface,
+                                                    .minImageCount = Framebuffer::max_presentable_images,
+                                                    .imageFormat = _swapchain_format,
+                                                    .imageColorSpace = vk::ColorSpaceKHR::eSrgbNonlinear,
+                                                    .imageExtent = _extent,
+                                                    .imageArrayLayers = 1,
+                                                    .imageUsage = vk::ImageUsageFlagBits::eColorAttachment,
+                                                    .imageSharingMode = vk::SharingMode::eExclusive,
+                                                    .queueFamilyIndexCount = {},
+                                                    .pQueueFamilyIndices = {},
+                                                    .preTransform = pre_transform,
+                                                    .compositeAlpha = composite_alpha,
+                                                    .presentMode = present_mode,
+                                                    .clipped = true,
+                                                    .oldSwapchain = nullptr};
 
   uint32_t indeces[1] {static_cast<uint32_t>(universal_queue_family_id)};
   swapchain_create_info.queueFamilyIndexCount = 1;
   swapchain_create_info.pQueueFamilyIndices = indeces;
 
-  _swapchain = app._device.createSwapchainKHR(swapchain_create_info).value;
+  _swapchain = state.device().createSwapchainKHR(swapchain_create_info).value;
 }
 
 void ter::WindowContext::create_framebuffers(VulkanState state)
 {
   std::vector<vk::Image> swampchain_images;
-  swampchain_images = app._device.getSwapchainImagesKHR(_swapchain).value;
+  swampchain_images = state.device().getSwapchainImagesKHR(_swapchain).value;
 
   for (uint i = 0; i < Framebuffer::max_presentable_images; i++)
     _framebuffers[i] = Framebuffer(state, _extent.width, _extent.height, _swapchain_format, swampchain_images[i]);
@@ -106,20 +100,17 @@ void ter::WindowContext::render()
   static Shader _shader = Shader(state, "default");
   static GraphicsPipeline _pipeline = GraphicsPipeline(state, &_shader);
 
-  auto result = state.device().waitForFences(_fence, VK_TRUE, UINT64_MAX);
-  assert(result == vk::Result::eSuccess);
+  state.device().waitForFences(_fence, VK_TRUE, UINT64_MAX);
   state.device().resetFences(_fence);
 
   ter::uint image_index = 0;
 
-  result =
-      state.device().acquireNextImageKHR(_swapchain, UINT64_MAX, _image_available_semaphore, nullptr, &image_index);
-  assert(result == vk::Result::eSuccess);
+  state.device().acquireNextImageKHR(_swapchain, UINT64_MAX, _image_available_semaphore, nullptr, &image_index);
 
   command_unit.begin();
 
   vk::ClearValue clear_color;
-  clear_color.setColor({0, 0, 0, 1});
+  clear_color.setColor(vk::ClearColorValue(std::array<float, 4ULL>{0.f, 0.f, 0.f, 1.f})); // don't compile otherwise
 
   vk::RenderPassBeginInfo render_pass_info {
       .renderPass = state.render_pass(),
@@ -152,8 +143,7 @@ void ter::WindowContext::render()
       .pSignalSemaphores = signal_semaphores,
   };
 
-  result = state.queue().submit(submit_info, _fence);
-  assert(result == vk::Result::eSuccess);
+  state.queue().submit(submit_info, _fence);
 
   vk::SwapchainKHR swapchains[] = {_swapchain};
   vk::PresentInfoKHR present_info {
@@ -164,6 +154,5 @@ void ter::WindowContext::render()
       .pImageIndices = &image_index,
       .pResults = nullptr, // Optional
   };
-  result = state.queue().presentKHR(present_info);
-  assert(result == vk::Result::eSuccess || result == vk::Result::eSuboptimalKHR);
+  state.queue().presentKHR(present_info);
 }

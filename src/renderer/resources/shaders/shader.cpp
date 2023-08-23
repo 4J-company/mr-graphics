@@ -24,7 +24,9 @@ ter::Shader::Shader(VulkanState state, std::string_view filename) : _path(filena
     vk::ShaderModuleCreateInfo create_info {.codeSize = source.size(),
                                             .pCode = reinterpret_cast<const uint *>(source.data())};
 
-      _modules[shd] = va.get_device().createShaderModule(create_info).value;
+    // vk::Result result;
+    // std::tie(result, _modules[shd]) = state.device().createShaderModule(create_info);
+    _modules[shd] = state.device().createShaderModule(create_info).value;
 
     _stages[shd].stage = stage_bits[shd];
     _stages[shd].module = _modules[shd];

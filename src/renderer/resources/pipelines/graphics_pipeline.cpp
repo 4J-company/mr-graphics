@@ -69,7 +69,7 @@ ter::GraphicsPipeline::GraphicsPipeline(VulkanState state, Shader *shader)
       .pPushConstantRanges = nullptr,
   };
 
-  _layout = va.get_device().createPipelineLayout(pipeline_layout_create_info).value;
+  _layout = state.device().createPipelineLayout(pipeline_layout_create_info).value;
 
   vk::GraphicsPipelineCreateInfo pipeline_create_info {
        // .stageCount = static_cast<uint>(_shader->get_stages().size()),
@@ -91,7 +91,7 @@ ter::GraphicsPipeline::GraphicsPipeline(VulkanState state, Shader *shader)
   };
 
   std::vector<vk::Pipeline> pipelines;
-  pipelines = va.get_device().createGraphicsPipelines(nullptr, pipeline_create_info).value;
+  pipelines = state.device().createGraphicsPipelines(nullptr, pipeline_create_info).value;
   _pipeline = pipelines[0];
 }
 
