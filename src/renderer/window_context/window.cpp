@@ -4,7 +4,7 @@
 // arguments:
 //   - size:
 //       size_t width, height
-wnd::Window::Window(mr::VulkanState state, size_t width, size_t height) : _width(width), _height(height)
+mr::Window::Window(mr::VulkanState state, size_t width, size_t height) : _width(width), _height(height)
 {
   std::atomic<bool> window_create;
   _thread = std::thread([&]() {
@@ -44,8 +44,8 @@ wnd::Window::Window(mr::VulkanState state, size_t width, size_t height) : _width
   _context = mr::WindowContext(this, state);
 } // End of 'wnd::window::window' function
 
-wnd::Window::~Window() { _thread.join(); }
+mr::Window::~Window() { _thread.join(); }
 
-wnd::Application::Application() {}
+mr::Kernel::Kernel() {}
 
-wnd::Application::~Application() {}
+mr::Kernel::~Kernel() {}

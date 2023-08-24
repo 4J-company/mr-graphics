@@ -8,7 +8,7 @@ namespace mr
 {
   class WindowContext;
 
-  class Application;
+  class Kernel;
 
   class Window
   {
@@ -38,11 +38,11 @@ namespace mr
     void render() { _context.render(); }
   };
 
-  class Application
+  class Kernel
   {
   public:
-    Application();
-    ~Application();
+    Kernel();
+    ~Kernel();
   };
 } // namespace mr
-#endif // __window_context_hpp_
+#endif // __window_hpp_

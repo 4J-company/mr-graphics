@@ -14,7 +14,7 @@ mr::Application::~Application() {}
   return std::make_unique<CommandUnit>();
 }
 
-[[nodiscard]] std::unique_ptr<wnd::Window> mr::Application::create_window(size_t width, size_t height) const
+[[nodiscard]] std::unique_ptr<mr::Window> mr::Application::create_window(size_t width, size_t height) const
 {
-  return std::make_unique<wnd::Window>(state);
+  return std::make_unique<Window>(state);
 }

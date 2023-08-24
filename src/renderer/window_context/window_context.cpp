@@ -3,7 +3,7 @@
 #include "resources/command_unit/command_unit.hpp"
 #include "resources/pipelines/graphics_pipeline.hpp"
 
-mr::WindowContext::WindowContext(wnd::Window *parent, VulkanState state) : _parent(parent)
+mr::WindowContext::WindowContext(Window *parent, VulkanState state) : _parent(parent)
 {
   _surface = xgfx::createSurface(_parent->xwindow_ptr(), state.instance());
 
