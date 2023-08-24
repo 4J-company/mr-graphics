@@ -8,6 +8,7 @@ namespace ter
 {
   class VulkanState
   {
+    friend class Application;
   private:
     vk::Instance _instance;
     vk::Device _device;

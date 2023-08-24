@@ -25,7 +25,7 @@ namespace wnd
 
   public:
     // constructors
-    Window(ter::VulkanState state, size_t width = 800, size_t height = 600);
+    Window(const ter::VulkanState &state, size_t width = 800, size_t height = 600);
     Window(Window &&other) noexcept = default;
     Window &operator=(Window &&other) noexcept = default;
 

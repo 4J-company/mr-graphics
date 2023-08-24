@@ -22,19 +22,19 @@ namespace ter
     vk::Extent2D _extent;
     std::array<Framebuffer, Framebuffer::max_presentable_images> _framebuffers;
 
-    VulkanState state;
+    VulkanState _state;
 
     wnd::Window *_parent;
 
   public:
     WindowContext() = default;
-    WindowContext(wnd::Window *parent, VulkanState state);
+    WindowContext(wnd::Window *parent, const VulkanState &state);
     WindowContext(WindowContext &&other) noexcept = default;
     WindowContext &operator=(WindowContext &&other) noexcept = default;
 
     ~WindowContext() = default;
 
-    void create_framebuffers(VulkanState state);
+    void create_framebuffers(const VulkanState &state);
     void resize(size_t width, size_t height);
     void render();
   };

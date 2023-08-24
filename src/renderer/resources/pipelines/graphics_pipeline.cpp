@@ -1,6 +1,6 @@
 #include "resources/pipelines/graphics_pipeline.hpp"
 
-ter::GraphicsPipeline::GraphicsPipeline(VulkanState state, Shader *shader)
+ter::GraphicsPipeline::GraphicsPipeline(const VulkanState &state, Shader *shader)
 {
   _shader = shader;
 

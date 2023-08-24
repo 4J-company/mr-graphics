@@ -31,7 +31,7 @@ namespace ter
     Shader() = default;
     ~Shader() = default;
 
-    Shader(VulkanState state, std::string_view filename);
+    Shader(const VulkanState &state, std::string_view filename);
 
     // move semantics
     Shader(Shader &&other) noexcept

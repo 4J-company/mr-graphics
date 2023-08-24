@@ -2,7 +2,7 @@
 #include <filesystem>
 #include <fstream>
 
-ter::Shader::Shader(VulkanState state, std::string_view filename) : _path(filename)
+ter::Shader::Shader(const VulkanState &state, std::string_view filename) : _path(std::string("bin/shaders/") + filename.data())
 {
   static const vk::ShaderStageFlagBits stage_bits[] = {vk::ShaderStageFlagBits::eVertex,
                                                        vk::ShaderStageFlagBits::eFragment,
@@ -54,7 +54,8 @@ std::vector<char> ter::Shader::load(ShaderStages stage)
   std::filesystem::path stage_file_path = _path;
 
   // Stage path: PROJECT_PATH/bin/shaders/SHADER_NAME/SHADER_TYPE.spv
-  stage_file_path.append(shader_type_names[(int)stage]).append(".spv");
+  stage_file_path.append(shader_type_names[(int)stage]);
+  stage_file_path += ".spv";
   if (!std::filesystem::exists(stage_file_path))
     return {};
 

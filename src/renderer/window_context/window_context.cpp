@@ -3,7 +3,7 @@
 #include "resources/command_unit/command_unit.hpp"
 #include "resources/pipelines/graphics_pipeline.hpp"
 
-ter::WindowContext::WindowContext(wnd::Window *parent, VulkanState state) : _parent(parent)
+ter::WindowContext::WindowContext(wnd::Window *parent, const VulkanState &state) : _parent(parent), _state(state)
 {
   _surface = xgfx::createSurface(_parent->xwindow_ptr(), state.instance());
 
@@ -48,6 +48,7 @@ ter::WindowContext::WindowContext(wnd::Window *parent, VulkanState state) : _par
       : vk::CompositeAlphaFlagBitsKHR::eOpaque;
 
   /// _swapchain_format = vk::Format::eB8G8R8A8Srgb; // ideal, we have eB8G8R8A8Unorm
+  swapchain_present_mode = vk::PresentModeKHR::eFifo;
   vk::SwapchainCreateInfoKHR swapchain_create_info {.flags = {},
                                                     .surface = _surface,
                                                     .minImageCount = Framebuffer::max_presentable_images,
@@ -71,9 +72,11 @@ ter::WindowContext::WindowContext(wnd::Window *parent, VulkanState state) : _par
 
   std::tie(result, _swapchain) = state.device().createSwapchainKHR(swapchain_create_info);
   assert(result == vk::Result::eSuccess);
+
+  create_framebuffers(state);
 }
 
-void ter::WindowContext::create_framebuffers(VulkanState state)
+void ter::WindowContext::create_framebuffers(const VulkanState &state)
 {
   vk::Result result;
   std::vector<vk::Image> swampchain_images;
@@ -85,21 +88,23 @@ void ter::WindowContext::create_framebuffers(VulkanState state)
 
 void ter::WindowContext::render()
 {
-  static CommandUnit command_unit {state};
-  static vk::Semaphore _image_available_semaphore;
-  static vk::Semaphore _render_rinished_semaphore;
-  static vk::Fence _fence;
-  static Shader _shader = Shader(state, "default");
-  static GraphicsPipeline _pipeline = GraphicsPipeline(state, &_shader);
+  vk::SemaphoreCreateInfo semaphore_create_info {};
+  vk::FenceCreateInfo fence_create_info { .flags = vk::FenceCreateFlagBits::eSignaled };
+  static CommandUnit command_unit {_state};
+  static vk::Semaphore _image_available_semaphore = _state.device().createSemaphore(semaphore_create_info).value;
+  static vk::Semaphore _render_rinished_semaphore = _state.device().createSemaphore(semaphore_create_info).value;
+  static vk::Fence _fence = _state.device().createFence(fence_create_info).value;
+  static Shader _shader = Shader(_state, "default");
+  static GraphicsPipeline _pipeline = GraphicsPipeline(_state, &_shader);
 
-  auto result = state.device().waitForFences(_fence, VK_TRUE, UINT64_MAX);
+  auto result = _state.device().waitForFences(_fence, VK_TRUE, UINT64_MAX);
   assert(result == vk::Result::eSuccess);
-  state.device().resetFences(_fence);
+  _state.device().resetFences(_fence);
 
   ter::uint image_index = 0;
 
   result =
-      state.device().acquireNextImageKHR(_swapchain, UINT64_MAX, _image_available_semaphore, nullptr, &image_index);
+      _state.device().acquireNextImageKHR(_swapchain, UINT64_MAX, _image_available_semaphore, nullptr, &image_index);
   assert(result == vk::Result::eSuccess);
 
   command_unit.begin();
@@ -108,7 +113,7 @@ void ter::WindowContext::render()
   clear_color.setColor({0, 0, 0, 1});
 
   vk::RenderPassBeginInfo render_pass_info {
-      .renderPass = state.render_pass(),
+      .renderPass = _state.render_pass(),
       .framebuffer = _framebuffers[image_index].framebuffer(),
       .renderArea = {{0, 0}, _extent},
       .clearValueCount = 1,
@@ -138,7 +143,7 @@ void ter::WindowContext::render()
       .pSignalSemaphores = signal_semaphores,
   };
 
-  result = state.queue().submit(submit_info, _fence);
+  result = _state.queue().submit(submit_info, _fence);
   assert(result == vk::Result::eSuccess);
 
   vk::SwapchainKHR swapchains[] = {_swapchain};
@@ -150,6 +155,6 @@ void ter::WindowContext::render()
       .pImageIndices = &image_index,
       .pResults = nullptr, // Optional
   };
-  result = state.queue().presentKHR(present_info);
+  result = _state.queue().presentKHR(present_info);
   assert(result == vk::Result::eSuccess || result == vk::Result::eSuboptimalKHR);
 }

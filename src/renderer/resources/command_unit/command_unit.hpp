@@ -18,7 +18,7 @@ namespace ter
     CommandUnit() = default;
     ~CommandUnit();
 
-    CommandUnit(VulkanState va);
+    CommandUnit(const VulkanState &state);
 
     // move semantics
     CommandUnit(CommandUnit &&other) noexcept = default;

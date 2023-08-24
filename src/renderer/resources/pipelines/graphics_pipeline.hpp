@@ -22,7 +22,7 @@ namespace ter
     GraphicsPipeline() = default;
     ~GraphicsPipeline() = default;
 
-    GraphicsPipeline(VulkanState va, Shader *ShaderProgram);
+    GraphicsPipeline(const VulkanState &state, Shader *ShaderProgram);
 
     GraphicsPipeline(GraphicsPipeline &&other) noexcept = default;
     GraphicsPipeline &operator=(GraphicsPipeline &&other) noexcept = default;

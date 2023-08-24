@@ -4,7 +4,7 @@
 // arguments:
 //   - size:
 //       size_t width, height
-wnd::Window::Window(ter::VulkanState state, size_t width, size_t height) : _width(width), _height(height)
+wnd::Window::Window(const ter::VulkanState &state, size_t width, size_t height) : _width(width), _height(height)
 {
   std::atomic<bool> window_create;
   _thread = std::thread([&]() {

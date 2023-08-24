@@ -34,7 +34,7 @@ namespace ter
     Framebuffer() = default;
     ~Framebuffer() = default;
 
-    Framebuffer(VulkanState state, uint width, uint height, vk::Format swapchain_format, vk::Image image);
+    Framebuffer(const VulkanState &state, uint width, uint height, vk::Format swapchain_format, vk::Image image);
 
     Framebuffer(Framebuffer &&other) noexcept = default;
     Framebuffer &operator=(Framebuffer &&other) noexcept = default;

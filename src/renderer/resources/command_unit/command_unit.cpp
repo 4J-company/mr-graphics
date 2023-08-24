@@ -3,7 +3,7 @@
 // destructor
 ter::CommandUnit::~CommandUnit() {}
 
-ter::CommandUnit::CommandUnit(VulkanState va)
+ter::CommandUnit::CommandUnit(const VulkanState &state)
 {
   vk::CommandPoolCreateInfo pool_create_info {
       .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
@@ -11,7 +11,7 @@ ter::CommandUnit::CommandUnit(VulkanState va)
   };
 
   vk::Result result;
-  std::tie(result, _cmd_pool) = va.device().createCommandPool(pool_create_info);
+  std::tie(result, _cmd_pool) = state.device().createCommandPool(pool_create_info);
   assert(result == vk::Result::eSuccess);
 
   vk::CommandBufferAllocateInfo cmd_buffer_alloc_info {
@@ -19,7 +19,7 @@ ter::CommandUnit::CommandUnit(VulkanState va)
       .level = vk::CommandBufferLevel::ePrimary,
       .commandBufferCount = 1,
   };
-  result = va.device().allocateCommandBuffers(&cmd_buffer_alloc_info, &_cmd_buffer);
+  result = state.device().allocateCommandBuffers(&cmd_buffer_alloc_info, &_cmd_buffer);
   assert(result == vk::Result::eSuccess);
 }
 

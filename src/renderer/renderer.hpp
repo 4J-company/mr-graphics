@@ -13,7 +13,8 @@ namespace ter
   class Application : private wnd::Application
   {
   private:
-    VulkanState state;
+    VulkanState _state;
+    VkDebugUtilsMessengerEXT _debug_messenger;
 
   public:
     Application();
