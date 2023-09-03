@@ -22,12 +22,7 @@ ter::Application::Application()
   std::vector<const char *> extension_names;
   std::vector<const char *> layers_names;
   extension_names.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
-
-#ifdef WIN32
-  extension_names.push_back(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
-#else
-  extension_names.push_back(VK_KHR_XCB_SURFACE_EXTENSION_NAME);
-#endif
+  extension_names.push_back(VK_XWIN_SURFACE_EXTENSION_NAME);
 
   if constexpr (1) 
   {

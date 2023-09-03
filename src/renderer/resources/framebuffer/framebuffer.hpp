@@ -20,7 +20,7 @@ namespace ter
     friend class WindowContext;
 
   private:
-    inline static const size_t max_presentable_images = 1, max_gbuffers = 1;
+    inline static const size_t max_presentable_images = 2, max_gbuffers = 1;
 
     vk::Framebuffer _framebuffer;
 
