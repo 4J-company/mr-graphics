@@ -1,4 +1,3 @@
-#include "window_context.hpp"
 #include <system.hpp>
 
 void xmain(int argc, const char **argv)
