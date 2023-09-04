@@ -13,7 +13,8 @@ namespace mr
   class Application : private Kernel
   {
   private:
-    VulkanState state;
+    VulkanState _state;
+    VkDebugUtilsMessengerEXT _debug_messenger;
 
   public:
     Application();

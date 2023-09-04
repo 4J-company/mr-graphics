@@ -22,7 +22,7 @@ namespace mr
 
   public:
     // constructors
-    Window(mr::VulkanState state, size_t width = 800, size_t height = 600);
+    Window(const mr::VulkanState &state, size_t width = 800, size_t height = 600);
     Window(Window &&other) noexcept = default;
     Window &operator=(Window &&other) noexcept = default;
 

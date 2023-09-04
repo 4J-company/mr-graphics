@@ -3,7 +3,7 @@
 #include "resources/command_unit/command_unit.hpp"
 #include "resources/pipelines/graphics_pipeline.hpp"
 
-mr::WindowContext::WindowContext(Window *parent, VulkanState state) : _parent(parent)
+mr::WindowContext::WindowContext(Window *parent, const VulkanState &state) : _parent(parent), _state(state)
 {
   _surface = xgfx::createSurface(_parent->xwindow_ptr(), state.instance());
 
@@ -58,6 +58,8 @@ mr::WindowContext::WindowContext(Window *parent, VulkanState state) : _parent(pa
       ? vk::CompositeAlphaFlagBitsKHR::eInherit
       : vk::CompositeAlphaFlagBitsKHR::eOpaque;
 
+  /// _swapchain_format = vk::Format::eB8G8R8A8Srgb; // ideal, we have eB8G8R8A8Unorm
+  _swapchain_format = vk::Format::eB8G8R8A8Unorm;
   vk::SwapchainCreateInfoKHR swapchain_create_info {.flags = {},
                                                     .surface = _surface,
                                                     .minImageCount = Framebuffer::max_presentable_images,
@@ -80,9 +82,11 @@ mr::WindowContext::WindowContext(Window *parent, VulkanState state) : _parent(pa
   swapchain_create_info.pQueueFamilyIndices = indeces;
 
   _swapchain = state.device().createSwapchainKHR(swapchain_create_info).value;
+
+  create_framebuffers(state);
 }
 
-void mr::WindowContext::create_framebuffers(VulkanState state)
+void mr::WindowContext::create_framebuffers(const VulkanState &state)
 {
   std::vector<vk::Image> swampchain_images;
   swampchain_images = state.device().getSwapchainImagesKHR(_swapchain).value;
@@ -93,27 +97,25 @@ void mr::WindowContext::create_framebuffers(VulkanState state)
 
 void mr::WindowContext::render()
 {
-  static CommandUnit command_unit {state};
-  static vk::Semaphore _image_available_semaphore;
-  static vk::Semaphore _render_rinished_semaphore;
-  static vk::Fence _fence;
-  static Shader _shader = Shader(state, "default");
-  static GraphicsPipeline _pipeline = GraphicsPipeline(state, &_shader);
+  vk::SemaphoreCreateInfo semaphore_create_info {};
+  vk::FenceCreateInfo fence_create_info { .flags = vk::FenceCreateFlagBits::eSignaled };
+  static CommandUnit command_unit {_state};
+  static vk::Semaphore _image_available_semaphore = _state.device().createSemaphore(semaphore_create_info).value;
+  static vk::Semaphore _render_rinished_semaphore = _state.device().createSemaphore(semaphore_create_info).value;
+  static vk::Fence _fence = _state.device().createFence(fence_create_info).value;
+  static Shader _shader = Shader(_state, "default");
+  static GraphicsPipeline _pipeline = GraphicsPipeline(_state, &_shader);
 
-  state.device().waitForFences(_fence, VK_TRUE, UINT64_MAX);
-  state.device().resetFences(_fence);
-
+  _state.device().waitForFences(_fence, VK_TRUE, UINT64_MAX);
+  _state.device().resetFences(_fence);
   mr::uint image_index = 0;
 
-  state.device().acquireNextImageKHR(_swapchain, UINT64_MAX, _image_available_semaphore, nullptr, &image_index);
-
+  _state.device().acquireNextImageKHR(_swapchain, UINT64_MAX, _image_available_semaphore, nullptr, &image_index);
   command_unit.begin();
 
-  vk::ClearValue clear_color;
-  clear_color.setColor(vk::ClearColorValue(std::array<float, 4ULL> {0.f, 0.f, 0.f, 1.f})); // don't compile otherwise
-
+  vk::ClearValue clear_color {vk::ClearColorValue(0, 0, 0, 0)};
   vk::RenderPassBeginInfo render_pass_info {
-      .renderPass = state.render_pass(),
+      .renderPass = _state.render_pass(),
       .framebuffer = _framebuffers[image_index].framebuffer(),
       .renderArea = {{0, 0}, _extent},
       .clearValueCount = 1,
@@ -143,7 +145,7 @@ void mr::WindowContext::render()
       .pSignalSemaphores = signal_semaphores,
   };
 
-  state.queue().submit(submit_info, _fence);
+  _state.queue().submit(submit_info, _fence);
 
   vk::SwapchainKHR swapchains[] = {_swapchain};
   vk::PresentInfoKHR present_info {
@@ -154,5 +156,5 @@ void mr::WindowContext::render()
       .pImageIndices = &image_index,
       .pResults = nullptr, // Optional
   };
-  state.queue().presentKHR(present_info);
+  _state.queue().presentKHR(present_info);
 }

@@ -1,6 +1,6 @@
 #include "resources/pipelines/graphics_pipeline.hpp"
 
-mr::GraphicsPipeline::GraphicsPipeline(VulkanState state, Shader *shader)
+mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state, Shader *shader)
 {
   _shader = shader;
 

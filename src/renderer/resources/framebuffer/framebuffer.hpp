@@ -20,7 +20,7 @@ namespace mr
     friend class WindowContext;
 
   private:
-    inline static const size_t max_presentable_images = 1, max_gbuffers = 1;
+    inline static const size_t max_presentable_images = 2, max_gbuffers = 1;
 
     vk::Framebuffer _framebuffer;
 
@@ -34,7 +34,7 @@ namespace mr
     Framebuffer() = default;
     ~Framebuffer() = default;
 
-    Framebuffer(VulkanState state, uint width, uint height, vk::Format swapchain_format, vk::Image image);
+    Framebuffer(const VulkanState &state, uint width, uint height, vk::Format swapchain_format, vk::Image image);
 
     Framebuffer(Framebuffer &&other) noexcept = default;
     Framebuffer &operator=(Framebuffer &&other) noexcept = default;

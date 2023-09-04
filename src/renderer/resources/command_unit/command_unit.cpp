@@ -3,7 +3,7 @@
 // destructor
 mr::CommandUnit::~CommandUnit() {}
 
-mr::CommandUnit::CommandUnit(VulkanState state)
+mr::CommandUnit::CommandUnit(const VulkanState &state)
 {
   vk::CommandPoolCreateInfo pool_create_info {
       .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,

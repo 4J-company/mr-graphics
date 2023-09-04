@@ -1,6 +1,6 @@
 #include "resources/framebuffer/framebuffer.hpp"
 
-mr::Framebuffer::Framebuffer(VulkanState state, uint width, uint height, vk::Format swapchain_format, vk::Image image)
+mr::Framebuffer::Framebuffer(const VulkanState &state, uint width, uint height, vk::Format swapchain_format, vk::Image image)
     : _width(width), _height(height)
 {
   // assert(images.size() == max_presentable_images);
