@@ -1,4 +1,3 @@
-#include <vulkan/vulkan_handles.hpp>
 #if !defined(__pipeline_hpp_)
   #define __pipeline_hpp_
 

@@ -1,4 +1,3 @@
-#include <vulkan/vulkan_structs.hpp>
 #if !defined(__framebuffer_hpp_)
   #define __framebuffer_hpp_
 

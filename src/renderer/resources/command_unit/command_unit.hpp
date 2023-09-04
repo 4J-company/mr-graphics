@@ -1,4 +1,3 @@
-#include <vulkan/vulkan_handles.hpp>
 #if !defined(__command_unit_hpp_)
   #define __command_unit_hpp_
 
