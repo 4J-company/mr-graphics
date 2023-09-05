@@ -1,13 +1,13 @@
 #include "resources/images/image.hpp"
 
-ter::Image::Image(const VulkanState &state, uint width, uint height, vk::Format format, vk::Image image)
+mr::Image::Image(const VulkanState &state, uint width, uint height, vk::Format format, vk::Image image)
     : _image(image), _size({width, height}), _format(format)
 {
   _aspect_flags = vk::ImageAspectFlagBits::eColor;
   craete_image_view(state);
 }
 
-void ter::Image::craete_image_view(const VulkanState &state)
+void mr::Image::craete_image_view(const VulkanState &state)
 {
   vk::ImageSubresourceRange range {
       .aspectMask = _aspect_flags,
@@ -24,13 +24,11 @@ void ter::Image::craete_image_view(const VulkanState &state)
                                                       vk::ComponentSwizzle::eIdentity, vk::ComponentSwizzle::eIdentity},
                                        .subresourceRange = range};
 
-  vk::Result result;
-  std::tie(result, _image_view) = state.device().createImageView(create_info);
-  assert(result == vk::Result::eSuccess);
+  _image_view = state.device().createImageView(create_info).value;
 }
 
-void ter::Image::switch_layout(vk::ImageLayout layout) {}
+void mr::Image::switch_layout(vk::ImageLayout layout) {}
 
-void ter::Image::copy_to_host() const {}
+void mr::Image::copy_to_host() const {}
 
-void ter::Image::get_pixel(const vk::Extent2D &coords) const {}
+void mr::Image::get_pixel(const vk::Extent2D &coords) const {}

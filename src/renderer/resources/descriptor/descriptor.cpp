@@ -1,3 +1,3 @@
 #include "resources/descriptor/descriptor.hpp"
 
-void ter::Descriptor::apply() {}
+void mr::Descriptor::apply() {}

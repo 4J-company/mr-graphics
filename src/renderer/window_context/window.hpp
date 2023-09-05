@@ -4,14 +4,11 @@
 #include "pch.hpp"
 #include "window_context.hpp"
 
-namespace ter
+namespace mr
 {
   class WindowContext;
-} // namespace ter
 
-namespace wnd
-{
-  class Application;
+  class Kernel;
 
   class Window
   {
@@ -21,11 +18,11 @@ namespace wnd
     xwin::EventQueue _event_queue;
     std::thread _thread;
 
-    ter::WindowContext _context;
+    mr::WindowContext _context;
 
   public:
     // constructors
-    Window(const ter::VulkanState &state, size_t width = 800, size_t height = 600);
+    Window(const mr::VulkanState &state, size_t width = 800, size_t height = 600);
     Window(Window &&other) noexcept = default;
     Window &operator=(Window &&other) noexcept = default;
 
@@ -41,11 +38,11 @@ namespace wnd
     void render() { _context.render(); }
   };
 
-  class Application
+  class Kernel
   {
   public:
-    Application();
-    ~Application();
+    Kernel();
+    ~Kernel();
   };
-} // namespace wnd
-#endif // __window_context_hpp_
+} // namespace mr
+#endif // __window_hpp_

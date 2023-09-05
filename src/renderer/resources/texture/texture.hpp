@@ -3,7 +3,7 @@
 
   #include "resources/texture/sampler/sampler.hpp"
 
-namespace ter
+namespace mr
 {
   class Texture
   {
@@ -19,6 +19,6 @@ namespace ter
     Texture(Texture &&other) noexcept = default;
     Texture &operator=(Texture &&other) noexcept = default;
   };
-} // namespace ter
+} // namespace mr
 
 #endif // __texture_hpp_

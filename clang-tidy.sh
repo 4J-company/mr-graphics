@@ -61,6 +61,7 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
+echo "$DIRECTORIES -> $BUILD_PATH"
 echo "Enabled checks: $CHECKS"
 
 # obtain source files
@@ -75,6 +76,6 @@ CLANG_TIDY_FILES=$(
 
 # execute clang-tidy
 for FILE in ${CLANG_TIDY_FILES}; do
-  echo "\n$FILE:"
+  echo "$FILE:"
   clang-tidy -p "$BUILD_PATH" -checks="$CHECKS" "$FILE"
 done            	

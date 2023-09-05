@@ -5,7 +5,7 @@
 
 #include "vulkan_application.hpp"
 
-namespace ter
+namespace mr
 {
   class Image
   {
@@ -40,6 +40,6 @@ namespace ter
   public:
     const vk::ImageView &image_view() const { return _image_view; }
   };
-} // namespace ter
+} // namespace mr
 
 #endif // __image_hpp_

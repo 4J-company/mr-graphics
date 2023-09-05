@@ -3,7 +3,7 @@
 
   #include "pch.hpp"
 
-namespace ter
+namespace mr
 {
   class Sampler
   {
@@ -21,6 +21,6 @@ namespace ter
     Sampler(Sampler &&other) noexcept = default;
     Sampler &operator=(Sampler &&other) noexcept = default;
   };
-} // namespace ter
+} // namespace mr
 
 #endif // __sampler_hpp_

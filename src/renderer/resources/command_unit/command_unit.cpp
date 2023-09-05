@@ -1,38 +1,30 @@
 #include "resources/command_unit/command_unit.hpp"
 
 // destructor
-ter::CommandUnit::~CommandUnit() {}
+mr::CommandUnit::~CommandUnit() {}
 
-ter::CommandUnit::CommandUnit(const VulkanState &state)
+mr::CommandUnit::CommandUnit(const VulkanState &state)
 {
   vk::CommandPoolCreateInfo pool_create_info {
       .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
       .queueFamilyIndex = 0 /// TODO: correct index
   };
 
-  vk::Result result;
-  std::tie(result, _cmd_pool) = state.device().createCommandPool(pool_create_info);
-  assert(result == vk::Result::eSuccess);
+  _cmd_pool = state.device().createCommandPool(pool_create_info).value;
 
   vk::CommandBufferAllocateInfo cmd_buffer_alloc_info {
       .commandPool = _cmd_pool,
       .level = vk::CommandBufferLevel::ePrimary,
       .commandBufferCount = 1,
   };
-  result = state.device().allocateCommandBuffers(&cmd_buffer_alloc_info, &_cmd_buffer);
-  assert(result == vk::Result::eSuccess);
+  state.device().allocateCommandBuffers(&cmd_buffer_alloc_info, &_cmd_buffer);
 }
 
-void ter::CommandUnit::begin()
+void mr::CommandUnit::begin()
 {
   _cmd_buffer.reset();
   vk::CommandBufferBeginInfo begin_info {}; /// .flags = 0, .pInheritanceInfo = nullptr, };
-  auto result = _cmd_buffer.begin(begin_info);
-  assert(result == vk::Result::eSuccess);
+  _cmd_buffer.begin(begin_info);
 }
 
-void ter::CommandUnit::end()
-{
-  auto result = _cmd_buffer.end();
-  assert(result == vk::Result::eSuccess);
-}
+void mr::CommandUnit::end() { _cmd_buffer.end(); }

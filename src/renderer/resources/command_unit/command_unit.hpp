@@ -1,4 +1,3 @@
-#include <vulkan/vulkan_handles.hpp>
 #if !defined(__command_unit_hpp_)
   #define __command_unit_hpp_
 
@@ -6,7 +5,7 @@
 
   #include "vulkan_application.hpp"
 
-namespace ter
+namespace mr
 {
   class CommandUnit
   {
@@ -31,6 +30,6 @@ namespace ter
 
     vk::CommandBuffer *operator->() { return &_cmd_buffer; }
   };
-} // namespace ter
+} // namespace mr
 
 #endif // __command_unit_hpp_

@@ -3,8 +3,8 @@
 
   #include "pch.hpp"
 
-namespace ter
+namespace mr
 {
-} // namespace ter
+} // namespace mr
 
 #endif // __context_hpp_

@@ -5,14 +5,10 @@
   #include "resources/resources.hpp"
   #include "vulkan_application.hpp"
 
-namespace wnd
+namespace mr
 {
-  // forward declaration
   class Window;
-} // namespace wnd
 
-namespace ter
-{
   class WindowContext
   {
   private:
@@ -24,11 +20,11 @@ namespace ter
 
     VulkanState _state;
 
-    wnd::Window *_parent;
+    Window *_parent;
 
   public:
     WindowContext() = default;
-    WindowContext(wnd::Window *parent, const VulkanState &state);
+    WindowContext(Window *parent, const VulkanState &state);
     WindowContext(WindowContext &&other) noexcept = default;
     WindowContext &operator=(WindowContext &&other) noexcept = default;
 
@@ -38,5 +34,5 @@ namespace ter
     void resize(size_t width, size_t height);
     void render();
   };
-} // namespace ter
+} // namespace mr
 #endif // __window_context_hpp_

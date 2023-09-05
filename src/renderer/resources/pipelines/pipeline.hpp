@@ -1,4 +1,3 @@
-#include <vulkan/vulkan_handles.hpp>
 #if !defined(__pipeline_hpp_)
   #define __pipeline_hpp_
 
@@ -7,7 +6,7 @@
   #include "resources/shaders/shader.hpp"
   #include "vulkan_application.hpp"
 
-namespace ter
+namespace mr
 {
   class Pipeline
   {
@@ -29,6 +28,6 @@ namespace ter
 
     virtual void apply(vk::CommandBuffer cmd_buffer) const;
   };
-} // namespace ter
+} // namespace mr
 
 #endif // __pipeline_hpp_

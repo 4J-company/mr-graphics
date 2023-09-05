@@ -7,31 +7,25 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback( VkDebugUtilsMessageSeverity
                                                      const VkDebugUtilsMessengerCallbackDataEXT *CallbackData,
                                                      void *UserData )
 {
-  if (MessageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
-  {
-    // SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 12);
-    std::cout << "validation layer: " << CallbackData->pMessage << '\n' << std::endl;
-    // SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 7);
-  }
+  std::cout << CallbackData->pMessage << '\n' << std::endl;
   return VK_FALSE;
 }
 
-// ter::application class defualt constructor (initializes vulkan instance, device ...)
-ter::Application::Application() 
+// mr::Application class defualt constructor (initializes vulkan instance, device ...)
+mr::Application::Application() 
 {
   std::vector<const char *> extension_names;
   std::vector<const char *> layers_names;
   extension_names.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
   extension_names.push_back(VK_XWIN_SURFACE_EXTENSION_NAME);
 
-  if constexpr (1) 
-  {
-    extension_names.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
-    extension_names.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-    
-    layers_names.push_back("VK_LAYER_KHRONOS_validation");
-    layers_names.push_back("VK_LAYER_RENDERDOC_Capture");
-  }
+#if !NDEBUG 
+  extension_names.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+  extension_names.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+
+  layers_names.push_back("VK_LAYER_KHRONOS_validation");
+  layers_names.push_back("VK_LAYER_RENDERDOC_Capture");
+#endif
 
   vk::ApplicationInfo app_info 
   {
@@ -50,39 +44,26 @@ ter::Application::Application()
     .ppEnabledExtensionNames = extension_names.data(),
   };
 
-  // _instance = vk::createInstance(inst_ci);
-  vk::Result result;
-  std::tie(result, _state._instance) = vk::createInstance(inst_ci);
-  assert(result == vk::Result::eSuccess);
+  _state._instance = vk::createInstance(inst_ci).value;
 
-  if constexpr (1)
+#if !NDEBUG
+  auto pfnVkCreateDebugUtilsMessengerEXT = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>( _state.instance().getProcAddr( "vkCreateDebugUtilsMessengerEXT" ) );
+  assert(pfnVkCreateDebugUtilsMessengerEXT);
+
+  auto pfnVkDestroyDebugUtilsMessengerEXT = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>( _state.instance().getProcAddr( "vkDestroyDebugUtilsMessengerEXT" ) );
+  assert(pfnVkDestroyDebugUtilsMessengerEXT);
+
+  vk::DebugUtilsMessengerCreateInfoEXT debug_msgr_create_info 
   {
-    VkDebugUtilsMessengerCreateInfoEXT debug_msgr_create_info {VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT};
+    .messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError,
+    .messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance,
+    .pfnUserCallback = DebugCallback,
+  };
 
-    debug_msgr_create_info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | 
-                                              VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | 
-                                              VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-    debug_msgr_create_info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | 
-                                          VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | 
-                                          VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-    debug_msgr_create_info.pfnUserCallback = DebugCallback;
-
-    auto create_debug_function = (PFN_vkCreateDebugUtilsMessengerEXT)_state._instance.getProcAddr("vkCreateDebugUtilsMessengerEXT");
-    VkResult result;
-    if (create_debug_function != nullptr)
-      result = create_debug_function(_state._instance, &debug_msgr_create_info, nullptr, &_debug_messenger);
-
-    assert(result == VK_SUCCESS);
-  }
-
-#if DEBUG
-  debugUtilsMessenger = _instance.createDebugUtilsMessengerEXT(vk::su::makeDebugUtilsMessengerCreateInfoEXT());
+  pfnVkCreateDebugUtilsMessengerEXT(_state.instance(), reinterpret_cast<const VkDebugUtilsMessengerCreateInfoEXT *>(&debug_msgr_create_info), nullptr, &_debug_messenger);
 #endif
 
-  std::vector<vk::PhysicalDevice> phys_device_array;
-  std::tie(result, phys_device_array) = _state._instance.enumeratePhysicalDevices();
-  assert(result == vk::Result::eSuccess);
-  _state._phys_device = phys_device_array.front();
+  _state._phys_device = _state._instance.enumeratePhysicalDevices().value.front();
 
   // get the QueueFamilyProperties of the first PhysicalDevice
   std::vector<vk::QueueFamilyProperties> queueFamilyProperties = _state._phys_device.getQueueFamilyProperties();
@@ -126,8 +107,7 @@ ter::Application::Application()
     .ppEnabledExtensionNames = extension_names.data(),
     .pEnabledFeatures = &required_features,
   };
-  std::tie(result, _state._device) = _state._phys_device.createDevice(create_info);
-  assert(result == vk::Result::eSuccess);
+  _state._device = _state._phys_device.createDevice(create_info).value;
 
   assert(graphics_queue_family_index == 0);
   _state._queue = _state._device.getQueue(graphics_queue_family_index, 0);
@@ -174,23 +154,19 @@ ter::Application::Application()
     .pDependencies = &dependency,   
   };
 
-  std::tie(result, _state._render_pass) = _state._device.createRenderPass(render_pass_create_info);
-  assert(result == vk::Result::eSuccess);
+  _state._render_pass = _state._device.createRenderPass(render_pass_create_info).value;
 }
 
-ter::Application::~Application() {}
+mr::Application::~Application() {}
 
-[[nodiscard]] std::unique_ptr<ter::Buffer> ter::Application::create_buffer() const
-{
-  return std::make_unique<Buffer>();
-}
+[[nodiscard]] std::unique_ptr<mr::Buffer> mr::Application::create_buffer() const { return std::make_unique<Buffer>(); }
 
-[[nodiscard]] std::unique_ptr<ter::CommandUnit> ter::Application::create_command_unit() const
+[[nodiscard]] std::unique_ptr<mr::CommandUnit> mr::Application::create_command_unit() const
 {
   return std::make_unique<CommandUnit>();
 }
 
-[[nodiscard]] std::unique_ptr<wnd::Window> ter::Application::create_window(size_t width, size_t height) const
+[[nodiscard]] std::unique_ptr<mr::Window> mr::Application::create_window(size_t width, size_t height) const
 {
-  return std::make_unique<wnd::Window>(_state, width, height);
+  return std::make_unique<Window>(_state, width, height);
 }

@@ -29,19 +29,20 @@
 #include <vector>
 
 // user includes
-#define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
 #define VULKAN_HPP_NO_EXCEPTIONS
+#define VULKAN_HPP_NO_NODISCARD_WARNINGS
+#define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
 #include <CrossWindow/CrossWindow.h>
 #include <CrossWindow/Graphics.h>
 #include <vulkan/vulkan.hpp>
 
-// WinAPI macros undefined
+// WinAPI macros undefined :(
 #undef max(a, b)
 
-namespace ter
+namespace mr
 {
   using uint = unsigned int;
   using byte = unsigned char;
-} // namespace ter
+} // namespace mr
 
 #endif // __pch_hpp_

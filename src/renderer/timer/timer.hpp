@@ -1,7 +1,7 @@
 #if !defined(__timer_hpp_)
   #define __timer_hpp_
 
-namespace ter
+namespace mr
 {
   /* Timer measures time in seconds */
   template <std::floating_point T> class Timer
@@ -50,6 +50,6 @@ namespace ter
     T _fps {};           // Frames per second
     bool _pause {false}; // Pause flag
   };                     // end of class 'timer'
-} // namespace ter
+} // namespace mr
 
 #endif // __timer_hpp_

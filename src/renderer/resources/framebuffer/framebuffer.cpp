@@ -1,6 +1,6 @@
 #include "resources/framebuffer/framebuffer.hpp"
 
-ter::Framebuffer::Framebuffer(const VulkanState &state, uint width, uint height, vk::Format swapchain_format, vk::Image image)
+mr::Framebuffer::Framebuffer(const VulkanState &state, uint width, uint height, vk::Format swapchain_format, vk::Image image)
     : _width(width), _height(height)
 {
   // assert(images.size() == max_presentable_images);
@@ -15,9 +15,7 @@ ter::Framebuffer::Framebuffer(const VulkanState &state, uint width, uint height,
       .layers = 1,
   };
 
-  vk::Result result;
-  std::tie(result, _framebuffer) = state.device().createFramebuffer(framebuffer_create_info);
-  assert(result == vk::Result::eSuccess);
+  _framebuffer = state.device().createFramebuffer(framebuffer_create_info).value;
 
   _viewport.viewport.x = 0.0f;
   _viewport.viewport.y = 0.0f;

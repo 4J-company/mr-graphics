@@ -1,6 +1,6 @@
 #include "resources/pipelines/graphics_pipeline.hpp"
 
-ter::GraphicsPipeline::GraphicsPipeline(const VulkanState &state, Shader *shader)
+mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state, Shader *shader)
 {
   _shader = shader;
 
@@ -69,8 +69,7 @@ ter::GraphicsPipeline::GraphicsPipeline(const VulkanState &state, Shader *shader
       .pPushConstantRanges = nullptr,
   };
 
-  vk::Result result;
-  std::tie(result, _layout) = state.device().createPipelineLayout(pipeline_layout_create_info);
+  _layout = state.device().createPipelineLayout(pipeline_layout_create_info).value;
 
   vk::GraphicsPipelineCreateInfo pipeline_create_info {
       // .stageCount = static_cast<uint>(_shader->get_stages().size()),
@@ -92,14 +91,13 @@ ter::GraphicsPipeline::GraphicsPipeline(const VulkanState &state, Shader *shader
   };
 
   std::vector<vk::Pipeline> pipelines;
-  std::tie(result, pipelines) = state.device().createGraphicsPipelines(nullptr, pipeline_create_info);
-  assert(result == vk::Result::eSuccess);
+  pipelines = state.device().createGraphicsPipelines(nullptr, pipeline_create_info).value;
   _pipeline = pipelines[0];
 }
 
-void ter::GraphicsPipeline::apply(vk::CommandBuffer cmd_buffer) const
+void mr::GraphicsPipeline::apply(vk::CommandBuffer cmd_buffer) const
 {
   cmd_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics, _pipeline);
 }
 
-void ter::GraphicsPipeline::recompile() {}
+void mr::GraphicsPipeline::recompile() {}

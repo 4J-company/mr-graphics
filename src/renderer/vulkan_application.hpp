@@ -1,10 +1,9 @@
-#include <vulkan/vulkan_handles.hpp>
 #if !defined(__vulkan_application_hpp_)
   #define __vulkan_application_hpp_
 
   #include "pch.hpp"
 
-namespace ter
+namespace mr
 {
   class VulkanState
   {
@@ -25,6 +24,6 @@ namespace ter
     vk::RenderPass render_pass() const { return _render_pass; }
     vk::Queue queue() const { return _queue; }
   };
-} // namespace ter
+} // namespace mr
 
 #endif // __vulkan_application_hpp_

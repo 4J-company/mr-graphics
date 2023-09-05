@@ -2,7 +2,7 @@
 #include <filesystem>
 #include <fstream>
 
-ter::Shader::Shader(const VulkanState &state, std::string_view filename) : _path(std::string("bin/shaders/") + filename.data())
+mr::Shader::Shader(const VulkanState &state, std::string_view filename) : _path(std::string("bin/shaders/") + filename.data())
 {
   static const vk::ShaderStageFlagBits stage_bits[] = {vk::ShaderStageFlagBits::eVertex,
                                                        vk::ShaderStageFlagBits::eFragment,
@@ -24,9 +24,9 @@ ter::Shader::Shader(const VulkanState &state, std::string_view filename) : _path
     vk::ShaderModuleCreateInfo create_info {.codeSize = source.size(),
                                             .pCode = reinterpret_cast<const uint *>(source.data())};
 
-    vk::Result result;
-    std::tie(result, _modules[shd]) = state.device().createShaderModule(create_info);
-    assert(result == vk::Result::eSuccess);
+    // vk::Result result;
+    // std::tie(result, _modules[shd]) = state.device().createShaderModule(create_info);
+    _modules[shd] = state.device().createShaderModule(create_info).value;
 
     _stages[shd].stage = stage_bits[shd];
     _stages[shd].module = _modules[shd];
@@ -35,20 +35,20 @@ ter::Shader::Shader(const VulkanState &state, std::string_view filename) : _path
 }
 
 /*
-ter::Shader::~Shader()
+mr::Shader::~Shader()
 {
   /// TODO: destroy shader modules
 }
 */
 
-void ter::Shader::compile(ShaderStages stage)
+void mr::Shader::compile(ShaderStages stage)
 {
   static const char *shader_type_names[] = {"vert", "frag", "geom", "tesc", "tese", "comp"};
   std::string stage_type = shader_type_names[(int)stage];
   std::system(("glslc *." + stage_type + " -o " + stage_type + ".spv").c_str());
 }
 
-std::vector<char> ter::Shader::load(ShaderStages stage)
+std::vector<char> mr::Shader::load(ShaderStages stage)
 {
   static const char *shader_type_names[] = {"vert", "frag", "geom", "tesc", "tese", "comp"};
   std::filesystem::path stage_file_path = _path;
@@ -68,4 +68,4 @@ std::vector<char> ter::Shader::load(ShaderStages stage)
   return source;
 }
 
-void ter::Shader::reload() {}
+void mr::Shader::reload() {}

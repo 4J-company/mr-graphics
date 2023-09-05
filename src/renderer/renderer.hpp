@@ -8,9 +8,9 @@
   #include "vulkan_application.hpp"
   #include "window_context/window.hpp"
 
-namespace ter
+namespace mr
 {
-  class Application : private wnd::Application
+  class Application : private Kernel
   {
   private:
     VulkanState _state;
@@ -28,13 +28,13 @@ namespace ter
     [[nodiscard]] std::unique_ptr<Pipeline> create_compute_pipeline() const;
 
     // window creator
-    [[nodiscard]] std::unique_ptr<wnd::Window> create_window(size_t width, size_t height) const;
+    [[nodiscard]] std::unique_ptr<Window> create_window(size_t width, size_t height) const;
 
     /// REAL SHIT BELOW
     vk::Semaphore _image_available_semaphore;
     vk::Semaphore _render_rinished_semaphore;
     vk::Fence _fence;
   };
-} // namespace ter
+} // namespace mr
 
 #endif // __renderer_hpp_
