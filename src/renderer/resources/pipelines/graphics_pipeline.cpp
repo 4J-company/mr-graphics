@@ -62,15 +62,33 @@ mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state, Shader *shader)
       .blendConstants = std::array<float, 4> {0.0, 0.0, 0.0, 0.0}, // ???
   };
 
+  // create pipeline layout
   vk::PipelineLayoutCreateInfo pipeline_layout_create_info {
       .setLayoutCount = 0,
       .pSetLayouts = nullptr,
       .pushConstantRangeCount = 0,
       .pPushConstantRanges = nullptr,
   };
-
   _layout = state.device().createPipelineLayout(pipeline_layout_create_info).value;
 
+  // retrieve pipeline cache
+  size_t cache_size = 0;
+  char *cache_data = nullptr;
+  std::fstream cache_file("bin/cache/pipeline", std::ios::in | std::ios::out | std::ios::binary | std::ios::ate);
+  if (cache_file)
+  {
+    cache_size = cache_file.tellg();
+    cache_data = new char[cache_size];
+    cache_file.seekg(std::ios::beg);
+    cache_file.read(cache_data, cache_size);
+    // TODO: maybe cache validation is needed (vk::PipelineCacheHeaderVersionOne)
+  }
+  vk::PipelineCacheCreateInfo pipeline_cache_create_info {.initialDataSize = cache_size, .pInitialData = cache_data};
+  _pipeline_cache = state.device().createPipelineCache(pipeline_cache_create_info).value;
+  if (cache_data != nullptr)
+    delete[] cache_data;
+
+  // create pipeline
   vk::GraphicsPipelineCreateInfo pipeline_create_info {
       // .stageCount = static_cast<uint>(_shader->get_stages().size()),
       .stageCount = _shader->stage_number(),
@@ -91,8 +109,22 @@ mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state, Shader *shader)
   };
 
   std::vector<vk::Pipeline> pipelines;
-  pipelines = state.device().createGraphicsPipelines(nullptr, pipeline_create_info).value;
+  pipelines = state.device().createGraphicsPipelines(_pipeline_cache, pipeline_create_info).value;
   _pipeline = pipelines[0];
+
+  // save pipeline cache
+  auto result = state.device().getPipelineCacheData(_pipeline_cache, &cache_size, nullptr);
+  assert(result == vk::Result::eSuccess);
+  char *cache_save_data = new char[cache_size]; // TODO: maybe using cache_data buffer instead
+  result = state.device().getPipelineCacheData(_pipeline_cache, &cache_size, cache_save_data);
+  assert(result == vk::Result::eSuccess);
+  if (cache_file && cache_save_data != nullptr)
+  {
+    cache_file.seekg(std::ios::beg);
+    cache_file.write(cache_save_data, cache_size);
+  }
+  if (cache_save_data != nullptr)
+    delete[] cache_save_data;
 }
 
 void mr::GraphicsPipeline::apply(vk::CommandBuffer cmd_buffer) const

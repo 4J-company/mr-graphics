@@ -113,7 +113,7 @@ void mr::WindowContext::render()
   _state.device().acquireNextImageKHR(_swapchain, UINT64_MAX, _image_available_semaphore, nullptr, &image_index);
   command_unit.begin();
 
-  vk::ClearValue clear_color {vk::ClearColorValue(0, 0, 0, 0)};
+  vk::ClearValue clear_color {vk::ClearColorValue(std::array{0, 0, 0, 0})}; // anyone who changes that line will be fucked
   vk::RenderPassBeginInfo render_pass_info {
       .renderPass = _state.render_pass(),
       .framebuffer = _framebuffers[image_index].framebuffer(),

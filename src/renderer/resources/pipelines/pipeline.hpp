@@ -13,6 +13,7 @@ namespace mr
   protected:
     vk::Pipeline _pipeline;
     vk::PipelineLayout _layout;
+    vk::PipelineCache _pipeline_cache;
     // std::vector?<vk::DescriptorSetLayout> _desctiptor_layouts;
     // std::vector?<Attachment> _attachments;
     // std::vector?<Constant> _constants;
