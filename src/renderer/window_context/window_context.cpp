@@ -2,6 +2,7 @@
 #include "renderer.hpp"
 #include "resources/command_unit/command_unit.hpp"
 #include "resources/pipelines/graphics_pipeline.hpp"
+#include <vulkan/vulkan_enums.hpp>
 
 mr::WindowContext::WindowContext(Window *parent, const VulkanState &state) : _parent(parent), _state(state)
 {
@@ -84,6 +85,10 @@ mr::WindowContext::WindowContext(Window *parent, const VulkanState &state) : _pa
   _swapchain = state.device().createSwapchainKHRUnique(swapchain_create_info).value;
 
   create_framebuffers(state);
+
+  _image_available_semaphore = _state.device().createSemaphore({}).value;
+  _render_rinished_semaphore = _state.device().createSemaphore({}).value;
+  _fence = _state.device().createFence({.flags = vk::FenceCreateFlagBits::eSignaled}).value;
 }
 
 void mr::WindowContext::create_framebuffers(const VulkanState &state)
@@ -96,14 +101,9 @@ void mr::WindowContext::create_framebuffers(const VulkanState &state)
 
 void mr::WindowContext::render()
 {
-  vk::SemaphoreCreateInfo semaphore_create_info {};
-  vk::FenceCreateInfo fence_create_info { .flags = vk::FenceCreateFlagBits::eSignaled };
-  static CommandUnit command_unit {_state};
-  static vk::Semaphore _image_available_semaphore = _state.device().createSemaphore(semaphore_create_info).value;
-  static vk::Semaphore _render_rinished_semaphore = _state.device().createSemaphore(semaphore_create_info).value;
-  static vk::Fence _fence = _state.device().createFence(fence_create_info).value;
   static Shader _shader = Shader(_state, "default");
   static GraphicsPipeline _pipeline = GraphicsPipeline(_state, &_shader);
+  static CommandUnit command_unit {_state};
 
   _state.device().waitForFences(_fence, VK_TRUE, UINT64_MAX);
   _state.device().resetFences(_fence);

@@ -20,6 +20,10 @@ namespace mr
 
     VulkanState _state;
 
+    vk::Semaphore _image_available_semaphore;
+    vk::Semaphore _render_rinished_semaphore;
+    vk::Fence _fence;
+
     Window *_parent;
 
   public:
