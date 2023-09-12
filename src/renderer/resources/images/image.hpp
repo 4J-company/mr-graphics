@@ -10,8 +10,8 @@ namespace mr
   class Image
   {
   private:
-    vk::Image _image;
-    vk::ImageView _image_view;
+    vk::UniqueImage _image;
+    vk::UniqueImageView _image_view;
 
     vk::Extent2D _size;
     vk::Format _format;
@@ -38,7 +38,7 @@ namespace mr
     void craete_image_view(const VulkanState &state);
 
   public:
-    const vk::ImageView &image_view() const { return _image_view; }
+    const vk::ImageView & image_view() const { return _image_view.get(); }
   };
 } // namespace mr
 

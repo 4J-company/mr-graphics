@@ -11,8 +11,8 @@ namespace mr
   class Pipeline
   {
   protected:
-    vk::Pipeline _pipeline;
-    vk::PipelineLayout _layout;
+    vk::UniquePipeline _pipeline;
+    vk::UniquePipelineLayout _layout;
     // std::vector?<vk::DescriptorSetLayout> _desctiptor_layouts;
     // std::vector?<Attachment> _attachments;
     // std::vector?<Constant> _constants;
@@ -23,8 +23,8 @@ namespace mr
     Pipeline() = default;
     ~Pipeline();
 
-    vk::Pipeline pipeline() const { return _pipeline; }
-    vk::PipelineLayout layout() const { return _layout; }
+    const vk::Pipeline pipeline() const { return _pipeline.get(); }
+    const vk::PipelineLayout layout() const { return _layout.get(); }
 
     virtual void apply(vk::CommandBuffer cmd_buffer) const;
   };

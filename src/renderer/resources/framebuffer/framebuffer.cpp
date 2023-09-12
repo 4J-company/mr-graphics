@@ -15,7 +15,7 @@ mr::Framebuffer::Framebuffer(const VulkanState &state, uint width, uint height, 
       .layers = 1,
   };
 
-  _framebuffer = state.device().createFramebuffer(framebuffer_create_info).value;
+  _framebuffer = state.device().createFramebufferUnique(framebuffer_create_info).value;
 
   _viewport.viewport.x = 0.0f;
   _viewport.viewport.y = 0.0f;

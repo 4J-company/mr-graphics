@@ -24,9 +24,6 @@ namespace mr
 
     GraphicsPipeline(const VulkanState &state, Shader *ShaderProgram);
 
-    GraphicsPipeline(GraphicsPipeline &&other) noexcept = default;
-    GraphicsPipeline &operator=(GraphicsPipeline &&other) noexcept = default;
-
     void recompile();
 
     void apply(vk::CommandBuffer cmd_buffer) const override;

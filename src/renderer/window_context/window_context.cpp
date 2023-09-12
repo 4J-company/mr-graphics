@@ -5,12 +5,12 @@
 
 mr::WindowContext::WindowContext(Window *parent, const VulkanState &state) : _parent(parent), _state(state)
 {
-  _surface = xgfx::createSurface(_parent->xwindow_ptr(), state.instance());
+  _surface.reset(xgfx::createSurface(_parent->xwindow_ptr(), state.instance()));
 
   size_t universal_queue_family_id = 0;
 
   // Choose surface format
-  const auto avaible_formats = state.phys_device().getSurfaceFormatsKHR(_surface).value;
+  const auto avaible_formats = state.phys_device().getSurfaceFormatsKHR(_surface.get()).value;                  
   _swapchain_format = avaible_formats[0].format;
   for (const auto format : avaible_formats)
     if (format.format == vk::Format::eB8G8R8A8Unorm) // Prefered format
@@ -23,7 +23,7 @@ mr::WindowContext::WindowContext(Window *parent, const VulkanState &state) : _pa
 
   // Choose surface extent
   vk::SurfaceCapabilitiesKHR surface_capabilities;
-  surface_capabilities = state.phys_device().getSurfaceCapabilitiesKHR(_surface).value;
+  surface_capabilities = state.phys_device().getSurfaceCapabilitiesKHR(_surface.get()).value;
   if (surface_capabilities.currentExtent.width == std::numeric_limits<uint>::max())
   {
     // If the surface size is undefined, the size is set to the size of the images requested.
@@ -36,7 +36,7 @@ mr::WindowContext::WindowContext(Window *parent, const VulkanState &state) : _pa
     _extent = surface_capabilities.currentExtent;
 
   // Chosse surface present mode
-  const auto avaible_present_modes = state.phys_device().getSurfacePresentModesKHR(_surface).value;
+  const auto avaible_present_modes = state.phys_device().getSurfacePresentModesKHR(_surface.get()).value;
   const auto iter = std::find(avaible_present_modes.begin(), avaible_present_modes.end(), vk::PresentModeKHR::eMailbox);
   auto present_mode = (iter != avaible_present_modes.end())
       ? *iter
@@ -61,7 +61,7 @@ mr::WindowContext::WindowContext(Window *parent, const VulkanState &state) : _pa
   /// _swapchain_format = vk::Format::eB8G8R8A8Srgb; // ideal, we have eB8G8R8A8Unorm
   _swapchain_format = vk::Format::eB8G8R8A8Unorm;
   vk::SwapchainCreateInfoKHR swapchain_create_info {.flags = {},
-                                                    .surface = _surface,
+                                                    .surface = _surface.get(),
                                                     .minImageCount = Framebuffer::max_presentable_images,
                                                     .imageFormat = _swapchain_format,
                                                     .imageColorSpace = vk::ColorSpaceKHR::eSrgbNonlinear,
@@ -81,15 +81,14 @@ mr::WindowContext::WindowContext(Window *parent, const VulkanState &state) : _pa
   swapchain_create_info.queueFamilyIndexCount = 1;
   swapchain_create_info.pQueueFamilyIndices = indeces;
 
-  _swapchain = state.device().createSwapchainKHR(swapchain_create_info).value;
+  _swapchain = state.device().createSwapchainKHRUnique(swapchain_create_info).value;
 
   create_framebuffers(state);
 }
 
 void mr::WindowContext::create_framebuffers(const VulkanState &state)
 {
-  std::vector<vk::Image> swampchain_images;
-  swampchain_images = state.device().getSwapchainImagesKHR(_swapchain).value;
+  auto swampchain_images = state.device().getSwapchainImagesKHR(_swapchain.get()).value;
 
   for (uint i = 0; i < Framebuffer::max_presentable_images; i++)
     _framebuffers[i] = Framebuffer(state, _extent.width, _extent.height, _swapchain_format, swampchain_images[i]);
@@ -110,7 +109,7 @@ void mr::WindowContext::render()
   _state.device().resetFences(_fence);
   mr::uint image_index = 0;
 
-  _state.device().acquireNextImageKHR(_swapchain, UINT64_MAX, _image_available_semaphore, nullptr, &image_index);
+  _state.device().acquireNextImageKHR(_swapchain.get(), UINT64_MAX, _image_available_semaphore, nullptr, &image_index);
   command_unit.begin();
 
   vk::ClearValue clear_color {vk::ClearColorValue(0, 0, 0, 0)};
@@ -147,7 +146,7 @@ void mr::WindowContext::render()
 
   _state.queue().submit(submit_info, _fence);
 
-  vk::SwapchainKHR swapchains[] = {_swapchain};
+  vk::SwapchainKHR swapchains[] = {_swapchain.get()};
   vk::PresentInfoKHR present_info {
       .waitSemaphoreCount = 1,
       .pWaitSemaphores = signal_semaphores,

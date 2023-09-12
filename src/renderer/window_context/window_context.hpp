@@ -12,9 +12,9 @@ namespace mr
   class WindowContext
   {
   private:
-    vk::SwapchainKHR _swapchain;
+    vk::UniqueSwapchainKHR _swapchain;
     vk::Format _swapchain_format;
-    vk::SurfaceKHR _surface;
+    vk::UniqueSurfaceKHR _surface;
     vk::Extent2D _extent;
     std::array<Framebuffer, Framebuffer::max_presentable_images> _framebuffers;
 

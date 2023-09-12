@@ -10,10 +10,11 @@ mr::CommandUnit::CommandUnit(const VulkanState &state)
       .queueFamilyIndex = 0 /// TODO: correct index
   };
 
-  _cmd_pool = state.device().createCommandPool(pool_create_info).value;
+  // _cmd_pool = state.device().createCommandPool(pool_create_info).value;
+  _cmd_pool = state.device().createCommandPoolUnique(pool_create_info).value;
 
   vk::CommandBufferAllocateInfo cmd_buffer_alloc_info {
-      .commandPool = _cmd_pool,
+      .commandPool = _cmd_pool.get(),
       .level = vk::CommandBufferLevel::ePrimary,
       .commandBufferCount = 1,
   };

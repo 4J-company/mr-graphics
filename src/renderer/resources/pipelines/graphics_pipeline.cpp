@@ -69,7 +69,7 @@ mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state, Shader *shader)
       .pPushConstantRanges = nullptr,
   };
 
-  _layout = state.device().createPipelineLayout(pipeline_layout_create_info).value;
+  _layout = state.device().createPipelineLayoutUnique(pipeline_layout_create_info).value;
 
   vk::GraphicsPipelineCreateInfo pipeline_create_info {
       // .stageCount = static_cast<uint>(_shader->get_stages().size()),
@@ -83,7 +83,7 @@ mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state, Shader *shader)
       .pDepthStencilState = nullptr,
       .pColorBlendState = &color_blendin_create_info,
       .pDynamicState = &dynamic_state_create_info,
-      .layout = _layout,
+      .layout = _layout.get(),
       .renderPass = state.render_pass(),
       .subpass = 0,
       .basePipelineHandle = VK_NULL_HANDLE, // Optional
@@ -92,12 +92,12 @@ mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state, Shader *shader)
 
   std::vector<vk::Pipeline> pipelines;
   pipelines = state.device().createGraphicsPipelines(nullptr, pipeline_create_info).value;
-  _pipeline = pipelines[0];
+  _pipeline.reset(pipelines[0]);
 }
 
 void mr::GraphicsPipeline::apply(vk::CommandBuffer cmd_buffer) const
 {
-  cmd_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics, _pipeline);
+  cmd_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics, _pipeline.get());
 }
 
 void mr::GraphicsPipeline::recompile() {}

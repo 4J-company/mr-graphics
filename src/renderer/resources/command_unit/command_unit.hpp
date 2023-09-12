@@ -10,7 +10,7 @@ namespace mr
   class CommandUnit
   {
   private:
-    vk::CommandPool _cmd_pool;
+    vk::UniqueCommandPool _cmd_pool;
     vk::CommandBuffer _cmd_buffer;
 
   public:
@@ -18,10 +18,6 @@ namespace mr
     ~CommandUnit();
 
     CommandUnit(const VulkanState &state);
-
-    // move semantics
-    CommandUnit(CommandUnit &&other) noexcept = default;
-    CommandUnit &operator=(CommandUnit &&other) noexcept = default;
 
     void begin();
     void end();

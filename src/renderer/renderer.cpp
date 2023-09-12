@@ -157,7 +157,11 @@ mr::Application::Application()
   _state._render_pass = _state._device.createRenderPass(render_pass_create_info).value;
 }
 
-mr::Application::~Application() {}
+mr::Application::~Application() 
+{
+  _state._device.destroy();
+  _state._instance.destroy();
+}
 
 [[nodiscard]] std::unique_ptr<mr::Buffer> mr::Application::create_buffer() const { return std::make_unique<Buffer>(); }
 

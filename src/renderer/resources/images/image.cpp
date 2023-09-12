@@ -17,14 +17,14 @@ void mr::Image::craete_image_view(const VulkanState &state)
       .layerCount = 1,
   };
 
-  vk::ImageViewCreateInfo create_info {.image = _image,
+  vk::ImageViewCreateInfo create_info {.image = _image.get(),
                                        .viewType = vk::ImageViewType::e2D,
                                        .format = _format,
                                        .components = {vk::ComponentSwizzle::eIdentity, vk::ComponentSwizzle::eIdentity,
                                                       vk::ComponentSwizzle::eIdentity, vk::ComponentSwizzle::eIdentity},
                                        .subresourceRange = range};
 
-  _image_view = state.device().createImageView(create_info).value;
+  _image_view = state.device().createImageViewUnique(create_info).value;
 }
 
 void mr::Image::switch_layout(vk::ImageLayout layout) {}

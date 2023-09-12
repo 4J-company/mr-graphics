@@ -29,11 +29,6 @@ namespace mr
 
     // window creator
     [[nodiscard]] std::unique_ptr<Window> create_window(size_t width, size_t height) const;
-
-    /// REAL SHIT BELOW
-    vk::Semaphore _image_available_semaphore;
-    vk::Semaphore _render_rinished_semaphore;
-    vk::Fence _fence;
   };
 } // namespace mr
 

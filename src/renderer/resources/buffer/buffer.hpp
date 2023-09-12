@@ -11,7 +11,7 @@ namespace mr
     void *_host_data;
     size_t _size;
 
-    vk::Buffer _buffer;
+    vk::UniqueBuffer _buffer;
     vk::BufferUsageFlags _usage_flags;
 
     // VMA data
@@ -22,10 +22,6 @@ namespace mr
     Buffer() = default;
     Buffer(size_t size);
     ~Buffer();
-
-    // move semantics
-    Buffer(Buffer &&other) noexcept = default;
-    Buffer &operator=(Buffer &&other) noexcept = default;
 
     // resize
     void resize(size_t size);
