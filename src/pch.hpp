@@ -2,6 +2,7 @@
 #define __pch_hpp_
 
 // libraries includes
+#include <experimental/simd>
 #include <algorithm>
 #include <array>
 #include <cassert>
@@ -43,6 +44,8 @@ namespace mr
 {
   using uint = unsigned int;
   using byte = unsigned char;
+  using vec4 = std::experimental::native_simd<float>;
+  using ivec4 = std::experimental::native_simd<int>;
 } // namespace mr
 
 #endif // __pch_hpp_
