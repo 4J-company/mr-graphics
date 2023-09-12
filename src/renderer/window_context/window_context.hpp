@@ -22,7 +22,7 @@ namespace mr
 
     vk::Semaphore _image_available_semaphore;
     vk::Semaphore _render_rinished_semaphore;
-    vk::Fence _fence;
+    vk::Fence _image_fence;
 
     Window *_parent;
 

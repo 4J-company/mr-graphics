@@ -88,7 +88,7 @@ mr::WindowContext::WindowContext(Window *parent, const VulkanState &state) : _pa
 
   _image_available_semaphore = _state.device().createSemaphore({}).value;
   _render_rinished_semaphore = _state.device().createSemaphore({}).value;
-  _fence = _state.device().createFence({.flags = vk::FenceCreateFlagBits::eSignaled}).value;
+  _image_fence = _state.device().createFence({.flags = vk::FenceCreateFlagBits::eSignaled}).value;
 }
 
 void mr::WindowContext::create_framebuffers(const VulkanState &state)
@@ -105,8 +105,8 @@ void mr::WindowContext::render()
   static GraphicsPipeline _pipeline = GraphicsPipeline(_state, &_shader);
   static CommandUnit command_unit {_state};
 
-  _state.device().waitForFences(_fence, VK_TRUE, UINT64_MAX);
-  _state.device().resetFences(_fence);
+  _state.device().waitForFences(_image_fence, VK_TRUE, UINT64_MAX);
+  _state.device().resetFences(_image_fence);
   mr::uint image_index = 0;
 
   _state.device().acquireNextImageKHR(_swapchain.get(), UINT64_MAX, _image_available_semaphore, nullptr, &image_index);
@@ -144,7 +144,7 @@ void mr::WindowContext::render()
       .pSignalSemaphores = signal_semaphores,
   };
 
-  _state.queue().submit(submit_info, _fence);
+  _state.queue().submit(submit_info, _image_fence);
 
   vk::SwapchainKHR swapchains[] = {_swapchain.get()};
   vk::PresentInfoKHR present_info {
