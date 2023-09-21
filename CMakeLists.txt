@@ -21,9 +21,10 @@ add_subdirectory(${PROJECT_SOURCE_DIR}/external)
 xwin_add_executable(${CMAKE_PROJECT_NAME} "")
 
 # link external dependencies
+target_include_directories(${CMAKE_PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/external)
 find_package(Vulkan REQUIRED)
-target_include_directories(${PROJECT_NAME} PUBLIC ${Vulkan_INCLUDE_DIRS})
-target_link_libraries(${PROJECT_NAME} Vulkan::Vulkan)
+target_include_directories(${CMAKE_PROJECT_NAME} PUBLIC ${Vulkan_INCLUDE_DIRS})
+target_link_libraries(${CMAKE_PROJECT_NAME} Vulkan::Vulkan)
 target_link_libraries(
     ${CMAKE_PROJECT_NAME}
     CrossWindow

@@ -4,3 +4,6 @@
 [submodule "external/crosswindow-graphics"]
 	path = external/crosswindow-graphics
 	url = https://github.com/cone-forest/CrossWindow-Graphics.git
+[submodule "external/stb"]
+	path = external/stb
+	url = https://github.com/nothings/stb

@@ -13,11 +13,14 @@ namespace mr
 
   public:
     Texture() = default;
-    Texture(std::string_view filename);
-    ~Texture();
+
+    Texture(const VulkanState &state, std::string_view filename);
 
     Texture(Texture &&other) noexcept = default;
     Texture &operator=(Texture &&other) noexcept = default;
+
+    const Image & image() const { return _image; }
+    const Sampler & sampler() const { return _sampler; }
   };
 } // namespace mr
 

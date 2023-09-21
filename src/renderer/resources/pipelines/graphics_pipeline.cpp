@@ -1,9 +1,8 @@
 #include "resources/pipelines/graphics_pipeline.hpp"
 
-mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state, Shader *shader)
+mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state, Shader *shader, std::vector<vk::VertexInputAttributeDescription> attributes,
+                                       std::vector<std::vector<vk::DescriptorSetLayoutBinding>> bindings) : Pipeline(state, shader, bindings)
 {
-  _shader = shader;
-
   // dynamic states of pipeline (viewport)
   _dynamic_states.push_back(vk::DynamicState::eViewport);
   _dynamic_states.push_back(vk::DynamicState::eScissor);
@@ -11,10 +10,24 @@ mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state, Shader *shader)
                                                                     static_cast<uint>(_dynamic_states.size()),
                                                                 .pDynamicStates = _dynamic_states.data()};
 
-  vk::PipelineVertexInputStateCreateInfo vertex_input_create_info {.vertexBindingDescriptionCount = 0,
-                                                                   .pVertexBindingDescriptions = nullptr,
-                                                                   .vertexAttributeDescriptionCount = 0,
-                                                                   .pVertexAttributeDescriptions = nullptr};
+  uint size = 0;
+  for (auto &atr : attributes)
+    size += atr.format == vk::Format::eR32G32B32Sfloat ? 4 :
+            atr.format == vk::Format::eR32G32B32Sfloat ? 3 :
+            atr.format == vk::Format::eR32G32Sfloat ? 2 : 1;
+  size *= 4;
+
+  vk::VertexInputBindingDescription binding_description
+  {
+    .binding = 0,
+    .stride = size,
+    .inputRate = vk::VertexInputRate::eVertex,
+  };
+
+  vk::PipelineVertexInputStateCreateInfo vertex_input_create_info {.vertexBindingDescriptionCount = static_cast<bool>(attributes.size()),
+                                                                   .pVertexBindingDescriptions = &binding_description,
+                                                                   .vertexAttributeDescriptionCount = static_cast<uint>(attributes.size()),
+                                                                   .pVertexAttributeDescriptions = attributes.data()};
 
   _topology = vk::PrimitiveTopology::eTriangleList;
   vk::PipelineInputAssemblyStateCreateInfo input_assembly_create_info {.topology = _topology,
@@ -61,15 +74,6 @@ mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state, Shader *shader)
       .pAttachments = &color_blend_attachment,
       .blendConstants = std::array<float, 4> {0.0, 0.0, 0.0, 0.0}, // ???
   };
-
-  vk::PipelineLayoutCreateInfo pipeline_layout_create_info {
-      .setLayoutCount = 0,
-      .pSetLayouts = nullptr,
-      .pushConstantRangeCount = 0,
-      .pPushConstantRanges = nullptr,
-  };
-
-  _layout = state.device().createPipelineLayoutUnique(pipeline_layout_create_info).value;
 
   vk::GraphicsPipelineCreateInfo pipeline_create_info {
       // .stageCount = static_cast<uint>(_shader->get_stages().size()),

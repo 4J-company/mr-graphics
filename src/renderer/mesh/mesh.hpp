@@ -8,7 +8,7 @@ namespace mr
 {
   struct Boundbox
   {
-    vec4 min, max;
+    // vec4 min, max;
   };
 
   class Mesh 

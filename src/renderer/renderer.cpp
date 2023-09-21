@@ -7,8 +7,15 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback( VkDebugUtilsMessageSeverity
                                                      const VkDebugUtilsMessengerCallbackDataEXT *CallbackData,
                                                      void *UserData )
 {
+  /*
+  if (CallbackData->messageIdNumber == 0x4d08326d) // command buffer end
+    return false;
+  if (CallbackData->messageIdNumber == 0xc7aabc16) // presetn image layout
+    return false;
+  */
+
   std::cout << CallbackData->pMessage << '\n' << std::endl;
-  return VK_FALSE;
+  return false;
 }
 
 // mr::Application class defualt constructor (initializes vulkan instance, device ...)

@@ -11,7 +11,7 @@ mr::WindowContext::WindowContext(Window *parent, const VulkanState &state) : _pa
   size_t universal_queue_family_id = 0;
 
   // Choose surface format
-  const auto avaible_formats = state.phys_device().getSurfaceFormatsKHR(_surface.get()).value;                  
+  const auto avaible_formats = state.phys_device().getSurfaceFormatsKHR(_surface.get()).value;
   _swapchain_format = avaible_formats[0].format;
   for (const auto format : avaible_formats)
     if (format.format == vk::Format::eB8G8R8A8Unorm) // Prefered format
@@ -102,8 +102,43 @@ void mr::WindowContext::create_framebuffers(const VulkanState &state)
 void mr::WindowContext::render()
 {
   static Shader _shader = Shader(_state, "default");
-  static GraphicsPipeline _pipeline = GraphicsPipeline(_state, &_shader);
+  std::vector<vk::VertexInputAttributeDescription> descrs
+  {
+    { .location = 0, .binding = 0, .format = vk::Format::eR32G32Sfloat, .offset = 0 },
+    { .location = 1, .binding = 0, .format = vk::Format::eR32G32Sfloat, .offset = 2 * sizeof(float) }
+  };
+  vk::DescriptorSetLayoutBinding binding 
+  { 
+    .binding = 0,
+    .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+    .descriptorCount = 1,
+    .stageFlags = vk::ShaderStageFlagBits::eFragment,
+  };
+  static GraphicsPipeline pipeline = GraphicsPipeline(_state, &_shader, descrs, {{binding}});
+
+  static Texture texture = Texture(_state, "bin/textures/cat.png");
+  DescriptorAttachment attach { .texture = &texture };
+  static Descriptor set = Descriptor(_state, &pipeline, {attach});
+
   static CommandUnit command_unit {_state};
+  
+  struct vec2 { float x, y; };
+  struct vertex { vec2 coord, tex; };
+  std::vector<vertex> vertexes
+  {
+    {{-0.5, -0.5}, {0, 0}},
+    {{0.5, -0.5}, {1, 0}},
+    {{0.5, 0.5}, {1, 1}},
+    {{-0.5, 0.5}, {0, 1}},
+  };
+  static Buffer vertex_buffer = Buffer(_state, sizeof(vertexes[0]) * vertexes.size(), vk::BufferUsageFlagBits::eVertexBuffer,
+    vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  vertex_buffer.write(_state, vertexes.data());
+
+  std::vector<int> indexes {0, 1, 2, 2, 3, 0};
+  static Buffer index_buffer = Buffer(_state, sizeof(int) * indexes.size(), vk::BufferUsageFlagBits::eIndexBuffer,
+    vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  index_buffer.write(_state, indexes.data());
 
   _state.device().waitForFences(_image_fence, VK_TRUE, UINT64_MAX);
   _state.device().resetFences(_image_fence);
@@ -122,10 +157,13 @@ void mr::WindowContext::render()
   };
 
   command_unit->beginRenderPass(render_pass_info, vk::SubpassContents::eInline);
-  command_unit->bindPipeline(vk::PipelineBindPoint::eGraphics, _pipeline.pipeline());
+  command_unit->bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline());
   command_unit->setViewport(0, _framebuffers[image_index].viewport());
   command_unit->setScissor(0, _framebuffers[image_index].scissors());
-  command_unit->draw(3, 1, 0, 0);
+  command_unit->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.layout(), 0, {set.set()}, {});
+  command_unit->bindVertexBuffers(0, {vertex_buffer.buffer()}, {0});
+  command_unit->bindIndexBuffer(index_buffer.buffer(), 0, vk::IndexType::eUint32);
+  command_unit->drawIndexed(indexes.size(), 1, 0, 0, 0);
 
   command_unit.end();
 

@@ -4,19 +4,21 @@
 namespace mr
 {
   class Buffer;
-  class Image;
-  class Sampler;
+  class Texture;
 
-  union AttachmentData {
-    const Buffer *buffer;
-    const Image *image;
-    const Sampler *sampler;
+  // TODO: trying convert it into union
+  struct DescriptorAttachment
+  {
+    const Buffer *uniform_buffer {};
+    const Buffer *storage_buffer {};
+    const Texture *texture {};
     // const ShadowMap *shadow_map = nullptr;
   };
 
+  // TODO: maybe delete
   struct Attachment
   {
-    AttachmentData data;
+    DescriptorAttachment data;
 
     uint32_t binding;
     uint32_t set;

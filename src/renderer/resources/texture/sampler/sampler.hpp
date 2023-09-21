@@ -2,13 +2,14 @@
   #define __sampler_hpp_
 
   #include "pch.hpp"
+#include "vulkan_application.hpp"
 
 namespace mr
 {
   class Sampler
   {
   private:
-    vk::Sampler _sampler;
+    vk::UniqueSampler _sampler;
 
     int _mip_level;
     vk::Filter _filter;
@@ -16,10 +17,13 @@ namespace mr
 
   public:
     Sampler() = default;
-    ~Sampler();
+
+    Sampler(const VulkanState &state, vk::Filter filter, vk::SamplerAddressMode address, int mip_level = 1);
 
     Sampler(Sampler &&other) noexcept = default;
     Sampler &operator=(Sampler &&other) noexcept = default;
+
+    const vk::Sampler sampler() const { return _sampler.get(); }
   };
 } // namespace mr
 
