@@ -5,6 +5,7 @@
 
 
 #include "vulkan_application.hpp"
+#include "resources/command_unit/command_unit.hpp"
 
 namespace mr
 {
@@ -33,11 +34,36 @@ namespace mr
     template<typename type>
     Buffer & write(const VulkanState &state, type *data)
     {
-      if (data == nullptr)
-        return *this;
       auto ptr = state.device().mapMemory(_memory.get(), 0, _size).value;
       memcpy(ptr, data, _size);
       state.device().unmapMemory(_memory.get());
+      return *this;
+    }
+
+    template<typename type>
+    Buffer & write_gpu(const VulkanState &state, type *data)
+    {
+      auto buf = Buffer(state, _size, vk::BufferUsageFlagBits::eTransferSrc, 
+        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+      buf.write(state, data);
+
+      vk::BufferCopy buffer_copy { .size = _size };
+
+      static CommandUnit command_unit(state);
+      command_unit.begin();
+      command_unit->copyBuffer(buf.buffer(), _buffer.get(), {buffer_copy});
+      command_unit.end();
+
+      auto [bufs, size] = command_unit.submit_info();
+      vk::SubmitInfo submit_info 
+      {
+        .commandBufferCount = size,
+        .pCommandBuffers = bufs,
+      };
+      auto fence = state.device().createFence({}).value;
+      state.queue().submit(submit_info, fence);
+      state.device().waitForFences({fence}, VK_TRUE, UINT64_MAX);
+
       return *this;
     }
 

@@ -105,20 +105,20 @@ namespace mr
   template<typename type = float>
   mr::Buffer create_vertex_buffer(const VulkanState &state, size_t size, type *data = nullptr)
   {
-    auto buf = Buffer(state, size, vk::BufferUsageFlagBits::eVertexBuffer,
-      vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+    auto buf = Buffer(state, size, vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
+      vk::MemoryPropertyFlagBits::eDeviceLocal);
     if (data != nullptr)
-      buf.write(state, data);
+      buf.write_gpu(state, data);
     return buf;
   }
 
   template<typename type = float>
   mr::Buffer create_index_buffer(const VulkanState &state, size_t size, type *data = nullptr)
   {
-    auto buf = Buffer(state, size, vk::BufferUsageFlagBits::eIndexBuffer,
-      vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+    auto buf = Buffer(state, size, vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst,
+      vk::MemoryPropertyFlagBits::eDeviceLocal);
     if (data != nullptr)
-      buf.write(state, data);
+      buf.write_gpu(state, data);
     return buf;
   }
 
