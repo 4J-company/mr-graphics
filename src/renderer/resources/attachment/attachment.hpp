@@ -9,9 +9,9 @@ namespace mr
   // TODO: trying convert it into union
   struct DescriptorAttachment
   {
-    const Buffer *uniform_buffer {};
-    const Buffer *storage_buffer {};
-    const Texture *texture {};
+    Buffer *uniform_buffer {};
+    Buffer *storage_buffer {};
+    Texture *texture {};
     // const ShadowMap *shadow_map = nullptr;
   };
 

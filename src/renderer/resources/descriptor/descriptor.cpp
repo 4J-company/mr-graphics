@@ -27,11 +27,15 @@ void mr::Descriptor::update_all_attachments(const VulkanState &state, const std:
       _attach_write[i].image_info.imageView = attachments[i].texture->image().image_view();
       _attach_write[i].image_info.sampler = attachments[i].texture->sampler().sampler();
     }
+    if (attachments[i].uniform_buffer != nullptr)
+    {
+      _attach_write[i].buffer_info.buffer = attachments[i].uniform_buffer->buffer();
+      _attach_write[i].buffer_info.range = attachments[i].uniform_buffer->size();
+      _attach_write[i].buffer_info.offset = 0;
+    }
   }
 
   std::vector<vk::WriteDescriptorSet> descriptor_writes(attachments.size());
-
-  // Fill each attachment to be update
   for (uint i = 0; i < attachments.size(); i++)
   {
     descriptor_writes[i] = 
@@ -48,9 +52,14 @@ void mr::Descriptor::update_all_attachments(const VulkanState &state, const std:
       descriptor_writes[i].descriptorType = vk::DescriptorType::eCombinedImageSampler;
       descriptor_writes[i].pImageInfo = &_attach_write[i].image_info;
     }
-
-    state.device().updateDescriptorSets(descriptor_writes, {});
+    else if (attachments[i].uniform_buffer != nullptr)
+    {
+      descriptor_writes[i].descriptorType = vk::DescriptorType::eUniformBuffer;
+      descriptor_writes[i].pBufferInfo = &_attach_write[i].buffer_info;
+    }
   }
+
+  state.device().updateDescriptorSets(descriptor_writes, {});
 }
 
 void mr::Descriptor::create_descriptor_pool(const VulkanState &state, const std::vector<DescriptorAttachment> &attachments)

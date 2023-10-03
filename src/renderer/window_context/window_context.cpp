@@ -99,6 +99,40 @@ void mr::WindowContext::create_framebuffers(const VulkanState &state)
     _framebuffers[i] = Framebuffer(state, _extent.width, _extent.height, _swapchain_format, swampchain_images[i]);
 }
 
+namespace mr
+{
+  // TODO: allocating vertex and index buffers in gpu memory
+  template<typename type = float>
+  mr::Buffer create_vertex_buffer(const VulkanState &state, size_t size, type *data = nullptr)
+  {
+    auto buf = Buffer(state, size, vk::BufferUsageFlagBits::eVertexBuffer,
+      vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+    if (data != nullptr)
+      buf.write(state, data);
+    return buf;
+  }
+
+  template<typename type = float>
+  mr::Buffer create_index_buffer(const VulkanState &state, size_t size, type *data = nullptr)
+  {
+    auto buf = Buffer(state, size, vk::BufferUsageFlagBits::eIndexBuffer,
+      vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+    if (data != nullptr)
+      buf.write(state, data);
+    return buf;
+  }
+
+  template<typename type = float>
+  mr::Buffer create_uniform_buffer(const VulkanState &state, size_t size, type *data = nullptr)
+  {
+    auto buf = Buffer(state, size, vk::BufferUsageFlagBits::eUniformBuffer,
+      vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+    if (data != nullptr)
+      buf.write(state, data);
+    return buf;
+  }
+}
+
 void mr::WindowContext::render()
 {
   static Shader _shader = Shader(_state, "default");
@@ -107,21 +141,40 @@ void mr::WindowContext::render()
     { .location = 0, .binding = 0, .format = vk::Format::eR32G32Sfloat, .offset = 0 },
     { .location = 1, .binding = 0, .format = vk::Format::eR32G32Sfloat, .offset = 2 * sizeof(float) }
   };
-  vk::DescriptorSetLayoutBinding binding 
+  
+  std::vector<vk::DescriptorSetLayoutBinding> bindings
   { 
-    .binding = 0,
-    .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-    .descriptorCount = 1,
-    .stageFlags = vk::ShaderStageFlagBits::eFragment,
+    {
+      .binding = 0,
+      .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+      .descriptorCount = 1,
+      .stageFlags = vk::ShaderStageFlagBits::eFragment,
+    },
+    {
+      .binding = 1,
+      .descriptorType = vk::DescriptorType::eUniformBuffer,
+      .descriptorCount = 1,
+      .stageFlags = vk::ShaderStageFlagBits::eVertex,
+    }
   };
-  static GraphicsPipeline pipeline = GraphicsPipeline(_state, &_shader, descrs, {{binding}});
+  static GraphicsPipeline pipeline = GraphicsPipeline(_state, &_shader, descrs, {bindings});
 
+  float matr[16]
+  {
+    -1.41421354, 0.816496611, -0.578506112, -0.577350259,
+    0.00000000, -1.63299322, -0.578506112, -0.577350259,
+    1.41421354, 0.816496611, -0.578506112, -0.577350259,
+    0.00000000, 0.00000000, 34.5101662, 34.6410141,
+  };
+
+  static Buffer uniiform_buffer = create_uniform_buffer(_state, sizeof(float) * 16);
+  uniiform_buffer.write(_state, matr);
   static Texture texture = Texture(_state, "bin/textures/cat.png");
-  DescriptorAttachment attach { .texture = &texture };
-  static Descriptor set = Descriptor(_state, &pipeline, {attach});
+  std::vector<DescriptorAttachment> attach { { .texture = &texture }, { .uniform_buffer = &uniiform_buffer } };
+  static Descriptor set = Descriptor(_state, &pipeline, attach);
 
   static CommandUnit command_unit {_state};
-  
+
   struct vec2 { float x, y; };
   struct vertex { vec2 coord, tex; };
   std::vector<vertex> vertexes
@@ -131,14 +184,9 @@ void mr::WindowContext::render()
     {{0.5, 0.5}, {1, 1}},
     {{-0.5, 0.5}, {0, 1}},
   };
-  static Buffer vertex_buffer = Buffer(_state, sizeof(vertexes[0]) * vertexes.size(), vk::BufferUsageFlagBits::eVertexBuffer,
-    vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-  vertex_buffer.write(_state, vertexes.data());
-
   std::vector<int> indexes {0, 1, 2, 2, 3, 0};
-  static Buffer index_buffer = Buffer(_state, sizeof(int) * indexes.size(), vk::BufferUsageFlagBits::eIndexBuffer,
-    vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-  index_buffer.write(_state, indexes.data());
+  static Buffer vertex_buffer = create_vertex_buffer(_state, sizeof(vertexes[0]) * vertexes.size(), vertexes.data());
+  static Buffer index_buffer = create_index_buffer(_state, sizeof(indexes[0]) * indexes.size(), indexes.data());
 
   _state.device().waitForFences(_image_fence, VK_TRUE, UINT64_MAX);
   _state.device().resetFences(_image_fence);
@@ -171,7 +219,7 @@ void mr::WindowContext::render()
   vk::PipelineStageFlags wait_stages[] = {vk::PipelineStageFlagBits::eColorAttachmentOutput};
   vk::Semaphore signal_semaphores[] = {_render_rinished_semaphore};
 
-  auto [bufs, size] = command_unit.submit_info();
+    auto [bufs, size] = command_unit.submit_info();
   vk::SubmitInfo submit_info {
       .waitSemaphoreCount = 1,
       .pWaitSemaphores = wait_semaphores,

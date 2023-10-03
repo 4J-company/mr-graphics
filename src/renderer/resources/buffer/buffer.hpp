@@ -31,17 +31,21 @@ namespace mr
     void resize(size_t size);
 
     template<typename type>
-    void write(const VulkanState &state, type *data)
+    Buffer & write(const VulkanState &state, type *data)
     {
+      if (data == nullptr)
+        return *this;
       auto ptr = state.device().mapMemory(_memory.get(), 0, _size).value;
       memcpy(ptr, data, _size);
       state.device().unmapMemory(_memory.get());
+      return *this;
     }
-                                                                  
+
     // find memory tppe
     static uint find_memory_type(const VulkanState &state, uint filter, vk::MemoryPropertyFlags properties);
 
     const vk::Buffer buffer() { return _buffer.get(); }
+    const size_t size() { return _size; }
   };
 } // namespace mr
 
