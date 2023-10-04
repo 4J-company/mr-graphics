@@ -1,6 +1,22 @@
 #include "resources/images/image.hpp"
 #include "resources/buffer/buffer.hpp"
 
+vk::Format mr::Image::find_supported_format(const VulkanState &state, const std::vector<vk::Format> &candidates,
+  vk::ImageTiling tiling, vk::FormatFeatureFlags features)
+{
+  for (auto format : candidates) 
+  {
+    vk::FormatProperties props = state.phys_device().getFormatProperties(format);
+
+    if (tiling == vk::ImageTiling::eLinear && (props.linearTilingFeatures & features) == features)
+      return format;
+    else if (tiling == vk::ImageTiling::eOptimal && (props.optimalTilingFeatures & features) == features)
+      return format;
+  }
+  assert(false); // cant find format
+  return {};
+}
+
 mr::Image::Image(const VulkanState &state, uint width, uint height, vk::Format format, vk::Image image)
     : _image(image), _extent({width, height}), _format(format), _layout(vk::ImageLayout::eUndefined)
 {
@@ -104,6 +120,15 @@ void mr::Image::switch_layout(const VulkanState &state, vk::ImageLayout new_layo
     source_stage = vk::PipelineStageFlagBits::eTransfer;
     destination_stage = vk::PipelineStageFlagBits::eFragmentShader;
   }
+  else if (_layout == vk::ImageLayout::eUndefined && new_layout == vk::ImageLayout::eDepthStencilAttachmentOptimal)
+  {
+    barrier.srcAccessMask = {};
+    barrier.dstAccessMask = 
+      vk::AccessFlagBits::eDepthStencilAttachmentRead | vk::AccessFlagBits::eDepthStencilAttachmentWrite;
+
+    source_stage = vk::PipelineStageFlagBits::eTopOfPipe;
+    destination_stage = vk::PipelineStageFlagBits::eEarlyFragmentTests;
+  }
   else
     assert(false); // cant chose layout
 
@@ -117,7 +142,7 @@ void mr::Image::switch_layout(const VulkanState &state, vk::ImageLayout new_layo
   vk::SubmitInfo submit_info 
   {
     .commandBufferCount = size,
-    .pCommandBuffers = bufs,                                                                                                                        
+    .pCommandBuffers = bufs,
   };
   auto fence = state.device().createFence({}).value;
   state.queue().submit(submit_info, fence);

@@ -117,49 +117,6 @@ mr::Application::Application()
   assert(graphics_queue_family_index == 0);
   _state._queue = _state._device.getQueue(graphics_queue_family_index, 0);
 
-  auto swapchain_format = vk::Format::eB8G8R8A8Unorm;
-  vk::AttachmentDescription color_attachment
-  {
-    .format =  swapchain_format,
-    .samples = vk::SampleCountFlagBits::e1,
-    .loadOp = vk::AttachmentLoadOp::eClear,
-    .storeOp = vk::AttachmentStoreOp::eStore,
-    .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
-    .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
-    .initialLayout = vk::ImageLayout::eUndefined,
-    .finalLayout = vk::ImageLayout::ePresentSrcKHR,
-  };
-
-  vk::AttachmentReference color_attachment_ref { .attachment = 0, .layout = vk::ImageLayout::eColorAttachmentOptimal };
-
-  vk::SubpassDescription subpass
-  {
-    .pipelineBindPoint = vk::PipelineBindPoint::eGraphics,
-    .colorAttachmentCount = 1,
-    .pColorAttachments = &color_attachment_ref,
-  };
-
-  vk::SubpassDependency dependency
-  {
-    .srcSubpass = VK_SUBPASS_EXTERNAL,
-    .dstSubpass = 0,
-    .srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput,
-    .dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput,
-    .srcAccessMask = {},
-    .dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite,
-  };
-
-  vk::RenderPassCreateInfo render_pass_create_info
-  {
-    .attachmentCount = 1,
-    .pAttachments = &color_attachment,
-    .subpassCount = 1,
-    .pSubpasses = &subpass,
-    .dependencyCount = 1,
-    .pDependencies = &dependency,   
-  };
-
-  _state._render_pass = _state._device.createRenderPass(render_pass_create_info).value;
 }
 
 mr::Application::~Application() 

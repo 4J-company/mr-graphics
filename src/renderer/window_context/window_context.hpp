@@ -18,6 +18,9 @@ namespace mr
     vk::Extent2D _extent;
     std::array<Framebuffer, Framebuffer::max_presentable_images> _framebuffers;
 
+    vk::UniqueRenderPass _render_pass;
+    Image _depthbuffer;
+
     VulkanState _state;
 
     vk::Semaphore _image_available_semaphore;
@@ -35,6 +38,8 @@ namespace mr
     ~WindowContext() = default;
 
     void create_framebuffers(const VulkanState &state);
+    void create_depthbuffer(const VulkanState &state);
+    void create_render_pass(const VulkanState &state);
     void resize(size_t width, size_t height);
     void render();
   };

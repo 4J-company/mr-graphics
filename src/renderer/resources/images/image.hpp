@@ -83,8 +83,13 @@ namespace mr
     void craete_image_view(const VulkanState &state);
 
   public:
-    const vk::ImageView & image_view() const { return _image_view.get(); }
-    const vk::Image & image() const { return _image.get(); }
+    const vk::ImageView image_view() const { return _image_view.get(); }
+    const vk::Image image() const { return _image.get(); }
+    const vk::Format format() const { return _format; } 
+
+  public:
+    static vk::Format find_supported_format(const VulkanState &state, const std::vector<vk::Format> &candidates,
+      vk::ImageTiling tiling, vk::FormatFeatureFlags features);
   };
 } // namespace mr
 

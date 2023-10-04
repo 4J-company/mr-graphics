@@ -1,7 +1,8 @@
 #include "resources/pipelines/graphics_pipeline.hpp"
 
-mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state, Shader *shader, std::vector<vk::VertexInputAttributeDescription> attributes,
-                                       std::vector<std::vector<vk::DescriptorSetLayoutBinding>> bindings) : Pipeline(state, shader, bindings)
+mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state, vk::RenderPass render_pass, Shader *shader, 
+   std::vector<vk::VertexInputAttributeDescription> attributes, std::vector<std::vector<vk::DescriptorSetLayoutBinding>> bindings) 
+   : Pipeline(state, shader, bindings)
 {
   // dynamic states of pipeline (viewport)
   _dynamic_states.push_back(vk::DynamicState::eViewport);
@@ -55,6 +56,19 @@ mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state, Shader *shader,
                                                                     .alphaToCoverageEnable = false,
                                                                     .alphaToOneEnable = false};
 
+  vk::PipelineDepthStencilStateCreateInfo depth_stencil_create_info
+  {
+    .depthTestEnable = true,
+    .depthWriteEnable = true,
+    .depthCompareOp = vk::CompareOp::eLess,
+    .depthBoundsTestEnable = false,
+    .stencilTestEnable = false,
+    .front = {},
+    .back = {},
+    .minDepthBounds = 0.0f,
+    .maxDepthBounds = 1.0f,
+  };
+
   vk::PipelineColorBlendAttachmentState color_blend_attachment {
       .blendEnable = false,
       .srcColorBlendFactor = vk::BlendFactor::eOne,
@@ -76,7 +90,6 @@ mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state, Shader *shader,
   };
 
   vk::GraphicsPipelineCreateInfo pipeline_create_info {
-      // .stageCount = static_cast<uint>(_shader->get_stages().size()),
       .stageCount = _shader->stage_number(),
       .pStages = _shader->get_stages().data(),
       .pVertexInputState = &vertex_input_create_info,
@@ -84,11 +97,11 @@ mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state, Shader *shader,
       .pViewportState = &viewport_state_create_info,
       .pRasterizationState = &rasterizer_create_info,
       .pMultisampleState = &multisampling_create_info,
-      .pDepthStencilState = nullptr,
+      .pDepthStencilState = &depth_stencil_create_info,
       .pColorBlendState = &color_blendin_create_info,
       .pDynamicState = &dynamic_state_create_info,
       .layout = _layout.get(),
-      .renderPass = state.render_pass(),
+      .renderPass = render_pass,
       .subpass = 0,
       .basePipelineHandle = VK_NULL_HANDLE, // Optional
       .basePipelineIndex = -1,              // Optional

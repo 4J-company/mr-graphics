@@ -84,11 +84,89 @@ mr::WindowContext::WindowContext(Window *parent, const VulkanState &state) : _pa
 
   _swapchain = state.device().createSwapchainKHRUnique(swapchain_create_info).value;
 
-  create_framebuffers(state);
+  create_depthbuffer(_state);
+  create_render_pass(_state);
+  create_framebuffers(_state);
 
   _image_available_semaphore = _state.device().createSemaphore({}).value;
   _render_rinished_semaphore = _state.device().createSemaphore({}).value;
   _image_fence = _state.device().createFence({.flags = vk::FenceCreateFlagBits::eSignaled}).value;
+}
+
+void mr::WindowContext::create_depthbuffer(const VulkanState &state)
+{
+  auto format = Image::find_supported_format(state,
+    {vk::Format::eD32Sfloat, vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint},
+     vk::ImageTiling::eOptimal, vk::FormatFeatureFlagBits::eDepthStencilAttachment);
+  _depthbuffer = Image(state, _extent.width, _extent.height, format, 
+    vk::ImageUsageFlagBits::eDepthStencilAttachment, vk::ImageAspectFlagBits::eDepth);
+  _depthbuffer.switch_layout(state, vk::ImageLayout::eDepthStencilAttachmentOptimal);
+}
+
+void mr::WindowContext::create_render_pass(const VulkanState &state)
+{
+  vk::AttachmentDescription color_attachment
+  {
+    .format = _swapchain_format,
+    .samples = vk::SampleCountFlagBits::e1,
+    .loadOp = vk::AttachmentLoadOp::eClear,
+    .storeOp = vk::AttachmentStoreOp::eStore,
+    .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
+    .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
+    .initialLayout = vk::ImageLayout::eUndefined,
+    .finalLayout = vk::ImageLayout::ePresentSrcKHR,
+  };
+
+  vk::AttachmentReference color_attachment_ref { .attachment = 0, .layout = vk::ImageLayout::eColorAttachmentOptimal };
+
+  vk::AttachmentDescription depth_attachment
+  {
+    .format = _depthbuffer.format(),
+    .samples = vk::SampleCountFlagBits::e1,
+    .loadOp = vk::AttachmentLoadOp::eClear,
+    .storeOp = vk::AttachmentStoreOp::eDontCare,
+    .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
+    .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
+    .initialLayout = vk::ImageLayout::eUndefined,
+    .finalLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
+  };
+
+  vk::AttachmentReference depth_attachment_ref 
+  {
+    .attachment = 1,
+    .layout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
+  };
+
+  vk::SubpassDescription subpass
+  {
+    .pipelineBindPoint = vk::PipelineBindPoint::eGraphics,
+    .colorAttachmentCount = 1,
+    .pColorAttachments = &color_attachment_ref,
+    .pDepthStencilAttachment = &depth_attachment_ref,
+  };
+
+  vk::SubpassDependency dependency
+  {
+    .srcSubpass = VK_SUBPASS_EXTERNAL,
+    .dstSubpass = 0,
+    .srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput,
+    .dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput,
+    .srcAccessMask = {},
+    .dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite,
+  };
+
+  std::array attachments {color_attachment, depth_attachment};
+  vk::RenderPassCreateInfo render_pass_create_info
+  {
+    .attachmentCount = static_cast<uint>(attachments.size()),
+    .pAttachments = attachments.data(),
+    .subpassCount = 1,
+    .pSubpasses = &subpass,
+    .dependencyCount = 1,
+    .pDependencies = &dependency,   
+  };
+
+  _render_pass = _state.device().createRenderPassUnique(render_pass_create_info).value;
 }
 
 void mr::WindowContext::create_framebuffers(const VulkanState &state)
@@ -96,8 +174,9 @@ void mr::WindowContext::create_framebuffers(const VulkanState &state)
   auto swampchain_images = state.device().getSwapchainImagesKHR(_swapchain.get()).value;
 
   for (uint i = 0; i < Framebuffer::max_presentable_images; i++)
-    _framebuffers[i] = Framebuffer(state, _extent.width, _extent.height, _swapchain_format, swampchain_images[i]);
+    _framebuffers[i] = Framebuffer(state, _render_pass.get(), _extent.width, _extent.height, _swapchain_format, swampchain_images[i], _depthbuffer);
 }
+
 
 namespace mr
 {
@@ -138,8 +217,8 @@ void mr::WindowContext::render()
   static Shader _shader = Shader(_state, "default");
   std::vector<vk::VertexInputAttributeDescription> descrs
   {
-    { .location = 0, .binding = 0, .format = vk::Format::eR32G32Sfloat, .offset = 0 },
-    { .location = 1, .binding = 0, .format = vk::Format::eR32G32Sfloat, .offset = 2 * sizeof(float) }
+    { .location = 0, .binding = 0, .format = vk::Format::eR32G32B32Sfloat, .offset = 0 },
+    { .location = 1, .binding = 0, .format = vk::Format::eR32G32Sfloat, .offset = 3 * sizeof(float) }
   };
   
   std::vector<vk::DescriptorSetLayoutBinding> bindings
@@ -157,7 +236,7 @@ void mr::WindowContext::render()
       .stageFlags = vk::ShaderStageFlagBits::eVertex,
     }
   };
-  static GraphicsPipeline pipeline = GraphicsPipeline(_state, &_shader, descrs, {bindings});
+  static GraphicsPipeline pipeline = GraphicsPipeline(_state, _render_pass.get(), &_shader, descrs, {bindings});
 
   float matr[16]
   {
@@ -175,16 +254,22 @@ void mr::WindowContext::render()
 
   static CommandUnit command_unit {_state};
 
+  struct vec3 { float x, y, z; };
   struct vec2 { float x, y; };
-  struct vertex { vec2 coord, tex; };
+  struct vertex { vec3 coord, tex; };
   std::vector<vertex> vertexes
   {
-    {{-0.5, -0.5}, {0, 0}},
-    {{0.5, -0.5}, {1, 0}},
-    {{0.5, 0.5}, {1, 1}},
-    {{-0.5, 0.5}, {0, 1}},
+    {{-0.5, 0, -0.5}, {0, 0}},
+    {{0.5, 0, -0.5}, {1, 0}},
+    {{0.5, 0, 0.5}, {1, 1}},
+    {{-0.5, 0, 0.5}, {0, 1}},
+    {{-0.5, -5, -0.5}, {0, 0}},
+    {{0.5, -5, -0.5}, {1, 0}},
+    {{0.5, -5, 0.5}, {1, 1}},
+    {{-0.5, -5, 0.5}, {0, 1}},
   };
-  std::vector<int> indexes {0, 1, 2, 2, 3, 0};
+  std::vector<int> indexes {0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4};
+  // std::vector<int> indexes {0, 1, 2, 2, 3, 0};
   static Buffer vertex_buffer = create_vertex_buffer(_state, sizeof(vertexes[0]) * vertexes.size(), vertexes.data());
   static Buffer index_buffer = create_index_buffer(_state, sizeof(indexes[0]) * indexes.size(), indexes.data());
 
@@ -195,13 +280,16 @@ void mr::WindowContext::render()
   _state.device().acquireNextImageKHR(_swapchain.get(), UINT64_MAX, _image_available_semaphore, nullptr, &image_index);
   command_unit.begin();
 
-  vk::ClearValue clear_color {vk::ClearColorValue(0, 0, 0, 0)};
+  std::array<vk::ClearValue, 2> clear_colors {};
+  clear_colors[0].color = {std::array {0.0f, 0.0f, 0.0f, 1.0f}};
+  clear_colors[1].depthStencil = {1.0f, 0};
+
   vk::RenderPassBeginInfo render_pass_info {
-      .renderPass = _state.render_pass(),
+      .renderPass = _render_pass.get(),
       .framebuffer = _framebuffers[image_index].framebuffer(),
       .renderArea = {{0, 0}, _extent},
-      .clearValueCount = 1,
-      .pClearValues = &clear_color,
+      .clearValueCount = static_cast<uint>(clear_colors.size()),
+      .pClearValues = clear_colors.data(),
   };
 
   command_unit->beginRenderPass(render_pass_info, vk::SubpassContents::eInline);
