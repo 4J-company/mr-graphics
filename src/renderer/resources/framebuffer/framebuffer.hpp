@@ -34,7 +34,7 @@ namespace mr
     ~Framebuffer() = default;
 
     Framebuffer(const VulkanState &state, vk::RenderPass render_pass, uint width, uint height, vk::Format swapchain_format, 
-      vk::Image final_target, Image &depthbuffer);
+      vk::Image final_target, std::array<Image, 6 /* constant... */> &gbuffers, Image &depthbuffer);
 
     Framebuffer(Framebuffer &&other) noexcept = default;
     Framebuffer &operator=(Framebuffer &&other) noexcept = default;

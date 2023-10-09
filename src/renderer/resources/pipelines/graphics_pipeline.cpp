@@ -1,8 +1,8 @@
 #include "resources/pipelines/graphics_pipeline.hpp"
 
-mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state, vk::RenderPass render_pass, Shader *shader, 
+mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state, vk::RenderPass render_pass, uint subpass, Shader *shader, 
    std::vector<vk::VertexInputAttributeDescription> attributes, std::vector<std::vector<vk::DescriptorSetLayoutBinding>> bindings) 
-   : Pipeline(state, shader, bindings)
+   : Pipeline(state, shader, bindings), _subpass(subpass)
 {
   // dynamic states of pipeline (viewport)
   _dynamic_states.push_back(vk::DynamicState::eViewport);
@@ -69,24 +69,43 @@ mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state, vk::RenderPass 
     .maxDepthBounds = 1.0f,
   };
 
-  vk::PipelineColorBlendAttachmentState color_blend_attachment {
-      .blendEnable = false,
-      .srcColorBlendFactor = vk::BlendFactor::eOne,
-      .dstColorBlendFactor = vk::BlendFactor::eZero,
-      .colorBlendOp = vk::BlendOp::eAdd,
-      .srcAlphaBlendFactor = vk::BlendFactor::eOne,
-      .dstAlphaBlendFactor = vk::BlendFactor::eZero,
-      .alphaBlendOp = vk::BlendOp::eAdd,
-      .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
-          vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
-  };
+  std::vector<vk::PipelineColorBlendAttachmentState> color_blend_attachments;
+  switch (subpass)
+  {
+  case 0:
+    color_blend_attachments.resize(WindowContext::gbuffers_number);
+    for (int i = 0; i < WindowContext::gbuffers_number; i++)
+    {
+      color_blend_attachments[i].blendEnable = false;
+      color_blend_attachments[i].srcColorBlendFactor = vk::BlendFactor::eOne;
+      color_blend_attachments[i].dstColorBlendFactor = vk::BlendFactor::eZero;
+      color_blend_attachments[i].colorBlendOp = vk::BlendOp::eAdd;
+      color_blend_attachments[i].srcAlphaBlendFactor = vk::BlendFactor::eOne;
+      color_blend_attachments[i].dstAlphaBlendFactor = vk::BlendFactor::eZero;
+      color_blend_attachments[i].alphaBlendOp = vk::BlendOp::eAdd;
+      color_blend_attachments[i].colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+          vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+    }
+    break;
+  case 1:
+    color_blend_attachments.resize(1);
+    color_blend_attachments[0].blendEnable = false;
+    color_blend_attachments[0].srcColorBlendFactor = vk::BlendFactor::eOne;
+    color_blend_attachments[0].dstColorBlendFactor = vk::BlendFactor::eZero;
+    color_blend_attachments[0].colorBlendOp = vk::BlendOp::eAdd;
+    color_blend_attachments[0].srcAlphaBlendFactor = vk::BlendFactor::eOne;
+    color_blend_attachments[0].dstAlphaBlendFactor = vk::BlendFactor::eZero;
+    color_blend_attachments[0].alphaBlendOp = vk::BlendOp::eAdd;
+    color_blend_attachments[0].colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+        vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+  }
 
   vk::PipelineColorBlendStateCreateInfo color_blendin_create_info {
       .logicOpEnable = false,
       .logicOp = vk::LogicOp::eCopy,
-      .attachmentCount = 1,
-      .pAttachments = &color_blend_attachment,
-      .blendConstants = std::array<float, 4> {0.0, 0.0, 0.0, 0.0}, // ???
+      .attachmentCount = static_cast<uint>(color_blend_attachments.size()),
+      .pAttachments = color_blend_attachments.data(),
+      .blendConstants = std::array<float, 4> {0.0, 0.0, 0.0, 0.0}, 
   };
 
   vk::GraphicsPipelineCreateInfo pipeline_create_info {
@@ -97,15 +116,16 @@ mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state, vk::RenderPass 
       .pViewportState = &viewport_state_create_info,
       .pRasterizationState = &rasterizer_create_info,
       .pMultisampleState = &multisampling_create_info,
-      .pDepthStencilState = &depth_stencil_create_info,
       .pColorBlendState = &color_blendin_create_info,
       .pDynamicState = &dynamic_state_create_info,
       .layout = _layout.get(),
       .renderPass = render_pass,
-      .subpass = 0,
+      .subpass = _subpass,
       .basePipelineHandle = VK_NULL_HANDLE, // Optional
       .basePipelineIndex = -1,              // Optional
   };
+  if (_subpass == 0)
+    pipeline_create_info.pDepthStencilState = &depth_stencil_create_info;
 
   std::vector<vk::Pipeline> pipelines;
   pipelines = state.device().createGraphicsPipelines(nullptr, pipeline_create_info).value;

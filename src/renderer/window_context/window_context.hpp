@@ -11,12 +11,16 @@ namespace mr
 
   class WindowContext
   {
+  public:
+    inline static const uint gbuffers_number = 6;
   private:
     vk::UniqueSwapchainKHR _swapchain;
     vk::Format _swapchain_format;
     vk::UniqueSurfaceKHR _surface;
     vk::Extent2D _extent;
     std::array<Framebuffer, Framebuffer::max_presentable_images> _framebuffers;
+
+    std::array<Image, gbuffers_number> _gbuffers;
 
     vk::UniqueRenderPass _render_pass;
     Image _depthbuffer;

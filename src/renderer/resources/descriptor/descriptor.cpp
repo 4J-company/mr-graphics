@@ -33,6 +33,12 @@ void mr::Descriptor::update_all_attachments(const VulkanState &state, const std:
       _attach_write[i].buffer_info.range = attachments[i].uniform_buffer->size();
       _attach_write[i].buffer_info.offset = 0;
     }
+    if (attachments[i].gbuffer != nullptr)
+    {
+      _attach_write[i].image_info.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+      _attach_write[i].image_info.imageView = attachments[i].gbuffer->image_view();
+      _attach_write[i].image_info.sampler = nullptr;
+    }
   }
 
   std::vector<vk::WriteDescriptorSet> descriptor_writes(attachments.size());
@@ -57,6 +63,11 @@ void mr::Descriptor::update_all_attachments(const VulkanState &state, const std:
       descriptor_writes[i].descriptorType = vk::DescriptorType::eUniformBuffer;
       descriptor_writes[i].pBufferInfo = &_attach_write[i].buffer_info;
     }
+    else if (attachments[i].gbuffer != nullptr)
+    {
+      descriptor_writes[i].descriptorType = vk::DescriptorType::eInputAttachment;
+      descriptor_writes[i].pImageInfo = &_attach_write[i].image_info;
+    }
   }
 
   state.device().updateDescriptorSets(descriptor_writes, {});
@@ -79,6 +90,8 @@ void mr::Descriptor::create_descriptor_pool(const VulkanState &state, const std:
       pool_sizes[i].type = vk::DescriptorType::eStorageBuffer; // Fill binding as SSBO
     else if (attachments[i].texture != nullptr)
       pool_sizes[i].type = vk::DescriptorType::eCombinedImageSampler; // Fill binding as texture
+    else if (attachments[i].gbuffer != nullptr)
+      pool_sizes[i].type = vk::DescriptorType::eInputAttachment; // Fill binding as texture
     else
       assert(false); // bad attachment
   }

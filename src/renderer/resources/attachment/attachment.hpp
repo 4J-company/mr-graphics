@@ -5,6 +5,7 @@ namespace mr
 {
   class Buffer;
   class Texture;
+  class Image;
 
   // TODO: trying convert it into union
   struct DescriptorAttachment
@@ -12,6 +13,7 @@ namespace mr
     Buffer *uniform_buffer {};
     Buffer *storage_buffer {};
     Texture *texture {};
+    Image *gbuffer {};
     // const ShadowMap *shadow_map = nullptr;
   };
 
