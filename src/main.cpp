@@ -2,9 +2,9 @@
 
 void xmain(int argc, const char **argv)
 {
-  mr::Application App;
+  mr::Application app;
 
-  auto wnd = App.create_window(800, 600);
+  auto wnd = app.create_window(800, 600);
 
   // TMP theme
   while (true)
