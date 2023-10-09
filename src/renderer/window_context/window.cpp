@@ -45,7 +45,3 @@ mr::Window::Window(const VulkanState &state, size_t width, size_t height) : _wid
 } // End of 'wnd::window::window' function
 
 mr::Window::~Window() { _thread.join(); }
-
-mr::Kernel::Kernel() {}
-
-mr::Kernel::~Kernel() {}
