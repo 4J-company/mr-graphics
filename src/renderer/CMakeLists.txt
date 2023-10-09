@@ -49,6 +49,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
   ${CMAKE_CURRENT_LIST_DIR}/timer/timer.hpp
   ${CMAKE_CURRENT_LIST_DIR}/timer/timer.cpp
 
+  ${CMAKE_CURRENT_LIST_DIR}/mesh/attribute_types.hpp
   ${CMAKE_CURRENT_LIST_DIR}/mesh/mesh.hpp
   ${CMAKE_CURRENT_LIST_DIR}/mesh/mesh.cpp
  )

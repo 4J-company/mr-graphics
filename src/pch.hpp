@@ -37,6 +37,10 @@
 #include <CrossWindow/Graphics.h>
 #include <vulkan/vulkan.hpp>
 
+#include <assimp/scene.h>
+#include <assimp/postprocess.h>
+#include <assimp/Importer.hpp>
+
 // WinAPI macros undefined :(
 #undef max(a, b)
 

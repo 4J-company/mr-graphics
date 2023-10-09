@@ -7,11 +7,6 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback( VkDebugUtilsMessageSeverity
                                                      const VkDebugUtilsMessengerCallbackDataEXT *CallbackData,
                                                      void *UserData )
 {
-  if (CallbackData->messageIdNumber == 0x4d08326d) // command buffer end
-    return false;
-  if (CallbackData->messageIdNumber == 0xc7aabc16) // presetn image layout
-    return false;
-
   std::cout << CallbackData->pMessage << '\n' << std::endl;
   return false;
 }
@@ -135,4 +130,19 @@ mr::Application::~Application()
 [[nodiscard]] std::unique_ptr<mr::Window> mr::Application::create_window(size_t width, size_t height) const
 {
   return std::make_unique<Window>(_state, width, height);
+}
+
+[[nodiscard]] mr::Mesh * mr::Application::create_mesh(
+    std::span<PositionType> positions,
+    std::span<FaceType> faces,
+    std::span<ColorType> colors,
+    std::span<TexCoordType> uvs,
+    std::span<NormalType> normals,
+    std::span<NormalType> tangents,
+    std::span<NormalType> bitangent,
+    std::span<BoneType> bones,
+    BoundboxType bbox
+    ) const {
+  _tmp_mesh_pool.emplace_back(positions, faces, colors, uvs, normals, tangents, bitangent, bones, bbox);
+  return &_tmp_mesh_pool.back();
 }

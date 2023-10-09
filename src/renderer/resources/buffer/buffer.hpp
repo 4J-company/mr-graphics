@@ -28,6 +28,9 @@ namespace mr
     Buffer() = default;
     Buffer(const VulkanState &state, size_t size, vk::BufferUsageFlags usage_flag, vk::MemoryPropertyFlags memory_properties);
 
+    Buffer(Buffer &&other) noexcept = default;
+    Buffer & operator=(Buffer &&other) noexcept = default;
+
     // resize
     void resize(size_t size);
 
