@@ -1,6 +1,6 @@
 CPMAddPackage(
   NAME CrossWindow
-  GITHUB_REPOSITORY cone-forest/CrossWindow
+  GITHUB_REPOSITORY 4J-company/mr-window
   GIT_TAG master
   )
 CPMAddPackage(
