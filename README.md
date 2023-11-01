@@ -1,3 +1,4 @@
+![mr. Graphics](./mr-graphics-logo.png) 
 # Fast* parallel** vulkan.hpp renderer***
 
 ## Building from source
