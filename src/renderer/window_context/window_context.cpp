@@ -316,9 +316,10 @@ void mr::WindowContext::render()
   _state.device().acquireNextImageKHR(_swapchain.get(), UINT64_MAX, _image_available_semaphore, nullptr, &image_index);
   command_unit.begin();
 
+  vk::ClearValue clear_color {vk::ClearColorValue(std::array{0, 0, 0, 0})}; // anyone who changes that line will be fucked
   std::array<vk::ClearValue, gbuffers_number + 2> clear_colors {};
   for (int i = 0; i < gbuffers_number + 1; i++)
-    clear_colors[i].color = {std::array {0.0f, 0.0f, 0.0f, 0.0f}};
+    clear_colors[i].color = clear_color;
   clear_colors.back().depthStencil = vk::ClearDepthStencilValue{1.0f, 0};
 
   vk::RenderPassBeginInfo render_pass_info {

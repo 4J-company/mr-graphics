@@ -100,13 +100,22 @@ mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state, vk::RenderPass 
         vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
   }
 
-  vk::PipelineColorBlendStateCreateInfo color_blendin_create_info {
+  vk::PipelineColorBlendStateCreateInfo color_blending_create_info {
       .logicOpEnable = false,
       .logicOp = vk::LogicOp::eCopy,
       .attachmentCount = static_cast<uint>(color_blend_attachments.size()),
       .pAttachments = color_blend_attachments.data(),
-      .blendConstants = std::array<float, 4> {0.0, 0.0, 0.0, 0.0}, 
+      .blendConstants = std::array<float, 4> {0.0, 0.0, 0.0, 0.0}, // ???
   };
+
+  // create pipeline layout
+  vk::PipelineLayoutCreateInfo pipeline_layout_create_info {
+      .setLayoutCount = 0,
+      .pSetLayouts = nullptr,
+      .pushConstantRangeCount = 0,
+      .pPushConstantRanges = nullptr,
+  };
+  _layout = state.device().createPipelineLayout(pipeline_layout_create_info).value;
 
   vk::GraphicsPipelineCreateInfo pipeline_create_info {
       .stageCount = _shader->stage_number(),
@@ -128,8 +137,8 @@ mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state, vk::RenderPass 
     pipeline_create_info.pDepthStencilState = &depth_stencil_create_info;
 
   std::vector<vk::Pipeline> pipelines;
-  pipelines = state.device().createGraphicsPipelines(nullptr, pipeline_create_info).value;
-  _pipeline.reset(pipelines[0]);
+  pipelines = state.device().createGraphicsPipelines(state.pipeline_cache(), pipeline_create_info).value;
+  _pipeline = pipelines[0];
 }
 
 void mr::GraphicsPipeline::apply(vk::CommandBuffer cmd_buffer) const
