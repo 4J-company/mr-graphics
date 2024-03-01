@@ -8,8 +8,6 @@ namespace mr
 {
   class WindowContext;
 
-  class Kernel;
-
   class Window
   {
   private:
@@ -36,13 +34,6 @@ namespace mr
 
     // methods
     void render() { _context.render(); }
-  };
-
-  class Kernel
-  {
-  public:
-    Kernel();
-    ~Kernel();
   };
 } // namespace mr
 #endif // __window_hpp_

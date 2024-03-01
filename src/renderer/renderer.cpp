@@ -8,7 +8,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(VkDebugUtilsMessageSeverityF
   void *UserData)
 {
   std::cout << CallbackData->pMessage << '\n' << std::endl;
-  return VK_FALSE;
+  return false;
 }
 
 // mr::Application class defualt constructor (initializes vulkan instance, device ...)
@@ -159,7 +159,11 @@ mr::Application::Application()
   _state.create_pipeline_cache();
 }
 
-mr::Application::~Application() {}
+mr::Application::~Application() 
+{
+  _state._device.destroy();
+  _state._instance.destroy();
+}
 
 [[nodiscard]] std::unique_ptr<mr::Buffer> mr::Application::create_buffer() const { return std::make_unique<Buffer>(); }
 
@@ -171,4 +175,19 @@ mr::Application::~Application() {}
 [[nodiscard]] std::unique_ptr<mr::Window> mr::Application::create_window(size_t width, size_t height) const
 {
   return std::make_unique<Window>(_state, width, height);
+}
+
+[[nodiscard]] mr::Mesh * mr::Application::create_mesh(
+    std::span<PositionType> positions,
+    std::span<FaceType> faces,
+    std::span<ColorType> colors,
+    std::span<TexCoordType> uvs,
+    std::span<NormalType> normals,
+    std::span<NormalType> tangents,
+    std::span<NormalType> bitangent,
+    std::span<BoneType> bones,
+    BoundboxType bbox
+    ) const {
+  _tmp_mesh_pool.emplace_back(positions, faces, colors, uvs, normals, tangents, bitangent, bones, bbox);
+  return &_tmp_mesh_pool.back();
 }

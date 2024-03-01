@@ -11,9 +11,9 @@ namespace mr
   class Pipeline
   {
   protected:
-    vk::Pipeline _pipeline;
-    vk::PipelineLayout _layout;
-    // std::vector?<vk::DescriptorSetLayout> _desctiptor_layouts;
+    vk::UniquePipeline _pipeline;
+    vk::UniquePipelineLayout _layout;
+    std::vector<vk::UniqueDescriptorSetLayout> _set_layouts;
     // std::vector?<Attachment> _attachments;
     // std::vector?<Constant> _constants;
 
@@ -21,12 +21,21 @@ namespace mr
 
   public:
     Pipeline() = default;
-    ~Pipeline();
 
-    vk::Pipeline pipeline() const { return _pipeline; }
-    vk::PipelineLayout layout() const { return _layout; }
+    Pipeline(const VulkanState &state, Shader *shader, std::vector<std::vector<vk::DescriptorSetLayoutBinding>> bindings);
+
+    const vk::Pipeline pipeline() const { return _pipeline.get(); }
+    const vk::PipelineLayout layout() const { return _layout.get(); }
 
     virtual void apply(vk::CommandBuffer cmd_buffer) const;
+
+    void create_layout_sets(const VulkanState &state, std::vector<std::vector<vk::DescriptorSetLayoutBinding>> bindings);
+
+    const vk::DescriptorSetLayout set_layout(uint set_number) 
+    {
+      assert(set_number < _set_layouts.size());
+      return _set_layouts[set_number].get();
+    }
   };
 } // namespace mr
 

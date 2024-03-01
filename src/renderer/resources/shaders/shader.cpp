@@ -26,10 +26,10 @@ mr::Shader::Shader(const VulkanState &state, std::string_view filename) : _path(
 
     // vk::Result result;
     // std::tie(result, _modules[shd]) = state.device().createShaderModule(create_info);
-    _modules[shd] = state.device().createShaderModule(create_info).value;
+    _modules[shd] = state.device().createShaderModuleUnique(create_info).value;
 
     _stages[shd].stage = stage_bits[shd];
-    _stages[shd].module = _modules[shd];
+    _stages[shd].module = _modules[shd].get();
     _stages[shd].pName = "main";
   });
 }

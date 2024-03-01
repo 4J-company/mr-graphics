@@ -11,14 +11,25 @@ namespace mr
 
   class WindowContext
   {
+  public:
+    inline static const uint gbuffers_number = 6;
   private:
-    vk::SwapchainKHR _swapchain;
+    vk::UniqueSwapchainKHR _swapchain;
     vk::Format _swapchain_format;
-    vk::SurfaceKHR _surface;
+    vk::UniqueSurfaceKHR _surface;
     vk::Extent2D _extent;
     std::array<Framebuffer, Framebuffer::max_presentable_images> _framebuffers;
 
+    std::array<Image, gbuffers_number> _gbuffers;
+
+    vk::UniqueRenderPass _render_pass;
+    Image _depthbuffer;
+
     VulkanState _state;
+
+    vk::Semaphore _image_available_semaphore;
+    vk::Semaphore _render_rinished_semaphore;
+    vk::Fence _image_fence;
 
     Window *_parent;
 
@@ -31,6 +42,8 @@ namespace mr
     ~WindowContext() = default;
 
     void create_framebuffers(const VulkanState &state);
+    void create_depthbuffer(const VulkanState &state);
+    void create_render_pass(const VulkanState &state);
     void resize(size_t width, size_t height);
     void render();
   };

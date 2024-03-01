@@ -22,10 +22,8 @@ namespace mr
     GraphicsPipeline() = default;
     ~GraphicsPipeline() = default;
 
-    GraphicsPipeline(const VulkanState &state, Shader *ShaderProgram);
-
-    GraphicsPipeline(GraphicsPipeline &&other) noexcept = default;
-    GraphicsPipeline &operator=(GraphicsPipeline &&other) noexcept = default;
+    GraphicsPipeline(const VulkanState &state, vk::RenderPass render_pass, uint subpass, Shader *ShaderProgram, 
+      std::vector<vk::VertexInputAttributeDescription> attributes, std::vector<std::vector<vk::DescriptorSetLayoutBinding>> bindings);
 
     void recompile();
 

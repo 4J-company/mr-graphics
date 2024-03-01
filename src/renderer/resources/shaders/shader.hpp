@@ -13,7 +13,7 @@ namespace mr
     inline static const size_t max_shader_modules = 6;
 
     std::filesystem::path _path;
-    std::array<vk::ShaderModule, max_shader_modules> _modules;
+    std::array<vk::UniqueShaderModule, max_shader_modules> _modules;
     std::array<vk::PipelineShaderStageCreateInfo, max_shader_modules> _stages;
     std::atomic<uint> _num_of_loaded_shaders;
 

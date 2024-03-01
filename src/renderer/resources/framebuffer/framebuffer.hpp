@@ -21,7 +21,7 @@ namespace mr
   private:
     inline static const size_t max_presentable_images = 2, max_gbuffers = 1;
 
-    vk::Framebuffer _framebuffer;
+    vk::UniqueFramebuffer _framebuffer;
 
     uint _width, _height;
     std::array<Image, max_presentable_images> _swapchain_images;
@@ -33,14 +33,15 @@ namespace mr
     Framebuffer() = default;
     ~Framebuffer() = default;
 
-    Framebuffer(const VulkanState &state, uint width, uint height, vk::Format swapchain_format, vk::Image image);
+    Framebuffer(const VulkanState &state, vk::RenderPass render_pass, uint width, uint height, vk::Format swapchain_format, 
+      vk::Image final_target, std::array<Image, 6 /* constant... */> &gbuffers, Image &depthbuffer);
 
     Framebuffer(Framebuffer &&other) noexcept = default;
     Framebuffer &operator=(Framebuffer &&other) noexcept = default;
 
     void resize(size_t width, size_t height);
 
-    vk::Framebuffer framebuffer() const { return _framebuffer; }
+    const vk::Framebuffer framebuffer() const { return _framebuffer.get(); }
     vk::Viewport viewport() const { return _viewport.viewport; }
     vk::Rect2D scissors() const { return _viewport.scissors; }
   };

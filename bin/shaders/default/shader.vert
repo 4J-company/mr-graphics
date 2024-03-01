@@ -1,11 +1,20 @@
+/**/
 #version 450
 
-vec2 positions[3] = vec2[](
-    vec2(0.0, -0.5),
-    vec2(0.5, 0.5),
-    vec2(-0.5, 0.5)
-);
+layout(location = 0) in vec3 position;
+layout(location = 1) in vec2 tex_coord;
 
-void main() {
-    gl_Position = vec4(positions[gl_VertexIndex], 0.0, 1.0);
+layout(location = 0) out vec2 tex_coord_out;
+
+layout(binding = 1) uniform PrimitiveUbo
+{
+  mat4 vp;
+} ubo;
+
+void main() 
+{
+  vec3 pos = position * 15;
+  pos.y = position.y;
+  gl_Position = ubo.vp * vec4(pos, 1.0);
+  tex_coord_out = tex_coord;
 }

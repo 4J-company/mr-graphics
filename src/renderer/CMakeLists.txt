@@ -10,8 +10,8 @@ target_precompile_headers(${CMAKE_PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_LIST_DIR
 # render resources files
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_LIST_DIR})
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE 
-  ${CMAKE_CURRENT_LIST_DIR}/renderer.cpp 
   ${CMAKE_CURRENT_LIST_DIR}/renderer.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/renderer.cpp 
 
   ${CMAKE_CURRENT_LIST_DIR}/resources/attachment/attachment.hpp
   ${CMAKE_CURRENT_LIST_DIR}/resources/attachment/attachment.cpp
@@ -48,5 +48,9 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
 
   ${CMAKE_CURRENT_LIST_DIR}/timer/timer.hpp
   ${CMAKE_CURRENT_LIST_DIR}/timer/timer.cpp
+
+  ${CMAKE_CURRENT_LIST_DIR}/mesh/attribute_types.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/mesh/mesh.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/mesh/mesh.cpp
  )
 target_precompile_headers(${CMAKE_PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_LIST_DIR}/renderer.hpp)

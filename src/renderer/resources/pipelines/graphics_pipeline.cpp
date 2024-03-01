@@ -1,9 +1,9 @@
 #include "resources/pipelines/graphics_pipeline.hpp"
 
-mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state, Shader *shader)
+mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state, vk::RenderPass render_pass, uint subpass, Shader *shader, 
+   std::vector<vk::VertexInputAttributeDescription> attributes, std::vector<std::vector<vk::DescriptorSetLayoutBinding>> bindings) 
+   : Pipeline(state, shader, bindings), _subpass(subpass)
 {
-  _shader = shader;
-
   // dynamic states of pipeline (viewport)
   _dynamic_states.push_back(vk::DynamicState::eViewport);
   _dynamic_states.push_back(vk::DynamicState::eScissor);
@@ -11,10 +11,24 @@ mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state, Shader *shader)
                                                                     static_cast<uint>(_dynamic_states.size()),
                                                                 .pDynamicStates = _dynamic_states.data()};
 
-  vk::PipelineVertexInputStateCreateInfo vertex_input_create_info {.vertexBindingDescriptionCount = 0,
-                                                                   .pVertexBindingDescriptions = nullptr,
-                                                                   .vertexAttributeDescriptionCount = 0,
-                                                                   .pVertexAttributeDescriptions = nullptr};
+  uint size = 0;
+  for (auto &atr : attributes)
+    size += atr.format == vk::Format::eR32G32B32Sfloat ? 4 :
+            atr.format == vk::Format::eR32G32B32Sfloat ? 3 :
+            atr.format == vk::Format::eR32G32Sfloat ? 2 : 1;
+  size *= 4;
+
+  vk::VertexInputBindingDescription binding_description
+  {
+    .binding = 0,
+    .stride = size,
+    .inputRate = vk::VertexInputRate::eVertex,
+  };
+
+  vk::PipelineVertexInputStateCreateInfo vertex_input_create_info {.vertexBindingDescriptionCount = static_cast<bool>(attributes.size()),
+                                                                   .pVertexBindingDescriptions = &binding_description,
+                                                                   .vertexAttributeDescriptionCount = static_cast<uint>(attributes.size()),
+                                                                   .pVertexAttributeDescriptions = attributes.data()};
 
   _topology = vk::PrimitiveTopology::eTriangleList;
   vk::PipelineInputAssemblyStateCreateInfo input_assembly_create_info {.topology = _topology,
@@ -42,23 +56,55 @@ mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state, Shader *shader)
                                                                     .alphaToCoverageEnable = false,
                                                                     .alphaToOneEnable = false};
 
-  vk::PipelineColorBlendAttachmentState color_blend_attachment {
-      .blendEnable = false,
-      .srcColorBlendFactor = vk::BlendFactor::eOne,
-      .dstColorBlendFactor = vk::BlendFactor::eZero,
-      .colorBlendOp = vk::BlendOp::eAdd,
-      .srcAlphaBlendFactor = vk::BlendFactor::eOne,
-      .dstAlphaBlendFactor = vk::BlendFactor::eZero,
-      .alphaBlendOp = vk::BlendOp::eAdd,
-      .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
-          vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
+  vk::PipelineDepthStencilStateCreateInfo depth_stencil_create_info
+  {
+    .depthTestEnable = true,
+    .depthWriteEnable = true,
+    .depthCompareOp = vk::CompareOp::eLess,
+    .depthBoundsTestEnable = false,
+    .stencilTestEnable = false,
+    .front = {},
+    .back = {},
+    .minDepthBounds = 0.0f,
+    .maxDepthBounds = 1.0f,
   };
 
-  vk::PipelineColorBlendStateCreateInfo color_blendin_create_info {
+  std::vector<vk::PipelineColorBlendAttachmentState> color_blend_attachments;
+  switch (subpass)
+  {
+  case 0:
+    color_blend_attachments.resize(WindowContext::gbuffers_number);
+    for (int i = 0; i < WindowContext::gbuffers_number; i++)
+    {
+      color_blend_attachments[i].blendEnable = false;
+      color_blend_attachments[i].srcColorBlendFactor = vk::BlendFactor::eOne;
+      color_blend_attachments[i].dstColorBlendFactor = vk::BlendFactor::eZero;
+      color_blend_attachments[i].colorBlendOp = vk::BlendOp::eAdd;
+      color_blend_attachments[i].srcAlphaBlendFactor = vk::BlendFactor::eOne;
+      color_blend_attachments[i].dstAlphaBlendFactor = vk::BlendFactor::eZero;
+      color_blend_attachments[i].alphaBlendOp = vk::BlendOp::eAdd;
+      color_blend_attachments[i].colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+          vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+    }
+    break;
+  case 1:
+    color_blend_attachments.resize(1);
+    color_blend_attachments[0].blendEnable = false;
+    color_blend_attachments[0].srcColorBlendFactor = vk::BlendFactor::eOne;
+    color_blend_attachments[0].dstColorBlendFactor = vk::BlendFactor::eZero;
+    color_blend_attachments[0].colorBlendOp = vk::BlendOp::eAdd;
+    color_blend_attachments[0].srcAlphaBlendFactor = vk::BlendFactor::eOne;
+    color_blend_attachments[0].dstAlphaBlendFactor = vk::BlendFactor::eZero;
+    color_blend_attachments[0].alphaBlendOp = vk::BlendOp::eAdd;
+    color_blend_attachments[0].colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+        vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+  }
+
+  vk::PipelineColorBlendStateCreateInfo color_blending_create_info {
       .logicOpEnable = false,
       .logicOp = vk::LogicOp::eCopy,
-      .attachmentCount = 1,
-      .pAttachments = &color_blend_attachment,
+      .attachmentCount = static_cast<uint>(color_blend_attachments.size()),
+      .pAttachments = color_blend_attachments.data(),
       .blendConstants = std::array<float, 4> {0.0, 0.0, 0.0, 0.0}, // ???
   };
 
@@ -71,9 +117,7 @@ mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state, Shader *shader)
   };
   _layout = state.device().createPipelineLayout(pipeline_layout_create_info).value;
 
-  // create pipeline
   vk::GraphicsPipelineCreateInfo pipeline_create_info {
-      // .stageCount = static_cast<uint>(_shader->get_stages().size()),
       .stageCount = _shader->stage_number(),
       .pStages = _shader->get_stages().data(),
       .pVertexInputState = &vertex_input_create_info,
@@ -81,15 +125,16 @@ mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state, Shader *shader)
       .pViewportState = &viewport_state_create_info,
       .pRasterizationState = &rasterizer_create_info,
       .pMultisampleState = &multisampling_create_info,
-      .pDepthStencilState = nullptr,
       .pColorBlendState = &color_blendin_create_info,
       .pDynamicState = &dynamic_state_create_info,
-      .layout = _layout,
-      .renderPass = state.render_pass(),
-      .subpass = 0,
+      .layout = _layout.get(),
+      .renderPass = render_pass,
+      .subpass = _subpass,
       .basePipelineHandle = VK_NULL_HANDLE, // Optional
       .basePipelineIndex = -1,              // Optional
   };
+  if (_subpass == 0)
+    pipeline_create_info.pDepthStencilState = &depth_stencil_create_info;
 
   std::vector<vk::Pipeline> pipelines;
   pipelines = state.device().createGraphicsPipelines(state.pipeline_cache(), pipeline_create_info).value;
@@ -98,7 +143,7 @@ mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state, Shader *shader)
 
 void mr::GraphicsPipeline::apply(vk::CommandBuffer cmd_buffer) const
 {
-  cmd_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics, _pipeline);
+  cmd_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics, _pipeline.get());
 }
 
 void mr::GraphicsPipeline::recompile() {}

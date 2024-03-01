@@ -13,7 +13,6 @@ namespace mr
     vk::Instance _instance;
     vk::Device _device;
     vk::PhysicalDevice _phys_device;
-    vk::RenderPass _render_pass;
     vk::Queue _queue;
     vk::PipelineCache _pipeline_cache;
 
@@ -63,7 +62,6 @@ namespace mr
     vk::Instance instance() const { return _instance; }
     vk::PhysicalDevice phys_device() const { return _phys_device; }
     vk::Device device() const { return _device; }
-    vk::RenderPass render_pass() const { return _render_pass; }
     vk::Queue queue() const { return _queue; }
     vk::PipelineCache pipeline_cache() const { return _pipeline_cache; }
   };
