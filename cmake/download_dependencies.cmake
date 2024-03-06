@@ -9,12 +9,6 @@ CPMAddPackage(
   GIT_TAG master
   )
 CPMAddPackage(
-  NAME stb
-  GITHUB_REPOSITORY gracicot/stb-cmake
-  GIT_TAG master
-  )
-set(stb_INCLUDE_DIRS ${stb_SOURCE_DIR})
-CPMAddPackage(
   NAME assimp
   GITHUB_REPOSITORY assimp/assimp
   GIT_TAG master

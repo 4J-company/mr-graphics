@@ -43,6 +43,8 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
 
   ${CMAKE_CURRENT_LIST_DIR}/resources/texture/sampler/sampler.hpp
   ${CMAKE_CURRENT_LIST_DIR}/resources/texture/sampler/sampler.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/resources/texture/stb/stb_image.h
+  ${CMAKE_CURRENT_LIST_DIR}/resources/texture/stb/stb_image.cpp
   ${CMAKE_CURRENT_LIST_DIR}/resources/texture/texture.hpp
   ${CMAKE_CURRENT_LIST_DIR}/resources/texture/texture.cpp
 

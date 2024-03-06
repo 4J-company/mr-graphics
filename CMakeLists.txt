@@ -19,7 +19,6 @@ xwin_add_executable(${CMAKE_PROJECT_NAME} "")
 
 # link external dependencies
 find_package(Vulkan REQUIRED)
-find_package(stb REQUIRED)
 find_package(assimp REQUIRED)
 find_package(CrossWindow REQUIRED)
 find_package(CrossWindowGraphics REQUIRED)
@@ -27,7 +26,6 @@ find_package(CrossWindowGraphics REQUIRED)
 target_include_directories(
   ${CMAKE_PROJECT_NAME} PUBLIC
   ${Vulkan_INCLUDE_DIRS}
-  ${stb_INCLUDE_DIRS}
   ${assimp_INCLUDE_DIRS}
 )
 
