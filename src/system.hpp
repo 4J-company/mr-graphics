@@ -4,4 +4,4 @@
 #include "pch.hpp"
 #include "renderer/renderer.hpp"
 
-#endif  // __system_hpp_
+#endif // __system_hpp_

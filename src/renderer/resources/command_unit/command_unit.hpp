@@ -1,21 +1,31 @@
 #if !defined(__command_unit_hpp_)
-#define __command_unit_hpp_
+  #define __command_unit_hpp_
 
-#include "pch.hpp"
+  #include "pch.hpp"
 
-namespace ter
+  #include "vulkan_application.hpp"
+
+namespace mr
 {
-  class command_unit
+  class CommandUnit
   {
-    friend class application;
-
   private:
-    vk::CommandPool _cmd_pool;
-    std::array<vk::CommandBuffer, 3> _cmd_buffer;
+    vk::UniqueCommandPool _cmd_pool;
+    vk::CommandBuffer _cmd_buffer;
 
   public:
-    command_unit() = default;
+    CommandUnit() = default;
+    ~CommandUnit();
+
+    CommandUnit(const VulkanState &state);
+
+    void begin();
+    void end();
+
+    std::tuple<vk::CommandBuffer *, uint> submit_info() { return {&_cmd_buffer, 1}; }
+
+    vk::CommandBuffer *operator->() { return &_cmd_buffer; }
   };
-}
+} // namespace mr
 
 #endif // __command_unit_hpp_

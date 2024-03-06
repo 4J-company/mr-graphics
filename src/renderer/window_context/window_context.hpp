@@ -1,55 +1,51 @@
 #if !defined(__window_context_hpp_)
-#define __window_context_hpp_
+  #define __window_context_hpp_
 
-#include "pch.hpp"
-#include "window_system/window.hpp"
+  #include "pch.hpp"
+  #include "resources/resources.hpp"
+  #include "vulkan_application.hpp"
 
-namespace ter 
+namespace mr
 {
-class application;
-class window_context;
+  class Window;
 
-class framebuffer 
-{
-  friend class window_context;
+  class WindowContext
+  {
+  public:
+    inline static const uint gbuffers_number = 6;
+  private:
+    vk::UniqueSwapchainKHR _swapchain;
+    vk::Format _swapchain_format;
+    vk::UniqueSurfaceKHR _surface;
+    vk::Extent2D _extent;
+    std::array<Framebuffer, Framebuffer::max_presentable_images> _framebuffers;
 
-public:
-  inline static const uint32_t num_of_presentable_images = 3,
-                               num_of_gbuffers = 1;                 
+    std::array<Image, gbuffers_number> _gbuffers;
 
-private:
-  std::array<vk::Image, num_of_presentable_images> _swapchain_images;
-  std::array<vk::ImageView, num_of_presentable_images> _swapchain_images_views;
+    vk::UniqueRenderPass _render_pass;
+    Image _depthbuffer;
 
-  std::array<vk::Image, num_of_gbuffers> _gbuffers;
-  std::array<vk::ImageView, num_of_gbuffers> _gbuffers_views;
+    VulkanState _state;
 
-public:
-  framebuffer() = default;
-  framebuffer(const vk::Format &image_format, const vk::Device &device);
+    vk::Semaphore _image_available_semaphore;
+    vk::Semaphore _render_rinished_semaphore;
+    vk::Fence _image_fence;
 
-  ~framebuffer();
+    Window *_parent;
 
-  void resize(size_t width, size_t height);
-};
+  public:
+    WindowContext() = default;
+    WindowContext(Window *parent, const VulkanState &state);
+    WindowContext(WindowContext &&other) noexcept = default;
+    WindowContext &operator=(WindowContext &&other) noexcept = default;
 
-class window_context 
-{
-  friend class application;
+    ~WindowContext() = default;
 
-private:
-  vk::SwapchainKHR _swapchain;
-  vk::Format _swapchain_format;
-  vk::UniqueSurfaceKHR _surface;
-
-  framebuffer _framebuffer;
-
-public:
-  window_context(window_system::window *window, const application &app);
-
-  window_context() = default;
-
-  void resize(size_t width, size_t height);
-};
-} // namespace ter
+    void create_framebuffers(const VulkanState &state);
+    void create_depthbuffer(const VulkanState &state);
+    void create_render_pass(const VulkanState &state);
+    void resize(size_t width, size_t height);
+    void render();
+  };
+} // namespace mr
 #endif // __window_context_hpp_
