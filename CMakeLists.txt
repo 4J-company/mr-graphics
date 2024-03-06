@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # set(CMAKE_CXX_COMPILER clang)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(BUILD_SHARED_LIBS OFF)
 
 project(model-renderer)
 
@@ -16,16 +17,24 @@ include(cmake/download_dependencies.cmake)
 # add executable
 xwin_add_executable(${CMAKE_PROJECT_NAME} "")
 
-## link external dependencies
-# VULKAN
+# link external dependencies
 find_package(Vulkan REQUIRED)
-target_include_directories(${CMAKE_PROJECT_NAME} PUBLIC ${Vulkan_INCLUDE_DIRS})
-target_link_libraries(${CMAKE_PROJECT_NAME} Vulkan::Vulkan)
-# STB
 find_package(stb REQUIRED)
+find_package(assimp REQUIRED)
+find_package(CrossWindow REQUIRED)
+find_package(CrossWindowGraphics REQUIRED)
+
+target_include_directories(
+  ${CMAKE_PROJECT_NAME} PUBLIC
+  ${Vulkan_INCLUDE_DIRS}
+  ${stb_INCLUDE_DIRS}
+  ${assimp_INCLUDE_DIRS}
+)
+
 target_link_libraries(
     ${CMAKE_PROJECT_NAME}
-    stb::image
+    Vulkan::Vulkan
+    assimp::assimp
     CrossWindow
     CrossWindowGraphics
 )

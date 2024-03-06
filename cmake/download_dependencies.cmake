@@ -13,5 +13,11 @@ CPMAddPackage(
   GITHUB_REPOSITORY gracicot/stb-cmake
   GIT_TAG master
   )
+set(stb_INCLUDE_DIRS ${stb_SOURCE_DIR})
+CPMAddPackage(
+  NAME assimp
+  GITHUB_REPOSITORY assimp/assimp
+  GIT_TAG master
+  )
+set(assimp_INCLUDE_DIRS ${assimp_SOURCE_DIR}/include)
 
-set(stb_ROOT ${stb_SOURCE_DIR})
