@@ -112,6 +112,7 @@ mr::Application::Application()
   assert(graphics_queue_family_index == 0);
   _state._queue = _state._device.getQueue(graphics_queue_family_index, 0);
 
+  /*
   auto swapchain_format = vk::Format::eB8G8R8A8Unorm;
   vk::AttachmentDescription color_attachment
   {
@@ -155,6 +156,7 @@ mr::Application::Application()
   };
 
   _state._render_pass = _state._device.createRenderPass(render_pass_create_info).value;
+  */
 
   _state.create_pipeline_cache();
 }

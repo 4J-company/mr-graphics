@@ -319,7 +319,7 @@ void mr::WindowContext::render()
   vk::ClearValue clear_color {vk::ClearColorValue(std::array{0, 0, 0, 0})}; // anyone who changes that line will be fucked
   std::array<vk::ClearValue, gbuffers_number + 2> clear_colors {};
   for (int i = 0; i < gbuffers_number + 1; i++)
-    clear_colors[i].color = clear_color;
+    clear_colors[i].color = clear_color.color;
   clear_colors.back().depthStencil = vk::ClearDepthStencilValue{1.0f, 0};
 
   vk::RenderPassBeginInfo render_pass_info {

@@ -108,15 +108,6 @@ mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state, vk::RenderPass 
       .blendConstants = std::array<float, 4> {0.0, 0.0, 0.0, 0.0}, // ???
   };
 
-  // create pipeline layout
-  vk::PipelineLayoutCreateInfo pipeline_layout_create_info {
-      .setLayoutCount = 0,
-      .pSetLayouts = nullptr,
-      .pushConstantRangeCount = 0,
-      .pPushConstantRanges = nullptr,
-  };
-  _layout = state.device().createPipelineLayout(pipeline_layout_create_info).value;
-
   vk::GraphicsPipelineCreateInfo pipeline_create_info {
       .stageCount = _shader->stage_number(),
       .pStages = _shader->get_stages().data(),
@@ -125,7 +116,7 @@ mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state, vk::RenderPass 
       .pViewportState = &viewport_state_create_info,
       .pRasterizationState = &rasterizer_create_info,
       .pMultisampleState = &multisampling_create_info,
-      .pColorBlendState = &color_blendin_create_info,
+      .pColorBlendState = &color_blending_create_info,
       .pDynamicState = &dynamic_state_create_info,
       .layout = _layout.get(),
       .renderPass = render_pass,
@@ -136,9 +127,7 @@ mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state, vk::RenderPass 
   if (_subpass == 0)
     pipeline_create_info.pDepthStencilState = &depth_stencil_create_info;
 
-  std::vector<vk::Pipeline> pipelines;
-  pipelines = state.device().createGraphicsPipelines(state.pipeline_cache(), pipeline_create_info).value;
-  _pipeline = pipelines[0];
+  _pipeline = std::move(state.device().createGraphicsPipelinesUnique(state.pipeline_cache(), pipeline_create_info).value[0]);
 }
 
 void mr::GraphicsPipeline::apply(vk::CommandBuffer cmd_buffer) const
