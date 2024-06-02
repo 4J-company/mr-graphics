@@ -38,7 +38,6 @@ find_package(assimp REQUIRED)
 add_subdirectory(${CrossWindow_SOURCE_DIR})
 find_package(CrossWindow REQUIRED)
 find_package(CrossWindowGraphics REQUIRED)
-find_package(TBB REQUIRED COMPONENTS tbb)
 
 # find sources
 execute_process(
@@ -57,7 +56,6 @@ target_link_libraries(
     assimp::assimp
     CrossWindow
     CrossWindowGraphics
-    tbb
 )
 target_include_directories(
   ${CMAKE_PROJECT_NAME} PUBLIC
