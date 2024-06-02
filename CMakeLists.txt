@@ -1,43 +1,96 @@
 cmake_minimum_required(VERSION 3.27)
-
-set(DEBUG false)
+project(model-renderer)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-# set(CMAKE_CXX_COMPILER clang)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(BUILD_SHARED_LIBS OFF)
 
-project(model-renderer)
+# download CPM.cmake
+file(
+  DOWNLOAD
+  https://github.com/cpm-cmake/CPM.cmake/releases/download/v0.38.3/CPM.cmake
+  ${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake
+  EXPECTED_HASH SHA256=cc155ce02e7945e7b8967ddfaff0b050e958a723ef7aad3766d368940cb15494
+)
+include(${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake)
 
 # add dependencies
-include(cmake/CPM.cmake)
-include(cmake/download_dependencies.cmake)
-
-# add executable
-xwin_add_executable(${CMAKE_PROJECT_NAME} "")
+CPMAddPackage(
+  NAME CrossWindow
+  GITHUB_REPOSITORY 4J-company/mr-window
+  GIT_TAG fix/ubuntu-compilation
+  DOWNLOAD_ONLY YES
+  )
+CPMAddPackage(
+  NAME CrossWindowGraphics
+  GITHUB_REPOSITORY cone-forest/CrossWindow-Graphics
+  GIT_TAG master
+  )
 
 # link external dependencies
 find_package(Vulkan REQUIRED)
 find_package(assimp REQUIRED)
-find_package(CrossWindow REQUIRED)
+add_subdirectory(${CrossWindow_SOURCE_DIR})
+# find_package(CrossWindow REQUIRED)
 find_package(CrossWindowGraphics REQUIRED)
+find_package(TBB REQUIRED COMPONENTS tbb)
 
-target_include_directories(
-  ${CMAKE_PROJECT_NAME} PUBLIC
-  ${Vulkan_INCLUDE_DIRS}
-  ${assimp_INCLUDE_DIRS}
+# find sources
+execute_process(
+    COMMAND bash "-c" "find ${CMAKE_CURRENT_LIST_DIR}/src -name '*.cpp'"
+    OUTPUT_VARIABLE SOURCES
 )
+# add executable
+add_executable(${CMAKE_PROJECT_NAME}
+  ${XMAIN_SOURCES}
+src/renderer/resources/command_unit/command_unit.cpp
+src/renderer/resources/attachment/attachment.cpp
+src/renderer/resources/buffer/buffer.cpp
+src/renderer/resources/descriptor/descriptor.cpp
+src/renderer/resources/framebuffer/framebuffer.cpp
+src/renderer/resources/images/image.cpp
+src/renderer/resources/pipelines/compute_pipeline.cpp
+src/renderer/resources/pipelines/pipeline.cpp
+src/renderer/resources/pipelines/graphics_pipeline.cpp
+src/renderer/resources/shaders/shader.cpp
+src/renderer/resources/texture/sampler/sampler.cpp
+src/renderer/resources/texture/stb/stb_image.cpp
+src/renderer/resources/texture/texture.cpp
+src/renderer/mesh/mesh.cpp
+src/renderer/timer/timer.cpp
+src/renderer/renderer.cpp
+src/renderer/window/window.cpp
+src/renderer/window/window_context.cpp
+src/main.cpp
+src/model/model.cpp
+#  ${SOURCES}
+)
+target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE ${XWIN_DEFINITIONS})
 
+# dependencies
 target_link_libraries(
     ${CMAKE_PROJECT_NAME}
     Vulkan::Vulkan
     assimp::assimp
     CrossWindow
     CrossWindowGraphics
+    tbb
+)
+target_include_directories(
+  ${CMAKE_PROJECT_NAME} PUBLIC
+  ${Vulkan_INCLUDE_DIRS}
+  ${assimp_INCLUDE_DIRS}
 )
 
-add_subdirectory(src)
+# source
+target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
+  ${CMAKE_CURRENT_LIST_DIR}/src
+  ${CMAKE_CURRENT_LIST_DIR}/src/renderer
+  )
+target_precompile_headers(${CMAKE_PROJECT_NAME} PRIVATE
+  ${CMAKE_CURRENT_LIST_DIR}/src/pch.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/src/renderer/renderer.hpp
+  )
 
 # copy assets
 set(ASSET_DIR bin)
@@ -45,3 +98,4 @@ add_custom_target(CopyAssets
   COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_LIST_DIR}/${ASSET_DIR} ${CMAKE_CURRENT_BINARY_DIR}/${ASSET_DIR}
   )
 add_dependencies(${CMAKE_PROJECT_NAME} CopyAssets)
+
