@@ -26,12 +26,17 @@ CPMAddPackage(
   GITHUB_REPOSITORY cone-forest/CrossWindow-Graphics
   GIT_TAG master
   )
+CPMAddPackage(
+  NAME assimp
+  GITHUB_REPOSITORY assimp/assimp
+  GIT_TAG master
+  )
 
 # link external dependencies
 find_package(Vulkan REQUIRED)
 find_package(assimp REQUIRED)
 add_subdirectory(${CrossWindow_SOURCE_DIR})
-# find_package(CrossWindow REQUIRED)
+find_package(CrossWindow REQUIRED)
 find_package(CrossWindowGraphics REQUIRED)
 find_package(TBB REQUIRED COMPONENTS tbb)
 
@@ -41,30 +46,8 @@ execute_process(
     OUTPUT_VARIABLE SOURCES
 )
 # add executable
-add_executable(${CMAKE_PROJECT_NAME}
-  ${XMAIN_SOURCES}
-src/renderer/resources/command_unit/command_unit.cpp
-src/renderer/resources/attachment/attachment.cpp
-src/renderer/resources/buffer/buffer.cpp
-src/renderer/resources/descriptor/descriptor.cpp
-src/renderer/resources/framebuffer/framebuffer.cpp
-src/renderer/resources/images/image.cpp
-src/renderer/resources/pipelines/compute_pipeline.cpp
-src/renderer/resources/pipelines/pipeline.cpp
-src/renderer/resources/pipelines/graphics_pipeline.cpp
-src/renderer/resources/shaders/shader.cpp
-src/renderer/resources/texture/sampler/sampler.cpp
-src/renderer/resources/texture/stb/stb_image.cpp
-src/renderer/resources/texture/texture.cpp
-src/renderer/mesh/mesh.cpp
-src/renderer/timer/timer.cpp
-src/renderer/renderer.cpp
-src/renderer/window/window.cpp
-src/renderer/window/window_context.cpp
-src/main.cpp
-src/model/model.cpp
-#  ${SOURCES}
-)
+add_executable(${CMAKE_PROJECT_NAME} ${XMAIN_SOURCES})
+add_subdirectory(src)
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE ${XWIN_DEFINITIONS})
 
 # dependencies
