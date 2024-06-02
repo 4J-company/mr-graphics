@@ -28,6 +28,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <span>
 
 // user includes
 #define VULKAN_HPP_NO_EXCEPTIONS

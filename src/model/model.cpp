@@ -6,7 +6,8 @@ mr::Model::Model(std::string_view filename, const mr::Application &app) noexcept
       std::filesystem::current_path()
         .append("build")
         .append("models")
-        .append(filename),
+        .append(filename)
+        .string(),
       aiProcessPreset_TargetRealtime_MaxQuality);
 
   assert(sc != nullptr);
