@@ -13,11 +13,11 @@ mr::Model::Model(std::string_view filename, const mr::Application &app) noexcept
   assert(sc->mMeshes != nullptr);
 
   _meshes.resize(sc->mNumMeshes);
-  std::transform(std::execution::seq, sc->mMeshes, sc->mMeshes + sc->mNumMeshes, _meshes.begin(), 
-      [&app] (aiMesh m) -> std::unique_ptr<mr::Mesh> { 
-        return app.create_mesh(
-            {m.mVertices, m.mNumVertices},
-            {m.mFaces, m.mNumFaces}, 
-            {}, {}, {}, {}, {}, {}, {});
+  std::transform(std::execution::seq, sc->mMeshes, sc->mMeshes + sc->mNumMeshes, _meshes.begin(),
+      [&app] (aiMesh *m) -> mr::Mesh * {
+      return app.create_mesh(
+          {m->mVertices, m->mNumVertices},
+          {m->mFaces, m->mNumFaces},
+          {}, {}, {}, {}, {}, {}, {});
       });
 }

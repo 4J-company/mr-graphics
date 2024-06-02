@@ -8,7 +8,7 @@ namespace mr
   class Model 
   {
   private:
-    std::vector<std::unique_ptr<mr::Mesh>> _meshes;
+    std::vector<mr::Mesh*> _meshes;
     std::string _name;
 
   public:
