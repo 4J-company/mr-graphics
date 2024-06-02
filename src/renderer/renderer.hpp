@@ -7,7 +7,7 @@
   #include "resources/resources.hpp"
   #include "timer/timer.hpp"
   #include "vulkan_application.hpp"
-  #include "window_context/window.hpp"
+  #include "window/window.hpp"
 
   #include "mesh/mesh.hpp"
 
