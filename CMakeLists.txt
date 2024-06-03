@@ -1,33 +1,104 @@
-cmake_minimum_required(VERSION 3.25)
+cmake_minimum_required(VERSION 3.27)
+project(model-renderer)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-# set(CMAKE_CXX_COMPILER clang)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(BUILD_SHARED_LIBS OFF)
 
-set(ASSET_DIR bin)
-add_custom_target(copy_assets
-  COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_LIST_DIR}/${ASSET_DIR} ${CMAKE_CURRENT_BINARY_DIR}/${ASSET_DIR}
+# download CPM.cmake
+file(
+  DOWNLOAD
+  https://github.com/cpm-cmake/CPM.cmake/releases/download/v0.38.3/CPM.cmake
+  ${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake
+  EXPECTED_HASH SHA256=cc155ce02e7945e7b8967ddfaff0b050e958a723ef7aad3766d368940cb15494
 )
+include(${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake)
 
-project(model-renderer)
+# add dependencies
+CPMAddPackage(
+  NAME CrossWindow
+  GITHUB_REPOSITORY 4J-company/mr-window
+  GIT_TAG fix/ubuntu-compilation
+  DOWNLOAD_ONLY YES
+  )
+CPMAddPackage(
+  NAME CrossWindowGraphics
+  GITHUB_REPOSITORY cone-forest/CrossWindow-Graphics
+  GIT_TAG master
+  )
+CPMAddPackage(
+  NAME assimp
+  GITHUB_REPOSITORY assimp/assimp
+  GIT_TAG master
+  )
 
-# external dependencies
-add_subdirectory(${PROJECT_SOURCE_DIR}/external)
-
-# add executable
-xwin_add_executable(${CMAKE_PROJECT_NAME} "")
+# add useful scripts
+CPMAddPackage(
+  NAME Format.cmake
+  GITHUB_REPOSITORY TheLartians/Format.cmake
+  VERSION 1.0
+)
+CPMAddPackage(
+  NAME GroupSourcesByFolder.cmake
+  GITHUB_REPOSITORY TheLartians/GroupSourcesByFolder.cmake
+  VERSION 1.0
+)
+CPMAddPackage(
+  NAME CPMLicenses.cmake
+  GITHUB_REPOSITORY cpm-cmake/CPMLicenses.cmake
+  VERSION 0.0.5
+)
+CPMAddPackage(
+  NAME Ccache.cmake
+  GITHUB_REPOSITORY TheLartians/Ccache.cmake
+  VERSION 1.2
+)
 
 # link external dependencies
 find_package(Vulkan REQUIRED)
-target_include_directories(${PROJECT_NAME} PUBLIC ${Vulkan_INCLUDE_DIRS})
-target_link_libraries(${PROJECT_NAME} Vulkan::Vulkan)
+find_package(assimp REQUIRED)
+add_subdirectory(${CrossWindow_SOURCE_DIR})
+find_package(CrossWindow REQUIRED)
+find_package(CrossWindowGraphics REQUIRED)
+
+# find sources
+execute_process(
+    COMMAND bash "-c" "find ${CMAKE_CURRENT_LIST_DIR}/src -name '*.cpp'"
+    OUTPUT_VARIABLE SOURCES
+)
+# add executable
+add_executable(${CMAKE_PROJECT_NAME} ${XMAIN_SOURCES})
+add_subdirectory(src)
+target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE ${XWIN_DEFINITIONS})
+
+# dependencies
 target_link_libraries(
     ${CMAKE_PROJECT_NAME}
+    Vulkan::Vulkan
+    assimp::assimp
     CrossWindow
     CrossWindowGraphics
 )
+target_include_directories(
+  ${CMAKE_PROJECT_NAME} PUBLIC
+  ${Vulkan_INCLUDE_DIRS}
+  ${assimp_INCLUDE_DIRS}
+)
 
-add_subdirectory(src)
-add_dependencies(${CMAKE_PROJECT_NAME} copy_assets)
+# source
+target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
+  ${CMAKE_CURRENT_LIST_DIR}/src
+  ${CMAKE_CURRENT_LIST_DIR}/src/renderer
+  )
+target_precompile_headers(${CMAKE_PROJECT_NAME} PRIVATE
+  ${CMAKE_CURRENT_LIST_DIR}/src/pch.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/src/renderer/renderer.hpp
+  )
+
+# copy assets
+set(ASSET_DIR bin)
+add_custom_target(CopyAssets
+  COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_LIST_DIR}/${ASSET_DIR} ${CMAKE_CURRENT_BINARY_DIR}/${ASSET_DIR}
+  )
+add_dependencies(${CMAKE_PROJECT_NAME} CopyAssets)
 
