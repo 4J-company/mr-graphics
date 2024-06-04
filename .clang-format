@@ -1,57 +1,140 @@
-﻿---
-BasedOnStyle: Microsoft
+---
+Language: Cpp
+
+# cross line alignment
+MaxEmptyLinesToKeep: 3
 AlignAfterOpenBracket: Align
-AlignConsecutiveMacros: 'true'
-AlignConsecutiveAssignments: 'false'
-AlignConsecutiveDeclarations: 'false'
-AlignOperands: 'false'
-AllowAllArgumentsOnNextLine: 'false'
-AllowShortBlocksOnASingleLine: 'true'
-AllowShortCaseLabelsOnASingleLine: 'true'
-AllowShortFunctionsOnASingleLine: All
+AlignArrayOfStructures: Right
+AlignConsecutiveAssignments:
+  Enabled: false
+  AcrossEmptyLines: false
+  AcrossComments: false
+  AlignCompound: true
+  PadOperators: true
+AlignConsecutiveBitFields:
+  Enabled: true
+  AcrossEmptyLines: false
+  AcrossComments: false
+AlignConsecutiveDeclarations: false
+AlignConsecutiveMacros:
+  Enabled: true
+  AcrossEmptyLines: false
+  AcrossComments: false
+AlignConsecutiveShortCaseStatements:
+  Enabled: true
+  AcrossEmptyLines: true
+  AcrossComments: true
+  AlignCaseColons: false
+AlignEscapedNewlines: Left
+AlignOperands: Align
+AlignTrailingComments:
+  Kind: Always
+  OverEmptyLines: 1
+DerivePointerAlignment: true
+PointerAlignment: Left
+ReferenceAlignment: Pointer
+QualifierAlignment: Custom
+QualifierOrder: ['friend', 'static', 'inline', 'constexpr', 'const', 'type']
+
+# new lines
+AllowAllArgumentsOnNextLine: true
+AllowAllParametersOfDeclarationOnNextLine: true
+EmptyLineAfterAccessModifier: Leave
+EmptyLineBeforeAccessModifier: Always
+
+AllowShortBlocksOnASingleLine: Always
+AllowShortEnumsOnASingleLine: true
+AllowShortFunctionsOnASingleLine: Inline
 AllowShortIfStatementsOnASingleLine: Never
 AllowShortLambdasOnASingleLine: All
-AllowShortLoopsOnASingleLine: 'false'
-AlwaysBreakAfterDefinitionReturnType: None
-AlwaysBreakAfterReturnType: None
-AlwaysBreakTemplateDeclarations: MultiLine
-CompactNamespaces: 'false'
-ConstructorInitializerAllOnOneLineOrOnePerLine: 'false'
-Cpp11BracedListStyle: 'true'
-DerivePointerAlignment: 'false'
-DisableFormat: 'false'
-FixNamespaceComments: 'true'
-IncludeBlocks: Preserve
-IndentCaseLabels: 'false'
-IndentPPDirectives: BeforeHash
-IndentWidth: '2'
-KeepEmptyLinesAtTheStartOfBlocks: 'false'
-Language: Cpp
-MaxEmptyLinesToKeep: '1'
-NamespaceIndentation: All
-ObjCSpaceBeforeProtocolList: 'false'
-PointerAlignment: Right
-ReflowComments: 'true'
-SortIncludes: 'true'
-SortUsingDeclarations: 'true'
-SpaceAfterCStyleCast: 'false'
-SpaceAfterLogicalNot: 'false'
-SpaceAfterTemplateKeyword: 'true'
-SpaceBeforeAssignmentOperators: 'true'
-SpaceBeforeCpp11BracedList: 'true'
-SpaceBeforeCtorInitializerColon: 'true'
-SpaceBeforeInheritanceColon: 'true'
+AllowShortLoopsOnASingleLine: true
+
+BinPackArguments: false
+BreakAfterAttributes: Leave
+BreakBeforeConceptDeclarations: Always
+BreakConstructorInitializers: BeforeComma
+BreakInheritanceList: BeforeComma
+BreakStringLiterals: true
+
+RequiresClausePosition: SingleLine
+
+PackConstructorInitializers: CurrentLine
+
+CompactNamespaces: false
+
+ColumnLimit: 80
+
+# spacing
+IndentWidth: 2
+ContinuationIndentWidth: 2
+
+BitFieldColonSpacing: Both
+BreakBeforeBraces: Stroustrup
+Cpp11BracedListStyle: true
+
+SpaceAfterCStyleCast: false
+SpaceAfterLogicalNot: false
+SpaceAfterTemplateKeyword: true
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeCaseColon: false
+SpaceBeforeCpp11BracedList: true
+SpaceBeforeCtorInitializerColon: true
+SpaceBeforeInheritanceColon: true
 SpaceBeforeParens: ControlStatements
-SpaceBeforeRangeBasedForLoopColon: 'true'
-SpaceInEmptyParentheses: 'false'
-SpacesBeforeTrailingComments: '1'
-SpacesInAngles: 'false'
-SpacesInCStyleCastParentheses: 'false'
-SpacesInContainerLiterals: 'false'
-SpacesInParentheses: 'false'
-SpacesInSquareBrackets: 'false'
-Standard: Auto
-TabWidth: '2'
+SpaceBeforeRangeBasedForLoopColon: true
+SpaceBeforeSquareBrackets: false
+SpaceInEmptyBlock: false
+SpaceInEmptyParentheses: false
+SpacesInAngles: false
+SpacesInCStyleCastParentheses: false
+SpacesInConditionalStatement: false
+SpacesInContainerLiterals: false
+SpacesInSquareBrackets: false
+Standard: Latest
+
+IndentAccessModifiers: true
+AccessModifierOffset: -2
+
 UseTab: Never
 
-...
+IndentCaseBlocks: true
+IndentCaseLabels: true
+IndentExternBlock: Indent
+IndentPPDirectives: None
+IndentRequiresClause: true
+RequiresExpressionIndentation: OuterScope
+IndentWrappedFunctionNames: false
+LambdaBodyIndentation: Signature
+NamespaceIndentation: All
+
+# comments
+FixNamespaceComments: true
+
+# inserts
+InsertBraces: true
+RemoveBracesLLVM: false
+InsertTrailingCommas: None
+IntegerLiteralSeparator:
+  Binary: 8
+  Decimal: 3
+  Hex: 2
+KeepEmptyLinesAtTheStartOfBlocks: false
+ReflowComments: false
+RemoveParentheses: ReturnStatement
+RemoveSemicolon: true
+SeparateDefinitionBlocks: Always
+SortIncludes: CaseInsensitive
+SortUsingDeclarations: Never
+
+# preprocessor
+IncludeBlocks: Preserve
+IncludeCategories:
+  - Regex:           '<[A-Za-z0-9]+>'
+    Priority:        1
+    SortPriority:    1
+  - Regex:           '<[A-Za-z0-9]+/*>'
+    Priority:        2
+    SortPriority:    2
+  - Regex:           '.*'
+    Priority:        3
+    SortPriority:    3
