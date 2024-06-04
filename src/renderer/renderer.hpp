@@ -11,10 +11,8 @@
 
   #include "mesh/mesh.hpp"
 
-namespace mr
-{
-  class Application
-  {
+namespace mr {
+  class Application {
   private:
     VulkanState _state;
     VkDebugUtilsMessengerEXT _debug_messenger;

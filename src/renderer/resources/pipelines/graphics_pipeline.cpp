@@ -1,7 +1,7 @@
 #include "resources/pipelines/graphics_pipeline.hpp"
 
-mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state, vk::RenderPass render_pass, uint subpass, Shader *shader, 
-   std::vector<vk::VertexInputAttributeDescription> attributes, std::vector<std::vector<vk::DescriptorSetLayoutBinding>> bindings) 
+mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state, vk::RenderPass render_pass, uint subpass, Shader *shader,
+   std::vector<vk::VertexInputAttributeDescription> attributes, std::vector<std::vector<vk::DescriptorSetLayoutBinding>> bindings)
    : Pipeline(state, shader, bindings), _subpass(subpass)
 {
   // dynamic states of pipeline (viewport)
@@ -74,7 +74,7 @@ mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state, vk::RenderPass 
   {
   case 0:
     color_blend_attachments.resize(WindowContext::gbuffers_number);
-    for (int i = 0; i < WindowContext::gbuffers_number; i++)
+    for (unsigned i = 0; i < WindowContext::gbuffers_number; i++)
     {
       color_blend_attachments[i].blendEnable = false;
       color_blend_attachments[i].srcColorBlendFactor = vk::BlendFactor::eOne;
