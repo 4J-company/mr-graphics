@@ -2,14 +2,19 @@
 #define __pch_hpp_
 
 // libraries includes
+/// #include <experimental/simd>
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <chrono>
+#include <concepts>
 #include <cstdlib>
 #include <cstring>
 #include <deque>
 #include <exception>
 #include <execution>
+#include <filesystem>
+#include <fstream>
 #include <functional>
 #include <future>
 #include <iostream>
@@ -23,16 +28,29 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <span>
 
 // user includes
+#define VULKAN_HPP_NO_EXCEPTIONS
+#define VULKAN_HPP_NO_NODISCARD_WARNINGS
 #define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
 #include <CrossWindow/CrossWindow.h>
 #include <CrossWindow/Graphics.h>
 #include <vulkan/vulkan.hpp>
 
-#define __DEBUG false
+#include <assimp/scene.h>
+#include <assimp/postprocess.h>
+#include <assimp/Importer.hpp>
 
-// WinAPI macros undefined
-#undef max(a,b)
+// WinAPI macros undefined :(
+#undef max(a, b)
+
+namespace mr
+{
+  using uint = unsigned int;
+  using byte = unsigned char;
+  /// using vec4 = std::experimental::native_simd<float>;
+  /// using ivec4 = std::experimental::native_simd<int>;
+} // namespace mr
 
 #endif // __pch_hpp_
