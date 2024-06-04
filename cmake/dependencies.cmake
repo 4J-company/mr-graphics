@@ -11,21 +11,20 @@ else()
 endif()
 
 # install libraries with no binaries available
-CPMAddPackage(
-  NAME CrossWindow
-  GITHUB_REPOSITORY 4J-company/mr-window
-  GIT_TAG master
-  DOWNLOAD_ONLY YES
+CPMFindPackage(
+  NAME glfw3
+  GITHUB_REPOSITORY glfw/glfw
+  GIT_TAG 3.4
+  OPTIONS
+    "GLFW_BUILD_TESTS OFF"
+    "GLFW_BUILD_EXAMPLES OFF"
+    "GLFW_BULID_DOCS OFF"
 )
 
-if (CrossWindow_ADDED)
-  add_subdirectory(${CrossWindow_SOURCE_DIR})
-endif()
-
-CPMAddPackage(
-  NAME CrossWindowGraphics
-  GITHUB_REPOSITORY cone-forest/CrossWindow-Graphics
-  GIT_TAG master
+CPMFindPackage(
+  NAME vkfw
+  GITHUB_REPOSITORY Cvelth/vkfw
+  GIT_TAG glfw-3.4
 )
 
 CPMFindPackage(
@@ -42,7 +41,7 @@ CPMFindPackage(
 file(
   DOWNLOAD
   https://raw.githubusercontent.com/nothings/stb/master/stb_image.h
-  ${CMAKE_CURRENT_BINARY_DIR}/_deps/stb/stb_image.h
+  ${CMAKE_CURRENT_BINARY_DIR}/_deps/stb-src/stb/stb_image.h
   EXPECTED_HASH SHA256=594c2fe35d49488b4382dbfaec8f98366defca819d916ac95becf3e75f4200b3
 )
 
@@ -52,17 +51,16 @@ find_package(Vulkan)
 set(DEPS_LIBRARIES
   Vulkan::Vulkan
   assimp::assimp
-  CrossWindow
-  CrossWindowGraphics
+  glfw
 )
 
 set(DEPS_INCLUDE_DIRS
   ${assimp_INCLUDE_DIRS}
-  ${CMAKE_CURRENT_BINARY_DIR}/_deps/stb
+  ${CMAKE_CURRENT_BINARY_DIR}/_deps/stb-src
+  ${vkfw_SOURCE_DIR}/include
 )
 
 set(DEPS_DEFINITIONS
-  ${XWIN_DEFINITIONS}
 )
 
 # install CMake scripts

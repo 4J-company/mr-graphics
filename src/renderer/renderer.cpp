@@ -2,6 +2,8 @@
 #include "resources/command_unit/command_unit.hpp"
 #include "window/window_context.hpp"
 
+#define NDEBUG 0
+
 static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT MessageSeverity,
   VkDebugUtilsMessageTypeFlagsEXT MessageType,
   const VkDebugUtilsMessengerCallbackDataEXT *CallbackData,
@@ -14,17 +16,17 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(VkDebugUtilsMessageSeverityF
 // mr::Application class defualt constructor (initializes vulkan instance, device ...)
 mr::Application::Application()
 {
+  while (vkfw::init() != vkfw::Result::eSuccess);
+
   std::vector<const char *> extension_names;
   std::vector<const char *> layers_names;
   extension_names.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
-  extension_names.push_back(VK_XWIN_SURFACE_EXTENSION_NAME);
 
-#if !NDEBUG 
+#if !NDEBUG
   extension_names.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
   extension_names.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 
   layers_names.push_back("VK_LAYER_KHRONOS_validation");
-  layers_names.push_back("VK_LAYER_RENDERDOC_Capture");
 #endif
 
   vk::ApplicationInfo app_info
@@ -35,8 +37,14 @@ mr::Application::Application()
       .engineVersion = VK_MAKE_VERSION(1, 0, 0),
       .apiVersion = VK_API_VERSION_1_3
   };
-  vk::InstanceCreateInfo inst_ci
-  {
+
+  uint32_t amountOfGlfwExtensions = 0;
+  auto glfwExtensions = glfwGetRequiredInstanceExtensions(&amountOfGlfwExtensions);
+
+  for (uint i = 0; i < amountOfGlfwExtensions; i++)
+    extension_names.push_back(glfwExtensions[i]);
+
+  vk::InstanceCreateInfo inst_ci {
     .pApplicationInfo = &app_info,
       .enabledLayerCount = static_cast<uint>(layers_names.size()),
       .ppEnabledLayerNames = layers_names.data(),
@@ -161,6 +169,7 @@ mr::Application::Application()
   _state.create_pipeline_cache();
 }
 
+// destructor
 mr::Application::~Application() 
 {
   _state._device.destroy();

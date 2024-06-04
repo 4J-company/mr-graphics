@@ -6,31 +6,28 @@
 
 namespace mr
 {
-  class WindowContext;
-
   class Window
   {
   private:
-    size_t _width, _height;
-    xwin::Window _window;
-    xwin::EventQueue _event_queue;
-    std::thread _thread;
+    std::size_t _width, _height;
+    std::jthread _thread;
 
+    vkfw::UniqueWindow _window;
     mr::WindowContext _context;
 
   public:
     // constructors
-    Window(const mr::VulkanState &state, size_t width = 800, size_t height = 600);
+    Window(const mr::VulkanState &state, std::size_t width = 800, std::size_t height = 600);
     Window(Window &&other) noexcept = default;
     Window &operator=(Window &&other) noexcept = default;
 
     // destructor
-    ~Window();
+    ~Window() = default;
 
     // getters
     size_t width() const { return _width; }
     size_t height() const { return _height; }
-    xwin::Window *xwindow_ptr() { return &_window; }
+    vkfw::Window window() { return _window.get(); }
 
     // methods
     void render() { _context.render(); }

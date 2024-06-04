@@ -2,11 +2,12 @@
 #include "renderer.hpp"
 #include "resources/command_unit/command_unit.hpp"
 #include "resources/pipelines/graphics_pipeline.hpp"
+#include "vkfw/vkfw.hpp"
 #include <vulkan/vulkan_enums.hpp>
 
-mr::WindowContext::WindowContext(Window *parent, const VulkanState &state) : _parent(parent), _state(state)
+mr::WindowContext::WindowContext(Window *parent, const VulkanState &state) : _state(state), _parent(parent)
 {
-  _surface.reset(xgfx::createSurface(_parent->xwindow_ptr(), state.instance()));
+  _surface = vkfw::createWindowSurfaceUnique(state.instance(), parent->window());
 
   size_t universal_queue_family_id = 0;
 
@@ -14,7 +15,7 @@ mr::WindowContext::WindowContext(Window *parent, const VulkanState &state) : _pa
   const auto avaible_formats = state.phys_device().getSurfaceFormatsKHR(_surface.get()).value;
   _swapchain_format = avaible_formats[0].format;
   for (const auto format : avaible_formats)
-    if (format.format == vk::Format::eB8G8R8A8Unorm) // Prefered format
+    if (format.format == vk::Format::eB8G8R8A8Unorm) // Preferred format
     {
       _swapchain_format = format.format;
       break;
@@ -28,15 +29,17 @@ mr::WindowContext::WindowContext(Window *parent, const VulkanState &state) : _pa
   if (surface_capabilities.currentExtent.width == std::numeric_limits<uint>::max())
   {
     // If the surface size is undefined, the size is set to the size of the images requested.
-    _extent.width = std::clamp(static_cast<uint32_t>(_parent->width()), surface_capabilities.minImageExtent.width,
+    _extent.width = std::clamp(static_cast<uint32_t>(_parent->width()),
+                               surface_capabilities.minImageExtent.width,
                                surface_capabilities.maxImageExtent.width);
-    _extent.height = std::clamp(static_cast<uint32_t>(_parent->height()), surface_capabilities.minImageExtent.height,
+    _extent.height = std::clamp(static_cast<uint32_t>(_parent->height()),
+                                surface_capabilities.minImageExtent.height,
                                 surface_capabilities.maxImageExtent.height);
   }
   else // If the surface size is defined, the swap chain size must match
     _extent = surface_capabilities.currentExtent;
 
-  // Chosse surface present mode
+  // Choose surface present mode
   const auto avaible_present_modes = state.phys_device().getSurfacePresentModesKHR(_surface.get()).value;
   const auto iter = std::find(avaible_present_modes.begin(), avaible_present_modes.end(), vk::PresentModeKHR::eMailbox);
   auto present_mode = (iter != avaible_present_modes.end())
@@ -52,14 +55,14 @@ mr::WindowContext::WindowContext(Window *parent, const VulkanState &state) : _pa
   // Choose composite alpha
   vk::CompositeAlphaFlagBitsKHR composite_alpha =
       (surface_capabilities.supportedCompositeAlpha & vk::CompositeAlphaFlagBitsKHR::ePreMultiplied)
-      ? vk::CompositeAlphaFlagBitsKHR::ePreMultiplied
+    ? vk::CompositeAlphaFlagBitsKHR::ePreMultiplied
       : (surface_capabilities.supportedCompositeAlpha & vk::CompositeAlphaFlagBitsKHR::ePostMultiplied)
       ? vk::CompositeAlphaFlagBitsKHR::ePostMultiplied
       : (surface_capabilities.supportedCompositeAlpha & vk::CompositeAlphaFlagBitsKHR::eInherit)
       ? vk::CompositeAlphaFlagBitsKHR::eInherit
       : vk::CompositeAlphaFlagBitsKHR::eOpaque;
 
-  /// _swapchain_format = vk::Format::eB8G8R8A8Srgb; // ideal, we have eB8G8R8A8Unorm
+  // _swapchain_format = vk::Format::eB8G8R8A8Srgb; // ideal, we have eB8G8R8A8Unorm
   _swapchain_format = vk::Format::eB8G8R8A8Unorm;
   vk::SwapchainCreateInfoKHR swapchain_create_info {.flags = {},
                                                     .surface = _surface.get(),
@@ -98,16 +101,16 @@ void mr::WindowContext::create_depthbuffer(const VulkanState &state)
   auto format = Image::find_supported_format(state,
     {vk::Format::eD32Sfloat, vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint},
      vk::ImageTiling::eOptimal, vk::FormatFeatureFlagBits::eDepthStencilAttachment);
-  _depthbuffer = Image(state, _extent.width, _extent.height, format, 
+  _depthbuffer = Image(state, _extent.width, _extent.height, format,
     vk::ImageUsageFlagBits::eDepthStencilAttachment, vk::ImageAspectFlagBits::eDepth);
   _depthbuffer.switch_layout(state, vk::ImageLayout::eDepthStencilAttachmentOptimal);
 }
 
 void mr::WindowContext::create_render_pass(const VulkanState &state)
 {
-  for (int i = 0; i < gbuffers_number; i++)
+  for (unsigned i = 0; i < gbuffers_number; i++)
     _gbuffers[i] = Image(state, _extent.width, _extent.height, vk::Format::eR32G32B32A32Sfloat,
-      vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eInputAttachment, 
+      vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eInputAttachment,
       vk::ImageAspectFlagBits::eColor);
 
   std::vector<vk::AttachmentDescription> color_attachments(gbuffers_number + 2,
@@ -144,7 +147,7 @@ void mr::WindowContext::create_render_pass(const VulkanState &state)
     gbuffers_in_refs[i].layout = vk::ImageLayout::eShaderReadOnlyOptimal;
   }
 
-  vk::AttachmentReference depth_attachment_ref 
+  vk::AttachmentReference depth_attachment_ref
   {
     .attachment = gbuffers_number + 1,
     .layout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
@@ -236,9 +239,9 @@ void mr::WindowContext::render()
     { .location = 0, .binding = 0, .format = vk::Format::eR32G32B32Sfloat, .offset = 0 },
     { .location = 1, .binding = 0, .format = vk::Format::eR32G32Sfloat, .offset = 3 * sizeof(float) }
   };
-  
+
   std::vector<vk::DescriptorSetLayoutBinding> bindings
-  { 
+  {
     {
       .binding = 0,
       .descriptorType = vk::DescriptorType::eCombinedImageSampler,
@@ -272,7 +275,7 @@ void mr::WindowContext::render()
 
   struct vec3 { float x, y, z; };
   struct vec2 { float x, y; };
-  struct vertex { vec3 coord, tex; };
+  struct vertex { vec3 coord; vec2 tex; };
   std::vector<vertex> vertexes
   {
     {{-0.5, 0, -0.5}, {0, 0}},
@@ -295,17 +298,17 @@ void mr::WindowContext::render()
   static Buffer light_index_buffer = create_index_buffer(_state, sizeof(light_indexes[0]) * light_indexes.size(), light_indexes.data());
   vk::VertexInputAttributeDescription light_descr { .location = 0, .binding = 0, .format = vk::Format::eR32G32Sfloat, .offset = 0 };
   static Shader light_shader = Shader(_state, "light");
-  std::vector<vk::DescriptorSetLayoutBinding> light_bindings(gbuffers_number, 
+  std::vector<vk::DescriptorSetLayoutBinding> light_bindings(gbuffers_number,
     {
       .descriptorType = vk::DescriptorType::eInputAttachment,
       .descriptorCount = 1,
       .stageFlags = vk::ShaderStageFlagBits::eFragment,
     });
-  for (int i = 0; i < gbuffers_number; i++)
+  for (unsigned i = 0; i < gbuffers_number; i++)
     light_bindings[i].binding = i;
   static GraphicsPipeline light_pipeline = GraphicsPipeline(_state, _render_pass.get(), 1, &light_shader, {light_descr}, {light_bindings});
   std::vector<DescriptorAttachment> light_attach(gbuffers_number);
-  for (int i = 0; i < gbuffers_number; i++)
+  for (unsigned i = 0; i < gbuffers_number; i++)
     light_attach[i].gbuffer = &_gbuffers[i];
   static Descriptor light_set = Descriptor(_state, &light_pipeline, light_attach);
 
@@ -318,7 +321,7 @@ void mr::WindowContext::render()
 
   vk::ClearValue clear_color {vk::ClearColorValue(std::array{0, 0, 0, 0})}; // anyone who changes that line will be fucked
   std::array<vk::ClearValue, gbuffers_number + 2> clear_colors {};
-  for (int i = 0; i < gbuffers_number + 1; i++)
+  for (unsigned i = 0; i < gbuffers_number + 1; i++)
     clear_colors[i].color = clear_color.color;
   clear_colors.back().depthStencil = vk::ClearDepthStencilValue{1.0f, 0};
 
@@ -344,7 +347,7 @@ void mr::WindowContext::render()
   command_unit->bindVertexBuffers(0, {light_vertex_buffer.buffer()}, {0});
   command_unit->bindIndexBuffer(light_index_buffer.buffer(), 0, vk::IndexType::eUint32);
   command_unit->drawIndexed(light_indexes.size(), 1, 0, 0, 0);
-  
+
   command_unit.end();
 
   vk::Semaphore wait_semaphores[] = {_image_available_semaphore};

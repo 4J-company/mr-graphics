@@ -2,7 +2,6 @@
 #define __pch_hpp_
 
 // libraries includes
-/// #include <experimental/simd>
 #include <algorithm>
 #include <array>
 #include <cassert>
@@ -34,23 +33,23 @@
 #define VULKAN_HPP_NO_EXCEPTIONS
 #define VULKAN_HPP_NO_NODISCARD_WARNINGS
 #define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
-#include <CrossWindow/CrossWindow.h>
-#include <CrossWindow/Graphics.h>
 #include <vulkan/vulkan.hpp>
+
+#define VKFW_NO_EXCEPTIONS
+#define VKFW_NO_STRUCT_CONSTRUCTORS
+#include <vkfw/vkfw.hpp>
 
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 #include <assimp/Importer.hpp>
 
 // WinAPI macros undefined :(
-#undef max(a, b)
+#undef max
 
 namespace mr
 {
   using uint = unsigned int;
   using byte = unsigned char;
-  /// using vec4 = std::experimental::native_simd<float>;
-  /// using ivec4 = std::experimental::native_simd<int>;
 } // namespace mr
 
 #endif // __pch_hpp_

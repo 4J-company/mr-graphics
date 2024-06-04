@@ -57,6 +57,8 @@ namespace mr
       _ibuf = std::move(other._ibuf);
       _element_count = std::move(other._element_count);
       _instance_count = std::move(other._instance_count.load());
+
+      return *this;
     }
   };
 };
