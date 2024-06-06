@@ -1,4 +1,4 @@
-set(CMAKE_GENERATOR Ninja)
+# set(CMAKE_GENERATOR Ninja)
 set(CMAKE_CXX_FLAGS "-fuse-ld=mold")
 
 set(BUILD_SHARED_LIBS OFF)
