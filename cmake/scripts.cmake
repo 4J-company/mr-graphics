@@ -49,5 +49,13 @@ if (cmake-scripts_ADDED)
     include(${cmake-scripts_SOURCE_DIR}/dependency-graph.cmake)
     gen_dep_graph(png)
   endif()
+  if (GENERATE_INCLUDE_GRAPH)
+    execute_process (
+      COMMAND bash -c "\
+        cinclude2dot --src=src --merge=module > include-graph.dot && \
+        dot -Tpng include-graph.dot > build/include-graph.png \
+        rm include-graph.dot"
+    )
+  endif()
 endif()
 
