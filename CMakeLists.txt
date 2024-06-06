@@ -6,7 +6,7 @@ include(${CMAKE_CURRENT_LIST_DIR}/cmake/settings.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/dependencies.cmake)
 
 # add executable
-add_executable(${CMAKE_PROJECT_NAME} ${XMAIN_SOURCES})
+add_executable(${CMAKE_PROJECT_NAME} "")
 add_subdirectory(src)
 
 # dependencies
