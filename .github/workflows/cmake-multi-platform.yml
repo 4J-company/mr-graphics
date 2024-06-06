@@ -61,7 +61,7 @@ jobs:
           - os: macos-latest
             c_compiler: cl
           - os: macos-latest
-            c_compiler: clang
+            c_compiler: gcc
           - os: macos-latest
             c_compiler: clang
 
