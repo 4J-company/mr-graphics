@@ -2,8 +2,6 @@
 #include "resources/command_unit/command_unit.hpp"
 #include "window/window_context.hpp"
 
-#define NDEBUG 0
-
 static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT MessageSeverity,
   VkDebugUtilsMessageTypeFlagsEXT MessageType,
   const VkDebugUtilsMessengerCallbackDataEXT *CallbackData,
@@ -22,7 +20,7 @@ mr::Application::Application()
   std::vector<const char *> layers_names;
   extension_names.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
 
-#if !NDEBUG
+#ifndef NDEBUG
   extension_names.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
   extension_names.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 
@@ -54,7 +52,7 @@ mr::Application::Application()
 
   _state._instance = vk::createInstance(inst_ci).value;
 
-#if !NDEBUG
+#ifndef NDEBUG
   auto pfnVkCreateDebugUtilsMessengerEXT = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(_state.instance().getProcAddr("vkCreateDebugUtilsMessengerEXT"));
   assert(pfnVkCreateDebugUtilsMessengerEXT);
 
