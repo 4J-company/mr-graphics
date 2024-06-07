@@ -1,30 +1,31 @@
 #if !defined(__command_unit_hpp_)
-  #define __command_unit_hpp_
+#define __command_unit_hpp_
 
-  #include "pch.hpp"
+#include "pch.hpp"
 
-  #include "vulkan_application.hpp"
+#include "vulkan_application.hpp"
 
-namespace mr
-{
-  class CommandUnit
-  {
-  private:
-    vk::UniqueCommandPool _cmd_pool;
-    vk::CommandBuffer _cmd_buffer;
+namespace mr {
+  class CommandUnit {
+    private:
+      vk::UniqueCommandPool _cmd_pool;
+      vk::CommandBuffer _cmd_buffer;
 
-  public:
-    CommandUnit() = default;
-    ~CommandUnit();
+    public:
+      CommandUnit() = default;
+      ~CommandUnit();
 
-    CommandUnit(const VulkanState &state);
+      CommandUnit(const VulkanState &state);
 
-    void begin();
-    void end();
+      void begin();
+      void end();
 
-    std::tuple<vk::CommandBuffer *, uint> submit_info() { return {&_cmd_buffer, 1}; }
+      std::tuple<vk::CommandBuffer *, uint> submit_info()
+      {
+        return {&_cmd_buffer, 1};
+      }
 
-    vk::CommandBuffer *operator->() { return &_cmd_buffer; }
+      vk::CommandBuffer *operator->() { return &_cmd_buffer; }
   };
 } // namespace mr
 

@@ -4,16 +4,16 @@
 
 template <std::floating_point T> void mr::Timer<T>::update()
 {
-  _global_time =
-      std::chrono::duration<T>(std::chrono::high_resolution_clock::now().time_since_epoch()).count() - _init_time;
+  _global_time = std::chrono::duration<T>(
+                   std::chrono::high_resolution_clock::now().time_since_epoch())
+                   .count() -
+                 _init_time;
   _global_delta_time = _global_time - _old_time;
-  if (_pause)
-  {
+  if (_pause) {
     _delta_time = 0;
     _pause_time += _global_delta_time;
   }
-  else
-  {
+  else {
     _time = _global_time - _pause_time - _init_time;
     _delta_time = _global_delta_time;
   }

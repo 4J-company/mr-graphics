@@ -2,36 +2,42 @@
 #include <filesystem>
 #include <fstream>
 
-mr::Shader::Shader(const VulkanState &state, std::string_view filename) : _path(std::string("bin/shaders/") + filename.data())
+mr::Shader::Shader(const VulkanState &state, std::string_view filename)
+    : _path(std::string("bin/shaders/") + filename.data())
 {
-  static const vk::ShaderStageFlagBits stage_bits[] = {vk::ShaderStageFlagBits::eVertex,
-                                                       vk::ShaderStageFlagBits::eFragment,
-                                                       vk::ShaderStageFlagBits::eGeometry,
-                                                       vk::ShaderStageFlagBits::eTessellationControl,
-                                                       vk::ShaderStageFlagBits::eTessellationEvaluation,
-                                                       vk::ShaderStageFlagBits::eCompute};
+  static const vk::ShaderStageFlagBits stage_bits[] = {
+    vk::ShaderStageFlagBits::eVertex,
+    vk::ShaderStageFlagBits::eFragment,
+    vk::ShaderStageFlagBits::eGeometry,
+    vk::ShaderStageFlagBits::eTessellationControl,
+    vk::ShaderStageFlagBits::eTessellationEvaluation,
+    vk::ShaderStageFlagBits::eCompute};
 
   std::array<int, max_shader_modules> shd_types;
   std::iota(shd_types.begin(), shd_types.end(), 0);
 
-  std::for_each(std::execution::seq, shd_types.begin(), shd_types.end(), [&](int shd) {
-    std::vector<char> source = load((ShaderStages)shd);
-    if (source.size() == 0)
-      return;
+  std::for_each(
+    std::execution::seq, shd_types.begin(), shd_types.end(), [&](int shd) {
+      std::vector<char> source = load((ShaderStages)shd);
+      if (source.size() == 0) {
+        return;
+      }
 
-    _num_of_loaded_shaders++;
+      _num_of_loaded_shaders++;
 
-    vk::ShaderModuleCreateInfo create_info {.codeSize = source.size(),
-                                            .pCode = reinterpret_cast<const uint *>(source.data())};
+      vk::ShaderModuleCreateInfo create_info {
+        .codeSize = source.size(),
+        .pCode = reinterpret_cast<const uint *>(source.data())};
 
-    // vk::Result result;
-    // std::tie(result, _modules[shd]) = state.device().createShaderModule(create_info);
-    _modules[shd] = state.device().createShaderModuleUnique(create_info).value;
+      // vk::Result result;
+      // std::tie(result, _modules[shd]) = state.device().createShaderModule(create_info);
+      _modules[shd] =
+        state.device().createShaderModuleUnique(create_info).value;
 
-    _stages[shd].stage = stage_bits[shd];
-    _stages[shd].module = _modules[shd].get();
-    _stages[shd].pName = "main";
-  });
+      _stages[shd].stage = stage_bits[shd];
+      _stages[shd].module = _modules[shd].get();
+      _stages[shd].pName = "main";
+    });
 }
 
 /*
@@ -43,23 +49,27 @@ mr::Shader::~Shader()
 
 void mr::Shader::compile(ShaderStages stage)
 {
-  static const char *shader_type_names[] = {"vert", "frag", "geom", "tesc", "tese", "comp"};
+  static const char *shader_type_names[] = {
+    "vert", "frag", "geom", "tesc", "tese", "comp"};
   std::string stage_type = shader_type_names[(int)stage];
   std::system(("glslc *." + stage_type + " -o " + stage_type + ".spv").c_str());
 }
 
 std::vector<char> mr::Shader::load(ShaderStages stage)
 {
-  static const char *shader_type_names[] = {"vert", "frag", "geom", "tesc", "tese", "comp"};
+  static const char *shader_type_names[] = {
+    "vert", "frag", "geom", "tesc", "tese", "comp"};
   std::filesystem::path stage_file_path = _path;
 
   // Stage path: PROJECT_PATH/bin/shaders/SHADER_NAME/SHADER_TYPE.spv
   stage_file_path.append(shader_type_names[(int)stage]);
   stage_file_path += ".spv";
-  if (!std::filesystem::exists(stage_file_path))
+  if (!std::filesystem::exists(stage_file_path)) {
     return {};
+  }
 
-  std::fstream stage_file {stage_file_path, std::fstream::in | std::ios::ate | std::ios::binary};
+  std::fstream stage_file {stage_file_path,
+                           std::fstream::in | std::ios::ate | std::ios::binary};
   int len = stage_file.tellg();
   std::vector<char> source(len);
   stage_file.seekg(0);

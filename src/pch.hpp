@@ -24,10 +24,10 @@
 #include <queue>
 #include <ranges>
 #include <set>
+#include <span>
 #include <string>
 #include <thread>
 #include <vector>
-#include <span>
 
 // user includes
 #define VULKAN_HPP_NO_EXCEPTIONS
@@ -39,16 +39,15 @@
 #define VKFW_NO_STRUCT_CONSTRUCTORS
 #include <vkfw/vkfw.hpp>
 
-#include <assimp/scene.h>
-#include <assimp/postprocess.h>
 #include <assimp/Importer.hpp>
+#include <assimp/postprocess.h>
+#include <assimp/scene.h>
 
 // WinAPI macros undefined :(
 #undef max
 #undef min
 
-namespace mr
-{
+namespace mr {
   using uint = unsigned int;
   using byte = unsigned char;
 } // namespace mr
