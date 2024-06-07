@@ -45,6 +45,7 @@
 
 // WinAPI macros undefined :(
 #undef max
+#undef min
 
 namespace mr
 {
