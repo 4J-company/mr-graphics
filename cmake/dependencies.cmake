@@ -33,9 +33,9 @@ CPMFindPackage(
   GITHUB_REPOSITORY assimp/assimp
   GIT_TAG master
   OPTIONS
-    ASSIMP_WARNINGS_AS_ERRORS OFF
-    ASSIMP_BUILD_TESTS OFF
-    ASSIMP_NO_EXPORT ON
+    "ASSIMP_WARNINGS_AS_ERRORS OFF"
+    "ASSIMP_BUILD_TESTS OFF"
+    "ASSIMP_NO_EXPORT ON"
 )
 
 # download a single file from stb
