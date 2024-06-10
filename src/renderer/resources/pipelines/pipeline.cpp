@@ -4,7 +4,7 @@ void mr::Pipeline::apply(vk::CommandBuffer cmd_buffer) const {}
 
 mr::Pipeline::Pipeline(
   const VulkanState &state, Shader *shader,
-  std::vector<std::vector<vk::DescriptorSetLayoutBinding>> bindings)
+  const std::vector<std::vector<vk::DescriptorSetLayoutBinding>> &bindings)
     : _shader(shader)
 {
   create_layout_sets(state, bindings);
@@ -12,7 +12,7 @@ mr::Pipeline::Pipeline(
 
 void mr::Pipeline::create_layout_sets(
   const VulkanState &state,
-  std::vector<std::vector<vk::DescriptorSetLayoutBinding>> bindings)
+  const std::vector<std::vector<vk::DescriptorSetLayoutBinding>> &bindings)
 {
   _set_layouts.resize(bindings.size());
   for (int i = 0; i < bindings.size(); i++) {
