@@ -1,8 +1,5 @@
 #include "resources/command_unit/command_unit.hpp"
 
-// destructor
-mr::CommandUnit::~CommandUnit() {}
-
 mr::CommandUnit::CommandUnit(const VulkanState &state)
 {
   vk::CommandPoolCreateInfo pool_create_info {

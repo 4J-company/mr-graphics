@@ -18,7 +18,6 @@ namespace mr {
 
     public:
       GraphicsPipeline() = default;
-      ~GraphicsPipeline() = default;
 
       GraphicsPipeline(
         const VulkanState &state, vk::RenderPass render_pass, uint subpass,

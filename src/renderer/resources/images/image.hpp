@@ -25,9 +25,6 @@ namespace mr {
     public:
       Image() = default;
 
-      Image(Image &&other) = default;
-      Image &operator=(Image &&other) = default;
-
       Image(const VulkanState &state, uint width, uint height,
             vk::Format format, vk::Image image);
       Image(const VulkanState &state, uint width, uint height,

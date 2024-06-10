@@ -28,16 +28,12 @@ namespace mr {
 
     public:
       Framebuffer() = default;
-      ~Framebuffer() = default;
 
       Framebuffer(const VulkanState &state, vk::RenderPass render_pass,
                   uint width, uint height, vk::Format swapchain_format,
                   vk::Image final_target,
                   std::array<Image, 6 /* constant... */> &gbuffers,
                   Image &depthbuffer);
-
-      Framebuffer(Framebuffer &&other) noexcept = default;
-      Framebuffer &operator=(Framebuffer &&other) noexcept = default;
 
       void resize(size_t width, size_t height);
 

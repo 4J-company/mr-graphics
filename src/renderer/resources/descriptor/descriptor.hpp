@@ -28,15 +28,6 @@ namespace mr {
                  const std::vector<DescriptorAttachment> &attachments,
                  uint set_number = 0);
 
-      Descriptor(Descriptor &&other) noexcept = default;
-      Descriptor &operator=(Descriptor &&other) noexcept = default;
-
-    private:
-      void create_descriptor_pool(
-        const VulkanState &state,
-        const std::vector<DescriptorAttachment> &attachments);
-
-    public:
       void update_all_attachments(
         const VulkanState &state,
         const std::vector<DescriptorAttachment> &attachments);
@@ -44,6 +35,11 @@ namespace mr {
       void apply();
 
       const vk::DescriptorSet set() { return _set; }
+
+    private:
+      void create_descriptor_pool(
+        const VulkanState &state,
+        const std::vector<DescriptorAttachment> &attachments);
   };
 } // namespace mr
 

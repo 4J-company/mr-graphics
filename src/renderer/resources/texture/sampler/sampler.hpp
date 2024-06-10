@@ -19,9 +19,6 @@ namespace mr {
       Sampler(const VulkanState &state, vk::Filter filter,
               vk::SamplerAddressMode address, int mip_level = 1);
 
-      Sampler(Sampler &&other) noexcept = default;
-      Sampler &operator=(Sampler &&other) noexcept = default;
-
       const vk::Sampler sampler() const { return _sampler.get(); }
   };
 } // namespace mr

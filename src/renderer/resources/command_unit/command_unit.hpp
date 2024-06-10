@@ -13,7 +13,6 @@ namespace mr {
 
     public:
       CommandUnit() = default;
-      ~CommandUnit();
 
       CommandUnit(const VulkanState &state);
 

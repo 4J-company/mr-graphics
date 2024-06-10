@@ -15,7 +15,7 @@ namespace mr {
       std::array<vk::PipelineShaderStageCreateInfo, max_shader_modules> _stages;
       std::atomic<uint> _num_of_loaded_shaders;
 
-      enum struct ShaderStages : size_t {
+      enum struct ShaderStages {
         compute = 0,
         vertex = 1,
         control = 2,
@@ -26,24 +26,23 @@ namespace mr {
 
     public:
       Shader() = default;
-      ~Shader() = default;
 
       Shader(const VulkanState &state, std::string_view filename);
 
       // move semantics
       Shader(Shader &&other) noexcept
-      {
-        std::swap(_path, other._path);
-        std::swap(_modules, other._modules);
-        std::swap(_stages, other._stages);
-        _num_of_loaded_shaders = other._num_of_loaded_shaders.load();
-      }
+        : _path(std::move(other._path))
+        , _modules(std::move(other._modules))
+        , _stages(std::move(other._stages))
+        , _num_of_loaded_shaders(other._num_of_loaded_shaders.load()) {}
 
       Shader &operator=(Shader &&other) noexcept
       {
-        std::swap(_path, other._path);
-        std::swap(_modules, other._modules);
-        std::swap(_stages, other._stages);
+        // do not need a self check
+
+        _path = std::move(other._path);
+        _modules = std::move(other._modules);
+        _stages = std::move(other._stages);
         _num_of_loaded_shaders = other._num_of_loaded_shaders.load();
         return *this;
       }

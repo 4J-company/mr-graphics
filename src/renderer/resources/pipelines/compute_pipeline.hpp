@@ -12,13 +12,6 @@ namespace mr {
       vk::VertexInputBindingDescription _binding_descriptor;
 
       uint32_t PipelineParametersFlag;
-
-    public:
-      ComputePipeline() = default;
-      ~ComputePipeline() = default;
-
-      ComputePipeline(ComputePipeline &&other) noexcept = default;
-      ComputePipeline &operator=(ComputePipeline &&other) noexcept = default;
   };
 } // namespace mr
 #endif // __compute_pipeline_hpp_

@@ -5,12 +5,6 @@ namespace mr {
   /* Timer measures time in seconds */
   template <std::floating_point T> class Timer {
     public:
-      Timer() = default;
-      ~Timer() = default;
-
-      Timer(Timer &&) noexcept = default;
-      Timer &operator=(Timer &&) noexcept = default;
-
       /* Update timer data */
       void update();
 
