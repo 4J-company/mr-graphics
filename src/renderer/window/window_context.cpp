@@ -278,14 +278,15 @@ namespace mr {
   }
 
   template <typename type = float>
-  mr::Buffer create_uniform_buffer(const VulkanState &state, size_t size,
+  mr::UniformBuffer create_uniform_buffer(const VulkanState &state, size_t size,
                                    type *data = nullptr)
   {
-    auto buf = Buffer(state,
-                      size,
-                      vk::BufferUsageFlagBits::eUniformBuffer,
-                      vk::MemoryPropertyFlagBits::eHostVisible |
-                        vk::MemoryPropertyFlagBits::eHostCoherent);
+    UniformBuffer buf(
+      state,
+      size,
+      vk::BufferUsageFlagBits::eUniformBuffer,
+      vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent
+    );
     if (data != nullptr) {
       buf.write(state, data);
     }
@@ -343,12 +344,15 @@ void mr::WindowContext::render()
     34.6410141,
   };
 
-  static Buffer uniiform_buffer =
+  static UniformBuffer uniform_buffer =
     create_uniform_buffer(_state, sizeof(float) * 16);
-  uniiform_buffer.write(_state, matr);
+  uniform_buffer.write(_state, matr);
   static Texture texture = Texture(_state, "bin/textures/cat.png");
-  std::vector<DescriptorAttachment> attach {
-    {.texture = &texture}, {.uniform_buffer = &uniiform_buffer}};
+  // std::vector<DescriptorAttachment> attach {
+  //   {.texture = &texture}, {.uniform_buffer = &uniiform_buffer}};
+  std::vector<Descriptor::Attachment::Data> attach {
+    {&texture}, {&uniform_buffer}
+};
   static Descriptor set = Descriptor(_state, &pipeline, attach);
 
   static CommandUnit command_unit {_state};
@@ -415,9 +419,9 @@ void mr::WindowContext::render()
                                                             &light_shader,
                                                             {light_descr},
                                                             {light_bindings});
-  std::vector<DescriptorAttachment> light_attach(gbuffers_number);
+  std::vector<Descriptor::Attachment::Data> light_attach(gbuffers_number);
   for (unsigned i = 0; i < gbuffers_number; i++) {
-    light_attach[i].gbuffer = &_gbuffers[i];
+    light_attach[i].emplace<Image *>(&_gbuffers[i]);
   }
   static Descriptor light_set =
     Descriptor(_state, &light_pipeline, light_attach);

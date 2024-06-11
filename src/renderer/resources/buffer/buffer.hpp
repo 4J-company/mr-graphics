@@ -77,6 +77,11 @@ namespace mr {
 
       const size_t size() { return _size; }
   };
+
+  class UniformBuffer : public Buffer { using Buffer::Buffer; };
+  class StorageBuffer : public Buffer { using Buffer::Buffer; };
+  class VertexBuffer  : public Buffer { using Buffer::Buffer; };
+  class IndexBuffer   : public Buffer { using Buffer::Buffer; };
 } // namespace mr
 
 #endif // __buffer_hpp_

@@ -3,7 +3,7 @@
 void mr::Descriptor::apply() {}
 
 mr::Descriptor::Descriptor(const VulkanState &state, Pipeline *pipeline,
-                           const std::vector<DescriptorAttachment> &attachments,
+                           const std::vector<Attachment::Data> &attachments,
                            uint set_number)
     : _set_number(set_number)
     , _set_layout(pipeline->set_layout(_set_number))
@@ -14,38 +14,44 @@ mr::Descriptor::Descriptor(const VulkanState &state, Pipeline *pipeline,
 
 void mr::Descriptor::update_all_attachments(
   const VulkanState &state,
-  const std::vector<DescriptorAttachment> &attachments)
+  const std::vector<Attachment::Data> &attachments)
 {
-  // Stucture to store attachments descriptor data
-  struct attach_write {
-      vk::DescriptorBufferInfo buffer_info;
-      vk::DescriptorImageInfo image_info;
-  };
+  using WriteInfo = std::variant<vk::DescriptorBufferInfo, vk::DescriptorImageInfo>;
+  std::vector<WriteInfo> write_infos(attachments.size());
 
-  std::vector<attach_write> _attach_write(attachments.size());
-  for (uint i = 0; i < attachments.size(); i++) {
-    if (attachments[i].texture != nullptr) {
-      _attach_write[i].image_info.imageLayout =
-        vk::ImageLayout::eShaderReadOnlyOptimal;
-      _attach_write[i].image_info.imageView =
-        attachments[i].texture->image().image_view();
-      _attach_write[i].image_info.sampler =
-        attachments[i].texture->sampler().sampler();
-    }
-    if (attachments[i].uniform_buffer != nullptr) {
-      _attach_write[i].buffer_info.buffer =
-        attachments[i].uniform_buffer->buffer();
-      _attach_write[i].buffer_info.range =
-        attachments[i].uniform_buffer->size();
-      _attach_write[i].buffer_info.offset = 0;
-    }
-    if (attachments[i].gbuffer != nullptr) {
-      _attach_write[i].image_info.imageLayout =
-        vk::ImageLayout::eShaderReadOnlyOptimal;
-      _attach_write[i].image_info.imageView =
-        attachments[i].gbuffer->image_view();
-      _attach_write[i].image_info.sampler = nullptr;
-    }
+  auto write_buffer =
+    [&](Buffer *buffer, vk::DescriptorBufferInfo &info) {
+      info.buffer = buffer->buffer();
+      info.range = buffer->size();
+      info.offset = 0;
+    };
+  auto write_uniform_buffer =
+    [&](UniformBuffer *buffer, vk::DescriptorBufferInfo &info) {
+      write_buffer(buffer, info);
+    };
+  auto write_storage_buffer =
+    [&](StorageBuffer *buffer, vk::DescriptorBufferInfo &info) {
+      write_buffer(buffer, info);
+    };
+  auto write_texture =
+    [&](Texture *texture, vk::DescriptorImageInfo &info) {
+      info.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+      info.imageView = texture->image().image_view();
+      info.sampler = texture->sampler().sampler();
+    };
+  auto write_geometry_buffer =
+    [&](Image *image, vk::DescriptorImageInfo &info) {
+      info.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+      info.imageView = image->image_view();
+      info.sampler = nullptr;
+    };
+  auto write_default = [](auto, auto) { std::unreachable(); };
+
+  for (const auto &[attachment, write_info] : std::views::zip(attachments, write_infos)) {
+    if (std::holds_alternative<Texture *>(attachment) || std::holds_alternative<Image *>(attachment))
+      write_info.emplace<vk::DescriptorImageInfo>();
+
+    std::visit(Overloads{write_uniform_buffer, write_storage_buffer, write_texture, write_geometry_buffer, write_default}, attachment, write_info);
   }
 
   std::vector<vk::WriteDescriptorSet> descriptor_writes(attachments.size());
@@ -55,22 +61,10 @@ void mr::Descriptor::update_all_attachments(
       .dstBinding = i,
       .dstArrayElement = 0,
       .descriptorCount = 1,
+      .descriptorType = get_descriptor_type(attachments[i]),
+      .pImageInfo = std::get_if<vk::DescriptorImageInfo>(&write_infos[i]),
+      .pBufferInfo = std::get_if<vk::DescriptorBufferInfo>(&write_infos[i]),
     };
-
-    if (attachments[i].texture != nullptr) {
-      descriptor_writes[i].descriptorType =
-        vk::DescriptorType::eCombinedImageSampler;
-      descriptor_writes[i].pImageInfo = &_attach_write[i].image_info;
-    }
-    else if (attachments[i].uniform_buffer != nullptr) {
-      descriptor_writes[i].descriptorType = vk::DescriptorType::eUniformBuffer;
-      descriptor_writes[i].pBufferInfo = &_attach_write[i].buffer_info;
-    }
-    else if (attachments[i].gbuffer != nullptr) {
-      descriptor_writes[i].descriptorType =
-        vk::DescriptorType::eInputAttachment;
-      descriptor_writes[i].pImageInfo = &_attach_write[i].image_info;
-    }
   }
 
   state.device().updateDescriptorSets(descriptor_writes, {});
@@ -78,7 +72,7 @@ void mr::Descriptor::update_all_attachments(
 
 void mr::Descriptor::create_descriptor_pool(
   const VulkanState &state,
-  const std::vector<DescriptorAttachment> &attachments)
+  const std::vector<Attachment::Data> &attachments)
 {
   // Check attachments existing
   if (attachments.empty()) {
@@ -86,28 +80,9 @@ void mr::Descriptor::create_descriptor_pool(
   }
 
   std::vector<vk::DescriptorPoolSize> pool_sizes(attachments.size());
-  for (uint i = 0; i < attachments.size(); i++) {
-    pool_sizes[i].descriptorCount = 1;
-
-    if (attachments[i].uniform_buffer != nullptr) {
-      pool_sizes[i].type =
-        vk::DescriptorType::eUniformBuffer; // Fill binding as UBO
-    }
-    else if (attachments[i].storage_buffer != nullptr) {
-      pool_sizes[i].type =
-        vk::DescriptorType::eStorageBuffer; // Fill binding as SSBO
-    }
-    else if (attachments[i].texture != nullptr) {
-      pool_sizes[i].type =
-        vk::DescriptorType::eCombinedImageSampler; // Fill binding as texture
-    }
-    else if (attachments[i].gbuffer != nullptr) {
-      pool_sizes[i].type =
-        vk::DescriptorType::eInputAttachment; // Fill binding as texture
-    }
-    else {
-      assert(false); // bad attachment
-    }
+  for (const auto &[attachment, pool_size] : std::views::zip(attachments, pool_sizes)) {
+    pool_size.descriptorCount = 1;
+    pool_size.type = get_descriptor_type(attachment);
   }
 
   vk::DescriptorPoolCreateInfo pool_create_info {
@@ -125,4 +100,13 @@ void mr::Descriptor::create_descriptor_pool(
   };
 
   _set = state.device().allocateDescriptorSets(descriptor_alloc_info).value[0];
+}
+
+vk::DescriptorType mr::get_descriptor_type(const Descriptor::Attachment::Data &attachment) noexcept {
+  using enum vk::DescriptorType;
+  static const std::array types {
+    eUniformBuffer, eStorageBuffer, eCombinedImageSampler, eInputAttachment,
+  };
+
+  return types[attachment.index()];
 }

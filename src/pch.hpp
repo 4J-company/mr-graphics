@@ -27,6 +27,7 @@
 #include <span>
 #include <string>
 #include <thread>
+#include <variant>
 #include <vector>
 
 // user includes
