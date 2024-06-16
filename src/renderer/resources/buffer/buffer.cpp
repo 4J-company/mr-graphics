@@ -1,10 +1,10 @@
 #include "resources/buffer/buffer.hpp"
 
 // constructor
-mr::Buffer::Buffer(const VulkanState &state, size_t size,
+mr::Buffer::Buffer(const VulkanState &state, size_t byte_size,
                    vk::BufferUsageFlags usage_flag,
                    vk::MemoryPropertyFlags memory_properties)
-    : _size(size)
+    : _size(byte_size)
     , _usage_flags(usage_flag)
     , _memory_properties(memory_properties)
 {
@@ -32,7 +32,7 @@ void resize(size_t size) {}
 
 // find memory type
 mr::uint mr::Buffer::find_memory_type(const VulkanState &state, uint filter,
-                                      vk::MemoryPropertyFlags properties)
+                                      vk::MemoryPropertyFlags properties) noexcept
 {
   vk::PhysicalDeviceMemoryProperties mem_properties =
     state.phys_device().getMemoryProperties();

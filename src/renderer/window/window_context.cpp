@@ -250,7 +250,7 @@ void mr::WindowContext::create_framebuffers(const VulkanState &state)
 void mr::WindowContext::render()
 {
   static Shader _shader = Shader(_state, "default");
-  std::vector<vk::VertexInputAttributeDescription> descrs {
+  const std::vector<vk::VertexInputAttributeDescription> descrs {
     {.location = 0,
      .binding = 0,
      .format = vk::Format::eR32G32B32Sfloat,
@@ -261,7 +261,7 @@ void mr::WindowContext::render()
      .offset = 3 * sizeof(float)}
   };
 
-  std::vector<vk::DescriptorSetLayoutBinding> bindings {
+  const std::vector<vk::DescriptorSetLayoutBinding> bindings {
     {
      .binding = 0,
      .descriptorType = vk::DescriptorType::eCombinedImageSampler,
@@ -278,7 +278,7 @@ void mr::WindowContext::render()
   static GraphicsPipeline pipeline = GraphicsPipeline(
     _state, _render_pass.get(), 0, &_shader, descrs, {bindings});
 
-  float matr[16] {
+  const float matr[16] {
     -1.41421354,
     0.816496611,
     -0.578506112,
@@ -297,7 +297,7 @@ void mr::WindowContext::render()
     34.6410141,
   };
 
-  static UniformBuffer uniform_buffer = UniformBuffer(_state, matr, 16);
+  static UniformBuffer uniform_buffer = UniformBuffer(_state, std::span{matr});
   static Texture texture = Texture(_state, "bin/textures/cat.png");
   // std::vector<DescriptorAttachment> attach {
   //   {.texture = &texture}, {.uniform_buffer = &uniiform_buffer}};
@@ -321,7 +321,7 @@ void mr::WindowContext::render()
       vec2 tex;
   };
 
-  std::vector<vertex> vertexes {
+  const std::vector<vertex> vertexes {
     { {-0.5, 0, -0.5}, {0, 0}},
     {  {0.5, 0, -0.5}, {1, 0}},
     {   {0.5, 0, 0.5}, {1, 1}},
@@ -331,15 +331,15 @@ void mr::WindowContext::render()
     {  {0.5, -5, 0.5}, {1, 1}},
     { {-0.5, -5, 0.5}, {0, 1}},
   };
-  std::vector<int> indexes {0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4};
-  static VertexBuffer vertex_buffer = VertexBuffer(_state, vertexes.data(), vertexes.size());
-  static IndexBuffer index_buffer = IndexBuffer(_state, indexes.data(), indexes.size());
+  const std::vector indexes {0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4};
+  static const VertexBuffer vertex_buffer = VertexBuffer(_state, std::span{vertexes});
+  static const IndexBuffer index_buffer = IndexBuffer(_state, std::span{indexes});
 
   /// light
-  std::vector<float> light_vertexes {-1, -1, 1, -1, 1, 1, -1, 1};
-  std::vector<int> light_indexes {0, 1, 2, 2, 3, 0};
-  static VertexBuffer light_vertex_buffer = VertexBuffer(_state, light_vertexes.data(), light_vertexes.size());
-  static IndexBuffer light_index_buffer = IndexBuffer(_state, light_indexes.data(), light_indexes.size());
+  const std::vector<float> light_vertexes {-1, -1, 1, -1, 1, 1, -1, 1};
+  const std::vector light_indexes {0, 1, 2, 2, 3, 0};
+  static const VertexBuffer light_vertex_buffer = VertexBuffer(_state, std::span{light_vertexes});
+  static const IndexBuffer light_index_buffer = IndexBuffer(_state, std::span{light_indexes});
   vk::VertexInputAttributeDescription light_descr {.location = 0,
                                                    .binding = 0,
                                                    .format =

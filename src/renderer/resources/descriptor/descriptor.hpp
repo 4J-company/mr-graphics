@@ -60,7 +60,7 @@ namespace mr {
 
     void apply();
 
-    const vk::DescriptorSet set() { return _set; }
+    const vk::DescriptorSet set() const noexcept { return _set; }
 
   private:
     void create_descriptor_pool(
