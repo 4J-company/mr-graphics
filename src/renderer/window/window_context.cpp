@@ -297,7 +297,7 @@ void mr::WindowContext::render()
     34.6410141,
   };
 
-  static UniformBuffer uniform_buffer = UniformBuffer(_state, std::span{matr});
+  static UniformBuffer uniform_buffer = UniformBuffer(_state, std::span {matr});
   static Texture texture = Texture(_state, "bin/textures/cat.png");
   // std::vector<DescriptorAttachment> attach {
   //   {.texture = &texture}, {.uniform_buffer = &uniiform_buffer}};
@@ -331,14 +331,18 @@ void mr::WindowContext::render()
     { {-0.5, -5, 0.5}, {0, 1}},
   };
   const std::vector indexes {0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4};
-  static const VertexBuffer vertex_buffer = VertexBuffer(_state, std::span{vertexes});
-  static const IndexBuffer index_buffer = IndexBuffer(_state, std::span{indexes});
+  static const VertexBuffer vertex_buffer =
+    VertexBuffer(_state, std::span {vertexes});
+  static const IndexBuffer index_buffer =
+    IndexBuffer(_state, std::span {indexes});
 
   /// light
   const std::vector<float> light_vertexes {-1, -1, 1, -1, 1, 1, -1, 1};
   const std::vector light_indexes {0, 1, 2, 2, 3, 0};
-  static const VertexBuffer light_vertex_buffer = VertexBuffer(_state, std::span{light_vertexes});
-  static const IndexBuffer light_index_buffer = IndexBuffer(_state, std::span{light_indexes});
+  static const VertexBuffer light_vertex_buffer =
+    VertexBuffer(_state, std::span {light_vertexes});
+  static const IndexBuffer light_index_buffer =
+    IndexBuffer(_state, std::span {light_indexes});
   vk::VertexInputAttributeDescription light_descr {.location = 0,
                                                    .binding = 0,
                                                    .format =

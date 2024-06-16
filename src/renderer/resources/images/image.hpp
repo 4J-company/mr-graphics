@@ -36,7 +36,7 @@ namespace mr {
       void get_pixel(const vk::Extent2D &coords) const;
 
       template <typename T>
-        void write(const VulkanState &state, std::span<const T> src)
+      void write(const VulkanState &state, std::span<const T> src)
       {
         size_t byte_size = src.size() * sizeof(T);
 
@@ -44,7 +44,7 @@ namespace mr {
 
         auto stage_buffer =
           HostBuffer(state, _size, vk::BufferUsageFlagBits::eTransferSrc);
-        stage_buffer.write(state, std::span{src});
+        stage_buffer.write(state, std::span {src});
 
         vk::ImageSubresourceLayers range {
           .aspectMask = _aspect_flags,

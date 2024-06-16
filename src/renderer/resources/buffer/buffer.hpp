@@ -171,7 +171,7 @@ namespace mr {
       IndexBuffer() = default;
 
       IndexBuffer(const VulkanState &state, size_t byte_size)
-          : DeviceBuffer(state, size,
+          : DeviceBuffer(state, byte_size,
                          vk::BufferUsageFlagBits::eIndexBuffer |
                            vk::BufferUsageFlagBits::eTransferDst)
       {
@@ -191,4 +191,3 @@ namespace mr {
 } // namespace mr
 
 #endif // __buffer_hpp_
-

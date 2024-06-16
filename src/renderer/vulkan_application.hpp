@@ -7,7 +7,7 @@ namespace mr {
   class VulkanState {
       friend class Application;
 
-  private:
+    private:
       vk::Instance _instance;
       vk::Device _device;
       vk::PhysicalDevice _phys_device;
@@ -15,12 +15,14 @@ namespace mr {
       vk::PipelineCache _pipeline_cache;
 
     public:
-      void create_pipeline_cache() {
+      void create_pipeline_cache()
+      {
         // retrieve pipeline cache data from previous runs
         size_t cache_size = 0;
         std::vector<char> cache_data;
         const auto cache_path = "bin/cache/pipeline";
-        std::fstream cache_file(cache_path, std::ios::in | std::ios::out | std::ios::binary);
+        std::fstream cache_file(
+          cache_path, std::ios::in | std::ios::out | std::ios::binary);
 
         if (cache_file.is_open()) {
           cache_file.seekg(0, std::ios::end);
@@ -36,22 +38,26 @@ namespace mr {
         }
 
         vk::PipelineCacheCreateInfo create_info {
-          .initialDataSize = cache_size, .pInitialData = cache_data.data()
-        };
+          .initialDataSize = cache_size, .pInitialData = cache_data.data()};
         _pipeline_cache = _device.createPipelineCache(create_info).value;
 
-        if (!cache_file.is_open())
+        if (!cache_file.is_open()) {
           return;
+        }
 
         // overwrite pipeline cache
-        auto result = _device.getPipelineCacheData(_pipeline_cache, &cache_size, nullptr);
-        if (result == vk::Result::eSuccess)
+        auto result =
+          _device.getPipelineCacheData(_pipeline_cache, &cache_size, nullptr);
+        if (result == vk::Result::eSuccess) {
           return;
+        }
 
         cache_data.reserve(cache_size);
-        result = _device.getPipelineCacheData(_pipeline_cache, &cache_size, cache_data.data());
-        if (result == vk::Result::eSuccess)
+        result = _device.getPipelineCacheData(
+          _pipeline_cache, &cache_size, cache_data.data());
+        if (result == vk::Result::eSuccess) {
           return;
+        }
 
         cache_file.seekp(0, std::ios::beg);
         cache_file.write(cache_data.data(), cache_size);

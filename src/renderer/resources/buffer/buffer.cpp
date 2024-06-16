@@ -31,8 +31,9 @@ mr::Buffer::Buffer(const VulkanState &state, size_t byte_size,
 void resize(size_t size) {}
 
 // find memory type
-mr::uint mr::Buffer::find_memory_type(const VulkanState &state, uint filter,
-                                      vk::MemoryPropertyFlags properties) noexcept
+mr::uint
+mr::Buffer::find_memory_type(const VulkanState &state, uint filter,
+                             vk::MemoryPropertyFlags properties) noexcept
 {
   vk::PhysicalDeviceMemoryProperties mem_properties =
     state.phys_device().getMemoryProperties();
