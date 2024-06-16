@@ -46,7 +46,7 @@ if (GENERATE_DEPENDENCY_GRAPH)
   set(TARGET_DEPS dep-graph-${CMAKE_PROJECT_NAME})
 endif()
 if (FORMAT_SOURCE)
-  set(TARGET_DEPS format-fix)
+  set(TARGET_DEPS fix-format)
 endif()
 
 add_dependencies(
