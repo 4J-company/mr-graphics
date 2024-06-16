@@ -19,19 +19,25 @@ void mr::Descriptor::update_all_attachments(
   using WriteInfo = std::variant<vk::DescriptorBufferInfo, vk::DescriptorImageInfo>;
   std::vector<WriteInfo> write_infos(attachments.size());
 
-  auto write_buffer =
-    [&](Buffer *buffer, vk::DescriptorBufferInfo &info) {
+  auto write_host_buffer =
+    [&](HostBuffer *buffer, vk::DescriptorBufferInfo &info) {
       info.buffer = buffer->buffer();
-      info.range = buffer->size();
+      info.range = buffer->byte_size();
+      info.offset = 0;
+    };
+  auto write_device_buffer =
+    [&](DeviceBuffer *buffer, vk::DescriptorBufferInfo &info) {
+      info.buffer = buffer->buffer();
+      info.range = buffer->byte_size();
       info.offset = 0;
     };
   auto write_uniform_buffer =
     [&](UniformBuffer *buffer, vk::DescriptorBufferInfo &info) {
-      write_buffer(buffer, info);
+      write_host_buffer(buffer, info);
     };
   auto write_storage_buffer =
     [&](StorageBuffer *buffer, vk::DescriptorBufferInfo &info) {
-      write_buffer(buffer, info);
+      write_device_buffer(buffer, info);
     };
   auto write_texture =
     [&](Texture *texture, vk::DescriptorImageInfo &info) {

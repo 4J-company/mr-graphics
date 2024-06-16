@@ -26,7 +26,8 @@ namespace mr {
 
       // resource creators
       [[nodiscard]] std::unique_ptr<CommandUnit> create_command_unit() const;
-      [[nodiscard]] std::unique_ptr<Buffer> create_buffer() const;
+      [[nodiscard]] std::unique_ptr<HostBuffer> create_host_buffer() const;
+      [[nodiscard]] std::unique_ptr<DeviceBuffer> create_device_buffer() const;
       [[nodiscard]] std::unique_ptr<Shader> create_shader() const;
       [[nodiscard]] std::unique_ptr<Pipeline> create_graphics_pipeline() const;
       [[nodiscard]] std::unique_ptr<Pipeline> create_compute_pipeline() const;

@@ -9,7 +9,7 @@
 
 namespace mr {
   class Buffer {
-    private:
+    protected:
       void *_host_data;
       size_t _size;
 
@@ -27,40 +27,70 @@ namespace mr {
       Buffer(const VulkanState &state, size_t size,
              vk::BufferUsageFlags usage_flag,
              vk::MemoryPropertyFlags memory_properties);
+      Buffer(Buffer&&) = default;
+      Buffer & operator=(Buffer&&) = default;
+      virtual ~Buffer() = 0;
 
-      // resize
-      void resize(size_t size);
+      void resize(size_t byte_size);
 
-      template <typename type>
-      Buffer &write(const VulkanState &state, type *data)
+      static uint find_memory_type(const VulkanState &state, uint filter,
+                                   vk::MemoryPropertyFlags properties);
+
+      const vk::Buffer buffer() { return _buffer.get(); }
+
+      const size_t byte_size() { return _size; }
+  };
+
+  inline Buffer::~Buffer() {}
+
+  class HostBuffer : public Buffer {
+    public:
+
+    using Buffer::Buffer;
+
+    template <typename T>
+      Buffer &write(const VulkanState &state, T *data, std::size_t size)
       {
-        auto ptr = state.device().mapMemory(_memory.get(), 0, _size).value;
+        size_t byte_size = size * sizeof(T);
+
+        assert(byte_size <= _size);
+
+        auto ptr = state.device().mapMemory(_memory.get(), 0, byte_size).value;
         memcpy(ptr, data, _size);
         state.device().unmapMemory(_memory.get());
         return *this;
       }
+  };
 
-      template <typename type>
-      Buffer &write_gpu(const VulkanState &state, type *data)
+  class DeviceBuffer : public Buffer {
+    public:
+    using Buffer::Buffer;
+
+    template <typename T>
+      Buffer &write(const VulkanState &state, T *data, std::size_t size)
       {
-        auto buf = Buffer(state,
-                          _size,
-                          vk::BufferUsageFlagBits::eTransferSrc,
-                          vk::MemoryPropertyFlagBits::eHostVisible |
-                            vk::MemoryPropertyFlagBits::eHostCoherent);
-        buf.write(state, data);
+        size_t byte_size = size * sizeof(T);
 
-        vk::BufferCopy buffer_copy {.size = _size};
+        assert(byte_size <= _size);
+
+        auto buf = HostBuffer(state,
+            _size,
+            vk::BufferUsageFlagBits::eTransferSrc,
+            vk::MemoryPropertyFlagBits::eHostVisible |
+            vk::MemoryPropertyFlagBits::eHostCoherent);
+        buf.write(state, data, size);
+
+        vk::BufferCopy buffer_copy {.size = byte_size};
 
         static CommandUnit command_unit(state);
         command_unit.begin();
         command_unit->copyBuffer(buf.buffer(), _buffer.get(), {buffer_copy});
         command_unit.end();
 
-        auto [bufs, size] = command_unit.submit_info();
+        auto [bufs, bufs_number] = command_unit.submit_info();
         vk::SubmitInfo submit_info {
-          .commandBufferCount = size,
-          .pCommandBuffers = bufs,
+          .commandBufferCount = bufs_number,
+            .pCommandBuffers = bufs,
         };
         auto fence = state.device().createFence({}).value;
         state.queue().submit(submit_info, fence);
@@ -68,20 +98,81 @@ namespace mr {
 
         return *this;
       }
-
-      // find memory tppe
-      static uint find_memory_type(const VulkanState &state, uint filter,
-                                   vk::MemoryPropertyFlags properties);
-
-      const vk::Buffer buffer() { return _buffer.get(); }
-
-      const size_t size() { return _size; }
   };
 
-  class UniformBuffer : public Buffer { using Buffer::Buffer; };
-  class StorageBuffer : public Buffer { using Buffer::Buffer; };
-  class VertexBuffer  : public Buffer { using Buffer::Buffer; };
-  class IndexBuffer   : public Buffer { using Buffer::Buffer; };
+  class UniformBuffer : public HostBuffer {
+    public:
+
+    using HostBuffer::HostBuffer;
+    using HostBuffer::Buffer;
+
+  UniformBuffer(const VulkanState &state, size_t size)
+   : HostBuffer(
+      state,
+      size,
+      vk::BufferUsageFlagBits::eUniformBuffer,
+      vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent
+    ) {}
+
+  template <typename T>
+    UniformBuffer(const VulkanState &state, T *data, size_t size)
+    : UniformBuffer(state, size)
+    {
+      assert(data);
+      write(state, data, size);
+    }
+  };
+
+  class StorageBuffer : public DeviceBuffer {
+    public:
+
+    using DeviceBuffer::DeviceBuffer;
+    using DeviceBuffer::Buffer;
+  };
+
+  class VertexBuffer  : public DeviceBuffer {
+    public:
+
+    using DeviceBuffer::DeviceBuffer;
+    using DeviceBuffer::Buffer;
+
+    VertexBuffer(const VulkanState &state, size_t size)
+      : DeviceBuffer(state, size,
+          vk::BufferUsageFlagBits::eVertexBuffer |
+          vk::BufferUsageFlagBits::eTransferDst,
+          vk::MemoryPropertyFlagBits::eDeviceLocal)
+    {}
+
+    template <typename type = float>
+      VertexBuffer(const VulkanState &state, type *data, size_t size) : VertexBuffer(state, size)
+    {
+      assert(data);
+      write(state, data, _size);
+    }
+  };
+
+  class IndexBuffer : public DeviceBuffer {
+    public:
+
+    using DeviceBuffer::DeviceBuffer;
+    using DeviceBuffer::Buffer;
+
+    IndexBuffer(const VulkanState &state, size_t size)
+     : DeviceBuffer(state,
+          size,
+          vk::BufferUsageFlagBits::eIndexBuffer |
+          vk::BufferUsageFlagBits::eTransferDst,
+          vk::MemoryPropertyFlagBits::eDeviceLocal)
+    {}
+
+    template <typename T>
+      IndexBuffer(const VulkanState &state, T *data, size_t size) : IndexBuffer(state, size)
+    {
+      assert(data);
+      write(state, data, size);
+    }
+  };
 } // namespace mr
 
 #endif // __buffer_hpp_
+

@@ -39,7 +39,7 @@ if (cmake-scripts_ADDED)
   include(${cmake-scripts_SOURCE_DIR}/c++-standards.cmake)
   include(${cmake-scripts_SOURCE_DIR}/compiler-options.cmake)
 
-  cxx_20()
+  cxx_23()
   if (SANITIZE)
     include(${cmake-scripts_SOURCE_DIR}/tools.cmake)
     include_what_you_use()
