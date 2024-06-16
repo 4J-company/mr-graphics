@@ -1,4 +1,24 @@
-#include "model/model.hpp"
+module;
+#include "pch.hpp"
+export module Model;
+
+import Renderer;
+
+export namespace mr {
+  class Model {
+    private:
+      std::vector<mr::Mesh *> _meshes;
+      std::string _name;
+
+    public:
+      Model() = default;
+      Model(std::string_view filename, const Application &app) noexcept;
+      Model(const Model &other) noexcept = default;
+      Model &operator=(const Model &other) noexcept = default;
+      Model(Model &&other) noexcept = default;
+      Model &operator=(Model &&other) noexcept = default;
+  };
+} // namespace mr
 
 mr::Model::Model(std::string_view filename, const mr::Application &app) noexcept
 {
@@ -15,7 +35,7 @@ mr::Model::Model(std::string_view filename, const mr::Application &app) noexcept
   assert(sc->mMeshes != nullptr);
 
   _meshes.resize(sc->mNumMeshes);
-  std::transform(std::execution::seq,
+  std::transform(// std::execution::seq,
                  sc->mMeshes,
                  sc->mMeshes + sc->mNumMeshes,
                  _meshes.begin(),

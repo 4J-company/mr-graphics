@@ -1,4 +1,4 @@
-#include <system.hpp>
+import Renderer;
 
 int main(int argc, const char **argv)
 {

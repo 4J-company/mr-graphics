@@ -1,9 +1,54 @@
-#include "window_context.hpp"
-#include "renderer.hpp"
-#include "resources/command_unit/command_unit.hpp"
-#include "resources/pipelines/graphics_pipeline.hpp"
-#include "vkfw/vkfw.hpp"
-#include <vulkan/vulkan_enums.hpp>
+module;
+#include "pch.hpp"
+export module WindowContext;
+
+import Buffer;
+import GraphicsPipeline;
+import VulkanApplication;
+
+export namespace mr {
+  class Window;
+
+  class WindowContext {
+    public:
+      static inline const uint gbuffers_number = 6;
+
+    private:
+      vk::UniqueSwapchainKHR _swapchain;
+      vk::Format _swapchain_format;
+      vk::UniqueSurfaceKHR _surface;
+      vk::Extent2D _extent;
+      std::array<Framebuffer, Framebuffer::max_presentable_images>
+        _framebuffers;
+
+      std::array<Image, gbuffers_number> _gbuffers;
+
+      vk::UniqueRenderPass _render_pass;
+      Image _depthbuffer;
+
+      VulkanState _state;
+
+      vk::Semaphore _image_available_semaphore;
+      vk::Semaphore _render_rinished_semaphore;
+      vk::Fence _image_fence;
+
+      Window *_parent;
+
+    public:
+      WindowContext() = default;
+      WindowContext(Window *parent, const VulkanState &state);
+      WindowContext(WindowContext &&other) noexcept = default;
+      WindowContext &operator=(WindowContext &&other) noexcept = default;
+
+      ~WindowContext() = default;
+
+      void create_framebuffers(const VulkanState &state);
+      void create_depthbuffer(const VulkanState &state);
+      void create_render_pass(const VulkanState &state);
+      void resize(size_t width, size_t height);
+      void render();
+  };
+} // namespace mr
 
 mr::WindowContext::WindowContext(Window *parent, const VulkanState &state)
     : _state(state)
@@ -246,7 +291,7 @@ void mr::WindowContext::create_framebuffers(const VulkanState &state)
   }
 }
 
-namespace mr {
+export namespace mr {
   template <typename type = float>
   mr::Buffer create_vertex_buffer(const VulkanState &state, size_t size,
                                   type *data = nullptr)

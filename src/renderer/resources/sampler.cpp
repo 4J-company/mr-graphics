@@ -1,4 +1,27 @@
-#include "resources/texture/sampler/sampler.hpp"
+module;
+#include "pch.hpp"
+export module Sampler;
+
+import VulkanApplication;
+
+export namespace mr {
+  class Sampler {
+    private:
+      vk::UniqueSampler _sampler;
+
+      int _mip_level;
+      vk::Filter _filter;
+      vk::SamplerAddressMode _address;
+
+    public:
+      Sampler() = default;
+
+      Sampler(const VulkanState &state, vk::Filter filter,
+              vk::SamplerAddressMode address, int mip_level = 1);
+
+      const vk::Sampler sampler() const { return _sampler.get(); }
+  };
+}
 
 mr::Sampler::Sampler(const VulkanState &state, vk::Filter filter,
                      vk::SamplerAddressMode address, int mip_level)

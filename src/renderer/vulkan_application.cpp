@@ -1,9 +1,8 @@
-#if !defined(__vulkan_application_hpp_)
-#define __vulkan_application_hpp_
-
+module;
 #include "pch.hpp"
+export module VulkanApplication;
 
-namespace mr {
+export namespace mr {
   class VulkanState {
       friend class Application;
 
@@ -76,5 +75,3 @@ namespace mr {
       vk::PipelineCache pipeline_cache() const { return _pipeline_cache; }
   };
 } // namespace mr
-
-#endif // __vulkan_application_hpp_
