@@ -301,9 +301,8 @@ void mr::WindowContext::render()
   static Texture texture = Texture(_state, "bin/textures/cat.png");
   // std::vector<DescriptorAttachment> attach {
   //   {.texture = &texture}, {.uniform_buffer = &uniiform_buffer}};
-  std::vector<Descriptor::Attachment::Data> attach {
-    {&texture}, {&uniform_buffer}
-  };
+  std::vector<Descriptor::Attachment::Data> attach {{&texture},
+                                                    {&uniform_buffer}};
   static Descriptor set = Descriptor(_state, &pipeline, attach);
 
   static CommandUnit command_unit {_state};

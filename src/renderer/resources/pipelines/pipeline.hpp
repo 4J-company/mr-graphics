@@ -20,9 +20,9 @@ namespace mr {
     public:
       Pipeline() = default;
 
-      Pipeline(
-        const VulkanState &state, Shader *shader,
-        const std::vector<std::vector<vk::DescriptorSetLayoutBinding>> &bindings);
+      Pipeline(const VulkanState &state, Shader *shader,
+               const std::vector<std::vector<vk::DescriptorSetLayoutBinding>>
+                 &bindings);
 
       const vk::Pipeline pipeline() const { return _pipeline.get(); }
 
@@ -32,7 +32,8 @@ namespace mr {
 
       void create_layout_sets(
         const VulkanState &state,
-        const std::vector<std::vector<vk::DescriptorSetLayoutBinding>> &bindings);
+        const std::vector<std::vector<vk::DescriptorSetLayoutBinding>>
+          &bindings);
 
       const vk::DescriptorSetLayout set_layout(uint set_number)
       {

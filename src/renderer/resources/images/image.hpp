@@ -43,11 +43,7 @@ namespace mr {
         assert(byte_size <= _size);
 
         auto stage_buffer =
-          HostBuffer(state,
-                 _size,
-                 vk::BufferUsageFlagBits::eTransferSrc,
-                 vk::MemoryPropertyFlagBits::eHostVisible |
-                 vk::MemoryPropertyFlagBits::eHostCoherent);
+          HostBuffer(state, _size, vk::BufferUsageFlagBits::eTransferSrc);
         stage_buffer.write(state, std::span{src});
 
         vk::ImageSubresourceLayers range {

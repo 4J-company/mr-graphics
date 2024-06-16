@@ -23,7 +23,8 @@ namespace mr {
         const VulkanState &state, vk::RenderPass render_pass, uint subpass,
         Shader *ShaderProgram,
         const std::vector<vk::VertexInputAttributeDescription> &attributes,
-        const std::vector<std::vector<vk::DescriptorSetLayoutBinding>> &bindings);
+        const std::vector<std::vector<vk::DescriptorSetLayoutBinding>>
+          &bindings);
 
       void recompile();
 

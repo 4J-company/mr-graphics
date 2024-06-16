@@ -31,10 +31,12 @@ namespace mr {
 
       // move semantics
       Shader(Shader &&other) noexcept
-        : _path(std::move(other._path))
-        , _modules(std::move(other._modules))
-        , _stages(std::move(other._stages))
-        , _num_of_loaded_shaders(other._num_of_loaded_shaders.load()) {}
+          : _path(std::move(other._path))
+          , _modules(std::move(other._modules))
+          , _stages(std::move(other._stages))
+          , _num_of_loaded_shaders(other._num_of_loaded_shaders.load())
+      {
+      }
 
       Shader &operator=(Shader &&other) noexcept
       {
