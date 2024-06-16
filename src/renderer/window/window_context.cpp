@@ -1,5 +1,6 @@
 #include "window_context.hpp"
 #include "renderer.hpp"
+#include "resources/buffer/buffer.hpp"
 #include "resources/command_unit/command_unit.hpp"
 #include "resources/pipelines/graphics_pipeline.hpp"
 #include "vkfw/vkfw.hpp"
@@ -246,54 +247,6 @@ void mr::WindowContext::create_framebuffers(const VulkanState &state)
   }
 }
 
-namespace mr {
-  template <typename type = float>
-  mr::Buffer create_vertex_buffer(const VulkanState &state, size_t size,
-                                  type *data = nullptr)
-  {
-    auto buf = Buffer(state,
-                      size,
-                      vk::BufferUsageFlagBits::eVertexBuffer |
-                        vk::BufferUsageFlagBits::eTransferDst,
-                      vk::MemoryPropertyFlagBits::eDeviceLocal);
-    if (data != nullptr) {
-      buf.write_gpu(state, data);
-    }
-    return buf;
-  }
-
-  template <typename type = float>
-  mr::Buffer create_index_buffer(const VulkanState &state, size_t size,
-                                 type *data = nullptr)
-  {
-    auto buf = Buffer(state,
-                      size,
-                      vk::BufferUsageFlagBits::eIndexBuffer |
-                        vk::BufferUsageFlagBits::eTransferDst,
-                      vk::MemoryPropertyFlagBits::eDeviceLocal);
-    if (data != nullptr) {
-      buf.write_gpu(state, data);
-    }
-    return buf;
-  }
-
-  template <typename type = float>
-  mr::UniformBuffer create_uniform_buffer(const VulkanState &state, size_t size,
-                                   type *data = nullptr)
-  {
-    UniformBuffer buf(
-      state,
-      size,
-      vk::BufferUsageFlagBits::eUniformBuffer,
-      vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent
-    );
-    if (data != nullptr) {
-      buf.write(state, data);
-    }
-    return buf;
-  }
-} // namespace mr
-
 void mr::WindowContext::render()
 {
   static Shader _shader = Shader(_state, "default");
@@ -344,15 +297,13 @@ void mr::WindowContext::render()
     34.6410141,
   };
 
-  static UniformBuffer uniform_buffer =
-    create_uniform_buffer(_state, sizeof(float) * 16);
-  uniform_buffer.write(_state, matr);
+  static UniformBuffer uniform_buffer = UniformBuffer(_state, matr, 16);
   static Texture texture = Texture(_state, "bin/textures/cat.png");
   // std::vector<DescriptorAttachment> attach {
   //   {.texture = &texture}, {.uniform_buffer = &uniiform_buffer}};
   std::vector<Descriptor::Attachment::Data> attach {
     {&texture}, {&uniform_buffer}
-};
+  };
   static Descriptor set = Descriptor(_state, &pipeline, attach);
 
   static CommandUnit command_unit {_state};
@@ -381,22 +332,14 @@ void mr::WindowContext::render()
     { {-0.5, -5, 0.5}, {0, 1}},
   };
   std::vector<int> indexes {0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4};
-  static Buffer vertex_buffer = create_vertex_buffer(
-    _state, sizeof(vertexes[0]) * vertexes.size(), vertexes.data());
-  static Buffer index_buffer = create_index_buffer(
-    _state, sizeof(indexes[0]) * indexes.size(), indexes.data());
+  static VertexBuffer vertex_buffer = VertexBuffer(_state, vertexes.data(), vertexes.size());
+  static IndexBuffer index_buffer = IndexBuffer(_state, indexes.data(), indexes.size());
 
   /// light
   std::vector<float> light_vertexes {-1, -1, 1, -1, 1, 1, -1, 1};
   std::vector<int> light_indexes {0, 1, 2, 2, 3, 0};
-  static Buffer light_vertex_buffer =
-    create_vertex_buffer(_state,
-                         sizeof(light_vertexes[0]) * light_vertexes.size(),
-                         light_vertexes.data());
-  static Buffer light_index_buffer =
-    create_index_buffer(_state,
-                        sizeof(light_indexes[0]) * light_indexes.size(),
-                        light_indexes.data());
+  static VertexBuffer light_vertex_buffer = VertexBuffer(_state, light_vertexes.data(), light_vertexes.size());
+  static IndexBuffer light_index_buffer = IndexBuffer(_state, light_indexes.data(), light_indexes.size());
   vk::VertexInputAttributeDescription light_descr {.location = 0,
                                                    .binding = 0,
                                                    .format =

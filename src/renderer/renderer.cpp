@@ -187,9 +187,14 @@ mr::Application::~Application()
   _state._instance.destroy();
 }
 
-[[nodiscard]] std::unique_ptr<mr::Buffer> mr::Application::create_buffer() const
+[[nodiscard]] std::unique_ptr<mr::HostBuffer> mr::Application::create_host_buffer() const
 {
-  return std::make_unique<Buffer>();
+  return std::make_unique<HostBuffer>();
+}
+
+[[nodiscard]] std::unique_ptr<mr::DeviceBuffer> mr::Application::create_device_buffer() const
+{
+  return std::make_unique<DeviceBuffer>();
 }
 
 [[nodiscard]] std::unique_ptr<mr::CommandUnit>

@@ -15,8 +15,8 @@ namespace mr {
 
   class Mesh {
     private:
-      Buffer _vbuf;
-      Buffer _ibuf;
+      VertexBuffer _vbuf;
+      IndexBuffer _ibuf;
 
       size_t _element_count = 0;
 

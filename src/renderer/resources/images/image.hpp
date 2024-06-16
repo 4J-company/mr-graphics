@@ -35,15 +35,20 @@ namespace mr {
       void copy_to_host() const;
       void get_pixel(const vk::Extent2D &coords) const;
 
-      template <typename type> void write(const VulkanState &state, type *data)
+      template <typename T>
+        void write(const VulkanState &state, T *data, std::size_t size)
       {
-        Buffer stage_buffer =
-          Buffer(state,
+        size_t byte_size = sizeof(T) * size;
+
+        assert(byte_size <= _size);
+
+        auto stage_buffer =
+          HostBuffer(state,
                  _size,
                  vk::BufferUsageFlagBits::eTransferSrc,
                  vk::MemoryPropertyFlagBits::eHostVisible |
-                   vk::MemoryPropertyFlagBits::eHostCoherent);
-        stage_buffer.write(state, data);
+                 vk::MemoryPropertyFlagBits::eHostCoherent);
+        stage_buffer.write(state, data, size);
 
         vk::ImageSubresourceLayers range {
           .aspectMask = _aspect_flags,
@@ -67,9 +72,9 @@ namespace mr {
           stage_buffer.buffer(), _image.get(), _layout, {region});
         command_unit.end();
 
-        auto [bufs, size] = command_unit.submit_info();
+        auto [bufs, bufs_number] = command_unit.submit_info();
         vk::SubmitInfo submit_info {
-          .commandBufferCount = size,
+          .commandBufferCount = bufs_number,
           .pCommandBuffers = bufs,
         };
         auto fence = state.device().createFence({}).value;

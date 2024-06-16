@@ -17,7 +17,7 @@ mr::Texture::Texture(const VulkanState &state, std::string_view filename)
                    vk::ImageUsageFlagBits::eSampled,
                  vk::ImageAspectFlagBits::eColor);
   _image.switch_layout(state, vk::ImageLayout::eTransferDstOptimal);
-  _image.write(state, data);
+  _image.write(state, data, w * h * ch);
   _image.switch_layout(state, vk::ImageLayout::eShaderReadOnlyOptimal);
 
   _sampler =
