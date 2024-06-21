@@ -419,6 +419,7 @@ void mr::WindowContext::render()
   command_unit->bindIndexBuffer(
     light_index_buffer.buffer(), 0, vk::IndexType::eUint32);
   command_unit->drawIndexed(light_indexes.size(), 1, 0, 0, 0);
+  command_unit->endRenderPass();
 
   command_unit.end();
 
