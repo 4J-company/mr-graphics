@@ -4,18 +4,20 @@
 #include "pch.hpp"
 
 namespace mr {
-  template <std::floating_point T = float>
-    class Timer {
+  template <std::floating_point T = float> class Timer {
     public:
       using TimeT = std::chrono::duration<T>;
       using DeltaT = std::chrono::duration<T>;
 
-      void update() noexcept {
-        _global_time = std::chrono::duration_cast<TimeT>(
-          std::chrono::high_resolution_clock::now().time_since_epoch()) - _init_time;
+      void update() noexcept
+      {
+        _global_time =
+          std::chrono::duration_cast<TimeT>(
+            std::chrono::high_resolution_clock::now().time_since_epoch()) -
+          _init_time;
         _global_delta_time = _global_time - _old_time;
         if (_pause) {
-          _delta_time = DeltaT{0};
+          _delta_time = DeltaT {0};
           _pause_time += std::chrono::duration_cast<TimeT>(_global_delta_time);
         }
         else {
@@ -44,8 +46,8 @@ namespace mr {
     private:
       TimeT _time {};
       TimeT _global_time {};
-      TimeT _init_time
-        {std::chrono::duration_cast<TimeT>(std::chrono::high_resolution_clock::now().time_since_epoch())};
+      TimeT _init_time {std::chrono::duration_cast<TimeT>(
+        std::chrono::high_resolution_clock::now().time_since_epoch())};
       TimeT _pause_time {};
       TimeT _old_time = _init_time;
 
@@ -55,8 +57,8 @@ namespace mr {
       T _fps {};
       bool _pause {false};
 
-      constexpr static double _delta_to_sec {1.0 / DeltaT::period::den};
-    };
+      static constexpr double _delta_to_sec {1.0 / DeltaT::period::den};
+  };
 } // namespace mr
 
 #endif // __timer_hpp_

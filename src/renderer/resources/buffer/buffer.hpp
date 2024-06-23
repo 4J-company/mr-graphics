@@ -10,7 +10,6 @@
 namespace mr {
   class Buffer {
     protected:
-      void *_host_data;
       size_t _size;
 
       vk::UniqueBuffer _buffer;
@@ -41,14 +40,28 @@ namespace mr {
       size_t byte_size() const noexcept { return _size; }
   };
 
-  inline Buffer::~Buffer() {};
+  inline Buffer::~Buffer() {}
 
   class HostBuffer : public Buffer {
     public:
-      using Buffer::Buffer;
+      HostBuffer() = default;
+
+      HostBuffer(
+        const VulkanState &state, std::size_t size,
+        vk::BufferUsageFlags usage_flags,
+        vk::MemoryPropertyFlags memory_properties = vk::MemoryPropertyFlags(0))
+          : Buffer(state, size, usage_flags,
+                   memory_properties |
+                     vk::MemoryPropertyFlagBits::eHostVisible |
+                     vk::MemoryPropertyFlagBits::eHostCoherent)
+      {
+      }
+
+      HostBuffer(HostBuffer &&) = default;
+      HostBuffer &operator=(HostBuffer &&) = default;
 
       template <typename T, size_t Extent>
-      Buffer &write(const VulkanState &state, std::span<T, Extent> src)
+      HostBuffer &write(const VulkanState &state, std::span<T, Extent> src)
       {
         // std::span<const T, Extent> cannot be constructed from non-const
 
@@ -56,7 +69,7 @@ namespace mr {
         assert(byte_size <= _size);
 
         auto ptr = state.device().mapMemory(_memory.get(), 0, byte_size).value;
-        memcpy(ptr, src.data(), _size);
+        memcpy(ptr, src.data(), byte_size);
         state.device().unmapMemory(_memory.get());
         return *this;
       }
@@ -64,21 +77,29 @@ namespace mr {
 
   class DeviceBuffer : public Buffer {
     public:
-      using Buffer::Buffer;
+      DeviceBuffer() = default;
+      DeviceBuffer(DeviceBuffer &&) = default;
+      DeviceBuffer &operator=(DeviceBuffer &&) = default;
+
+      DeviceBuffer(
+        const VulkanState &state, std::size_t size,
+        vk::BufferUsageFlags usage_flags,
+        vk::MemoryPropertyFlags memory_properties = vk::MemoryPropertyFlags(0))
+          : Buffer(state, size, usage_flags,
+                   memory_properties | vk::MemoryPropertyFlagBits::eDeviceLocal)
+      {
+      }
 
       template <typename T, size_t Extent>
-      Buffer &write(const VulkanState &state, std::span<T, Extent> src)
+      DeviceBuffer &write(const VulkanState &state, std::span<T, Extent> src)
       {
         // std::span<const T, Extent> cannot be constructed from non-const
 
         size_t byte_size = src.size() * sizeof(T);
         assert(byte_size <= _size);
 
-        auto buf = HostBuffer(state,
-                              _size,
-                              vk::BufferUsageFlagBits::eTransferSrc,
-                              vk::MemoryPropertyFlagBits::eHostVisible |
-                                vk::MemoryPropertyFlagBits::eHostCoherent);
+        auto buf =
+          HostBuffer(state, _size, vk::BufferUsageFlagBits::eTransferSrc);
         buf.write(state, src);
 
         vk::BufferCopy buffer_copy {.size = byte_size};
@@ -103,12 +124,10 @@ namespace mr {
 
   class UniformBuffer : public HostBuffer {
     public:
-      using HostBuffer::HostBuffer;
-
-      UniformBuffer(const VulkanState &state, size_t byte_size)
-          : HostBuffer(state, byte_size, vk::BufferUsageFlagBits::eUniformBuffer,
-                       vk::MemoryPropertyFlagBits::eHostVisible |
-                         vk::MemoryPropertyFlagBits::eHostCoherent) {}
+      UniformBuffer(const VulkanState &state, size_t size)
+          : HostBuffer(state, size, vk::BufferUsageFlagBits::eUniformBuffer)
+      {
+      }
 
       template <typename T, size_t Extent>
       UniformBuffer(const VulkanState &state, std::span<T, Extent> src)
@@ -126,15 +145,17 @@ namespace mr {
 
   class VertexBuffer : public DeviceBuffer {
     public:
-      using DeviceBuffer::DeviceBuffer;
+      VertexBuffer() = default;
 
       VertexBuffer(const VulkanState &state, size_t byte_size)
           : DeviceBuffer(state, byte_size,
                          vk::BufferUsageFlagBits::eVertexBuffer |
-                           vk::BufferUsageFlagBits::eTransferDst,
-                         vk::MemoryPropertyFlagBits::eDeviceLocal)
+                           vk::BufferUsageFlagBits::eTransferDst)
       {
       }
+
+      VertexBuffer(VertexBuffer &&) noexcept = default;
+      VertexBuffer &operator=(VertexBuffer &&) noexcept = default;
 
       template <typename T, size_t Extent>
       VertexBuffer(const VulkanState &state, std::span<T, Extent> src)
@@ -147,15 +168,17 @@ namespace mr {
 
   class IndexBuffer : public DeviceBuffer {
     public:
-      using DeviceBuffer::DeviceBuffer;
+      IndexBuffer() = default;
 
       IndexBuffer(const VulkanState &state, size_t byte_size)
           : DeviceBuffer(state, byte_size,
                          vk::BufferUsageFlagBits::eIndexBuffer |
-                           vk::BufferUsageFlagBits::eTransferDst,
-                         vk::MemoryPropertyFlagBits::eDeviceLocal)
+                           vk::BufferUsageFlagBits::eTransferDst)
       {
       }
+
+      IndexBuffer(IndexBuffer &&) noexcept = default;
+      IndexBuffer &operator=(IndexBuffer &&) noexcept = default;
 
       template <typename T, size_t Extent>
       IndexBuffer(const VulkanState &state, std::span<T, Extent> src)

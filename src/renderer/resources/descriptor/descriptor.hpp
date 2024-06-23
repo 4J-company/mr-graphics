@@ -60,15 +60,16 @@ namespace mr {
 
     void apply();
 
-    const vk::DescriptorSet set() const noexcept { return _set; }
+    vk::DescriptorSet set() const noexcept { return _set; }
 
-  private:
-    void create_descriptor_pool(
-      const VulkanState &state,
-      const std::vector<Attachment::Data> &attachments);
+    private:
+      void
+      create_descriptor_pool(const VulkanState &state,
+                             const std::vector<Attachment::Data> &attachments);
   };
 
-  vk::DescriptorType get_descriptor_type(const Descriptor::Attachment::Data &attachment) noexcept;
+  vk::DescriptorType
+  get_descriptor_type(const Descriptor::Attachment::Data &attachment) noexcept;
 } // namespace mr
 
 #endif // __descriptor_hpp_

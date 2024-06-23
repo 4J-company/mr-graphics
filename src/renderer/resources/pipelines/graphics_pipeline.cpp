@@ -2,7 +2,8 @@
 
 mr::GraphicsPipeline::GraphicsPipeline(
   const VulkanState &state, vk::RenderPass render_pass, uint subpass,
-  Shader *shader, const std::vector<vk::VertexInputAttributeDescription> &attributes,
+  Shader *shader,
+  const std::vector<vk::VertexInputAttributeDescription> &attributes,
   const std::vector<std::vector<vk::DescriptorSetLayoutBinding>> &bindings)
     : Pipeline(state, shader, bindings)
     , _subpass(subpass)
