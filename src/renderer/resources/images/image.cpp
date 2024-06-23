@@ -23,11 +23,12 @@ vk::Format mr::Image::find_supported_format(
 }
 
 mr::Image::Image(const VulkanState &state, uint width, uint height,
-                 vk::Format format, vk::Image image)
-    : _image(image)
-    , _extent({width, height})
-    , _format(format)
-    , _layout(vk::ImageLayout::eUndefined)
+                 vk::Format format, vk::Image image, bool swapchain_image)
+  : _image(image)
+  , _extent({width, height})
+  , _format(format)
+  , _layout(vk::ImageLayout::eUndefined)
+  , _holds_swapchain_image(swapchain_image)
 {
   _mip_level = 1;
   _aspect_flags = vk::ImageAspectFlagBits::eColor;
@@ -44,6 +45,7 @@ mr::Image::Image(const VulkanState &state, uint width, uint height,
     , _layout(vk::ImageLayout::eUndefined)
     , _usage_flags(usage_flags)
     , _aspect_flags(aspect_flags)
+    , _holds_swapchain_image(false)
 {
   vk::ImageCreateInfo image_create_info {
     .imageType = vk::ImageType::e2D,
@@ -73,6 +75,12 @@ mr::Image::Image(const VulkanState &state, uint width, uint height,
   state.device().bindImageMemory(_image.get(), _memory.get(), 0);
 
   craete_image_view(state);
+}
+
+mr::Image::~Image() {
+  // swapchain images are destroyed with owning swapchain
+  if (_holds_swapchain_image)
+    _image.release();
 }
 
 void mr::Image::craete_image_view(const VulkanState &state)

@@ -232,16 +232,17 @@ void mr::WindowContext::create_render_pass(const VulkanState &state)
 
 void mr::WindowContext::create_framebuffers(const VulkanState &state)
 {
+  // *** Swamp Chain Images™ ***
   auto swampchain_images =
     state.device().getSwapchainImagesKHR(_swapchain.get()).value;
 
   for (uint i = 0; i < Framebuffer::max_presentable_images; i++) {
+    Image image{state, _extent.width, _extent.height, _swapchain_format, swampchain_images[i], true};
     _framebuffers[i] = Framebuffer(state,
                                    _render_pass.get(),
                                    _extent.width,
                                    _extent.height,
-                                   _swapchain_format,
-                                   swampchain_images[i],
+                                   std::move(image),
                                    _gbuffers,
                                    _depthbuffer);
   }

@@ -17,6 +17,7 @@ namespace mr {
       vk::Format _format;
       int _num_of_channels;
       uint _mip_level;
+      bool _holds_swapchain_image;
 
       vk::ImageLayout _layout;
       vk::ImageUsageFlags _usage_flags;
@@ -26,10 +27,15 @@ namespace mr {
       Image() = default;
 
       Image(const VulkanState &state, uint width, uint height,
-            vk::Format format, vk::Image image);
+            vk::Format format, vk::Image image, bool swapchain_image);
+
       Image(const VulkanState &state, uint width, uint height,
             vk::Format format, vk::ImageUsageFlags usage_flags,
             vk::ImageAspectFlags aspect_flags, uint mip_level = 1);
+
+      Image(Image &&) = default;
+      Image & operator =(Image &&) = default;
+      ~Image();
 
       void switch_layout(const VulkanState &state, vk::ImageLayout new_layout);
       void copy_to_host() const;

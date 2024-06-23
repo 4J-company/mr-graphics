@@ -2,16 +2,15 @@
 
 mr::Framebuffer::Framebuffer(const VulkanState &state,
                              vk::RenderPass render_pass, uint width,
-                             uint height, vk::Format swapchain_format,
-                             vk::Image final_target,
+                             uint height,
+                             Image final_target,
                              std::array<Image, 6 /* constant... */> &gbuffers,
                              Image &depthbuffer)
     : _width(width)
     , _height(height)
 {
   // assert(images.size() == max_presentable_images);
-  _swapchain_images[0] =
-    Image(state, width, height, swapchain_format, final_target);
+  _swapchain_images[0] = std::move(final_target);
 
   std::array<vk::ImageView, 6 + 2> attachments;
   attachments[0] = _swapchain_images[0].image_view();
