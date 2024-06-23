@@ -37,6 +37,7 @@
 #include <vulkan/vulkan.hpp>
 
 #define VKFW_NO_EXCEPTIONS
+#define VKFW_NO_NODISCARD_WARNINGS
 #define VKFW_NO_STRUCT_CONSTRUCTORS
 #include <vkfw/vkfw.hpp>
 

@@ -13,25 +13,22 @@ namespace mr {
       static inline const uint gbuffers_number = 6;
 
     private:
-      vk::UniqueSwapchainKHR _swapchain;
-      vk::Format _swapchain_format;
+      Window *_parent;
+      VulkanState _state;
       vk::UniqueSurfaceKHR _surface;
+      vk::Format _swapchain_format;
       vk::Extent2D _extent;
-      std::array<Framebuffer, Framebuffer::max_presentable_images>
-        _framebuffers;
+      vk::UniqueSwapchainKHR _swapchain;
 
+      std::array<Framebuffer, Framebuffer::max_presentable_images> _framebuffers;
       std::array<Image, gbuffers_number> _gbuffers;
-
-      vk::UniqueRenderPass _render_pass;
       Image _depthbuffer;
 
-      VulkanState _state;
+      vk::UniqueRenderPass _render_pass;
 
-      vk::Semaphore _image_available_semaphore;
-      vk::Semaphore _render_rinished_semaphore;
-      vk::Fence _image_fence;
-
-      Window *_parent;
+      vk::UniqueSemaphore _image_available_semaphore;
+      vk::UniqueSemaphore _render_finished_semaphore;
+      vk::UniqueFence _image_fence;
 
     public:
       WindowContext() = default;
@@ -39,7 +36,7 @@ namespace mr {
       WindowContext(WindowContext &&other) noexcept = default;
       WindowContext &operator=(WindowContext &&other) noexcept = default;
 
-      ~WindowContext() = default;
+      ~WindowContext();
 
       void create_framebuffers(const VulkanState &state);
       void create_depthbuffer(const VulkanState &state);

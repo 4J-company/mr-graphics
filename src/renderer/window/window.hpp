@@ -8,8 +8,6 @@ namespace mr {
   class Window {
     private:
       std::size_t _width, _height;
-      std::jthread _thread;
-
       vkfw::UniqueWindow _window;
       mr::WindowContext _context;
 
@@ -31,6 +29,7 @@ namespace mr {
       vkfw::Window window() { return _window.get(); }
 
       // methods
+      void start_main_loop();
       void render() { _context.render(); }
   };
 } // namespace mr

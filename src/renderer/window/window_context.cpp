@@ -110,11 +110,15 @@ mr::WindowContext::WindowContext(Window *parent, const VulkanState &state)
   create_render_pass(_state);
   create_framebuffers(_state);
 
-  _image_available_semaphore = _state.device().createSemaphore({}).value;
-  _render_rinished_semaphore = _state.device().createSemaphore({}).value;
+  _image_available_semaphore = _state.device().createSemaphoreUnique({}).value;
+  _render_finished_semaphore = _state.device().createSemaphoreUnique({}).value;
   _image_fence = _state.device()
-                   .createFence({.flags = vk::FenceCreateFlagBits::eSignaled})
+                   .createFenceUnique({.flags = vk::FenceCreateFlagBits::eSignaled})
                    .value;
+}
+
+mr::WindowContext::~WindowContext() {
+  _state.queue().waitIdle();
 }
 
 void mr::WindowContext::create_depthbuffer(const VulkanState &state)
@@ -232,7 +236,7 @@ void mr::WindowContext::create_render_pass(const VulkanState &state)
 
 void mr::WindowContext::create_framebuffers(const VulkanState &state)
 {
-  // *** Swamp Chain Imagesâ„¢ ***
+  // *** Swamp Chain Images™ ***
   auto swampchain_images =
     state.device().getSwapchainImagesKHR(_swapchain.get()).value;
 
@@ -277,7 +281,7 @@ void mr::WindowContext::render()
      }
   };
   static GraphicsPipeline pipeline = GraphicsPipeline(
-    _state, _render_pass.get(), 0, &_shader, descrs, {bindings});
+    _state, _render_pass.get(), GraphicsPipeline::Subpass::opaque_geometry, &_shader, descrs, {bindings});
 
   const float matr[16] {
     -1.41421354,
@@ -362,7 +366,7 @@ void mr::WindowContext::render()
   }
   static GraphicsPipeline light_pipeline = GraphicsPipeline(_state,
                                                             _render_pass.get(),
-                                                            1,
+                                                            GraphicsPipeline::Subpass::opaque_lighting,
                                                             &light_shader,
                                                             {light_descr},
                                                             {light_bindings});
@@ -373,13 +377,13 @@ void mr::WindowContext::render()
   static Descriptor light_set =
     Descriptor(_state, &light_pipeline, light_attach);
 
-  _state.device().waitForFences(_image_fence, VK_TRUE, UINT64_MAX);
-  _state.device().resetFences(_image_fence);
-  mr::uint image_index = 0;
+  _state.device().waitForFences(_image_fence.get(), VK_TRUE, UINT64_MAX);
+  _state.device().resetFences(_image_fence.get());
 
+  mr::uint image_index = 0;
   _state.device().acquireNextImageKHR(_swapchain.get(),
                                       UINT64_MAX,
-                                      _image_available_semaphore,
+                                      _image_available_semaphore.get(),
                                       nullptr,
                                       &image_index);
   command_unit.begin();
@@ -427,10 +431,10 @@ void mr::WindowContext::render()
 
   command_unit.end();
 
-  vk::Semaphore wait_semaphores[] = {_image_available_semaphore};
+  vk::Semaphore wait_semaphores[] = {_image_available_semaphore.get()};
   vk::PipelineStageFlags wait_stages[] = {
     vk::PipelineStageFlagBits::eColorAttachmentOutput};
-  vk::Semaphore signal_semaphores[] = {_render_rinished_semaphore};
+  vk::Semaphore signal_semaphores[] = {_render_finished_semaphore.get()};
 
   auto [bufs, size] = command_unit.submit_info();
   vk::SubmitInfo submit_info {
@@ -443,7 +447,7 @@ void mr::WindowContext::render()
     .pSignalSemaphores = signal_semaphores,
   };
 
-  _state.queue().submit(submit_info, _image_fence);
+  _state.queue().submit(submit_info, _image_fence.get());
 
   vk::SwapchainKHR swapchains[] = {_swapchain.get()};
   vk::PresentInfoKHR present_info {
