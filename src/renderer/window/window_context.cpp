@@ -282,7 +282,7 @@ void mr::WindowContext::render()
      }
   };
   static GraphicsPipeline pipeline = GraphicsPipeline(
-    _state, _render_pass.get(), GraphicsPipeline::Subpass::opaque_geometry, &_shader, descrs, {bindings});
+    _state, _render_pass.get(), GraphicsPipeline::Subpass::OpaqueGeometry, &_shader, descrs, {bindings});
 
   const float matr[16] {
     -1.41421354,
@@ -368,7 +368,7 @@ void mr::WindowContext::render()
   }
   static GraphicsPipeline light_pipeline = GraphicsPipeline(_state,
                                                             _render_pass.get(),
-                                                            GraphicsPipeline::Subpass::opaque_lighting,
+                                                            GraphicsPipeline::Subpass::OpaqueLighting,
                                                             &light_shader,
                                                             {light_descr},
                                                             {light_bindings});

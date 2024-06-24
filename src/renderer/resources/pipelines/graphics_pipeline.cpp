@@ -1,7 +1,7 @@
 #include "resources/pipelines/graphics_pipeline.hpp"
 
 mr::GraphicsPipeline::GraphicsPipeline(
-  const VulkanState &state, vk::RenderPass render_pass, uint subpass,
+  const VulkanState &state, vk::RenderPass render_pass, Subpass subpass,
   Shader *shader,
   const std::vector<vk::VertexInputAttributeDescription> &attributes,
   const std::vector<std::vector<vk::DescriptorSetLayoutBinding>> &bindings)
@@ -62,7 +62,8 @@ mr::GraphicsPipeline::GraphicsPipeline(
     .minSampleShading = 1.0f,
     .pSampleMask = nullptr,
     .alphaToCoverageEnable = false,
-    .alphaToOneEnable = false};
+    .alphaToOneEnable = false
+  };
 
   vk::PipelineDepthStencilStateCreateInfo depth_stencil_create_info {
     .depthTestEnable = true,
@@ -78,7 +79,7 @@ mr::GraphicsPipeline::GraphicsPipeline(
 
   std::vector<vk::PipelineColorBlendAttachmentState> color_blend_attachments;
   switch (subpass) {
-    case 0:
+    case Subpass::OpaqueGeometry:
       color_blend_attachments.resize(WindowContext::gbuffers_number);
       for (unsigned i = 0; i < WindowContext::gbuffers_number; i++) {
         color_blend_attachments[i].blendEnable = false;
@@ -93,7 +94,7 @@ mr::GraphicsPipeline::GraphicsPipeline(
           vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
       }
       break;
-    case 1:
+    case Subpass::OpaqueLighting:
       color_blend_attachments.resize(1);
       color_blend_attachments[0].blendEnable = false;
       color_blend_attachments[0].srcColorBlendFactor = vk::BlendFactor::eOne;
@@ -127,11 +128,12 @@ mr::GraphicsPipeline::GraphicsPipeline(
     .pDynamicState = &dynamic_state_create_info,
     .layout = _layout.get(),
     .renderPass = render_pass,
-    .subpass = _subpass,
+    .subpass = (uint32_t)_subpass,
     .basePipelineHandle = VK_NULL_HANDLE, // Optional
     .basePipelineIndex = -1,              // Optional
   };
-  if (_subpass == 0) {
+
+  if (_subpass == Subpass::OpaqueGeometry) {
     pipeline_create_info.pDepthStencilState = &depth_stencil_create_info;
   }
 
