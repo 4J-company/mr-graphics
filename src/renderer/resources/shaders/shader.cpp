@@ -5,67 +5,50 @@
 mr::Shader::Shader(const VulkanState &state, std::string_view filename)
     : _path(std::string("bin/shaders/") + filename.data())
 {
-  static const vk::ShaderStageFlagBits stage_bits[] = {
-    vk::ShaderStageFlagBits::eVertex,
-    vk::ShaderStageFlagBits::eFragment,
-    vk::ShaderStageFlagBits::eGeometry,
-    vk::ShaderStageFlagBits::eTessellationControl,
-    vk::ShaderStageFlagBits::eTessellationEvaluation,
-    vk::ShaderStageFlagBits::eCompute};
-
   std::array<int, max_shader_modules> shd_types;
   std::iota(shd_types.begin(), shd_types.end(), 0);
 
   std::for_each(
-    std::execution::seq, shd_types.begin(), shd_types.end(), [&](int shd) {
-      std::vector<char> source = load((ShaderStages)shd);
-      if (source.size() == 0) {
+    std::execution::par, shd_types.begin(), shd_types.end(), [&](int shd) {
+      std::optional<std::vector<char>> source = load((Shader::Stage)shd);
+      if (!source) {
+        // TODO: check if this stage is optional
         return;
       }
 
-      _num_of_loaded_shaders++;
+      int ind = _num_of_loaded_shaders++;
 
       vk::ShaderModuleCreateInfo create_info {
-        .codeSize = source.size(),
-        .pCode = reinterpret_cast<const uint *>(source.data())};
+        .codeSize = source->size(),
+        .pCode = reinterpret_cast<const uint *>(source->data())
+      };
 
-      // vk::Result result;
-      // std::tie(result, _modules[shd]) = state.device().createShaderModule(create_info);
-      _modules[shd] =
+      // TODO: handle this error
+      _modules[ind] =
         state.device().createShaderModuleUnique(create_info).value;
-
-      _stages[shd].stage = stage_bits[shd];
-      _stages[shd].module = _modules[shd].get();
-      _stages[shd].pName = "main";
+      _stages[ind] = vk::PipelineShaderStageCreateInfo{
+        .stage = get_stage_flags((Shader::Stage)shd),
+        .module = _modules[ind].get(),
+        .pName = "main",
+      };
     });
 }
 
-/*
-mr::Shader::~Shader()
+void mr::Shader::compile(Shader::Stage stage)
 {
-  /// TODO: destroy shader modules
-}
-*/
-
-void mr::Shader::compile(ShaderStages stage)
-{
-  static const char *shader_type_names[] = {
-    "vert", "frag", "geom", "tesc", "tese", "comp"};
-  std::string stage_type = shader_type_names[(int)stage];
+  std::string stage_type = get_stage_name(stage);
   std::system(("glslc *." + stage_type + " -o " + stage_type + ".spv").c_str());
 }
 
-std::vector<char> mr::Shader::load(ShaderStages stage)
+std::optional<std::vector<char>> mr::Shader::load(Shader::Stage stage)
 {
-  static const char *shader_type_names[] = {
-    "vert", "frag", "geom", "tesc", "tese", "comp"};
   std::filesystem::path stage_file_path = _path;
 
   // Stage path: PROJECT_PATH/bin/shaders/SHADER_NAME/SHADER_TYPE.spv
-  stage_file_path.append(shader_type_names[(int)stage]);
+  stage_file_path.append(get_stage_name(stage));
   stage_file_path += ".spv";
   if (!std::filesystem::exists(stage_file_path)) {
-    return {};
+    return std::nullopt;
   }
 
   std::fstream stage_file {stage_file_path,
