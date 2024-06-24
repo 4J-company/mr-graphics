@@ -2,6 +2,7 @@
 #include "renderer.hpp"
 #include "resources/buffer/buffer.hpp"
 #include "resources/command_unit/command_unit.hpp"
+#include "resources/descriptor/descriptor.hpp"
 #include "resources/pipelines/graphics_pipeline.hpp"
 #include "vkfw/vkfw.hpp"
 #include <vulkan/vulkan_enums.hpp>
@@ -304,11 +305,12 @@ void mr::WindowContext::render()
 
   static UniformBuffer uniform_buffer = UniformBuffer(_state, std::span {matr});
   static Texture texture = Texture(_state, "bin/textures/cat.png");
-  // std::vector<DescriptorAttachment> attach {
-  //   {.texture = &texture}, {.uniform_buffer = &uniiform_buffer}};
-  std::vector<Descriptor::Attachment::Data> attach {{&texture},
-                                                    {&uniform_buffer}};
-  static Descriptor set = Descriptor(_state, &pipeline, attach);
+  static std::vector<Shader::ResourceView> attach {
+    {0, 0, &texture},        // set, binding, res
+    {0, 1, &uniform_buffer}, // set, binding, res
+  };
+  static DescriptorAllocator descriptor_alloc = DescriptorAllocator(_state);
+  static DescriptorSet set = descriptor_alloc.allocate_set(Shader::Stage::Vertex, attach).value();
 
   static CommandUnit command_unit {_state};
 
@@ -370,12 +372,12 @@ void mr::WindowContext::render()
                                                             &light_shader,
                                                             {light_descr},
                                                             {light_bindings});
-  std::vector<Descriptor::Attachment::Data> light_attach(gbuffers_number);
+  std::vector<Shader::ResourceView> light_attach;
   for (unsigned i = 0; i < gbuffers_number; i++) {
-    light_attach[i].emplace<Image *>(&_gbuffers[i]);
+    light_attach.emplace_back(0, 1, (Image *)&_gbuffers[i]);
   }
-  static Descriptor light_set =
-    Descriptor(_state, &light_pipeline, light_attach);
+  static DescriptorSet light_set =
+    descriptor_alloc.allocate_set(Shader::Stage::Vertex, light_attach).value_or(DescriptorSet());
 
   _state.device().waitForFences(_image_fence.get(), VK_TRUE, UINT64_MAX);
   _state.device().resetFences(_image_fence.get());

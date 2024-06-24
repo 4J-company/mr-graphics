@@ -2,74 +2,60 @@
 #define __descriptor_hpp_
 
 #include "pch.hpp"
-#include "resources/attachment/attachment.hpp"
 #include "resources/images/image.hpp"
 #include "resources/pipelines/pipeline.hpp"
 #include "resources/texture/sampler/sampler.hpp"
+#include "resources/shaders/shader.hpp"
 
 namespace mr {
-  class UniformBuffer;
-  class StorageBuffer;
-  class Texture;
-  class Image;
+  class DescriptorAllocator;
 
-  // TODO: move this elsewhere
-  template<typename... Ts>
-    struct Overloads : Ts... { using Ts::operator()...; };
-
-  class Descriptor {
-  public:
-
-    struct Attachment {
-      using Data = std::variant<UniformBuffer *, StorageBuffer *, Texture *, Image *>;
-      Data data;
-      uint32_t binding;
-      uint32_t set;
-      vk::ShaderStageFlags shader_stages;
-      vk::DescriptorType descriptor_type;
-    };
-
-    struct Constant {
-      uint32_t size;
-      uint32_t offset;
-      vk::ShaderStageFlags shader_stages;
-    };
-
-  private:
-    vk::UniqueDescriptorPool _pool;
-
-    /// TODO: static allocation
-    /// inline static const int _max_sets = 4;
-    /// std::array<vk::DescriptorSet, _max_sets> _sets;
-    /// std::array<vk::DescriptorSetLayout, _max_sets> _set_layouts;
-
-    vk::DescriptorSet _set;
-    vk::DescriptorSetLayout _set_layout;
-    uint _set_number;
+  class DescriptorSet {
+    friend class DescriptorAllocator;
 
   public:
-    Descriptor() = default;
+    DescriptorSet() noexcept = default;
+    DescriptorSet(DescriptorSet &&) noexcept = default;
+    DescriptorSet & operator=(DescriptorSet &&) noexcept = default;
 
-    Descriptor(const VulkanState &state, Pipeline *pipeline,
-               const std::vector<Attachment::Data> &attachments,
-               uint set_number = 0);
+    DescriptorSet(vk::DescriptorSet s, vk::UniqueDescriptorSetLayout l, uint u) noexcept :
+      _set(s), _set_layout(std::move(l)), _set_number(u) {}
 
-    void update_all_attachments(
+    void update(
       const VulkanState &state,
-      const std::vector<Attachment::Data> &attachments);
-
-    void apply();
+      std::span<Shader::ResourceView> attachments) noexcept;
 
     vk::DescriptorSet set() const noexcept { return _set; }
 
-    private:
-      void
-      create_descriptor_pool(const VulkanState &state,
-                             const std::vector<Attachment::Data> &attachments);
+    vk::DescriptorSetLayout layout() const noexcept { return _set_layout.get(); }
+
+  private:
+    vk::DescriptorSet _set;
+    vk::UniqueDescriptorSetLayout _set_layout;
+    uint _set_number;
   };
 
-  vk::DescriptorType
-  get_descriptor_type(const Descriptor::Attachment::Data &attachment) noexcept;
+  class DescriptorAllocator {
+  private:
+    std::vector<vk::UniqueDescriptorPool> _pools;
+    const VulkanState &_state;
+
+    std::optional<vk::UniqueDescriptorPool> allocate_pool(
+        std::span<vk::DescriptorPoolSize> sizes) noexcept;
+
+  public:
+    DescriptorAllocator(const VulkanState &state) : _state(state) {
+      // TODO: create pool
+    }
+
+    std::optional<mr::DescriptorSet> allocate_set(
+        Shader::Stage stage, std::span<Shader::ResourceView> attachments) noexcept;
+
+    std::optional<std::vector<mr::DescriptorSet>> allocate_sets(
+        std::span<std::pair<Shader::Stage, std::span<Shader::ResourceView>>> attachment_sets) noexcept;
+
+    void reset() noexcept;
+  };
 } // namespace mr
 
 #endif // __descriptor_hpp_
