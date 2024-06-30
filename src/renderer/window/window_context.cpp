@@ -256,7 +256,7 @@ void mr::WindowContext::create_framebuffers(const VulkanState &state)
 void mr::WindowContext::render()
 {
   static Shader _shader = Shader(_state, "default");
-  const std::vector<vk::VertexInputAttributeDescription> descrs {
+  static std::vector<vk::VertexInputAttributeDescription> descrs {
     {.location = 0,
      .binding = 0,
      .format = vk::Format::eR32G32B32Sfloat,
@@ -281,8 +281,6 @@ void mr::WindowContext::render()
      .stageFlags = vk::ShaderStageFlagBits::eVertex,
      }
   };
-  static GraphicsPipeline pipeline = GraphicsPipeline(
-    _state, _render_pass.get(), GraphicsPipeline::Subpass::OpaqueGeometry, &_shader, descrs, {bindings});
 
   const float matr[16] {
     -1.41421354,
@@ -311,6 +309,9 @@ void mr::WindowContext::render()
   };
   static DescriptorAllocator descriptor_alloc = DescriptorAllocator(_state);
   static DescriptorSet set = descriptor_alloc.allocate_set(Shader::Stage::Vertex, attach).value();
+  static vk::DescriptorSetLayout layout = set.layout();
+  static GraphicsPipeline pipeline = GraphicsPipeline(
+    _state, _render_pass.get(), GraphicsPipeline::Subpass::OpaqueGeometry, &_shader, descrs, {&layout, 1});
 
   static CommandUnit command_unit {_state};
 
@@ -366,18 +367,19 @@ void mr::WindowContext::render()
   for (unsigned i = 0; i < gbuffers_number; i++) {
     light_bindings[i].binding = i;
   }
-  static GraphicsPipeline light_pipeline = GraphicsPipeline(_state,
-                                                            _render_pass.get(),
-                                                            GraphicsPipeline::Subpass::OpaqueLighting,
-                                                            &light_shader,
-                                                            {light_descr},
-                                                            {light_bindings});
   std::vector<Shader::ResourceView> light_attach;
   for (unsigned i = 0; i < gbuffers_number; i++) {
     light_attach.emplace_back(0, 1, (Image *)&_gbuffers[i]);
   }
   static DescriptorSet light_set =
     descriptor_alloc.allocate_set(Shader::Stage::Vertex, light_attach).value_or(DescriptorSet());
+  static vk::DescriptorSetLayout light_layout = light_set.layout();
+  static GraphicsPipeline light_pipeline = GraphicsPipeline(_state,
+                                                            _render_pass.get(),
+                                                            GraphicsPipeline::Subpass::OpaqueLighting,
+                                                            &light_shader,
+                                                            {&light_descr, 1},
+                                                            {&light_layout, 1});
 
   _state.device().waitForFences(_image_fence.get(), VK_TRUE, UINT64_MAX);
   _state.device().resetFences(_image_fence.get());
