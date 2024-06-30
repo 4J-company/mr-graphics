@@ -1,11 +1,11 @@
 #include "resources/descriptor/descriptor.hpp"
 #include "resources/shaders/shader.hpp"
 
-static constexpr
-vk::DescriptorType get_descriptor_type(const mr::Shader::Resource &attachment) noexcept
+static vk::DescriptorType
+get_descriptor_type(const mr::Shader::Resource &attachment) noexcept
 {
   using enum vk::DescriptorType;
-  static constexpr std::array types {
+  static std::array types {
     eUniformBuffer,
     eStorageBuffer,
     eCombinedImageSampler,
@@ -15,7 +15,7 @@ vk::DescriptorType get_descriptor_type(const mr::Shader::Resource &attachment) n
   return types[attachment.index()];
 }
 
-static constexpr std::vector<vk::DescriptorSetLayoutBinding>
+static std::vector<vk::DescriptorSetLayoutBinding>
 get_bindings(mr::Shader::Stage stage, std::span<mr::Shader::ResourceView> attachment_set)
 {
 
