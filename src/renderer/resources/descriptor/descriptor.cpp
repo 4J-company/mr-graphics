@@ -18,18 +18,16 @@ vk::DescriptorType get_descriptor_type(const mr::Shader::Resource &attachment) n
 static constexpr std::vector<vk::DescriptorSetLayoutBinding>
 get_bindings(mr::Shader::Stage stage, std::span<mr::Shader::ResourceView> attachment_set)
 {
-  std::vector<vk::DescriptorSetLayoutBinding> set_bindings(
-    attachment_set.size());
-  for (auto &resource_view : attachment_set) {
-    vk::DescriptorSetLayoutBinding binding {
-      .binding = resource_view.binding,
-      .descriptorType = get_descriptor_type(resource_view.res),
+
+  std::vector<vk::DescriptorSetLayoutBinding> set_bindings(attachment_set.size());
+  for (int i = 0; i < attachment_set.size(); i++) {
+    set_bindings[i] = vk::DescriptorSetLayoutBinding {
+      .binding = attachment_set[i].binding,
+      .descriptorType = get_descriptor_type(attachment_set[i].res),
       .descriptorCount = 1, // TODO: replace with reasonable value
       .stageFlags = get_stage_flags(stage),
       .pImmutableSamplers = nullptr, // TODO: investigate immutable samplers
     };
-
-    set_bindings.emplace_back(std::move(binding));
   }
 
   return std::move(set_bindings);
