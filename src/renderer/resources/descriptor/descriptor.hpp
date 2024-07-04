@@ -45,7 +45,13 @@ namespace mr {
 
   public:
     DescriptorAllocator(const VulkanState &state) : _state(state) {
-      // TODO: create pool
+      static std::vector<vk::DescriptorPoolSize> default_sizes = {
+        { vk::DescriptorType::eUniformBuffer, 10 },
+        { vk::DescriptorType::eSampledImage, 5 },
+      };
+      if (auto pool = allocate_pool(default_sizes); pool.has_value()) {
+        _pools.emplace_back(std::move(pool.value()));
+      }
     }
 
     std::optional<mr::DescriptorSet> allocate_set(
