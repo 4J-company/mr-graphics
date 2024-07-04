@@ -45,15 +45,7 @@ namespace mr {
         std::span<vk::DescriptorPoolSize> sizes) noexcept;
 
   public:
-    DescriptorAllocator(const VulkanState &state) : _state(state) {
-      static std::vector<vk::DescriptorPoolSize> default_sizes = {
-        { vk::DescriptorType::eUniformBuffer, 10 },
-        { vk::DescriptorType::eSampledImage, 5 },
-      };
-      if (auto pool = allocate_pool(default_sizes); pool.has_value()) {
-        _pools.emplace_back(std::move(pool.value()));
-      }
-    }
+    DescriptorAllocator(const VulkanState &state);
 
     std::optional<mr::DescriptorSet> allocate_set(
         Shader::Stage stage, std::span<const Shader::ResourceView> attachments) noexcept;

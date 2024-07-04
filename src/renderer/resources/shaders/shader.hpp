@@ -22,6 +22,8 @@ namespace mr {
 
     public:
       using Resource = std::variant<UniformBuffer *, StorageBuffer *, Texture *, Image *>;
+
+      // TODO: consider RT shaders from extensions;
       enum struct Stage {
         Compute  = 0,
         Vertex   = 1,
@@ -30,14 +32,13 @@ namespace mr {
         Geometry = 4,
         Fragment = 5,
       };
+
       struct ResourceView {
         uint32_t set;
         uint32_t binding;
-        const Resource &res;
+        Resource res;
 
-        operator const Resource&() {
-          return res;
-        }
+        operator const Resource&() const { return res; }
       };
 
       Shader() = default;
@@ -69,42 +70,46 @@ namespace mr {
 
     private:
       // compile sources
-      void compile(Stage stage);
+      void compile(Stage stage) const noexcept;
 
       // load sources
-      std::optional<std::vector<char>> load(Stage stage);
+      std::optional<std::vector<char>> load(Stage stage) noexcept;
+
+      bool _validate_stage(Stage stage, bool present)  const noexcept;
 
     public:
-      std::array<vk::PipelineShaderStageCreateInfo, max_shader_modules> &
-      get_stages()
-      {
-        return _stages;
-      }
+      const std::array<vk::PipelineShaderStageCreateInfo, max_shader_modules> &
+      get_stages() const { return _stages; }
 
-      uint stage_number() { return _num_of_loaded_shaders; }
+      std::array<vk::PipelineShaderStageCreateInfo, max_shader_modules> &
+      get_stages() { return _stages; }
+
+      uint stage_number() const noexcept { return _num_of_loaded_shaders; }
   };
 
-  inline constexpr vk::ShaderStageFlagBits get_stage_flags(std::integral auto stage) noexcept
+  constexpr vk::ShaderStageFlagBits get_stage_flags(std::integral auto stage) noexcept
   {
-    static constexpr const vk::ShaderStageFlagBits stage_bits[] = {
+    static constexpr std::array stage_bits {
       vk::ShaderStageFlagBits::eCompute,
       vk::ShaderStageFlagBits::eVertex,
       vk::ShaderStageFlagBits::eTessellationControl,
       vk::ShaderStageFlagBits::eTessellationEvaluation,
       vk::ShaderStageFlagBits::eGeometry,
-      vk::ShaderStageFlagBits::eFragment};
+      vk::ShaderStageFlagBits::eFragment
+    };
+    assert(stage < stage_bits.size());
 
     return stage_bits[stage];
   }
 
-  inline constexpr vk::ShaderStageFlagBits get_stage_flags(Shader::Stage stage) noexcept
+  constexpr vk::ShaderStageFlagBits get_stage_flags(Shader::Stage stage) noexcept
   {
     return get_stage_flags(std::to_underlying(stage));
   }
 
-  inline constexpr const char * get_stage_name(std::integral auto stage)
+  constexpr const char * get_stage_name(std::integral auto stage) noexcept
   {
-    static constexpr const char *shader_type_names[] = {
+    static constexpr std::array shader_type_names {
       "comp",
       "vert",
       "tesc",
@@ -112,10 +117,11 @@ namespace mr {
       "geom",
       "frag",
     };
+    assert(stage < shader_type_names.size());
     return shader_type_names[stage];
   }
 
-  inline constexpr const char * get_stage_name(Shader::Stage stage)
+  constexpr const char * get_stage_name(Shader::Stage stage) noexcept
   {
     return get_stage_name(std::to_underlying(stage));
   }

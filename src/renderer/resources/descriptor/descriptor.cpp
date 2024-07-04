@@ -12,25 +12,25 @@ get_descriptor_type(const mr::Shader::Resource &attachment) noexcept
     eInputAttachment,
   };
 
+  assert(attachment.index() < types.size());
   return types[attachment.index()];
 }
 
 static std::vector<vk::DescriptorSetLayoutBinding>
 get_bindings(mr::Shader::Stage stage, std::span<const mr::Shader::ResourceView> attachment_set)
 {
-
   std::vector<vk::DescriptorSetLayoutBinding> set_bindings(attachment_set.size());
   for (int i = 0; i < attachment_set.size(); i++) {
     set_bindings[i] = vk::DescriptorSetLayoutBinding {
       .binding = attachment_set[i].binding,
-      .descriptorType = get_descriptor_type(attachment_set[i].res),
+      .descriptorType = get_descriptor_type(attachment_set[i]),
       .descriptorCount = 1, // TODO: replace with reasonable value
       .stageFlags = get_stage_flags(stage),
       .pImmutableSamplers = nullptr, // TODO: investigate immutable samplers
     };
   }
 
-  return std::move(set_bindings);
+  return set_bindings;
 }
 
 void mr::DescriptorSet::update(
@@ -40,25 +40,19 @@ void mr::DescriptorSet::update(
     std::variant<vk::DescriptorBufferInfo, vk::DescriptorImageInfo>;
   std::vector<WriteInfo> write_infos(attachments.size());
 
-  auto write_host_buffer = [&](HostBuffer *buffer,
+  auto write_buffer = [&](Buffer *buffer,
                                vk::DescriptorBufferInfo &info) {
-    info.buffer = buffer->buffer();
-    info.range = buffer->byte_size();
-    info.offset = 0;
-  };
-  auto write_device_buffer = [&](DeviceBuffer *buffer,
-                                 vk::DescriptorBufferInfo &info) {
     info.buffer = buffer->buffer();
     info.range = buffer->byte_size();
     info.offset = 0;
   };
   auto write_uniform_buffer = [&](UniformBuffer *buffer,
                                   vk::DescriptorBufferInfo &info) {
-    write_host_buffer(buffer, info);
+    write_buffer(buffer, info);
   };
   auto write_storage_buffer = [&](StorageBuffer *buffer,
                                   vk::DescriptorBufferInfo &info) {
-    write_device_buffer(buffer, info);
+    write_buffer(buffer, info);
   };
   auto write_texture = [&](Texture *texture, vk::DescriptorImageInfo &info) {
     info.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
@@ -104,6 +98,19 @@ void mr::DescriptorSet::update(
   }
 
   state.device().updateDescriptorSets(descriptor_writes, {});
+}
+
+mr::DescriptorAllocator::DescriptorAllocator(const VulkanState &state)
+  : _state(state)
+{
+  static std::vector<vk::DescriptorPoolSize> default_sizes = {
+    { vk::DescriptorType::eUniformBuffer, 10 },
+    { vk::DescriptorType::eSampledImage, 5 },
+  };
+
+  if (auto pool = allocate_pool(default_sizes); pool.has_value()) {
+    _pools.emplace_back(std::move(pool.value()));
+  }
 }
 
 std::optional<vk::UniqueDescriptorPool> mr::DescriptorAllocator::allocate_pool(
