@@ -139,8 +139,11 @@ std::optional<std::vector<mr::DescriptorSet>>
 mr::DescriptorAllocator::allocate_sets(
   std::span<std::pair<Shader::Stage, std::span<Shader::ResourceView>>> attachment_sets) noexcept
 {
-  std::vector<vk::DescriptorSetLayout> layouts(attachment_sets.size());
-  std::vector<mr::DescriptorSet> sets(attachment_sets.size());
+  std::vector<vk::DescriptorSetLayout> layouts;
+  std::vector<mr::DescriptorSet> sets;
+
+  layouts.reserve(attachment_sets.size());
+  sets.reserve(attachment_sets.size());
 
   for (auto &attachment_set : attachment_sets) {
     auto set_bindings = get_bindings(attachment_set.first, attachment_set.second);
