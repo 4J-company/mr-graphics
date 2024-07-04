@@ -23,10 +23,11 @@ namespace mr {
 
     void update(
       const VulkanState &state,
-      std::span<Shader::ResourceView> attachments) noexcept;
+      std::span<const Shader::ResourceView> attachments) noexcept;
 
     vk::DescriptorSet set() const noexcept { return _set; }
 
+    operator vk::DescriptorSet() const noexcept { return _set; }
     vk::DescriptorSetLayout layout() const noexcept { return _set_layout.get(); }
 
   private:
@@ -55,10 +56,10 @@ namespace mr {
     }
 
     std::optional<mr::DescriptorSet> allocate_set(
-        Shader::Stage stage, std::span<Shader::ResourceView> attachments) noexcept;
+        Shader::Stage stage, std::span<const Shader::ResourceView> attachments) noexcept;
 
     std::optional<std::vector<mr::DescriptorSet>> allocate_sets(
-        std::span<std::pair<Shader::Stage, std::span<Shader::ResourceView>>> attachment_sets) noexcept;
+        std::span<const std::pair<Shader::Stage, std::span<const Shader::ResourceView>>> attachment_sets) noexcept;
 
     void reset() noexcept;
   };

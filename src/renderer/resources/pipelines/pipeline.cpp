@@ -4,7 +4,7 @@ void mr::Pipeline::apply(vk::CommandBuffer cmd_buffer) const {}
 
 mr::Pipeline::Pipeline(
     const VulkanState &state, Shader *shader,
-    const std::span<vk::DescriptorSetLayout> descriptor_layouts) : _shader(shader)
+    std::span<const vk::DescriptorSetLayout> descriptor_layouts) : _shader(shader)
 {
   vk::PipelineLayoutCreateInfo pipeline_layout_create_info {
     .setLayoutCount = static_cast<uint>(descriptor_layouts.size()),

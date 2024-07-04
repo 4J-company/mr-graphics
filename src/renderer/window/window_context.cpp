@@ -303,7 +303,7 @@ void mr::WindowContext::render()
 
   static UniformBuffer uniform_buffer = UniformBuffer(_state, std::span {matr});
   static Texture texture = Texture(_state, "bin/textures/cat.png");
-  static std::vector<Shader::ResourceView> attach {
+  static const std::vector<Shader::ResourceView> attach {
     {0, 0, &texture},        // set, binding, res
     {0, 1, &uniform_buffer}, // set, binding, res
   };

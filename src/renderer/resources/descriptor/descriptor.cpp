@@ -16,7 +16,7 @@ get_descriptor_type(const mr::Shader::Resource &attachment) noexcept
 }
 
 static std::vector<vk::DescriptorSetLayoutBinding>
-get_bindings(mr::Shader::Stage stage, std::span<mr::Shader::ResourceView> attachment_set)
+get_bindings(mr::Shader::Stage stage, std::span<const mr::Shader::ResourceView> attachment_set)
 {
 
   std::vector<vk::DescriptorSetLayoutBinding> set_bindings(attachment_set.size());
@@ -34,7 +34,7 @@ get_bindings(mr::Shader::Stage stage, std::span<mr::Shader::ResourceView> attach
 }
 
 void mr::DescriptorSet::update(
-  const VulkanState &state, std::span<Shader::ResourceView> attachments) noexcept
+  const VulkanState &state, std::span<const Shader::ResourceView> attachments) noexcept
 {
   using WriteInfo =
     std::variant<vk::DescriptorBufferInfo, vk::DescriptorImageInfo>;
@@ -125,7 +125,7 @@ std::optional<vk::UniqueDescriptorPool> mr::DescriptorAllocator::allocate_pool(
 
 // TODO: rewrite allocate_set in a 1-dimensional manner
 std::optional<mr::DescriptorSet> mr::DescriptorAllocator::allocate_set(
-  Shader::Stage stage, std::span<Shader::ResourceView> attachments) noexcept
+  Shader::Stage stage, std::span<const Shader::ResourceView> attachments) noexcept
 {
   std::pair p = {stage, attachments};
   return allocate_sets({&p, 1})
@@ -137,7 +137,7 @@ std::optional<mr::DescriptorSet> mr::DescriptorAllocator::allocate_set(
 // TODO: handle resizing pool vector
 std::optional<std::vector<mr::DescriptorSet>>
 mr::DescriptorAllocator::allocate_sets(
-  std::span<std::pair<Shader::Stage, std::span<Shader::ResourceView>>> attachment_sets) noexcept
+  std::span<const std::pair<Shader::Stage, std::span<const Shader::ResourceView>>> attachment_sets) noexcept
 {
   std::vector<vk::DescriptorSetLayout> layouts;
   std::vector<mr::DescriptorSet> sets;

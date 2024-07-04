@@ -21,7 +21,7 @@ namespace mr {
 
       Pipeline(
           const VulkanState &state, Shader *_shader,
-          const std::span<vk::DescriptorSetLayout> bindings);
+          std::span<const vk::DescriptorSetLayout> bindings);
 
       const vk::Pipeline pipeline() const { return _pipeline.get(); }
 
