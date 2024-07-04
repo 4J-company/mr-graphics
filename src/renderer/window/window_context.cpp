@@ -308,10 +308,14 @@ void mr::WindowContext::render()
     {0, 1, &uniform_buffer}, // set, binding, res
   };
   static DescriptorAllocator descriptor_alloc = DescriptorAllocator(_state);
-  static DescriptorSet set = descriptor_alloc.allocate_set(Shader::Stage::Vertex, attach).value();
-  static vk::DescriptorSetLayout layout = set.layout();
+  static const std::array attachments {
+    std::make_pair(Shader::Stage::Vertex, std::span{attach}),
+    std::make_pair(Shader::Stage::Fragment, std::span{attach}),
+  };
+  static auto sets = descriptor_alloc.allocate_sets(attachments).value();
+  static const std::array layouts {sets[0].layout(), sets[1].layout() };
   static GraphicsPipeline pipeline = GraphicsPipeline(
-    _state, _render_pass.get(), GraphicsPipeline::Subpass::OpaqueGeometry, &_shader, descrs, {&layout, 1});
+    _state, _render_pass.get(), GraphicsPipeline::Subpass::OpaqueGeometry, &_shader, descrs, std::span{layouts});
 
   static CommandUnit command_unit {_state};
 
@@ -357,22 +361,13 @@ void mr::WindowContext::render()
                                                      vk::Format::eR32G32Sfloat,
                                                    .offset = 0};
   static Shader light_shader = Shader(_state, "light");
-  std::vector<vk::DescriptorSetLayoutBinding> light_bindings(
-    gbuffers_number,
-    {
-      .descriptorType = vk::DescriptorType::eInputAttachment,
-      .descriptorCount = 1,
-      .stageFlags = vk::ShaderStageFlagBits::eFragment,
-    });
-  for (unsigned i = 0; i < gbuffers_number; i++) {
-    light_bindings[i].binding = i;
-  }
   std::vector<Shader::ResourceView> light_attach;
+  light_attach.reserve(gbuffers_number);
   for (unsigned i = 0; i < gbuffers_number; i++) {
-    light_attach.emplace_back(0, 1, (Image *)&_gbuffers[i]);
+    light_attach.emplace_back(0, i, &_gbuffers[i]);
   }
   static DescriptorSet light_set =
-    descriptor_alloc.allocate_set(Shader::Stage::Vertex, light_attach).value_or(DescriptorSet());
+    descriptor_alloc.allocate_set(Shader::Stage::Fragment, light_attach).value_or(DescriptorSet());
   static vk::DescriptorSetLayout light_layout = light_set.layout();
   static GraphicsPipeline light_pipeline = GraphicsPipeline(_state,
                                                             _render_pass.get(),
@@ -414,7 +409,7 @@ void mr::WindowContext::render()
   command_unit->setViewport(0, _framebuffers[image_index].viewport());
   command_unit->setScissor(0, _framebuffers[image_index].scissors());
   command_unit->bindDescriptorSets(
-    vk::PipelineBindPoint::eGraphics, pipeline.layout(), 0, {set.set()}, {});
+    vk::PipelineBindPoint::eGraphics, pipeline.layout(), 0, {sets[0].set(), sets[1].set()}, {});
   command_unit->bindVertexBuffers(0, {vertex_buffer.buffer()}, {0});
   command_unit->bindIndexBuffer(
     index_buffer.buffer(), 0, vk::IndexType::eUint32);
