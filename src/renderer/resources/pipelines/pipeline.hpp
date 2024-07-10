@@ -19,9 +19,8 @@ namespace mr {
     public:
       Pipeline() = default;
 
-      Pipeline(
-          const VulkanState &state, Shader *_shader,
-          std::span<const vk::DescriptorSetLayout> bindings);
+      Pipeline(const VulkanState &state, Shader *_shader,
+               std::span<const vk::DescriptorSetLayout> bindings);
 
       const vk::Pipeline pipeline() const { return _pipeline.get(); }
 

@@ -22,13 +22,14 @@ mr::Shader::Shader(const VulkanState &state, std::string_view filename)
 
       vk::ShaderModuleCreateInfo create_info {
         .codeSize = source->size(),
-        .pCode = reinterpret_cast<const uint *>(source->data())
-      };
+        .pCode = reinterpret_cast<const uint *>(source->data())};
 
-      // TODO: handle this error
-      _modules[ind] =
-        state.device().createShaderModuleUnique(create_info).value;
-      _stages[ind] = vk::PipelineShaderStageCreateInfo{
+      auto [result, module] =
+        state.device().createShaderModuleUnique(create_info);
+      assert(result == vk::Result::eSuccess);
+      _modules[ind] = std::move(module);
+
+      _stages[ind] = vk::PipelineShaderStageCreateInfo {
         .stage = get_stage_flags(stage),
         .module = _modules[ind].get(),
         .pName = "main",
@@ -39,7 +40,9 @@ mr::Shader::Shader(const VulkanState &state, std::string_view filename)
 void mr::Shader::compile(Shader::Stage stage) const noexcept
 {
   std::string stage_type = get_stage_name(stage);
-  std::system(("glslc --target-env=vulkan1.2 *." + stage_type + " -o " + stage_type + ".spv").c_str());
+  std::system(("glslc --target-env=vulkan1.2 *." + stage_type + " -o " +
+               stage_type + ".spv")
+                .c_str());
 }
 
 std::optional<std::vector<char>> mr::Shader::load(Shader::Stage stage) noexcept
@@ -66,19 +69,24 @@ std::optional<std::vector<char>> mr::Shader::load(Shader::Stage stage) noexcept
 bool mr::Shader::_validate_stage(Stage stage, bool present) const noexcept
 {
   // TODO: add mesh & task stages
-  if (not present && (stage == Stage::Vertex || stage == Stage::Fragment))
+  if (not present && (stage == Stage::Vertex || stage == Stage::Fragment)) {
     return false;
+  }
 
-  auto find_stage =
-    [this](Stage stage) {
-      return std::ranges::find(_stages, get_stage_flags(stage), &vk::PipelineShaderStageCreateInfo::stage) != _stages.end();
-    };
+  auto find_stage = [this](Stage stage) {
+    return std::ranges::find(_stages,
+                             get_stage_flags(stage),
+                             &vk::PipelineShaderStageCreateInfo::stage) !=
+           _stages.end();
+  };
 
-  if (present && stage == Stage::Evaluate)
+  if (present && stage == Stage::Evaluate) {
     return find_stage(Stage::Control);
+  }
 
-  if (present && stage != Stage::Compute)
+  if (present && stage != Stage::Compute) {
     return not find_stage(Stage::Compute);
+  }
 
   return true;
 }
