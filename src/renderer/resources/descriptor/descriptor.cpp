@@ -90,7 +90,7 @@ void mr::DescriptorSet::update(
   for (uint i = 0; i < attachments.size(); i++) {
     descriptor_writes[i] = vk::WriteDescriptorSet {
       .dstSet = _set,
-      .dstBinding = i,
+      .dstBinding = attachments[i].binding,
       .dstArrayElement = 0,
       .descriptorCount = 1,
       .descriptorType = get_descriptor_type(attachments[i]),

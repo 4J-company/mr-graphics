@@ -303,14 +303,16 @@ void mr::WindowContext::render()
 
   static UniformBuffer uniform_buffer = UniformBuffer(_state, std::span {matr});
   static Texture texture = Texture(_state, "bin/textures/cat.png");
-  static const std::vector<Shader::ResourceView> attach {
-    {0, 0, &texture},        // set, binding, res
+  static DescriptorAllocator descriptor_alloc = DescriptorAllocator(_state);
+  static const std::vector<Shader::ResourceView> vertex_attachments {
     {0, 1, &uniform_buffer}, // set, binding, res
   };
-  static DescriptorAllocator descriptor_alloc = DescriptorAllocator(_state);
+  static const std::vector<Shader::ResourceView> fragment_attachments {
+    {0, 0, &texture}, // set, binding, res
+  };
   static const std::array attachments {
-    std::make_pair(Shader::Stage::Vertex, std::span{attach}),
-    std::make_pair(Shader::Stage::Fragment, std::span{attach}),
+    std::make_pair(Shader::Stage::Vertex, std::span{vertex_attachments}),
+    std::make_pair(Shader::Stage::Fragment, std::span {fragment_attachments}),
   };
   static auto sets = descriptor_alloc.allocate_sets(attachments).value();
   static const std::array layouts {sets[0].layout(), sets[1].layout() };

@@ -6,7 +6,7 @@ layout(location = 1) in vec2 tex_coord;
 
 layout(location = 0) out vec2 tex_coord_out;
 
-layout(binding = 1) uniform PrimitiveUbo
+layout(set = 0, binding = 1) uniform PrimitiveUbo
 {
   mat4 vp;
 } ubo;
