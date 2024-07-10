@@ -44,12 +44,12 @@ mr::Window::Window(const VulkanState &state, size_t width, size_t height)
 void mr::Window::start_main_loop() {
   std::jthread render_thread {
     [&](std::stop_token stop_token) {
-      while (!_window->shouldClose().value) {
-        vkfw::pollEvents();
-      }
+      while (not stop_token.stop_requested()) { render(); }
     }
   };
 
   // TMP theme
-  while (!_window->shouldClose().value) { render(); }
+  while (!_window->shouldClose().value) {
+    vkfw::pollEvents();
+  }
 }
