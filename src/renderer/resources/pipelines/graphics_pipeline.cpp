@@ -17,10 +17,10 @@ mr::GraphicsPipeline::GraphicsPipeline(
 
   uint size = 0;
   for (auto &atr : attributes) {
-    size += atr.format == vk::Format::eR32G32B32Sfloat   ? 4
-            : atr.format == vk::Format::eR32G32B32Sfloat ? 3
-            : atr.format == vk::Format::eR32G32Sfloat    ? 2
-                                                         : 1;
+    size += atr.format == vk::Format::eR32G32B32A32Sfloat ? 4
+            : atr.format == vk::Format::eR32G32B32Sfloat  ? 3
+            : atr.format == vk::Format::eR32G32Sfloat     ? 2
+                                                          : 1;
   }
   size *= 4;
 
