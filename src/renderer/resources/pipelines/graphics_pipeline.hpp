@@ -27,10 +27,9 @@ namespace mr {
 
       GraphicsPipeline(
         const VulkanState &state, vk::RenderPass render_pass, Subpass subpass,
-        Shader *ShaderProgram,
-        const std::vector<vk::VertexInputAttributeDescription> &attributes,
-        const std::vector<std::vector<vk::DescriptorSetLayoutBinding>>
-          &bindings);
+        Shader *shader,
+        std::span<const vk::VertexInputAttributeDescription> attributes,
+        std::span<const vk::DescriptorSetLayout> descriptor_layouts);
 
       void recompile();
 

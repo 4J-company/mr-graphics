@@ -52,6 +52,8 @@
 namespace mr {
   using uint = unsigned int;
   using byte = unsigned char;
+
+  template<typename... Ts> struct Overloads : Ts... { using Ts::operator()...; };
 } // namespace mr
 
 #endif // __pch_hpp_

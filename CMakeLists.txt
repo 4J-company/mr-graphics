@@ -53,4 +53,4 @@ add_dependencies(
   ${CMAKE_PROJECT_NAME}
   ${TARGET_DEPS}
 )
-# GroupSourcesByFolder(${CMAKE_PROJECT_NAME}) # better IDE integration
+GroupSourcesByFolder(${CMAKE_PROJECT_NAME}) # better IDE integration

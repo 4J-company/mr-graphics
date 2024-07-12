@@ -3,9 +3,9 @@
 mr::GraphicsPipeline::GraphicsPipeline(
   const VulkanState &state, vk::RenderPass render_pass, Subpass subpass,
   Shader *shader,
-  const std::vector<vk::VertexInputAttributeDescription> &attributes,
-  const std::vector<std::vector<vk::DescriptorSetLayoutBinding>> &bindings)
-    : Pipeline(state, shader, bindings)
+  std::span<const vk::VertexInputAttributeDescription> attributes,
+  std::span<const vk::DescriptorSetLayout> descriptor_layouts)
+    : Pipeline(state, shader, descriptor_layouts)
     , _subpass(subpass)
 {
   // dynamic states of pipeline (viewport)
