@@ -4,8 +4,6 @@
 #include "pch.hpp"
 #include "resources/resources.hpp"
 
-#include <any>
-
 #include "attribute_types.hpp"
 
 namespace mr {
@@ -25,12 +23,22 @@ namespace mr {
       // mr::Boundbox _boundbox;
 
     public:
+      struct Vertex {
+        PositionType pos;
+        ColorType color;
+        TexCoordType uv;
+        NormalType normal;
+        NormalType tangent;
+        NormalType bitangent;
+      };
+
       Mesh() = default;
 
-      Mesh(std::span<PositionType> positions, std::span<FaceType> faces,
+      Mesh(const VulkanState &state,
+           std::span<PositionType> positions, std::span<FaceType> faces,
            std::span<ColorType> colors, std::span<TexCoordType> uvs,
            std::span<NormalType> normals, std::span<NormalType> tangents,
-           std::span<NormalType> bitangent, std::span<BoneType> bones,
+           std::span<NormalType> bitangents, std::span<BoneType> bones,
            BoundboxType bbox);
 
       // copy semantics
@@ -55,7 +63,11 @@ namespace mr {
 
         return *this;
       }
+
+      unsigned num_of_indices() const noexcept { return _element_count; }
+      const VertexBuffer & vbuf() const noexcept { return _vbuf; }
+      const IndexBuffer & ibuf() const noexcept { return _ibuf; }
   };
-};     // namespace mr
+}     // namespace mr
 
 #endif // __mesh_cpp_

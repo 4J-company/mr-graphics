@@ -218,7 +218,7 @@ mr::Application::create_window(size_t width, size_t height) const
   std::span<NormalType> bitangent, std::span<BoneType> bones,
   BoundboxType bbox) const
 {
-  _tmp_mesh_pool.emplace_back(
+  _tmp_mesh_pool.emplace_back(_state,
     positions, faces, colors, uvs, normals, tangents, bitangent, bones, bbox);
   return &_tmp_mesh_pool.back();
 }

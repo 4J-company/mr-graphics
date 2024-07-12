@@ -1,4 +1,5 @@
 #include "window_context.hpp"
+#include "model/model.hpp"
 #include "renderer.hpp"
 #include "resources/buffer/buffer.hpp"
 #include "resources/command_unit/command_unit.hpp"
@@ -256,30 +257,52 @@ void mr::WindowContext::create_framebuffers(const VulkanState &state)
 void mr::WindowContext::render()
 {
   static Shader _shader = Shader(_state, "default");
-  static std::vector<vk::VertexInputAttributeDescription> descrs {
-    {.location = 0,
-     .binding = 0,
-     .format = vk::Format::eR32G32B32Sfloat,
-     .offset = 0                },
-    {.location = 1,
-     .binding = 0,
-     .format = vk::Format::eR32G32Sfloat,
-     .offset = 3 * sizeof(float)}
+
+  struct Vertex {
+    PositionType pos;
+    ColorType color;
+    TexCoordType uv;
+    NormalType normal;
+    NormalType tangent;
+    NormalType bitangent;
   };
 
-  const std::vector<vk::DescriptorSetLayoutBinding> bindings {
+  static std::vector<vk::VertexInputAttributeDescription> descrs {
     {
-     .binding = 0,
-     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-     .descriptorCount = 1,
-     .stageFlags = vk::ShaderStageFlagBits::eFragment,
-     },
+      .location = 0,
+      .binding = 0,
+      .format = vk::Format::eR32G32B32Sfloat,
+      .offset = 0
+    },
     {
-     .binding = 1,
-     .descriptorType = vk::DescriptorType::eUniformBuffer,
-     .descriptorCount = 1,
-     .stageFlags = vk::ShaderStageFlagBits::eVertex,
-     }
+      .location = 1,
+      .binding = 0,
+      .format = vk::Format::eR32G32B32A32Sfloat,
+      .offset = 3 * sizeof(float)
+    },
+    {
+      .location = 2,
+      .binding = 0,
+      .format = vk::Format::eR32G32Sfloat,
+      .offset = 7 * sizeof(float)},
+    {
+      .location = 3,
+      .binding = 0,
+      .format = vk::Format::eR32G32B32Sfloat,
+      .offset = 9 * sizeof(float)
+    },
+    {
+      .location = 4,
+      .binding = 0,
+      .format = vk::Format::eR32G32B32Sfloat,
+      .offset = 12 * sizeof(float)
+    },
+    {
+      .location = 5,
+      .binding = 0,
+      .format = vk::Format::eR32G32B32Sfloat,
+      .offset = 15 * sizeof(float)
+    },
   };
 
   const float matr[16] {
@@ -321,34 +344,8 @@ void mr::WindowContext::render()
 
   static CommandUnit command_unit {_state};
 
-  struct vec3 {
-      float x, y, z;
-  };
-
-  struct vec2 {
-      float x, y;
-  };
-
-  struct vertex {
-      vec3 coord;
-      vec2 tex;
-  };
-
-  const std::vector<vertex> vertexes {
-    { {-0.5, 0, -0.5}, {0, 0}},
-    {  {0.5, 0, -0.5}, {1, 0}},
-    {   {0.5, 0, 0.5}, {1, 1}},
-    {  {-0.5, 0, 0.5}, {0, 1}},
-    {{-0.5, -5, -0.5}, {0, 0}},
-    { {0.5, -5, -0.5}, {1, 0}},
-    {  {0.5, -5, 0.5}, {1, 1}},
-    { {-0.5, -5, 0.5}, {0, 1}},
-  };
-  const std::vector indexes {0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4};
-  static const VertexBuffer vertex_buffer =
-    VertexBuffer(_state, std::span {vertexes});
-  static const IndexBuffer index_buffer =
-    IndexBuffer(_state, std::span {indexes});
+  /// model
+  static Model model = Model(_state, "cheburashka.obj");
 
   /// light
   const std::vector<float> light_vertexes {-1, -1, 1, -1, 1, 1, -1, 1};
@@ -410,12 +407,8 @@ void mr::WindowContext::render()
                              pipeline.pipeline());
   command_unit->setViewport(0, _framebuffers[image_index].viewport());
   command_unit->setScissor(0, _framebuffers[image_index].scissors());
-  command_unit->bindDescriptorSets(
-    vk::PipelineBindPoint::eGraphics, pipeline.layout(), 0, {sets[0].set(), sets[1].set()}, {});
-  command_unit->bindVertexBuffers(0, {vertex_buffer.buffer()}, {0});
-  command_unit->bindIndexBuffer(
-    index_buffer.buffer(), 0, vk::IndexType::eUint32);
-  command_unit->drawIndexed(indexes.size(), 1, 0, 0, 0);
+  command_unit->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.layout(), 0, {sets[0].set(), sets[1].set()}, {});
+  model.draw(command_unit);
   command_unit->nextSubpass(vk::SubpassContents::eInline);
   command_unit->bindPipeline(vk::PipelineBindPoint::eGraphics,
                              light_pipeline.pipeline());
