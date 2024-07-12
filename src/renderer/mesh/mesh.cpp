@@ -13,16 +13,16 @@ mr::Mesh::Mesh(const VulkanState &state,
     vertices.emplace_back(
       positions[i],
       ColorType{1, 0, 0, 1}, // colors[i],
-      uvs[i],
-      normals[i],
-      tangents[i],
-      bitangents[i]
+      TexCoordType{}, // uvs[i],
+      NormalType{}, // normals[i],
+      NormalType{}, // tangents[i],
+      NormalType{} // bitangents[i]
     );
   }
 
   std::vector<int> indices;
-  indices.resize(positions.size());
-  for (int i = 0; i < positions.size(); i++) {
+  indices.reserve(positions.size());
+  for (int i = 0; i < faces.size(); i++) {
     indices.insert(indices.end(), faces[i].mIndices, faces[i].mIndices + faces[i].mNumIndices);
   }
 
