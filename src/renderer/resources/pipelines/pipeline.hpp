@@ -1,41 +1,32 @@
 #if !defined(__pipeline_hpp_)
-  #define __pipeline_hpp_
+#define __pipeline_hpp_
 
-  #include "pch.hpp"
-  #include "resources/attachment/attachment.hpp"
-  #include "resources/shaders/shader.hpp"
-  #include "vulkan_application.hpp"
+#include "pch.hpp"
+#include "resources/attachment/attachment.hpp"
+#include "resources/shaders/shader.hpp"
+#include "vulkan_application.hpp"
 
-namespace mr
-{
-  class Pipeline
-  {
-  protected:
-    vk::UniquePipeline _pipeline;
-    vk::UniquePipelineLayout _layout;
-    std::vector<vk::UniqueDescriptorSetLayout> _set_layouts;
-    // std::vector?<Attachment> _attachments;
-    // std::vector?<Constant> _constants;
+namespace mr {
+  class Pipeline {
+    protected:
+      vk::UniquePipeline _pipeline;
+      vk::UniquePipelineLayout _layout;
+      // std::vector?<Attachment> _attachments;
+      // std::vector?<Constant> _constants;
 
-    Shader *_shader;
+      Shader *_shader;
 
-  public:
-    Pipeline() = default;
+    public:
+      Pipeline() = default;
 
-    Pipeline(const VulkanState &state, Shader *shader, std::vector<std::vector<vk::DescriptorSetLayoutBinding>> bindings);
+      Pipeline(const VulkanState &state, Shader *_shader,
+               std::span<const vk::DescriptorSetLayout> bindings);
 
-    const vk::Pipeline pipeline() const { return _pipeline.get(); }
-    const vk::PipelineLayout layout() const { return _layout.get(); }
+      const vk::Pipeline pipeline() const { return _pipeline.get(); }
 
-    virtual void apply(vk::CommandBuffer cmd_buffer) const;
+      const vk::PipelineLayout layout() const { return _layout.get(); }
 
-    void create_layout_sets(const VulkanState &state, std::vector<std::vector<vk::DescriptorSetLayoutBinding>> bindings);
-
-    const vk::DescriptorSetLayout set_layout(uint set_number) 
-    {
-      assert(set_number < _set_layouts.size());
-      return _set_layouts[set_number].get();
-    }
+      virtual void apply(vk::CommandBuffer cmd_buffer) const;
   };
 } // namespace mr
 

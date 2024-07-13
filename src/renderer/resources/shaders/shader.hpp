@@ -1,70 +1,130 @@
 #if !defined(__shader_hpp_)
-  #define __shader_hpp_
+#define __shader_hpp_
 
-  #include "pch.hpp"
+#include "pch.hpp"
 
-  #include "vulkan_application.hpp"
+#include "vulkan_application.hpp"
 
-namespace mr
-{
-  class Shader
-  {
-  private:
-    inline static const size_t max_shader_modules = 6;
+namespace mr {
+  class UniformBuffer;
+  class StorageBuffer;
+  class Texture;
+  class Image;
 
-    std::filesystem::path _path;
-    std::array<vk::UniqueShaderModule, max_shader_modules> _modules;
-    std::array<vk::PipelineShaderStageCreateInfo, max_shader_modules> _stages;
-    std::atomic<uint> _num_of_loaded_shaders;
+  class Shader {
+    private:
+      static inline const size_t max_shader_modules = 6;
 
-    enum struct ShaderStages : size_t
-    {
-      compute = 0,
-      vertex = 1,
-      control = 2,
-      evaluate = 3,
-      geometry = 4,
-      fragment = 5,
-    };
+      std::filesystem::path _path;
+      std::array<vk::UniqueShaderModule, max_shader_modules> _modules;
+      std::array<vk::PipelineShaderStageCreateInfo, max_shader_modules> _stages;
+      std::atomic<uint> _num_of_loaded_shaders;
 
-  public:
-    Shader() = default;
-    ~Shader() = default;
+    public:
+      using Resource = std::variant<UniformBuffer *, StorageBuffer *, Texture *, Image *>;
 
-    Shader(const VulkanState &state, std::string_view filename);
+      // TODO: consider RT shaders from extensions;
+      enum struct Stage {
+        Compute  = 0,
+        Vertex   = 1,
+        Control  = 2,
+        Evaluate = 3,
+        Geometry = 4,
+        Fragment = 5,
+      };
 
-    // move semantics
-    Shader(Shader &&other) noexcept
-    {
-      std::swap(_path, other._path);
-      std::swap(_modules, other._modules);
-      std::swap(_stages, other._stages);
-      _num_of_loaded_shaders = other._num_of_loaded_shaders.load();
-    }
+      struct ResourceView {
+        uint32_t set;
+        uint32_t binding;
+        Resource res;
 
-    Shader &operator=(Shader &&other) noexcept
-    {
-      std::swap(_path, other._path);
-      std::swap(_modules, other._modules);
-      std::swap(_stages, other._stages);
-      _num_of_loaded_shaders = other._num_of_loaded_shaders.load();
-      return *this;
-    }
+        operator const Resource&() const { return res; }
+      };
 
-    // reload shader
-    void reload();
+      Shader() = default;
 
-  private:
-    // compile sources
-    void compile(ShaderStages stage);
+      Shader(const VulkanState &state, std::string_view filename);
 
-    // load sources
-    std::vector<char> load(ShaderStages stage);
+      // move semantics
+      Shader(Shader &&other) noexcept
+          : _path(std::move(other._path))
+          , _modules(std::move(other._modules))
+          , _stages(std::move(other._stages))
+          , _num_of_loaded_shaders(other._num_of_loaded_shaders.load())
+      {
+      }
 
-  public:
-    std::array<vk::PipelineShaderStageCreateInfo, max_shader_modules> &get_stages() { return _stages; }
-    uint stage_number() { return _num_of_loaded_shaders; }
+      Shader &operator=(Shader &&other) noexcept
+      {
+        // do not need a self check
+
+        _path = std::move(other._path);
+        _modules = std::move(other._modules);
+        _stages = std::move(other._stages);
+        _num_of_loaded_shaders = other._num_of_loaded_shaders.load();
+        return *this;
+      }
+
+      // reload shader
+      void reload();
+
+    private:
+      // compile sources
+      void compile(Stage stage) const noexcept;
+
+      // load sources
+      std::optional<std::vector<char>> load(Stage stage) noexcept;
+
+      bool _validate_stage(Stage stage, bool present)  const noexcept;
+
+    public:
+      const std::array<vk::PipelineShaderStageCreateInfo, max_shader_modules> &
+      get_stages() const { return _stages; }
+
+      std::array<vk::PipelineShaderStageCreateInfo, max_shader_modules> &
+      get_stages() { return _stages; }
+
+      uint stage_number() const noexcept { return _num_of_loaded_shaders; }
   };
+
+  constexpr vk::ShaderStageFlagBits get_stage_flags(std::integral auto stage) noexcept
+  {
+    static constexpr std::array stage_bits {
+      vk::ShaderStageFlagBits::eCompute,
+      vk::ShaderStageFlagBits::eVertex,
+      vk::ShaderStageFlagBits::eTessellationControl,
+      vk::ShaderStageFlagBits::eTessellationEvaluation,
+      vk::ShaderStageFlagBits::eGeometry,
+      vk::ShaderStageFlagBits::eFragment
+    };
+    assert(stage < stage_bits.size());
+
+    return stage_bits[stage];
+  }
+
+  constexpr vk::ShaderStageFlagBits get_stage_flags(Shader::Stage stage) noexcept
+  {
+    return get_stage_flags(std::to_underlying(stage));
+  }
+
+  constexpr const char * get_stage_name(std::integral auto stage) noexcept
+  {
+    static constexpr std::array shader_type_names {
+      "comp",
+      "vert",
+      "tesc",
+      "tese",
+      "geom",
+      "frag",
+    };
+    assert(stage < shader_type_names.size());
+    return shader_type_names[stage];
+  }
+
+  constexpr const char * get_stage_name(Shader::Stage stage) noexcept
+  {
+    return get_stage_name(std::to_underlying(stage));
+  }
 } // namespace mr
 
 #endif // __shader_hpp_

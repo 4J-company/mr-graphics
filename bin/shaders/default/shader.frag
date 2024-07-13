@@ -8,7 +8,7 @@ layout(location = 4) out vec4 OutKsPh;
 layout(location = 5) out vec4 OutColorTrans;
 
 layout(location = 0) in vec2 tex_coord;
-layout(binding = 0) uniform sampler2D tex;
+layout(set = 1, binding = 0) uniform sampler2D tex;
 
 void main() 
 {

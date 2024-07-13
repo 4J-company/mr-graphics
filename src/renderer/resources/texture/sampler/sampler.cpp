@@ -1,12 +1,14 @@
 #include "resources/texture/sampler/sampler.hpp"
 
-mr::Sampler::Sampler(const VulkanState &state, vk::Filter filter, vk::SamplerAddressMode address, int mip_level)
-  : _filter(filter), _address(address), _mip_level(mip_level)
+mr::Sampler::Sampler(const VulkanState &state, vk::Filter filter,
+                     vk::SamplerAddressMode address, int mip_level)
+    : _filter(filter)
+    , _address(address)
+    , _mip_level(mip_level)
 {
   static auto props = state.phys_device().getProperties();
 
-  vk::SamplerCreateInfo sampler_create_info
-  {
+  vk::SamplerCreateInfo sampler_create_info {
     .magFilter = _filter,
     .minFilter = _filter,
     .mipmapMode = vk::SamplerMipmapMode::eLinear,
@@ -24,5 +26,4 @@ mr::Sampler::Sampler(const VulkanState &state, vk::Filter filter, vk::SamplerAdd
     .unnormalizedCoordinates = false,
   };
   _sampler = state.device().createSamplerUnique(sampler_create_info).value;
-
 }

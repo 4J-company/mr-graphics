@@ -1,55 +1,64 @@
 #if !defined(__timer_hpp_)
-  #define __timer_hpp_
+#define __timer_hpp_
 
-namespace mr
-{
-  /* Timer measures time in seconds */
-  template <std::floating_point T> class Timer
-  {
-  public:
-    Timer() = default;
-    ~Timer() = default;
+#include "pch.hpp"
 
-    Timer(Timer &&) noexcept = default;
-    Timer &operator=(Timer &&) noexcept = default;
+namespace mr {
+  template <std::floating_point T = float> class Timer {
+    public:
+      using TimeT = std::chrono::duration<T>;
+      using DeltaT = std::chrono::duration<T>;
 
-    /* Update timer data */
-    void update();
+      void update() noexcept
+      {
+        _global_time =
+          std::chrono::duration_cast<TimeT>(
+            std::chrono::high_resolution_clock::now().time_since_epoch()) -
+          _init_time;
+        _global_delta_time = _global_time - _old_time;
+        if (_pause) {
+          _delta_time = DeltaT {0};
+          _pause_time += std::chrono::duration_cast<TimeT>(_global_delta_time);
+        }
+        else {
+          _time = _global_time - _pause_time;
+          _delta_time = _global_delta_time;
+        }
+        _old_time = _global_time;
 
-    /* Set pause flag */
-    void set_pause(bool Pause) { _pause = Pause; }
+        _fps = 1.0 / (_global_delta_time.count() * _delta_to_sec);
+      }
 
-    /* Get pause flag */
-    bool get_pause() const { return _pause; }
+      void pause(bool pause) noexcept { _pause = pause; }
 
-    /* Get time from timer creation exclude puases (sec) */
-    T get_time() const { return _time; }
+      [[nodiscard]] bool pause() const noexcept { return _pause; }
 
-    /* Get time from previous update exclude pauses (sec) */
-    T get_delta_time() const { return _delta_time; }
+      TimeT time() const noexcept { return _time; }
 
-    /* Get time from timer creation include puases (sec) */
-    T get_global_time() const { return _global_time; }
+      DeltaT delta_time() const noexcept { return _delta_time; }
 
-    /* Get time from previous update include pauses (sec) */
-    T get_global_delta_time() const { return _global_delta_time; }
+      TimeT global_time() const noexcept { return _global_time; }
 
-    /* Get frames per second count */
-    T get_fps() { return _fps; }
+      DeltaT global_delta_time() const noexcept { return _global_delta_time; }
 
-  private:
-    T _time {},                // Time from timer creation exclude puases (sec)
-        _delta_time {},        // Time from previous update exclude pauses (sec)
-        _global_time {},       // Time from timer creation include puases (sec)
-        _global_delta_time {}, // Time from previous update include pauses (sec)
-        _init_time {std::chrono::duration<T>(std::chrono::high_resolution_clock::now().time_since_epoch())
-                        .count()}, // Time on timer creation (sec)
-        _pause_time {},            // All pauses duration (sec)
-        _old_time {_init_time};    // Previous update _global_time (sec)
+      double fps() const noexcept { return _fps; }
 
-    T _fps {};           // Frames per second
-    bool _pause {false}; // Pause flag
-  };                     // end of class 'timer'
+    private:
+      TimeT _time {};
+      TimeT _global_time {};
+      TimeT _init_time {std::chrono::duration_cast<TimeT>(
+        std::chrono::high_resolution_clock::now().time_since_epoch())};
+      TimeT _pause_time {};
+      TimeT _old_time = _init_time;
+
+      DeltaT _delta_time {};
+      DeltaT _global_delta_time {};
+
+      T _fps {};
+      bool _pause {false};
+
+      static constexpr double _delta_to_sec {1.0 / DeltaT::period::den};
+  };
 } // namespace mr
 
 #endif // __timer_hpp_

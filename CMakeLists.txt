@@ -6,7 +6,7 @@ include(${CMAKE_CURRENT_LIST_DIR}/cmake/settings.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/dependencies.cmake)
 
 # add executable
-add_executable(${CMAKE_PROJECT_NAME} ${XMAIN_SOURCES})
+add_executable(${CMAKE_PROJECT_NAME} "")
 add_subdirectory(src)
 
 # dependencies
@@ -46,11 +46,11 @@ if (GENERATE_DEPENDENCY_GRAPH)
   set(TARGET_DEPS dep-graph-${CMAKE_PROJECT_NAME})
 endif()
 if (FORMAT_SOURCE)
-  set(TARGET_DEPS format-fix)
+  set(TARGET_DEPS fix-format)
 endif()
 
 add_dependencies(
   ${CMAKE_PROJECT_NAME}
   ${TARGET_DEPS}
 )
-# GroupSourcesByFolder(${CMAKE_PROJECT_NAME}) # better IDE integration
+GroupSourcesByFolder(${CMAKE_PROJECT_NAME}) # better IDE integration

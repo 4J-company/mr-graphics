@@ -14,7 +14,7 @@ endif()
 CPMFindPackage(
   NAME glfw3
   GITHUB_REPOSITORY glfw/glfw
-  GIT_TAG 3.3.2
+  GIT_TAG 3.4
   OPTIONS
     "GLFW_BUILD_TESTS OFF"
     "GLFW_BUILD_EXAMPLES OFF"
@@ -29,12 +29,11 @@ CPMFindPackage(
 
 CPMFindPackage(
   NAME assimp
-  GITHUB_REPOSITORY assimp/assimp
-  GIT_TAG master
+  URL "https://github.com/assimp/assimp/archive/refs/tags/v5.4.2.zip"
   OPTIONS
-    ASSIMP_WARNINGS_AS_ERRORS OFF
-    ASSIMP_BUILD_TESTS OFF
-    ASSIMP_NO_EXPORT ON
+    "ASSIMP_WARNINGS_AS_ERRORS OFF"
+    "ASSIMP_BUILD_TESTS OFF"
+    "ASSIMP_NO_EXPORT ON"
 )
 
 # download a single file from stb

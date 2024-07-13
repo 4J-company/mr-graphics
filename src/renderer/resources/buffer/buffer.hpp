@@ -1,80 +1,192 @@
 #if !defined(__buffer_hpp_)
-  #define __buffer_hpp_
+#define __buffer_hpp_
 
-  #include "pch.hpp"
+#include "pch.hpp"
 
 
-#include "vulkan_application.hpp"
 #include "resources/command_unit/command_unit.hpp"
+#include "vulkan_application.hpp"
 
-namespace mr
-{
-  class Buffer
-  {
-  private:
-    void *_host_data;
-    size_t _size;
+namespace mr {
+  class Buffer {
+    protected:
+      size_t _size;
 
-    vk::UniqueBuffer _buffer;
-    vk::UniqueDeviceMemory _memory;
+      vk::UniqueBuffer _buffer;
+      vk::UniqueDeviceMemory _memory;
 
-    vk::BufferUsageFlags _usage_flags;
-    vk::MemoryPropertyFlags _memory_properties;
-    // VMA data
-    // VmaAllocation _allocation;
-    // VmaMemoryUsage _memory_usage;
+      vk::BufferUsageFlags _usage_flags;
+      vk::MemoryPropertyFlags _memory_properties;
+      // VMA data
+      // VmaAllocation _allocation;
+      // VmaMemoryUsage _memory_usage;
 
-  public:
-    Buffer() = default;
-    Buffer(const VulkanState &state, size_t size, vk::BufferUsageFlags usage_flag, vk::MemoryPropertyFlags memory_properties);
+    public:
+      Buffer() = default;
+      Buffer(const VulkanState &state, size_t byte_size,
+             vk::BufferUsageFlags usage_flag,
+             vk::MemoryPropertyFlags memory_properties);
+      Buffer(Buffer &&) = default;
+      Buffer &operator=(Buffer &&) = default;
+      virtual ~Buffer() = 0;
 
-    Buffer(Buffer &&other) noexcept = default;
-    Buffer & operator=(Buffer &&other) noexcept = default;
+      void resize(size_t byte_size);
 
-    // resize
-    void resize(size_t size);
+      static uint find_memory_type(const VulkanState &state, uint filter,
+                                   vk::MemoryPropertyFlags properties) noexcept;
 
-    template<typename type>
-    Buffer & write(const VulkanState &state, type *data)
-    {
-      auto ptr = state.device().mapMemory(_memory.get(), 0, _size).value;
-      memcpy(ptr, data, _size);
-      state.device().unmapMemory(_memory.get());
-      return *this;
-    }
+      vk::Buffer buffer() const noexcept { return _buffer.get(); }
 
-    template<typename type>
-    Buffer & write_gpu(const VulkanState &state, type *data)
-    {
-      auto buf = Buffer(state, _size, vk::BufferUsageFlagBits::eTransferSrc, 
-        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-      buf.write(state, data);
+      size_t byte_size() const noexcept { return _size; }
+  };
 
-      vk::BufferCopy buffer_copy { .size = _size };
+  inline Buffer::~Buffer() {}
 
-      static CommandUnit command_unit(state);
-      command_unit.begin();
-      command_unit->copyBuffer(buf.buffer(), _buffer.get(), {buffer_copy});
-      command_unit.end();
+  class HostBuffer : public Buffer {
+    public:
+      HostBuffer() = default;
 
-      auto [bufs, size] = command_unit.submit_info();
-      vk::SubmitInfo submit_info 
+      HostBuffer(
+        const VulkanState &state, std::size_t size,
+        vk::BufferUsageFlags usage_flags,
+        vk::MemoryPropertyFlags memory_properties = vk::MemoryPropertyFlags(0))
+          : Buffer(state, size, usage_flags,
+                   memory_properties |
+                     vk::MemoryPropertyFlagBits::eHostVisible |
+                     vk::MemoryPropertyFlagBits::eHostCoherent)
       {
-        .commandBufferCount = size,
-        .pCommandBuffers = bufs,
-      };
-      auto fence = state.device().createFence({}).value;
-      state.queue().submit(submit_info, fence);
-      state.device().waitForFences({fence}, VK_TRUE, UINT64_MAX);
+      }
 
-      return *this;
-    }
+      HostBuffer(HostBuffer &&) = default;
+      HostBuffer &operator=(HostBuffer &&) = default;
 
-    // find memory tppe
-    static uint find_memory_type(const VulkanState &state, uint filter, vk::MemoryPropertyFlags properties);
+      template <typename T, size_t Extent>
+      HostBuffer &write(const VulkanState &state, std::span<T, Extent> src)
+      {
+        // std::span<const T, Extent> cannot be constructed from non-const
 
-    const vk::Buffer buffer() { return _buffer.get(); }
-    const size_t size() { return _size; }
+        size_t byte_size = src.size() * sizeof(T);
+        assert(byte_size <= _size);
+
+        auto ptr = state.device().mapMemory(_memory.get(), 0, byte_size).value;
+        memcpy(ptr, src.data(), byte_size);
+        state.device().unmapMemory(_memory.get());
+        return *this;
+      }
+  };
+
+  class DeviceBuffer : public Buffer {
+    public:
+      DeviceBuffer() = default;
+      DeviceBuffer(DeviceBuffer &&) = default;
+      DeviceBuffer &operator=(DeviceBuffer &&) = default;
+
+      DeviceBuffer(
+        const VulkanState &state, std::size_t size,
+        vk::BufferUsageFlags usage_flags,
+        vk::MemoryPropertyFlags memory_properties = vk::MemoryPropertyFlags(0))
+          : Buffer(state, size, usage_flags,
+                   memory_properties | vk::MemoryPropertyFlagBits::eDeviceLocal)
+      {
+      }
+
+      template <typename T, size_t Extent>
+      DeviceBuffer &write(const VulkanState &state, std::span<T, Extent> src)
+      {
+        // std::span<const T, Extent> cannot be constructed from non-const
+
+        size_t byte_size = src.size() * sizeof(T);
+        assert(byte_size <= _size);
+
+        auto buf =
+          HostBuffer(state, _size, vk::BufferUsageFlagBits::eTransferSrc);
+        buf.write(state, src);
+
+        vk::BufferCopy buffer_copy {.size = byte_size};
+
+        static CommandUnit command_unit(state);
+        command_unit.begin();
+        command_unit->copyBuffer(buf.buffer(), _buffer.get(), {buffer_copy});
+        command_unit.end();
+
+        auto [bufs, bufs_number] = command_unit.submit_info();
+        vk::SubmitInfo submit_info {
+          .commandBufferCount = bufs_number,
+          .pCommandBuffers = bufs,
+        };
+        auto fence = state.device().createFence({}).value;
+        state.queue().submit(submit_info, fence);
+        state.device().waitForFences({fence}, VK_TRUE, UINT64_MAX);
+
+        return *this;
+      }
+  };
+
+  class UniformBuffer : public HostBuffer {
+    public:
+      UniformBuffer(const VulkanState &state, size_t size)
+          : HostBuffer(state, size, vk::BufferUsageFlagBits::eUniformBuffer)
+      {
+      }
+
+      template <typename T, size_t Extent>
+      UniformBuffer(const VulkanState &state, std::span<T, Extent> src)
+          : UniformBuffer(state, src.size() * sizeof(T))
+      {
+        assert(src.data());
+        write(state, src);
+      }
+  };
+
+  class StorageBuffer : public DeviceBuffer {
+    public:
+      using DeviceBuffer::DeviceBuffer;
+  };
+
+  class VertexBuffer : public DeviceBuffer {
+    public:
+      VertexBuffer() = default;
+
+      VertexBuffer(const VulkanState &state, size_t byte_size)
+          : DeviceBuffer(state, byte_size,
+                         vk::BufferUsageFlagBits::eVertexBuffer |
+                           vk::BufferUsageFlagBits::eTransferDst)
+      {
+      }
+
+      VertexBuffer(VertexBuffer &&) noexcept = default;
+      VertexBuffer &operator=(VertexBuffer &&) noexcept = default;
+
+      template <typename T, size_t Extent>
+      VertexBuffer(const VulkanState &state, std::span<T, Extent> src)
+          : VertexBuffer(state, src.size() * sizeof(T))
+      {
+        assert(src.data());
+        write(state, src);
+      }
+  };
+
+  class IndexBuffer : public DeviceBuffer {
+    public:
+      IndexBuffer() = default;
+
+      IndexBuffer(const VulkanState &state, size_t byte_size)
+          : DeviceBuffer(state, byte_size,
+                         vk::BufferUsageFlagBits::eIndexBuffer |
+                           vk::BufferUsageFlagBits::eTransferDst)
+      {
+      }
+
+      IndexBuffer(IndexBuffer &&) noexcept = default;
+      IndexBuffer &operator=(IndexBuffer &&) noexcept = default;
+
+      template <typename T, size_t Extent>
+      IndexBuffer(const VulkanState &state, std::span<T, Extent> src)
+          : IndexBuffer(state, src.size() * sizeof(T))
+      {
+        assert(src.data());
+        write(state, src);
+      }
   };
 } // namespace mr
 
