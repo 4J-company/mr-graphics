@@ -8,16 +8,16 @@ mr::Mesh::Mesh(const VulkanState &state,
                BoundboxType bbox)
 {
   std::vector<Vertex> vertices;
-  vertices.reserve(positions.size());
+  vertices.resize(positions.size());
   for (int i = 0; i < positions.size(); i++) {
-    vertices.emplace_back(
+    vertices[i] = {
       positions[i],
-      ColorType{1, 0, 0, 1}, // colors[i],
-      TexCoordType{}, // uvs[i],
-      NormalType{}, // normals[i],
-      NormalType{}, // tangents[i],
-      NormalType{} // bitangents[i]
-    );
+      ColorType {1, 0, 0, 1}, // colors[i],
+      TexCoordType {}, // uvs[i],
+      NormalType {}, // normals[i],
+      NormalType {}, // tangents[i],
+      NormalType {}  // bitangents[i]
+    };
   }
 
   std::vector<int> indices;

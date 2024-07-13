@@ -55,7 +55,7 @@ mr::WindowContext::WindowContext(Window *parent, const VulkanState &state)
     state.phys_device().getSurfacePresentModesKHR(_surface.get()).value;
   const auto iter = std::find(avaible_present_modes.begin(),
                               avaible_present_modes.end(),
-                              vk::PresentModeKHR::eMailbox);
+                              vk::PresentModeKHR::eImmediate);
   auto present_mode =
     (iter != avaible_present_modes.end())
       ? *iter
@@ -283,25 +283,25 @@ void mr::WindowContext::render()
     {
       .location = 2,
       .binding = 0,
-      .format = vk::Format::eR32G32Sfloat,
+      .format = vk::Format::eR32G32B32Sfloat,
       .offset = 7 * sizeof(float)},
     {
       .location = 3,
       .binding = 0,
       .format = vk::Format::eR32G32B32Sfloat,
-      .offset = 9 * sizeof(float)
+      .offset = 10 * sizeof(float)
     },
     {
       .location = 4,
       .binding = 0,
       .format = vk::Format::eR32G32B32Sfloat,
-      .offset = 12 * sizeof(float)
+      .offset = 13 * sizeof(float)
     },
     {
       .location = 5,
       .binding = 0,
       .format = vk::Format::eR32G32B32Sfloat,
-      .offset = 15 * sizeof(float)
+      .offset = 16 * sizeof(float)
     },
   };
 
