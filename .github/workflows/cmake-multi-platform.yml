@@ -84,10 +84,7 @@ jobs:
       with:
         version: latest
 
-    - name: Set up GCC
-      uses: egor-tensin/setup-gcc@v1
-      with:
-        version: latest
+    - uses: johelegp/gcc-snapshot@v1 # This action.
 
     # Download VulkanAPI
     - name: Setup Vulkan
