@@ -3,19 +3,29 @@
 
 #include "pch.hpp"
 
-namespace ter
-{
-  class command_unit
-  {
-    friend class application;
+#include "vulkan_application.hpp"
 
-  private:
-    vk::CommandPool _cmd_pool;
-    std::array<vk::CommandBuffer, 3> _cmd_buffer;
+namespace mr {
+  class CommandUnit {
+    private:
+      vk::UniqueCommandPool _cmd_pool;
+      vk::CommandBuffer _cmd_buffer;
 
-  public:
-    command_unit() = default;
+    public:
+      CommandUnit() = default;
+
+      CommandUnit(const VulkanState &state);
+
+      void begin();
+      void end();
+
+      std::tuple<vk::CommandBuffer *, uint> submit_info()
+      {
+        return {&_cmd_buffer, 1};
+      }
+
+      vk::CommandBuffer *operator->() { return &_cmd_buffer; }
   };
-}
+} // namespace mr
 
 #endif // __command_unit_hpp_
