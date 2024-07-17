@@ -9,6 +9,7 @@ layout(location = 5) out vec4 OutColorTrans;
 
 layout(location = 0) in vec2 tex_coord;
 layout(location = 1) in vec3 color;
+layout(location = 2) in vec3 normal;
 
 layout(set = 1, binding = 0) uniform sampler2D tex;
 
