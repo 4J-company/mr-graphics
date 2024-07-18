@@ -1,4 +1,5 @@
 #include "mesh/mesh.hpp"
+#include "mesh/attribute_types.hpp"
 
 mr::Mesh::Mesh(const VulkanState &state,
                std::span<PositionType> positions, std::span<FaceType> faces,
@@ -12,11 +13,11 @@ mr::Mesh::Mesh(const VulkanState &state,
   for (int i = 0; i < positions.size(); i++) {
     vertices[i] = {
       positions[i],
-      ColorType {1, 0, 0, 1}, // colors[i],
-      TexCoordType {}, // uvs[i],
-      NormalType {}, // normals[i],
-      NormalType {}, // tangents[i],
-      NormalType {}  // bitangents[i]
+      colors.data() == nullptr ? ColorType {} : colors[i],
+      uvs.data() == nullptr ? TexCoordType {} : uvs[i],
+      normals.data() == nullptr ? NormalType {} : normals[i],
+      tangents.data() == nullptr ? NormalType {} : tangents[i],
+      bitangents.data() == nullptr ? NormalType {} : bitangents[i]
     };
   }
 

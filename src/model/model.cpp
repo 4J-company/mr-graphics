@@ -20,14 +20,15 @@ mr::Model::Model(const VulkanState &state, std::string_view filename) noexcept
                  sc->mMeshes + sc->mNumMeshes,
                  _meshes.begin(),
                  [&state](aiMesh *m) -> mr::Mesh {
+                   // TODO: Investigate 'mColors', 'mTextureCoords', 'mBones'
                    return Mesh(state,
                                {m->mVertices, m->mNumVertices},
                                {m->mFaces, m->mNumFaces},
-                               {},
-                               {},
-                               {},
-                               {},
-                               {},
+                               {m->mColors[0], m->mNumVertices},
+                               {m->mTextureCoords[0], m->mNumVertices},
+                               {m->mNormals, m->mNumVertices},
+                               {m->mTangents, m->mNumVertices},
+                               {m->mBitangents, m->mNumVertices},
                                {},
                                {});
                  });
