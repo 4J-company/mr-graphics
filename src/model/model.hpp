@@ -9,6 +9,7 @@ namespace mr {
   class Model {
     private:
       std::vector<mr::Mesh> _meshes;
+      std::vector<mr::Texture> _textures;
       std::string _name;
 
     public:

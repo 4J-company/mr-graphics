@@ -15,6 +15,7 @@ mr::Model::Model(const VulkanState &state, std::string_view filename) noexcept
   assert(sc != nullptr);
   assert(sc->mMeshes != nullptr);
 
+  // load meshes
   _meshes.resize(sc->mNumMeshes);
   std::transform(sc->mMeshes,
                  sc->mMeshes + sc->mNumMeshes,
@@ -32,6 +33,22 @@ mr::Model::Model(const VulkanState &state, std::string_view filename) noexcept
                                {},
                                {});
                  });
+
+  // load textures
+  if (sc->mTextures != nullptr) {
+    std::transform(
+        sc->mTextures,
+        sc->mTextures + sc->mNumTextures,
+        _textures.begin(),
+        [&state](aiTexture *t) -> mr::Texture {
+          // file in a compressed file format
+          if (t->mHeight == 0) {
+            return Texture(state, t->mFilename.C_Str());
+          }
+          // NOTE: hard-coded vk::Format is specified by the assimp
+          return Texture(state, reinterpret_cast<byte *>(t->pcData), t->mHeight, t->mWidth, vk::Format::eR8G8B8A8Srgb);
+        });
+  }
 }
 
 void mr::Model::draw(CommandUnit &unit) const noexcept {
