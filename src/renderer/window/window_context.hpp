@@ -3,7 +3,7 @@
 
 #include "pch.hpp"
 #include "resources/resources.hpp"
-#include "vulkan_application.hpp"
+#include "vulkan_state.hpp"
 
 namespace mr {
   class Window;

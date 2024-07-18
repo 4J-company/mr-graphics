@@ -6,7 +6,7 @@
 
 #include "resources/resources.hpp"
 #include "timer/timer.hpp"
-#include "vulkan_application.hpp"
+#include "vulkan_state.hpp"
 #include "window/window.hpp"
 
 #include "mesh/mesh.hpp"
@@ -14,8 +14,7 @@
 namespace mr {
   class Application {
     private:
-      VulkanState _state;
-      VkDebugUtilsMessengerEXT _debug_messenger;
+      VulkanGlobalState _state;
 
       /// TMP SOLUTION
       mutable std::vector<mr::Mesh> _tmp_mesh_pool;

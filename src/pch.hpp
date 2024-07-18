@@ -49,6 +49,8 @@
 #undef max
 #undef min
 
+namespace std { namespace fs = ::std::filesystem; }
+
 namespace mr {
   using uint = unsigned int;
   using byte = unsigned char;

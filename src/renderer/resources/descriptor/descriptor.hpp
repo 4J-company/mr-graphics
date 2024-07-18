@@ -13,10 +13,6 @@ namespace mr {
   class Texture;
   class Image;
 
-  // TODO: move this elsewhere
-  template<typename... Ts>
-    struct Overloads : Ts... { using Ts::operator()...; };
-
   class Descriptor {
   public:
 
