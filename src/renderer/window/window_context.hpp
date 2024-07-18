@@ -4,17 +4,34 @@
 #include "pch.hpp"
 #include "resources/resources.hpp"
 #include "vulkan_state.hpp"
+#include "utils/misc.hpp"
 
 namespace mr {
   class Window;
 
-  class WindowContext {
+  class RenderContext {
     public:
       static inline const uint gbuffers_number = 6;
 
+      RenderContext() = default;
+      RenderContext(RenderContext &&other) noexcept = default;
+      RenderContext &operator=(RenderContext &&other) noexcept = default;
+
+      RenderContext(VulkanGlobalState *state, Window *parent);
+
+      ~RenderContext();
+
+      void resize(Extent extent);
+      void render();
+
     private:
+      void _create_framebuffers();
+      void _create_depthbuffer();
+      void _create_render_pass();
+
       Window *_parent;
       VulkanState _state;
+
       vk::UniqueSurfaceKHR _surface;
       vk::Format _swapchain_format;
       vk::Extent2D _extent;
@@ -29,20 +46,6 @@ namespace mr {
       vk::UniqueSemaphore _image_available_semaphore;
       vk::UniqueSemaphore _render_finished_semaphore;
       vk::UniqueFence _image_fence;
-
-    public:
-      WindowContext() = default;
-      WindowContext(Window *parent, const VulkanState &state);
-      WindowContext(WindowContext &&other) noexcept = default;
-      WindowContext &operator=(WindowContext &&other) noexcept = default;
-
-      ~WindowContext();
-
-      void create_framebuffers(const VulkanState &state);
-      void create_depthbuffer(const VulkanState &state);
-      void create_render_pass(const VulkanState &state);
-      void resize(size_t width, size_t height);
-      void render();
   };
 } // namespace mr
 #endif // __window_context_hpp_

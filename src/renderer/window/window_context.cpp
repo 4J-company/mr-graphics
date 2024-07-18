@@ -6,18 +6,17 @@
 #include "vkfw/vkfw.hpp"
 #include <vulkan/vulkan_enums.hpp>
 
-mr::WindowContext::WindowContext(Window *parent, const VulkanState &state)
-    : _state(state)
-    , _parent(parent)
+mr::RenderContext::RenderContext(VulkanGlobalState *state, Window *parent)
+  : _parent(parent)
+  , _state(state)
 {
-  _surface =
-    vkfw::createWindowSurfaceUnique(state.instance(), parent->window());
+  _surface = vkfw::createWindowSurfaceUnique(_state.instance(), _parent->window());
 
   size_t universal_queue_family_id = 0;
 
   // Choose surface format
   const auto avaible_formats =
-    state.phys_device().getSurfaceFormatsKHR(_surface.get()).value;
+    _state.phys_device().getSurfaceFormatsKHR(_surface.get()).value;
   _swapchain_format = avaible_formats[0].format;
   for (const auto format : avaible_formats) {
     if (format.format == vk::Format::eB8G8R8A8Unorm) // Preferred format
@@ -33,14 +32,14 @@ mr::WindowContext::WindowContext(Window *parent, const VulkanState &state)
   // Choose surface extent
   vk::SurfaceCapabilitiesKHR surface_capabilities;
   surface_capabilities =
-    state.phys_device().getSurfaceCapabilitiesKHR(_surface.get()).value;
+    _state.phys_device().getSurfaceCapabilitiesKHR(_surface.get()).value;
   if (surface_capabilities.currentExtent.width ==
       std::numeric_limits<uint>::max()) {
     // If the surface size is undefined, the size is set to the size of the images requested.
-    _extent.width = std::clamp(static_cast<uint32_t>(_parent->width()),
+    _extent.width = std::clamp(static_cast<uint32_t>(_parent->extent().width),
                                surface_capabilities.minImageExtent.width,
                                surface_capabilities.maxImageExtent.width);
-    _extent.height = std::clamp(static_cast<uint32_t>(_parent->height()),
+    _extent.height = std::clamp(static_cast<uint32_t>(_parent->extent().height),
                                 surface_capabilities.minImageExtent.height,
                                 surface_capabilities.maxImageExtent.height);
   }
@@ -50,7 +49,7 @@ mr::WindowContext::WindowContext(Window *parent, const VulkanState &state)
 
   // Choose surface present mode
   const auto avaible_present_modes =
-    state.phys_device().getSurfacePresentModesKHR(_surface.get()).value;
+    _state.phys_device().getSurfacePresentModesKHR(_surface.get()).value;
   const auto iter = std::find(avaible_present_modes.begin(),
                               avaible_present_modes.end(),
                               vk::PresentModeKHR::eMailbox);
@@ -103,47 +102,43 @@ mr::WindowContext::WindowContext(Window *parent, const VulkanState &state)
   swapchain_create_info.queueFamilyIndexCount = 1;
   swapchain_create_info.pQueueFamilyIndices = indeces;
 
-  _swapchain =
-    state.device().createSwapchainKHRUnique(swapchain_create_info).value;
+  _swapchain = _state.device().createSwapchainKHRUnique(swapchain_create_info).value;
 
-  create_depthbuffer(_state);
-  create_render_pass(_state);
-  create_framebuffers(_state);
+  _create_depthbuffer();
+  _create_render_pass();
+  _create_framebuffers();
 
   _image_available_semaphore = _state.device().createSemaphoreUnique({}).value;
   _render_finished_semaphore = _state.device().createSemaphoreUnique({}).value;
-  _image_fence = _state.device()
-                   .createFenceUnique({.flags = vk::FenceCreateFlagBits::eSignaled})
-                   .value;
+  _image_fence = _state.device().createFenceUnique({.flags = vk::FenceCreateFlagBits::eSignaled}).value;
 }
 
-mr::WindowContext::~WindowContext() {
+mr::RenderContext::~RenderContext() {
   _state.queue().waitIdle();
 }
 
-void mr::WindowContext::create_depthbuffer(const VulkanState &state)
+void mr::RenderContext::_create_depthbuffer()
 {
   auto format = Image::find_supported_format(
-    state,
-    {vk::Format::eD32Sfloat,
-     vk::Format::eD32SfloatS8Uint,
-     vk::Format::eD24UnormS8Uint},
+    _state,
+    {vk::Format::eD32Sfloat, vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint},
     vk::ImageTiling::eOptimal,
-    vk::FormatFeatureFlagBits::eDepthStencilAttachment);
-  _depthbuffer = Image(state,
+    vk::FormatFeatureFlagBits::eDepthStencilAttachment
+  );
+  _depthbuffer = Image(_state,
                        _extent.width,
                        _extent.height,
                        format,
                        vk::ImageUsageFlagBits::eDepthStencilAttachment,
                        vk::ImageAspectFlagBits::eDepth);
-  _depthbuffer.switch_layout(state,
+  _depthbuffer.switch_layout(_state,
                              vk::ImageLayout::eDepthStencilAttachmentOptimal);
 }
 
-void mr::WindowContext::create_render_pass(const VulkanState &state)
+void mr::RenderContext::_create_render_pass()
 {
   for (unsigned i = 0; i < gbuffers_number; i++) {
-    _gbuffers[i] = Image(state,
+    _gbuffers[i] = Image(_state,
                          _extent.width,
                          _extent.height,
                          vk::Format::eR32G32B32A32Sfloat,
@@ -234,15 +229,15 @@ void mr::WindowContext::create_render_pass(const VulkanState &state)
     _state.device().createRenderPassUnique(render_pass_create_info).value;
 }
 
-void mr::WindowContext::create_framebuffers(const VulkanState &state)
+void mr::RenderContext::_create_framebuffers()
 {
   // *** Swamp Chain Images™ ***
   auto swampchain_images =
-    state.device().getSwapchainImagesKHR(_swapchain.get()).value;
+    _state.device().getSwapchainImagesKHR(_swapchain.get()).value;
 
   for (uint i = 0; i < Framebuffer::max_presentable_images; i++) {
-    Image image{state, _extent.width, _extent.height, _swapchain_format, swampchain_images[i], true};
-    _framebuffers[i] = Framebuffer(state,
+    Image image{_state, _extent.width, _extent.height, _swapchain_format, swampchain_images[i], true};
+    _framebuffers[i] = Framebuffer(_state,
                                    _render_pass.get(),
                                    _extent.width,
                                    _extent.height,
@@ -252,7 +247,7 @@ void mr::WindowContext::create_framebuffers(const VulkanState &state)
   }
 }
 
-void mr::WindowContext::render()
+void mr::RenderContext::render()
 {
   static Shader _shader = Shader(_state, "default");
   const std::vector<vk::VertexInputAttributeDescription> descrs {
@@ -281,7 +276,7 @@ void mr::WindowContext::render()
      }
   };
   static GraphicsPipeline pipeline = GraphicsPipeline(
-    _state, _render_pass.get(), GraphicsPipeline::Subpass::opaque_geometry, &_shader, descrs, {bindings});
+    _state, _render_pass.get(), 0, &_shader, descrs, {bindings});
 
   const float matr[16] {
     -1.41421354,
@@ -366,7 +361,7 @@ void mr::WindowContext::render()
   }
   static GraphicsPipeline light_pipeline = GraphicsPipeline(_state,
                                                             _render_pass.get(),
-                                                            GraphicsPipeline::Subpass::opaque_lighting,
+                                                            1,
                                                             &light_shader,
                                                             {light_descr},
                                                             {light_bindings});

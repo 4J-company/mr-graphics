@@ -38,8 +38,7 @@ namespace mr {
                   BoundboxType bbox) const;
 
       // window creator
-      [[nodiscard]] std::unique_ptr<Window> create_window(size_t width,
-                                                          size_t height) const;
+      [[nodiscard]] std::unique_ptr<Window> create_window(Extent extent);
   };
 } // namespace mr
 

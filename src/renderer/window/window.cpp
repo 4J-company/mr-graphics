@@ -1,12 +1,7 @@
 #include "window.hpp"
 
-// size-based constructor
-// arguments:
-//   - size:
-//       size_t width, height
-mr::Window::Window(const VulkanState &state, size_t width, size_t height)
-    : _width(width)
-    , _height(height)
+mr::Window::Window(VulkanGlobalState *state, Extent extent)
+  : _extent(extent)
 {
   // TODO: retry a couple of times
   vkfw::WindowHints hints{};
@@ -16,13 +11,14 @@ mr::Window::Window(const VulkanState &state, size_t width, size_t height)
   // hints.transparentFramebuffer = true;
 
   auto [result_code, window] =
-    vkfw::createWindowUnique(640, 480, "CGSGFOREVER", hints);
+    vkfw::createWindowUnique(_extent.width, _extent.height, "CGSGFOREVER", hints);
   if (result_code != vkfw::Result::eSuccess) {
-    exit(1);
+    std::exit(1);
   }
 
   _window = std::move(window);
-  _window->callbacks()->on_key = [](const vkfw::Window &win, vkfw::Key key, int scan_code, vkfw::KeyAction action, vkfw::ModifierKeyFlags flags)
+  _window->callbacks()->on_key =
+    [](const vkfw::Window &win, vkfw::Key key, int scan_code, vkfw::KeyAction action, vkfw::ModifierKeyFlags flags)
     {
       if (key == vkfw::Key::eEscape)
         win.setShouldClose(true);
@@ -35,7 +31,7 @@ mr::Window::Window(const VulkanState &state, size_t width, size_t height)
       }
     };
 
-  _context = mr::WindowContext(this, state);
+  _context = RenderContext(state, this);
 }
 
 void mr::Window::start_main_loop() {
