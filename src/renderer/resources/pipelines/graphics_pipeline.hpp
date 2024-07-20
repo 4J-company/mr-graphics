@@ -31,9 +31,9 @@ namespace mr {
         std::span<const vk::VertexInputAttributeDescription> attributes,
         std::span<const vk::DescriptorSetLayout> descriptor_layouts);
 
-      void recompile();
-
       void apply(vk::CommandBuffer cmd_buffer) const override;
+
+      void reload(const VulkanState &state);
   };
 } // namespace mr
 #endif // __graphics_pipeline_hpp_

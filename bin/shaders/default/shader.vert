@@ -13,7 +13,8 @@ layout(set = 0, binding = 1) uniform PrimitiveUbo
 
 void main() 
 {
-  vec3 pos = position;
+  vec3 pos = position * 15;
+  pos.y = position.y;
   gl_Position = ubo.vp * vec4(pos, 1.0);
   tex_coord_out = tex_coord;
 }

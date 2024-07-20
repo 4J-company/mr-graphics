@@ -27,6 +27,8 @@ namespace mr {
       const vk::PipelineLayout layout() const { return _layout.get(); }
 
       virtual void apply(vk::CommandBuffer cmd_buffer) const;
+
+      Shader * shader() const { return _shader; }
   };
 } // namespace mr
 

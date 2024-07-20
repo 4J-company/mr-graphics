@@ -16,9 +16,14 @@ namespace mr {
       static inline const size_t max_shader_modules = 6;
 
       std::filesystem::path _path;
+      std::string _name;
       std::array<vk::UniqueShaderModule, max_shader_modules> _modules;
       std::array<vk::PipelineShaderStageCreateInfo, max_shader_modules> _stages;
       std::atomic<uint> _num_of_loaded_shaders;
+
+      std::array<std::atomic<bool>, max_shader_modules> _stage_reloaded {};
+      std::atomic<bool> _recompiled = false;
+      std::atomic<bool> _reloaded = false;
 
     public:
       using Resource = std::variant<UniformBuffer *, StorageBuffer *, Texture *, Image *>;
@@ -65,9 +70,6 @@ namespace mr {
         return *this;
       }
 
-      // reload shader
-      void reload();
-
     private:
       // compile sources
       void compile(Stage stage) const noexcept;
@@ -77,6 +79,12 @@ namespace mr {
 
       bool _validate_stage(Stage stage, bool present)  const noexcept;
 
+      void recompile(const VulkanState &state);
+      void reload(const VulkanState &state);
+
+      bool check_stage_exist(int stage);
+      bool check_need_recompile(int stage);
+
     public:
       const std::array<vk::PipelineShaderStageCreateInfo, max_shader_modules> &
       get_stages() const { return _stages; }
@@ -85,6 +93,19 @@ namespace mr {
       get_stages() { return _stages; }
 
       uint stage_number() const noexcept { return _num_of_loaded_shaders; }
+
+      std::string_view name() { return _name; }
+      bool reloaded() { return _reloaded.load(); }
+      bool claer_reloaded() { return _reloaded = false; }
+
+
+      static void hot_recompile_shaders(const VulkanState &state,
+                                        std::map<std::string, Shader> &shaders,
+                                        std::mutex &mutex) noexcept;
+      static void hot_reload_shaders(const VulkanState &state,
+                                     std::map<std::string, Shader> &shaders,
+                                     std::mutex &mutex) noexcept;
+
   };
 
   constexpr vk::ShaderStageFlagBits get_stage_flags(std::integral auto stage) noexcept

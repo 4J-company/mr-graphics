@@ -4,45 +4,27 @@
 
 mr::Shader::Shader(const VulkanState &state, std::string_view filename)
     : _path(std::string("bin/shaders/") + filename.data())
+    , _name(filename)
 {
-  std::array<int, max_shader_modules> shd_types;
-  std::iota(shd_types.begin(), shd_types.end(), 0);
+  std::fill(_stage_reloaded.begin(), _stage_reloaded.end(), true);
+  _recompiled = true;
 
-  std::for_each(
-    std::execution::par, shd_types.begin(), shd_types.end(), [&](int shd_ind) {
-      auto stage = static_cast<Stage>(shd_ind);
-      std::optional<std::vector<char>> source = load(stage);
-      assert(_validate_stage(stage, source.has_value()));
-      if (!source) {
-        // TODO: check if this stage is optional
-        return;
-      }
-
-      int ind = _num_of_loaded_shaders++;
-
-      vk::ShaderModuleCreateInfo create_info {
-        .codeSize = source->size(),
-        .pCode = reinterpret_cast<const uint *>(source->data())};
-
-      auto [result, module] =
-        state.device().createShaderModuleUnique(create_info);
-      assert(result == vk::Result::eSuccess);
-      _modules[ind] = std::move(module);
-
-      _stages[ind] = vk::PipelineShaderStageCreateInfo {
-        .stage = get_stage_flags(stage),
-        .module = _modules[ind].get(),
-        .pName = "main",
-      };
-    });
+  recompile(state);
+  reload(state);
 }
 
 void mr::Shader::compile(Shader::Stage stage) const noexcept
 {
-  std::string stage_type = get_stage_name(stage);
-  std::system(("glslc --target-env=vulkan1.2 *." + stage_type + " -o " +
-               stage_type + ".spv")
-                .c_str());
+  std::string stage_name = get_stage_name(stage);
+  auto shader =
+    (_path / (std::string("shader.") + stage_name)).string();
+  auto shader_out =
+    (_path / (std::string(stage_name) + ".spv")).string();
+
+  std::string command = std::string("glslc ") + shader +
+    " -o " + shader_out;
+  std::cout << "COMMAND: " << command << '\n';
+  std::system(command.c_str());
 }
 
 std::optional<std::vector<char>> mr::Shader::load(Shader::Stage stage) noexcept
@@ -91,4 +73,124 @@ bool mr::Shader::_validate_stage(Stage stage, bool present) const noexcept
   return true;
 }
 
-void mr::Shader::reload() {}
+void mr::Shader::reload(const VulkanState &state)
+{
+  if (not _recompiled) {
+    return;
+  }
+  _recompiled = false;
+
+  std::array<int, max_shader_modules> shd_types;
+  std::iota(shd_types.begin(), shd_types.end(), 0);
+
+  _num_of_loaded_shaders = 0;
+
+  _reloaded = true;
+
+  std::for_each(
+    std::execution::seq, shd_types.begin(), shd_types.end(), [&](int shd_ind)
+    {
+      if (not check_stage_exist(shd_ind)) {
+        return;
+      }
+      int ind = _num_of_loaded_shaders++;
+
+      if (not _stage_reloaded[shd_ind]) {
+        return;
+      }
+      _stage_reloaded[shd_ind] = false;
+
+      auto stage = static_cast<Stage>(shd_ind);
+      std::optional<std::vector<char>> source = load(stage);
+      assert(source);
+      assert(_validate_stage(stage, source.has_value()));
+
+      vk::ShaderModuleCreateInfo create_info {
+        .codeSize = source->size(),
+        .pCode = reinterpret_cast<const uint *>(source->data())
+      };
+
+      auto [result, module] =
+        state.device().createShaderModuleUnique(create_info);
+      assert(result == vk::Result::eSuccess);
+      _modules[ind] = std::move(module);
+
+      _stages[ind] = vk::PipelineShaderStageCreateInfo {
+        .stage = get_stage_flags(stage),
+        .module = _modules[ind].get(),
+        .pName = "main",
+      };
+    });
+}
+
+void mr::Shader::recompile(const VulkanState &state)
+{
+  std::array<int, max_shader_modules> shd_types;
+  std::iota(shd_types.begin(), shd_types.end(), 0);
+
+  std::for_each(
+    std::execution::seq, shd_types.begin(), shd_types.end(), [&](int shd_ind)
+    {
+      if (not check_stage_exist(shd_ind)) {
+        return;
+      }
+
+      auto stage = static_cast<Stage>(shd_ind);
+      if (check_need_recompile(shd_ind)) {
+        std::cout << "RECOMPILING\n";
+        compile(stage);
+        _stage_reloaded[shd_ind] = true;
+        _recompiled = true;
+      }
+    });
+}
+
+void mr::Shader::hot_recompile_shaders(const VulkanState &state,
+                                    std::map<std::string, Shader> &shaders,
+                                    std::mutex &mutex) noexcept
+{
+  std::lock_guard guard(mutex);
+  for (auto&& [_, shd] : shaders) {
+    shd.recompile(state);
+  }
+}
+
+void mr::Shader::hot_reload_shaders(const VulkanState &state,
+                                    std::map<std::string, Shader> &shaders,
+                                    std::mutex &mutex) noexcept
+{
+  std::lock_guard guard(mutex);
+  for (auto&& [_, shd] : shaders) {
+    shd.reload(state);
+  }
+}
+
+
+bool mr::Shader::check_stage_exist(int stage) {
+  std::filesystem::path stage_src_path =
+    _path / (std::string("shader.") + get_stage_name(stage));
+  return std::filesystem::exists(stage_src_path);
+}
+
+bool mr::Shader::check_need_recompile(int stage) {
+  std::filesystem::path stage_spv_path =
+    _path / (std::string(get_stage_name(stage)) + ".spv");
+
+  std::error_code ec;
+  if (!std::filesystem::exists(stage_spv_path, ec)) {
+    return true;
+  }
+  assert(not ec);
+
+  std::filesystem::path stage_src_path =
+    _path / (std::string("shader.") + get_stage_name(stage));
+
+  auto src_time = std::filesystem::last_write_time(stage_src_path, ec);
+  auto spv_time = std::filesystem::last_write_time(stage_spv_path, ec);
+
+  auto time1 = std::format("File write time {} is {}\n", stage_src_path.string(), src_time);
+  auto time2 = std::format("File write time {} is {}\n", stage_spv_path.string(), spv_time);
+
+  return spv_time < src_time;
+}
+

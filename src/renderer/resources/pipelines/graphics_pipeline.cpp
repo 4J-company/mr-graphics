@@ -147,5 +147,3 @@ void mr::GraphicsPipeline::apply(vk::CommandBuffer cmd_buffer) const
 {
   cmd_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics, _pipeline.get());
 }
-
-void mr::GraphicsPipeline::recompile() {}

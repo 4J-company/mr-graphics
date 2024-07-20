@@ -20,6 +20,10 @@ namespace mr {
       vk::Extent2D _extent;
       vk::UniqueSwapchainKHR _swapchain;
 
+      std::map<std::string, Shader> _shaders;
+      std::array<GraphicsPipeline, 10> _pipelines;
+      size_t _pipelines_size = 0;
+
       std::array<Framebuffer, Framebuffer::max_presentable_images> _framebuffers;
       std::array<Image, gbuffers_number> _gbuffers;
       Image _depthbuffer;
@@ -30,7 +34,7 @@ namespace mr {
       vk::UniqueSemaphore _render_finished_semaphore;
       vk::UniqueFence _image_fence;
 
-    public:
+public:
       WindowContext() = default;
       WindowContext(Window *parent, const VulkanState &state);
       WindowContext(WindowContext &&other) noexcept = default;
@@ -43,6 +47,14 @@ namespace mr {
       void create_render_pass(const VulkanState &state);
       void resize(size_t width, size_t height);
       void render();
+
+
+      [[nodiscard]] Shader * create_shader(std::string_view filename);
+      [[nodiscard]] GraphicsPipeline * create_graphics_pipeline(
+        vk::RenderPass render_pass, GraphicsPipeline::Subpass subpass,
+        Shader *shader,
+        std::span<const vk::VertexInputAttributeDescription> attributes,
+        std::span<const vk::DescriptorSetLayout> descriptor_layouts);
   };
 } // namespace mr
 #endif // __window_context_hpp_

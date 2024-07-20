@@ -255,7 +255,8 @@ void mr::WindowContext::create_framebuffers(const VulkanState &state)
 
 void mr::WindowContext::render()
 {
-  static Shader _shader = Shader(_state, "default");
+  static auto shd_ptr = create_shader("default");
+  Shader &shader = *shd_ptr;
   static std::vector<vk::VertexInputAttributeDescription> descrs {
     {.location = 0,
      .binding = 0,
@@ -316,8 +317,9 @@ void mr::WindowContext::render()
   };
   static auto sets = descriptor_alloc.allocate_sets(attachments).value();
   static const std::array layouts {sets[0].layout(), sets[1].layout() };
-  static GraphicsPipeline pipeline = GraphicsPipeline(
-    _state, _render_pass.get(), GraphicsPipeline::Subpass::OpaqueGeometry, &_shader, descrs, std::span{layouts});
+  static auto _pipeline_ptr = create_graphics_pipeline(
+    _render_pass.get(), GraphicsPipeline::Subpass::OpaqueGeometry, &shader, descrs, std::span{layouts});
+  static GraphicsPipeline &pipeline = *_pipeline_ptr;
 
   static CommandUnit command_unit {_state};
 
@@ -362,7 +364,8 @@ void mr::WindowContext::render()
                                                    .format =
                                                      vk::Format::eR32G32Sfloat,
                                                    .offset = 0};
-  static Shader light_shader = Shader(_state, "light");
+  static auto light_shader_ptr = create_shader("light");
+  static Shader &light_shader = *light_shader_ptr;
   std::vector<Shader::ResourceView> light_attach;
   light_attach.reserve(gbuffers_number);
   for (unsigned i = 0; i < gbuffers_number; i++) {
@@ -371,12 +374,13 @@ void mr::WindowContext::render()
   static DescriptorSet light_set =
     descriptor_alloc.allocate_set(Shader::Stage::Fragment, light_attach).value_or(DescriptorSet());
   static vk::DescriptorSetLayout light_layout = light_set.layout();
-  static GraphicsPipeline light_pipeline = GraphicsPipeline(_state,
-                                                            _render_pass.get(),
-                                                            GraphicsPipeline::Subpass::OpaqueLighting,
-                                                            &light_shader,
-                                                            {&light_descr, 1},
-                                                            {&light_layout, 1});
+  static GraphicsPipeline *light_pipeline_ptr = create_graphics_pipeline(
+     _render_pass.get(),
+     GraphicsPipeline::Subpass::OpaqueLighting,
+     &light_shader,
+     {&light_descr, 1},
+     {&light_layout, 1});
+  static GraphicsPipeline &light_pipeline = *light_pipeline_ptr;
 
   _state.device().waitForFences(_image_fence.get(), VK_TRUE, UINT64_MAX);
   _state.device().resetFences(_image_fence.get());
@@ -460,4 +464,47 @@ void mr::WindowContext::render()
     .pResults = nullptr, // Optional
   };
   _state.queue().presentKHR(present_info);
+
+  std::mutex mutex;
+  Shader::hot_recompile_shaders(_state, _shaders, mutex);
+  Shader::hot_reload_shaders(_state, _shaders, mutex);
+
+  if (shader.reloaded()) {
+    shader.claer_reloaded();
+    std::cout << "reloading pipeline\n";
+    *_pipeline_ptr = GraphicsPipeline(
+      _state, _render_pass.get(), GraphicsPipeline::Subpass::OpaqueGeometry, &shader, descrs, std::span{layouts});
+  }
+  if (light_shader.reloaded()) {
+    light_shader.claer_reloaded();
+    std::cout << "reloading light pipeline\n";
+    *light_pipeline_ptr = GraphicsPipeline(
+       _state,
+       _render_pass.get(),
+       GraphicsPipeline::Subpass::OpaqueLighting,
+       &light_shader,
+       {&light_descr, 1},
+       {&light_layout, 1});
+  }
+}
+
+mr::Shader *
+mr::WindowContext::create_shader(std::string_view filename)
+{
+  _shaders[filename.data()] = Shader(_state, filename);
+  return &_shaders[filename.data()];
+}
+
+mr::GraphicsPipeline *
+mr::WindowContext::create_graphics_pipeline(
+  vk::RenderPass render_pass, GraphicsPipeline::Subpass subpass,
+  Shader *shader,
+  std::span<const vk::VertexInputAttributeDescription> attributes,
+  std::span<const vk::DescriptorSetLayout> descriptor_layouts)
+{
+  _pipelines[_pipelines_size++] = GraphicsPipeline(_state,
+    render_pass, subpass, shader,
+    attributes, descriptor_layouts);
+  
+  return &_pipelines[_pipelines_size - 1];
 }
