@@ -2,6 +2,7 @@
 #define __model_hpp_
 
 #include "renderer/mesh/mesh.hpp"
+#include "renderer/material/material.hpp"
 
 namespace mr {
   class VulkanState;
@@ -9,7 +10,8 @@ namespace mr {
   class Model {
     private:
       std::vector<mr::Mesh> _meshes;
-      std::vector<mr::Texture> _textures;
+      std::vector<mr::Material> _materials;
+
       std::string _name;
 
     public:
