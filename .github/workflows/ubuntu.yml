@@ -56,14 +56,26 @@ jobs:
         sudo apt-get update
         sudo apt-get install mold
 
-    - name: Configure CMake
+    - name: Configure CMake (GCC)
+      if: ${{ matrix.cpp_compiler == 'g++' }}
       run: >
         cmake -B ${{ steps.strings.outputs.build-output-dir }}
         -DCPM_SOURCE_CACHE=~/cpm-cache
-        -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
-        -DCMAKE_C_COMPILER=${{ matrix.cpp_compiler }}
+        -DCMAKE_CXX_COMPILER=g++
+        -DCMAKE_C_COMPILER=gcc
         -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
         -S ${{ github.workspace }}
+
+    - name: Configure CMake (Clang)
+      if: ${{ matrix.cpp_compiler == 'clang++' }}
+      run: >
+        cmake -B ${{ steps.strings.outputs.build-output-dir }}
+        -DCPM_SOURCE_CACHE=~/cpm-cache
+        -DCMAKE_CXX_COMPILER=clang++
+        -DCMAKE_C_COMPILER=clang
+        -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+        -S ${{ github.workspace }}
+
 
     - name: Build
       run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}

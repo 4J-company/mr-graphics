@@ -48,7 +48,7 @@ jobs:
         cmake -B ${{ steps.strings.outputs.build-output-dir }}
         -DCPM_SOURCE_CACHE=~/cpm-cache
         -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
-        -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
+        -DCMAKE_C_COMPILER=${{ matrix.cpp_compiler }}
         -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
         -S ${{ github.workspace }}
 
