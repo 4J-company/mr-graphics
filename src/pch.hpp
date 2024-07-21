@@ -49,7 +49,7 @@
 #undef max
 #undef min
 
-namespace std { namespace fs = ::std::filesystem; }
+namespace std { namespace fs = filesystem; }
 
 namespace mr {
   using uint = unsigned int;

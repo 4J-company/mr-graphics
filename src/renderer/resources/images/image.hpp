@@ -13,11 +13,11 @@ namespace mr {
       vk::UniqueDeviceMemory _memory;
 
       vk::Extent3D _extent;
-      size_t _size;
+      size_t _size{};
       vk::Format _format;
-      int _num_of_channels;
-      uint _mip_level;
-      bool _holds_swapchain_image;
+      int _num_of_channels{};
+      uint _mip_level{};
+      bool _holds_swapchain_image{};
 
       vk::ImageLayout _layout;
       vk::ImageUsageFlags _usage_flags;
@@ -26,10 +26,10 @@ namespace mr {
     public:
       Image() = default;
 
-      Image(const VulkanState &state, uint width, uint height,
+      Image(const VulkanState &state, Extent extent,
             vk::Format format, vk::Image image, bool swapchain_image);
 
-      Image(const VulkanState &state, uint width, uint height,
+      Image(const VulkanState &state, Extent extent,
             vk::Format format, vk::ImageUsageFlags usage_flags,
             vk::ImageAspectFlags aspect_flags, uint mip_level = 1);
 
@@ -88,11 +88,10 @@ namespace mr {
       void craete_image_view(const VulkanState &state);
 
     public:
-      const vk::ImageView image_view() const { return _image_view.get(); }
-
-      const vk::Image image() const { return _image.get(); }
-
-      const vk::Format format() const { return _format; }
+      vk::ImageView image_view() const noexcept { return _image_view.get(); }
+      vk::Image image() const noexcept { return _image.get(); }
+      vk::Format format() const noexcept { return _format; }
+      size_t size() const noexcept { return _size; }
 
     public:
       static vk::Format find_supported_format(

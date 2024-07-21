@@ -25,16 +25,17 @@ namespace mr {
       void render();
 
     private:
+      void _create_swapchain();
       void _create_framebuffers();
       void _create_depthbuffer();
       void _create_render_pass();
 
       Window *_parent;
       VulkanState _state;
+      Extent _extent;
 
       vk::UniqueSurfaceKHR _surface;
-      vk::Format _swapchain_format;
-      vk::Extent2D _extent;
+      vk::Format _swapchain_format{vk::Format::eB8G8R8A8Unorm};
       vk::UniqueSwapchainKHR _swapchain;
 
       std::array<Framebuffer, Framebuffer::max_presentable_images> _framebuffers;

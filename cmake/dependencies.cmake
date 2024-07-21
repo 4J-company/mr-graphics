@@ -28,13 +28,19 @@ CPMFindPackage(
 )
 
 CPMFindPackage(
+  NAME vk-bootstrap
+  GITHUB_REPOSITORY charles-lunarg/vk-bootstrap
+  GIT_TAG v1.3.290
+)
+
+CPMFindPackage(
   NAME assimp
   GITHUB_REPOSITORY assimp/assimp
   GIT_TAG master
   OPTIONS
-    ASSIMP_WARNINGS_AS_ERRORS OFF
-    ASSIMP_BUILD_TESTS OFF
-    ASSIMP_NO_EXPORT ON
+    "ASSIMP_WARNINGS_AS_ERRORS OFF"
+    "ASSIMP_BUILD_TESTS OFF"
+    "ASSIMP_NO_EXPORT ON"
 )
 
 # download a single file from stb
@@ -52,12 +58,14 @@ set(DEPS_LIBRARIES
   Vulkan::Vulkan
   assimp::assimp
   glfw
+  vk-bootstrap::vk-bootstrap
 )
 
 set(DEPS_INCLUDE_DIRS
   ${assimp_INCLUDE_DIRS}
   ${CMAKE_CURRENT_BINARY_DIR}/_deps/stb-src
   ${vkfw_SOURCE_DIR}/include
+  ${vk-bootstrap_SOURCE_DIR}/src
 )
 
 set(DEPS_DEFINITIONS

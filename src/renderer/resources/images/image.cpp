@@ -22,30 +22,29 @@ vk::Format mr::Image::find_supported_format(
   return {};
 }
 
-mr::Image::Image(const VulkanState &state, uint width, uint height,
+mr::Image::Image(const VulkanState &state, Extent extent,
                  vk::Format format, vk::Image image, bool swapchain_image)
-  : _image(image)
-  , _extent({width, height})
-  , _format(format)
-  , _layout(vk::ImageLayout::eUndefined)
-  , _holds_swapchain_image(swapchain_image)
+  : _image{image}
+  , _extent{extent.width, extent.height, 1}
+  , _format{format}
+  , _layout{vk::ImageLayout::eUndefined}
+  , _holds_swapchain_image{swapchain_image}
 {
   _mip_level = 1;
   _aspect_flags = vk::ImageAspectFlagBits::eColor;
   craete_image_view(state);
 }
 
-mr::Image::Image(const VulkanState &state, uint width, uint height,
+mr::Image::Image(const VulkanState &state, Extent extent,
                  vk::Format format, vk::ImageUsageFlags usage_flags,
                  vk::ImageAspectFlags aspect_flags, uint mip_level)
-    : _mip_level(mip_level)
-    , _extent({width, height, 1})
-    , _format(format)
-    , _size(width * height * 4)
-    , _layout(vk::ImageLayout::eUndefined)
-    , _usage_flags(usage_flags)
-    , _aspect_flags(aspect_flags)
-    , _holds_swapchain_image(false)
+  : _mip_level{mip_level}
+  , _extent{extent.width, extent.height, 1}
+  , _format{format}
+  , _size{extent.width * extent.height * 4}
+  , _layout{vk::ImageLayout::eUndefined}
+  , _usage_flags{usage_flags}
+  , _aspect_flags{aspect_flags}
 {
   vk::ImageCreateInfo image_create_info {
     .imageType = vk::ImageType::e2D,

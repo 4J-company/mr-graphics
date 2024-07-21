@@ -1,14 +1,44 @@
 #pragma once
 
+#include "pch.hpp"
+
 namespace mr {
   template <typename... Ts>
     struct Overloads : Ts... {
       using Ts::operator()...;
   };
 
+  template <typename T>
+    concept ExtentLike = requires(T t) { t.width; t.height; };
+
   struct Extent {
-    size_t width {};
-    size_t height {};
+    using ValueT = uint;
+
+    ValueT width {};
+    ValueT height {};
+
+    Extent() = default;
+
+    constexpr Extent(ValueT width_, ValueT height_) noexcept
+      : width{height_}, height{height_} {}
+
+    // converting to/from other extents
+    template <ExtentLike Other>
+      constexpr Extent(const Other &extent) noexcept
+        : width{extent.width}, height{extent.height} {}
+
+    template <ExtentLike Other>
+      constexpr Extent & operator =(const Other &extent) noexcept
+      {
+        width = extent.width, height = extent.height;
+        return *this;
+      }
+
+    template <ExtentLike Other>
+      constexpr operator Other() const noexcept
+      {
+        return { .width = width, .height = height };
+      }
   };
 
   class CacheFile {

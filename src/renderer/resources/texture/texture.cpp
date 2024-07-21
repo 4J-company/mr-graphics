@@ -10,15 +10,14 @@ mr::Texture::Texture(const VulkanState &state, std::string_view filename)
   assert(data);
 
   _image = Image(state,
-                 w,
-                 h,
+                 {static_cast<uint>(w), static_cast<uint>(h)},
                  vk::Format::eR8G8B8A8Srgb,
                  vk::ImageUsageFlagBits::eTransferDst |
                    vk::ImageUsageFlagBits::eSampled,
                  vk::ImageAspectFlagBits::eColor);
   _image.switch_layout(state, vk::ImageLayout::eTransferDstOptimal);
   _image.write<const byte>(state,
-                           std::span {data, static_cast<size_t>(w) * h * ch});
+                           std::span{data, _image.size()});
   _image.switch_layout(state, vk::ImageLayout::eShaderReadOnlyOptimal);
 
   _sampler =
