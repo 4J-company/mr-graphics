@@ -1,9 +1,11 @@
 name: Ubuntu CI
+
 on:
   push:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+
 jobs:
   build:
     runs-on: ${{ matrix.os }}
@@ -13,7 +15,7 @@ jobs:
       matrix:
         os: [ubuntu-24.04]
         build_type: [Release, Debug]
-        c_compiler: [gcc, clang]
+        cpp_compiler: [g++, clang++]
 
     steps:
     - uses: actions/checkout@v3
