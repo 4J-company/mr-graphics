@@ -89,7 +89,7 @@ namespace mr {
 
   constexpr vk::ShaderStageFlagBits get_stage_flags(std::integral auto stage) noexcept
   {
-    static constexpr std::array stage_bits {
+    constexpr std::array stage_bits {
       vk::ShaderStageFlagBits::eCompute,
       vk::ShaderStageFlagBits::eVertex,
       vk::ShaderStageFlagBits::eTessellationControl,
@@ -109,7 +109,7 @@ namespace mr {
 
   constexpr const char * get_stage_name(std::integral auto stage) noexcept
   {
-    static constexpr std::array shader_type_names {
+    constexpr std::array shader_type_names {
       "comp",
       "vert",
       "tesc",

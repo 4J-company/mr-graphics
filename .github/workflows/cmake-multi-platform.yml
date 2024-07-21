@@ -79,6 +79,13 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-cpm-a
 
+    - name: Set up Clang
+      uses: egor-tensin/setup-clang@v1
+      with:
+        version: latest
+
+    - uses: johelegp/gcc-snapshot@v1 # This action.
+
     # Download VulkanAPI
     - name: Setup Vulkan
       uses: humbletim/setup-vulkan-sdk@v1.2.0
