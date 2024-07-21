@@ -37,10 +37,10 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-cpm-a
 
-    - name: Setup Vulkan and Mold
+    - name: Setup Vulkan, GCC and Mold
       uses: tecolicom/actions-use-homebrew-tools@v1
       with:
-        tools: mold vulkan-tools spirv-headers spirv-tools spirv-cross vulkan-extensionlayer
+        tools: gcc mold vulkan-tools spirv-headers spirv-tools spirv-cross vulkan-extensionlayer
 
     # Download SPIRV-Reflect
     - name: Install SPIRV-Reflect
@@ -55,8 +55,8 @@ jobs:
       run: >
         cmake -B ${{ steps.strings.outputs.build-output-dir }}
         -DCPM_SOURCE_CACHE=~/cpm-cache
-        -DCMAKE_CXX_COMPILER=clang++
-        -DCMAKE_C_COMPILER=clang
+        -DCMAKE_CXX_COMPILER=g++
+        -DCMAKE_C_COMPILER=gcc
         -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
         -S ${{ github.workspace }}
 
