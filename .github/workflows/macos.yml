@@ -37,10 +37,10 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-cpm-a
 
-    - name: Setup Vulkan, GCC and Mold
+    - name: Setup Vulkan, GCC, Mold and GLFW
       uses: tecolicom/actions-use-homebrew-tools@v1
       with:
-        tools: gcc mold vulkan-tools spirv-headers spirv-tools spirv-cross vulkan-extensionlayer
+        tools: gcc mold glfw vulkan-tools spirv-headers spirv-tools spirv-cross vulkan-extensionlayer
 
     # Download SPIRV-Reflect
     - name: Install SPIRV-Reflect
