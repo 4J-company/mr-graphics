@@ -2,6 +2,8 @@
 #include <filesystem>
 #include <fstream>
 
+#include "spirv_reflect.h"
+
 mr::Shader::Shader(const VulkanState &state, std::string_view filename)
     : _path(std::string("bin/shaders/") + filename.data())
     , _name(filename)

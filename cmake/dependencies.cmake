@@ -44,6 +44,24 @@ file(
   EXPECTED_HASH SHA256=594c2fe35d49488b4382dbfaec8f98366defca819d916ac95becf3e75f4200b3
 )
 
+# download a 3 files from SPIR-V reflection
+file(
+  DOWNLOAD
+  https://raw.githubusercontent.com/KhronosGroup/SPIRV-Reflect/main/spirv_reflect.c
+  ${CMAKE_CURRENT_BINARY_DIR}/_deps/spirv-reflect-src/spirv_reflect.c
+)
+file(
+  DOWNLOAD
+  https://raw.githubusercontent.com/KhronosGroup/SPIRV-Reflect/main/spirv_reflect.h
+  ${CMAKE_CURRENT_BINARY_DIR}/_deps/spirv-reflect-src/spirv_reflect.h
+)
+file(
+  DOWNLOAD
+  https://raw.githubusercontent.com/KhronosGroup/SPIRV-Reflect/main/include/spirv/unified1/spirv.h
+  ${CMAKE_CURRENT_BINARY_DIR}/_deps/spirv-reflect-src/include/spirv/unified1/spirv.h
+)
+
+
 find_package(Vulkan)
 
 # set important variables
@@ -57,6 +75,7 @@ set(DEPS_INCLUDE_DIRS
   ${assimp_INCLUDE_DIRS}
   ${CMAKE_CURRENT_BINARY_DIR}/_deps/stb-src
   ${vkfw_SOURCE_DIR}/include
+  ${CMAKE_CURRENT_BINARY_DIR}/_deps/spirv-reflect-src
 )
 
 set(DEPS_DEFINITIONS
