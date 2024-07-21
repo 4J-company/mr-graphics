@@ -89,7 +89,8 @@ jobs:
 
     # Download GLFW dependencies
     - name: Setup GLFW deps
-      uses: RpxdYTX/install-glfw-deps@v2
+      if: ${{ runner.os == 'Linux' || matrix.os == 'Linux' }}
+      run: sudo apt-get build-dep glfw3
 
     - name: Configure CMake
       run: >
