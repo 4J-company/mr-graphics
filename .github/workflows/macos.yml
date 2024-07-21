@@ -55,8 +55,8 @@ jobs:
       run: >
         cmake -B ${{ steps.strings.outputs.build-output-dir }}
         -DCPM_SOURCE_CACHE=~/cpm-cache
-        -DCMAKE_CXX_COMPILER=$(brew --prefix gcc@14)/bin/g++
-        -DCMAKE_C_COMPILER=$(brew --prefix gcc@14)/bin/gcc
+        -DCMAKE_CXX_COMPILER=$(which gcc-14)
+        -DCMAKE_C_COMPILER=$(which gcc-14)
         -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
         -S ${{ github.workspace }}
 
