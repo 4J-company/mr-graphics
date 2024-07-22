@@ -56,7 +56,7 @@ jobs:
         cmake -B ${{ steps.strings.outputs.build-output-dir }}
         -DCPM_SOURCE_CACHE=~/cpm-cache
         -DCMAKE_CXX_COMPILER=g++-14
-        -DCMAKE_CXX_FLAGS="-ltbb -Wl,-ld_classic"
+        -DCMAKE_CXX_FLAGS="-L/opt/homebrew/lib/libtbb.a -Wl,-ld_classic"
         -DCMAKE_C_COMPILER=gcc-14
         -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
         -S ${{ github.workspace }}
