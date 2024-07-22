@@ -1,4 +1,4 @@
-name: MacOS CI
+name: MacOS x86 CI
 
 on:
   push:
@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        os: [macos-latest]
+        os: [macos-latest-large]
         build_type: [Release, Debug]
 
     steps:
