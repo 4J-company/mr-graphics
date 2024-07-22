@@ -37,10 +37,10 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-cpm-a
 
-    - name: Setup Vulkan, GCC, Mold and GLFW
+    - name: Setup Vulkan, GCC, Mold, TBB and GLFW
       uses: tecolicom/actions-use-homebrew-tools@v1
       with:
-        tools: gcc mold glfw vulkan-tools spirv-headers spirv-tools spirv-cross vulkan-extensionlayer
+        tools: gcc mold tbb glfw vulkan-tools spirv-headers spirv-tools spirv-cross vulkan-extensionlayer
 
     # Download SPIRV-Reflect
     - name: Install SPIRV-Reflect
@@ -60,7 +60,6 @@ jobs:
         -DCMAKE_C_COMPILER=gcc-14
         -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
         -S ${{ github.workspace }}
-
 
     - name: Build
       run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
