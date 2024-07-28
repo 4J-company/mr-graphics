@@ -257,32 +257,6 @@ void mr::WindowContext::render()
 {
   static auto shd_ptr = create_shader("default");
   Shader &shader = *shd_ptr;
-  static std::vector<vk::VertexInputAttributeDescription> descrs {
-    {.location = 0,
-     .binding = 0,
-     .format = vk::Format::eR32G32B32Sfloat,
-     .offset = 0                },
-    {.location = 1,
-     .binding = 0,
-     .format = vk::Format::eR32G32Sfloat,
-     .offset = 3 * sizeof(float)}
-  };
-
-  const std::vector<vk::DescriptorSetLayoutBinding> bindings {
-    {
-     .binding = 0,
-     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-     .descriptorCount = 1,
-     .stageFlags = vk::ShaderStageFlagBits::eFragment,
-     },
-    {
-     .binding = 1,
-     .descriptorType = vk::DescriptorType::eUniformBuffer,
-     .descriptorCount = 1,
-     .stageFlags = vk::ShaderStageFlagBits::eVertex,
-     }
-  };
-
   const float matr[16] {
     -1.41421354,
     0.816496611,
@@ -318,7 +292,7 @@ void mr::WindowContext::render()
   static auto sets = descriptor_alloc.allocate_sets(attachments).value();
   static const std::array layouts {sets[0].layout(), sets[1].layout() };
   static auto _pipeline_ptr = create_graphics_pipeline(
-    _render_pass.get(), GraphicsPipeline::Subpass::OpaqueGeometry, &shader, descrs, std::span{layouts});
+    _render_pass.get(), GraphicsPipeline::Subpass::OpaqueGeometry, &shader, std::span{layouts});
   static GraphicsPipeline &pipeline = *_pipeline_ptr;
 
   static CommandUnit command_unit {_state};
@@ -378,7 +352,6 @@ void mr::WindowContext::render()
      _render_pass.get(),
      GraphicsPipeline::Subpass::OpaqueLighting,
      &light_shader,
-     {&light_descr, 1},
      {&light_layout, 1});
   static GraphicsPipeline &light_pipeline = *light_pipeline_ptr;
 
@@ -473,7 +446,7 @@ void mr::WindowContext::render()
     shader.claer_reloaded();
     std::cout << "reloading pipeline\n";
     *_pipeline_ptr = GraphicsPipeline(
-      _state, _render_pass.get(), GraphicsPipeline::Subpass::OpaqueGeometry, &shader, descrs, std::span{layouts});
+      _state, _render_pass.get(), GraphicsPipeline::Subpass::OpaqueGeometry, &shader, std::span{layouts});
   }
   if (light_shader.reloaded()) {
     light_shader.claer_reloaded();
@@ -483,7 +456,6 @@ void mr::WindowContext::render()
        _render_pass.get(),
        GraphicsPipeline::Subpass::OpaqueLighting,
        &light_shader,
-       {&light_descr, 1},
        {&light_layout, 1});
   }
 }
@@ -499,12 +471,11 @@ mr::GraphicsPipeline *
 mr::WindowContext::create_graphics_pipeline(
   vk::RenderPass render_pass, GraphicsPipeline::Subpass subpass,
   Shader *shader,
-  std::span<const vk::VertexInputAttributeDescription> attributes,
   std::span<const vk::DescriptorSetLayout> descriptor_layouts)
 {
   _pipelines[_pipelines_size++] = GraphicsPipeline(_state,
     render_pass, subpass, shader,
-    attributes, descriptor_layouts);
+    descriptor_layouts);
   
   return &_pipelines[_pipelines_size - 1];
 }

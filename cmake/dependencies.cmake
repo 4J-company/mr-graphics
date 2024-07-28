@@ -61,6 +61,17 @@ file(
   ${CMAKE_CURRENT_BINARY_DIR}/_deps/spirv-reflect-src/include/spirv/unified1/spirv.h
 )
 
+file(
+  DOWNLOAD
+  https://raw.githubusercontent.com/KhronosGroup/Vulkan-LoaderAndValidationLayers/master/layers/vk_format_utils.cpp
+  ${CMAKE_CURRENT_BINARY_DIR}/_deps/vkformat-utils-src/vk_format_utils.cpp
+)
+file(
+  DOWNLOAD
+  https://raw.githubusercontent.com/KhronosGroup/Vulkan-LoaderAndValidationLayers/master/layers/vk_format_utils.h
+  ${CMAKE_CURRENT_BINARY_DIR}/_deps/vkformat-utils-src/vk_format_utils.h
+)
+
 
 find_package(Vulkan)
 
@@ -76,6 +87,7 @@ set(DEPS_INCLUDE_DIRS
   ${CMAKE_CURRENT_BINARY_DIR}/_deps/stb-src
   ${vkfw_SOURCE_DIR}/include
   ${CMAKE_CURRENT_BINARY_DIR}/_deps/spirv-reflect-src
+  ${CMAKE_CURRENT_BINARY_DIR}/_deps/vkformat-utils-src
 )
 
 set(DEPS_DEFINITIONS

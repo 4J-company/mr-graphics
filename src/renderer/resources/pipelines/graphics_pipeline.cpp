@@ -1,9 +1,10 @@
 #include "resources/pipelines/graphics_pipeline.hpp"
 
+#include "vk_format_utils.h"
+
 mr::GraphicsPipeline::GraphicsPipeline(
   const VulkanState &state, vk::RenderPass render_pass, Subpass subpass,
   Shader *shader,
-  std::span<const vk::VertexInputAttributeDescription> attributes,
   std::span<const vk::DescriptorSetLayout> descriptor_layouts)
     : Pipeline(state, shader, descriptor_layouts)
     , _subpass(subpass)
@@ -15,14 +16,11 @@ mr::GraphicsPipeline::GraphicsPipeline(
     .dynamicStateCount = static_cast<uint>(_dynamic_states.size()),
     .pDynamicStates = _dynamic_states.data()};
 
-  uint size = 0;
+  auto &attributes = shader->attributes();
+  uint32_t size = 0;
   for (auto &atr : attributes) {
-    size += atr.format == vk::Format::eR32G32B32A32Sfloat ? 4
-            : atr.format == vk::Format::eR32G32B32Sfloat  ? 3
-            : atr.format == vk::Format::eR32G32Sfloat     ? 2
-                                                          : 1;
+    size += FormatSize(static_cast<VkFormat>(atr.format));
   }
-  size *= 4;
 
   vk::VertexInputBindingDescription binding_description {
     .binding = 0,

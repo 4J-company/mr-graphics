@@ -3,6 +3,7 @@
 #include <fstream>
 
 #include "spirv_reflect.h"
+#include "vk_format_utils.h"
 
 mr::Shader::Shader(const VulkanState &state, std::string_view filename)
     : _path(std::string("bin/shaders/") + filename.data())
@@ -107,6 +108,8 @@ void mr::Shader::reload(const VulkanState &state)
       assert(source);
       assert(_validate_stage(stage, source.has_value()));
 
+      reflect_metadata(source.value(), stage);
+
       vk::ShaderModuleCreateInfo create_info {
         .codeSize = source->size(),
         .pCode = reinterpret_cast<const uint *>(source->data())
@@ -148,8 +151,8 @@ void mr::Shader::recompile(const VulkanState &state)
 }
 
 void mr::Shader::hot_recompile_shaders(const VulkanState &state,
-                                    std::map<std::string, Shader> &shaders,
-                                    std::mutex &mutex) noexcept
+                                       std::map<std::string, Shader> &shaders,
+                                       std::mutex &mutex) noexcept
 {
   std::lock_guard guard(mutex);
   for (auto&& [_, shd] : shaders) {
@@ -196,3 +199,62 @@ bool mr::Shader::check_need_recompile(int stage) {
   return spv_time < src_time;
 }
 
+void mr::Shader::reflect_metadata(std::span<char> spv_data, Stage stage)
+{
+  // Generate reflection data for a shader
+  SpvReflectShaderModule module {};
+  SpvReflectResult result = spvReflectCreateShaderModule(spv_data.size(), spv_data.data(), &module);
+  assert(result == SPV_REFLECT_RESULT_SUCCESS);
+
+  uint32_t count = 0;
+  result = spvReflectEnumerateDescriptorSets(&module, &count, NULL);
+  assert(result == SPV_REFLECT_RESULT_SUCCESS);
+
+  std::vector<SpvReflectDescriptorSet *> sets(count);
+  result = spvReflectEnumerateDescriptorSets(&module, &count, sets.data());
+  assert(result == SPV_REFLECT_RESULT_SUCCESS);
+
+  for (auto *set : sets) {
+    _reflected_sets.resize(std::max(_reflected_sets.size(), (size_t)set->set + 1));
+    auto &refl_set = _reflected_sets[set->set];
+
+    for (int i = 0; i < set->binding_count; i++) {
+      auto *binding = set->bindings[i];
+      refl_set.resize(std::max(refl_set.size(), (size_t)binding->binding + 1));
+      assert(not refl_set[binding->binding].has_value()); // not overriding by other module
+      auto &refl_bind = refl_set[binding->binding].emplace();
+
+      refl_bind.binding = binding->binding;
+      refl_bind.type = static_cast<vk::DescriptorType>(binding->descriptor_type);
+      refl_bind.set = set->set;
+      for (uint32_t i = 0; i < binding->array.dims_count; ++i) {
+        refl_bind.descriptor_count *= binding->array.dims[i];
+      }
+      refl_bind.stages = static_cast<vk::ShaderStageFlagBits>(module.shader_stage);
+    }
+  }
+
+  if (stage == Stage::Vertex) {
+    uint32_t count = 0;
+    result = spvReflectEnumerateInputVariables(&module, &count, NULL);
+    assert(result == SPV_REFLECT_RESULT_SUCCESS);
+
+    std::vector<SpvReflectInterfaceVariable *> input_variables(count);
+    result = spvReflectEnumerateInputVariables(&module, &count, input_variables.data());
+    assert(result == SPV_REFLECT_RESULT_SUCCESS);
+
+    _reflected_attributes.reserve(count);
+    uint32_t offset = 0;
+    for (auto *input_var : input_variables) {
+      _reflected_attributes.push_back({
+        .location = input_var->location,
+        .binding = 0, // TODO: what is this mode?
+        .format = vk::Format(input_var->format),
+        .offset = offset,
+       });
+      offset += FormatSize(static_cast<VkFormat>(input_var->format));
+    }
+  }
+
+  spvReflectDestroyShaderModule(&module);
+}
