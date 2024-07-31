@@ -28,12 +28,9 @@ CPMFindPackage(
 )
 
 CPMFindPackage(
-  NAME assimp
-  URL "https://github.com/assimp/assimp/archive/refs/tags/v5.4.2.zip"
-  OPTIONS
-    "ASSIMP_WARNINGS_AS_ERRORS OFF"
-    "ASSIMP_BUILD_TESTS OFF"
-    "ASSIMP_NO_EXPORT ON"
+  NAME tinygltf
+  GITHUB_REPOSITORY syoyo/tinygltf
+  GIT_TAG release
 )
 
 # download a single file from stb
@@ -49,7 +46,6 @@ find_package(Vulkan)
 # set important variables
 set(DEPS_LIBRARIES
   Vulkan::Vulkan
-  assimp::assimp
   glfw
 )
 
@@ -57,6 +53,7 @@ set(DEPS_INCLUDE_DIRS
   ${assimp_INCLUDE_DIRS}
   ${CMAKE_CURRENT_BINARY_DIR}/_deps/stb-src
   ${vkfw_SOURCE_DIR}/include
+  ${tinygltf_SOURCE_DIR}
 )
 
 set(DEPS_DEFINITIONS

@@ -210,15 +210,3 @@ mr::Application::create_window(size_t width, size_t height) const
 {
   return std::make_unique<Window>(_state, width, height);
 }
-
-[[nodiscard]] mr::Mesh *mr::Application::create_mesh(
-  std::span<PositionType> positions, std::span<FaceType> faces,
-  std::span<ColorType> colors, std::span<TexCoordType> uvs,
-  std::span<NormalType> normals, std::span<NormalType> tangents,
-  std::span<NormalType> bitangent, std::span<BoneType> bones,
-  BoundboxType bbox) const
-{
-  _tmp_mesh_pool.emplace_back(_state,
-    positions, faces, colors, uvs, normals, tangents, bitangent, bones, bbox);
-  return &_tmp_mesh_pool.back();
-}

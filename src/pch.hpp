@@ -41,10 +41,6 @@
 #define VKFW_NO_STRUCT_CONSTRUCTORS
 #include <vkfw/vkfw.hpp>
 
-#include <assimp/Importer.hpp>
-#include <assimp/postprocess.h>
-#include <assimp/scene.h>
-
 // WinAPI macros undefined :(
 #undef max
 #undef min
@@ -52,6 +48,16 @@
 namespace mr {
   using uint = unsigned int;
   using byte = unsigned char;
+
+  using Vec2f = std::array<float, 2>;
+  using Vec3f = std::array<float, 3>;
+  using Vec4f = std::array<float, 4>;
+  using Matr4f = std::array<float, 16>;
+
+  struct Boundbox {
+      mr::Vec3f min;
+      mr::Vec3f max;
+  };
 
   template<typename... Ts> struct Overloads : Ts... { using Ts::operator()...; };
 } // namespace mr

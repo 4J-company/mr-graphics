@@ -256,96 +256,11 @@ void mr::WindowContext::create_framebuffers(const VulkanState &state)
 
 void mr::WindowContext::render()
 {
-  static Shader _shader = Shader(_state, "default");
-
-  struct Vertex {
-    PositionType pos;
-    ColorType color;
-    TexCoordType uv;
-    NormalType normal;
-    NormalType tangent;
-    NormalType bitangent;
-  };
-
-  static std::vector<vk::VertexInputAttributeDescription> descrs {
-    {
-      .location = 0,
-      .binding = 0,
-      .format = vk::Format::eR32G32B32Sfloat,
-      .offset = 0
-    },
-    {
-      .location = 1,
-      .binding = 0,
-      .format = vk::Format::eR32G32B32A32Sfloat,
-      .offset = 3 * sizeof(float)
-    },
-    {
-      .location = 2,
-      .binding = 0,
-      .format = vk::Format::eR32G32B32Sfloat,
-      .offset = 7 * sizeof(float)},
-    {
-      .location = 3,
-      .binding = 0,
-      .format = vk::Format::eR32G32B32Sfloat,
-      .offset = 10 * sizeof(float)
-    },
-    {
-      .location = 4,
-      .binding = 0,
-      .format = vk::Format::eR32G32B32Sfloat,
-      .offset = 13 * sizeof(float)
-    },
-    {
-      .location = 5,
-      .binding = 0,
-      .format = vk::Format::eR32G32B32Sfloat,
-      .offset = 16 * sizeof(float)
-    },
-  };
-
-  const float matr[16] {
-    -1.41421354,
-    0.816496611,
-    -0.578506112,
-    -0.577350259,
-    0.00000000,
-    -1.63299322,
-    -0.578506112,
-    -0.577350259,
-    1.41421354,
-    0.816496611,
-    -0.578506112,
-    -0.577350259,
-    0.00000000,
-    0.00000000,
-    34.5101662,
-    34.6410141,
-  };
-
-  static UniformBuffer uniform_buffer = UniformBuffer(_state, std::span {matr});
-  static Texture texture = Texture(_state, "bin/textures/cat.png");
   static DescriptorAllocator descriptor_alloc = DescriptorAllocator(_state);
-  static const std::vector<Shader::ResourceView> vertex_attachments {
-    {0, 1, &uniform_buffer}, // set, binding, res
-  };
-  static const std::vector<Shader::ResourceView> fragment_attachments {
-    {0, 0, &texture}, // set, binding, res
-  };
-  static const std::array attachments {
-    std::make_pair(Shader::Stage::Vertex, std::span{vertex_attachments}),
-    std::make_pair(Shader::Stage::Fragment, std::span {fragment_attachments}),
-  };
-  static auto sets = descriptor_alloc.allocate_sets(attachments).value();
-  static const std::array layouts {sets[0].layout(), sets[1].layout() };
-  static GraphicsPipeline pipeline = GraphicsPipeline(
-    _state, _render_pass.get(), GraphicsPipeline::Subpass::OpaqueGeometry, &_shader, descrs, std::span{layouts});
 
   static CommandUnit command_unit {_state};
 
-  /// model
-  static Model model = Model(_state, "cheburashka.obj");
+  static Model model = Model(_state, _render_pass.get(), "Lego_856_Bulldozer.gltf");
 
   /// light
   const std::vector<float> light_vertexes {-1, -1, 1, -1, 1, 1, -1, 1};
@@ -403,11 +318,8 @@ void mr::WindowContext::render()
   };
 
   command_unit->beginRenderPass(render_pass_info, vk::SubpassContents::eInline);
-  command_unit->bindPipeline(vk::PipelineBindPoint::eGraphics,
-                             pipeline.pipeline());
   command_unit->setViewport(0, _framebuffers[image_index].viewport());
   command_unit->setScissor(0, _framebuffers[image_index].scissors());
-  command_unit->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.layout(), 0, {sets[0].set(), sets[1].set()}, {});
   model.draw(command_unit);
   command_unit->nextSubpass(vk::SubpassContents::eInline);
   command_unit->bindPipeline(vk::PipelineBindPoint::eGraphics,

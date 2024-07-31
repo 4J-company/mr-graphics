@@ -12,12 +12,15 @@ namespace mr {
       std::vector<mr::Mesh> _meshes;
       std::vector<mr::Material> _materials;
 
+      mr::Shader _shader;
+      mr::GraphicsPipeline _pipeline;
+
       std::string _name;
 
     public:
       Model() = default;
 
-      Model(const VulkanState &state, std::string_view filename) noexcept;
+      Model(const VulkanState &state, vk::RenderPass render_pass, std::string_view filename) noexcept;
 
       Model(const Model &other) noexcept = default;
       Model &operator=(const Model &other) noexcept = default;

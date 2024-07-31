@@ -167,6 +167,9 @@ namespace mr {
   };
 
   class IndexBuffer : public DeviceBuffer {
+    private:
+      vk::IndexType _index_type;
+
     public:
       IndexBuffer() = default;
 
@@ -186,7 +189,20 @@ namespace mr {
       {
         assert(src.data());
         write(state, src);
+
+        // determine index type
+        if constexpr (sizeof(T) == 4) {
+          _index_type = vk::IndexType::eUint32;
+        }
+        else if constexpr (sizeof(T) == 2) {
+          _index_type = vk::IndexType::eUint16;
+        }
+        else if constexpr (sizeof(T) == 1) {
+          _index_type = vk::IndexType::eUint8KHR;
+        }
       }
+
+      vk::IndexType index_type() const noexcept { return _index_type; }
   };
 } // namespace mr
 
