@@ -53,7 +53,6 @@ public:
       [[nodiscard]] GraphicsPipeline * create_graphics_pipeline(
         vk::RenderPass render_pass, GraphicsPipeline::Subpass subpass,
         Shader *shader,
-        std::span<const vk::VertexInputAttributeDescription> attributes,
         std::span<const vk::DescriptorSetLayout> descriptor_layouts);
   };
 } // namespace mr
