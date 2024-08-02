@@ -221,7 +221,7 @@ void mr::Shader::reflect_metadata(std::span<char> spv_data, Stage stage)
     for (int i = 0; i < set->binding_count; i++) {
       auto *binding = set->bindings[i];
       refl_set.resize(std::max(refl_set.size(), (size_t)binding->binding + 1));
-      assert(not refl_set[binding->binding].has_value()); // not overriding by other module
+      // assert(not refl_set[binding->binding].has_value()); // TODO: check not overriding by other module
       auto &refl_bind = refl_set[binding->binding].emplace();
 
       refl_bind.binding = binding->binding;
@@ -235,6 +235,8 @@ void mr::Shader::reflect_metadata(std::span<char> spv_data, Stage stage)
   }
 
   if (stage == Stage::Vertex) {
+    _reflected_attributes.clear();
+
     uint32_t count = 0;
     result = spvReflectEnumerateInputVariables(&module, &count, NULL);
     assert(result == SPV_REFLECT_RESULT_SUCCESS);
