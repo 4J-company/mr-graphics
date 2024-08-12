@@ -19,6 +19,7 @@ namespace mr {
       std::array<vk::UniqueShaderModule, max_shader_modules> _modules;
       std::array<vk::PipelineShaderStageCreateInfo, max_shader_modules> _stages;
       std::atomic<uint> _num_of_loaded_shaders;
+      std::string _define_string;
 
     public:
       using Resource = std::variant<UniformBuffer *, StorageBuffer *, Texture *, Image *>;
@@ -43,7 +44,8 @@ namespace mr {
 
       Shader() = default;
 
-      Shader(const VulkanState &state, std::string_view filename);
+      Shader(const VulkanState &state, std::string_view filename,
+             const std::unordered_map<std::string, std::string> &define_map = {});
 
       // move semantics
       Shader(Shader &&other) noexcept
@@ -89,7 +91,7 @@ namespace mr {
 
   constexpr vk::ShaderStageFlagBits get_stage_flags(std::integral auto stage) noexcept
   {
-    static constexpr std::array stage_bits {
+    constexpr std::array stage_bits {
       vk::ShaderStageFlagBits::eCompute,
       vk::ShaderStageFlagBits::eVertex,
       vk::ShaderStageFlagBits::eTessellationControl,
@@ -109,7 +111,7 @@ namespace mr {
 
   constexpr const char * get_stage_name(std::integral auto stage) noexcept
   {
-    static constexpr std::array shader_type_names {
+    constexpr std::array shader_type_names {
       "comp",
       "vert",
       "tesc",

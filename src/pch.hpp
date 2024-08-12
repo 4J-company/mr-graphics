@@ -41,6 +41,8 @@
 #define VKFW_NO_STRUCT_CONSTRUCTORS
 #include <vkfw/vkfw.hpp>
 
+#include <mr-math/math.hpp>
+
 // WinAPI macros undefined :(
 #undef max
 #undef min
@@ -48,11 +50,6 @@
 namespace mr {
   using uint = unsigned int;
   using byte = unsigned char;
-
-  using Vec2f = std::array<float, 2>;
-  using Vec3f = std::array<float, 3>;
-  using Vec4f = std::array<float, 4>;
-  using Matr4f = std::array<float, 16>;
 
   struct Boundbox {
       mr::Vec3f min;

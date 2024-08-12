@@ -12,6 +12,12 @@ endif()
 
 # install libraries with no binaries available
 CPMFindPackage(
+  NAME mr-math
+  GITHUB_REPOSITORY 4j-company/mr-math
+  GIT_TAG fix/cmake
+)
+
+CPMFindPackage(
   NAME glfw3
   GITHUB_REPOSITORY glfw/glfw
   GIT_TAG 3.4
@@ -46,6 +52,7 @@ find_package(Vulkan)
 # set important variables
 set(DEPS_LIBRARIES
   Vulkan::Vulkan
+  mr-math-lib
   glfw
 )
 

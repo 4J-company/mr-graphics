@@ -1,16 +1,26 @@
 #include "resources/shaders/shader.hpp"
 #include <filesystem>
 #include <fstream>
+#include <sstream>
 
-mr::Shader::Shader(const VulkanState &state, std::string_view filename)
-    : _path(std::string("bin/shaders/") + filename.data())
+mr::Shader::Shader(const VulkanState &state, std::string_view filename, const std::unordered_map<std::string, std::string> &define_map)
+    : _path(std::filesystem::current_path())
 {
+  _path.append("bin").append("shaders").append(filename);
+
+  std::stringstream ss;
+  for (auto &[name, value] : define_map) {
+    ss << "-D" << name << '=' << value << ' ';
+  }
+  _define_string = ss.str();
+
   std::array<int, max_shader_modules> shd_types;
   std::iota(shd_types.begin(), shd_types.end(), 0);
 
   std::for_each(
-    std::execution::par, shd_types.begin(), shd_types.end(), [&](int shd_ind) {
+    std::execution::seq, shd_types.begin(), shd_types.end(), [&](int shd_ind) {
       auto stage = static_cast<Stage>(shd_ind);
+      compile(stage);
       std::optional<std::vector<char>> source = load(stage);
       assert(_validate_stage(stage, source.has_value()));
       if (!source) {
@@ -29,20 +39,47 @@ mr::Shader::Shader(const VulkanState &state, std::string_view filename)
       assert(result == vk::Result::eSuccess);
       _modules[ind] = std::move(module);
 
+      vk::SpecializationInfo *specialization_info_ptr = nullptr;
+      vk::SpecializationInfo specialization_info;
+      #if 0
+        specialization_info_ptr = &specialization_info;
+        specialization_info = vk::SpecializationInfo {
+          .dataSize = specialization_data.size(),
+          .pData = specialization_data.data(),
+        };
+      #endif
+
       _stages[ind] = vk::PipelineShaderStageCreateInfo {
         .stage = get_stage_flags(stage),
         .module = _modules[ind].get(),
         .pName = "main",
+        .pSpecializationInfo = specialization_info_ptr,
       };
     });
 }
 
+// TODO: replace with Google's libshaderc
 void mr::Shader::compile(Shader::Stage stage) const noexcept
 {
   std::string stage_type = get_stage_name(stage);
-  std::system(("glslc --target-env=vulkan1.2 *." + stage_type + " -o " +
-               stage_type + ".spv")
-                .c_str());
+
+  std::filesystem::path src_path = _path;
+  src_path.append("shader").replace_extension(stage_type);
+
+  if (!std::filesystem::exists(src_path)) return;
+
+  std::filesystem::path dst_path = _path;
+  dst_path.append(stage_type).replace_extension("spv");
+
+  if (0 && stage == mr::Shader::Stage::Vertex) {
+    std::system(("glslc " + _define_string + "-E " + src_path.string() + " > " +
+                 src_path.string() + ".txt")
+                  .c_str());
+    std::cout << "Preprocessed shader:\n"
+              << std::fstream(src_path.string() + ".txt").rdbuf() << std::endl;
+  }
+
+  std::system(("glslc " + _define_string + src_path.string() + " -o " + dst_path.string()).c_str());
 }
 
 std::optional<std::vector<char>> mr::Shader::load(Shader::Stage stage) noexcept

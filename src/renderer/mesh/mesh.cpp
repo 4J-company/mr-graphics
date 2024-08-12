@@ -2,10 +2,9 @@
 
 mr::Mesh::Mesh(
 	VertexBuffer vbuf,
-	IndexBuffer ibuf,
-	std::size_t index_count) noexcept
+	IndexBuffer ibuf) noexcept
   : _ibuf(std::move(ibuf))
   , _vbuf(std::move(vbuf))
-  , _element_count(index_count)
+  , _instance_count(1)
 {
 }

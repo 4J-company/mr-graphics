@@ -6,105 +6,104 @@
 
 namespace mr {
   class Material {
-  private:
-    Matr4f _transform;
-    Vec3f _ambient_color;
-    Vec3f _diffuse_color;
-    Vec3f _specular_color;
-    float _shininess;
-
-    std::span<float> _attachments = {(float *)&_transform, std::size_t(&((Material*)nullptr)->_attachments)};
-    mr::Shader _shader;
+  protected:
     mr::UniformBuffer _ubo;
+    mr::Shader _shader;
 
-    DescriptorAllocator _descriptor_allocator;
-    DescriptorSet _descriptor_set;
-
+    mr::DescriptorAllocator _descriptor_allocator; 
+    mr::DescriptorSet _descriptor_set; 
     mr::GraphicsPipeline _pipeline;
 
+    std::array<vk::VertexInputAttributeDescription, 3> _descrs {
+      vk::VertexInputAttributeDescription {
+        .location = 0,
+        .binding = 0,
+        .format = vk::Format::eR32G32B32Sfloat,
+        .offset = 0
+      },
+      vk::VertexInputAttributeDescription {
+        .location = 1,
+        .binding = 0,
+        .format = vk::Format::eR32G32B32Sfloat,
+        .offset = 3 * sizeof(float)
+      },
+      vk::VertexInputAttributeDescription {
+        .location = 2,
+        .binding = 0,
+        .format = vk::Format::eR32G32Sfloat,
+        .offset = 6 * sizeof(float)
+      },
+    };
+
   public:
-    Material() noexcept = default;
+    Material(const VulkanState state, const vk::RenderPass render_pass, Shader shader,
+             std::span<float> ubo_data, std::span<std::optional<mr::Texture>> textures) noexcept;
 
-    Material(const VulkanState &state, vk::RenderPass render_pass,
-             Shader shader, Vec3f ambient, Vec3f diffuse, Vec3f specular,
-             float shininess, Matr4f transform)
-        : _transform(transform)
-        , _ambient_color(ambient)
-        , _diffuse_color(diffuse)
-        , _specular_color(specular)
-        , _shininess(shininess)
-        , _ubo(state, _attachments)
-        , _descriptor_allocator(state)
-        , _shader(std::move(shader))
-    {
-      const std::array descrs {
-        vk::VertexInputAttributeDescription{
-          .location = 0,
-          .binding = 0,
-          .format = vk::Format::eR32G32B32Sfloat,
-          .offset = 0
-        },
-        vk::VertexInputAttributeDescription{
-          .location = 1,
-          .binding = 0,
-          .format = vk::Format::eR32G32B32Sfloat,
-          .offset = 3 * sizeof(float)
-        },
- /*
-        vk::VertexInputAttributeDescription{
-          .location = 2,
-          .binding = 0,
-          .format = vk::Format::eR32G32B32Sfloat,
-          .offset = 6 * sizeof(float)},
-        vk::VertexInputAttributeDescription{
-          .location = 3,
-          .binding = 0,
-          .format = vk::Format::eR32G32B32Sfloat,
-          .offset = 9 * sizeof(float)
-        },
-        vk::VertexInputAttributeDescription{
-          .location = 4,
-          .binding = 0,
-          .format = vk::Format::eR32G32B32Sfloat,
-          .offset = 12 * sizeof(float)
-        },
-        vk::VertexInputAttributeDescription{
-          .location = 5,
-          .binding = 0,
-          .format = vk::Format::eR32G32B32Sfloat,
-          .offset = 15 * sizeof(float)
-        },
-*/
-      };
+    void bind(CommandUnit &unit) const noexcept;
+  };
 
-      const std::array vertex_attachments {
-        Shader::ResourceView {0, 0, &_ubo}, // set, binding, res
-      };
+  class MaterialBuilder {
+    mr::VulkanState _state;
+    vk::RenderPass _render_pass;
 
-      _descriptor_set =
-        _descriptor_allocator
-          .allocate_set(Shader::Stage::Vertex, std::span {vertex_attachments})
-          .value();
+    std::vector<byte> _specialization_data;
+    std::unordered_map<std::string, std::string> _defines;
+    std::vector<float> _ubo_data;
+    std::vector<std::optional<mr::Texture>> _textures;
 
-      std::array layouts = {_descriptor_set.layout()};
+    std::string_view _shader_filename;
 
-      _pipeline =
-        mr::GraphicsPipeline(state,
-                             render_pass,
-                             mr::GraphicsPipeline::Subpass::OpaqueGeometry,
-                             &_shader,
-                             std::span {descrs},
-                             std::span {layouts});
+    void _add_shader_define(const std::string &name, const std::string &value) noexcept {
+      _defines[name] = value;
     }
 
-    void bind(CommandUnit &unit) const noexcept
+  public:
+    MaterialBuilder(
+      const mr::VulkanState &state,
+      const vk::RenderPass &render_pass,
+      std::string_view filename)
+        : _state(state)
+        , _render_pass(render_pass)
+        , _shader_filename(filename)
     {
-      unit->bindPipeline(vk::PipelineBindPoint::eGraphics, _pipeline.pipeline());
-      unit->bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                               _pipeline.layout(),
-                               0,
-                               {_descriptor_set.set()},
-                               {});
+    }
+
+    MaterialBuilder(MaterialBuilder &&) noexcept = default;
+    MaterialBuilder & operator=(MaterialBuilder &&) noexcept = default;
+
+    MaterialBuilder &add_texture(const std::string &name,
+                                 std::optional<mr::Texture> tex,
+                                 mr::Vec4f fallback = {0, 0, 0, 0})
+    {
+      _add_shader_define(name + "_PRESENT", std::to_string(tex.has_value()));
+      add_value(fallback);
+      _textures.emplace_back(std::move(tex));
+      return *this;
+    }
+
+    MaterialBuilder & add_value(const auto &value)
+    {
+      _ubo_data.append_range(std::span {(float *)&value, sizeof(value)});
+      return *this;
+    }
+
+    MaterialBuilder & add_value(float value)
+    {
+      _ubo_data.push_back(value);
+      return *this;
+    }
+
+    Material build() noexcept
+    {
+      return Material {
+        _state,
+        _render_pass,
+        mr::Shader(_state,
+                   _shader_filename,
+                   _defines),
+        std::span {_ubo_data},
+        std::span {_textures}
+      };
     }
   };
 } // namespace mr

@@ -169,6 +169,7 @@ namespace mr {
   class IndexBuffer : public DeviceBuffer {
     private:
       vk::IndexType _index_type;
+      std::size_t _element_count;
 
     public:
       IndexBuffer() = default;
@@ -190,6 +191,8 @@ namespace mr {
         assert(src.data());
         write(state, src);
 
+        _element_count = src.size();
+
         // determine index type
         if constexpr (sizeof(T) == 4) {
           _index_type = vk::IndexType::eUint32;
@@ -202,6 +205,7 @@ namespace mr {
         }
       }
 
+      std::size_t   element_count() const noexcept { return _element_count; }
       vk::IndexType index_type() const noexcept { return _index_type; }
   };
 } // namespace mr

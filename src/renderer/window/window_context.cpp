@@ -260,7 +260,7 @@ void mr::WindowContext::render()
 
   static CommandUnit command_unit {_state};
 
-  static Model model = Model(_state, _render_pass.get(), "Lego_856_Bulldozer.gltf");
+  static Model model = Model(_state, _render_pass.get(), "ABeautifulGame/ABeautifulGame.gltf");
 
   /// light
   const std::vector<float> light_vertexes {-1, -1, 1, -1, 1, 1, -1, 1};

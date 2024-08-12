@@ -26,9 +26,9 @@ get_bindings(mr::Shader::Stage stage,
     set_bindings[i] = vk::DescriptorSetLayoutBinding {
       .binding = attachment_set[i].binding,
       .descriptorType = get_descriptor_type(attachment_set[i]),
-      .descriptorCount = 1,          // TODO: replace with reasonable value
+      .descriptorCount = 1,
       .stageFlags = get_stage_flags(stage),
-      .pImmutableSamplers = nullptr, // TODO: investigate immutable samplers
+      .pImmutableSamplers = nullptr, // TODO: replace this with corresponding sampler as it's never changed
     };
   }
 
@@ -88,7 +88,7 @@ void mr::DescriptorSet::update(
 
   std::vector<vk::WriteDescriptorSet> descriptor_writes(attachments.size());
   for (uint i = 0; i < attachments.size(); i++) {
-    descriptor_writes[i] = vk::WriteDescriptorSet {
+    descriptor_writes[i] = {
       .dstSet = _set,
       .dstBinding = attachments[i].binding,
       .dstArrayElement = 0,
