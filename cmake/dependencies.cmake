@@ -35,8 +35,7 @@ CPMFindPackage(
 
 CPMFindPackage(
   NAME assimp
-  GITHUB_REPOSITORY assimp/assimp
-  GIT_TAG master
+  URL "https://github.com/assimp/assimp/archive/refs/tags/v5.4.2.zip"
   OPTIONS
     "ASSIMP_WARNINGS_AS_ERRORS OFF"
     "ASSIMP_BUILD_TESTS OFF"

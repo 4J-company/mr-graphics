@@ -24,14 +24,16 @@ mr::Window::Window(VulkanGlobalState *state, Extent extent)
         win.setShouldClose(true);
 
       if (key == vkfw::Key::eF11) {
-        if (flags & vkfw::ModifierKeyBits::eShift)
+        if (flags & vkfw::ModifierKeyBits::eShift) {
           win.setSize(640, 480);
-        else
+        }
+        else {
           win.maximize();
+        }
       }
     };
 
-  _context = RenderContext(state, this);
+    _context = RenderContext(state, this);
 }
 
 void mr::Window::start_main_loop() {

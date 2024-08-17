@@ -5,8 +5,14 @@
 
 namespace mr {
   class GraphicsPipeline : public Pipeline {
+    public:
+      enum struct Subpass {
+        OpaqueGeometry = 0,
+        OpaqueLighting = 1,
+      };
+
     private:
-      uint _subpass;
+      Subpass _subpass;
 
       vk::PrimitiveTopology _topology;
       vk::VertexInputBindingDescription _binding_descriptor;
@@ -20,11 +26,10 @@ namespace mr {
       GraphicsPipeline() = default;
 
       GraphicsPipeline(
-        const VulkanState &state, vk::RenderPass render_pass, uint subpass,
-        Shader *ShaderProgram,
-        const std::vector<vk::VertexInputAttributeDescription> &attributes,
-        const std::vector<std::vector<vk::DescriptorSetLayoutBinding>>
-          &bindings);
+        const VulkanState &state, vk::RenderPass render_pass, Subpass subpass,
+        Shader *shader,
+        std::span<const vk::VertexInputAttributeDescription> attributes,
+        std::span<const vk::DescriptorSetLayout> descriptor_layouts);
 
       void recompile();
 
