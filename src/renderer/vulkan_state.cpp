@@ -93,14 +93,14 @@ void mr::VulkanGlobalState::_create_phys_device()
     .tessellationShader = true,
     .samplerAnisotropy = true,
   };
-  if (not _phys_device.enable_features_if_present(required_features)) {
+  if (not _phys_device.enable_features_if_present(static_cast<const VkPhysicalDeviceFeatures &>(required_features))) {
     std::cerr << "VkPhysicalDevice does not support required features\n";
   }
 
   const vk::PhysicalDeviceFeatures optional_features {
     .multiDrawIndirect = true,
   };
-  _phys_device.enable_features_if_present(optional_features);
+  _phys_device.enable_features_if_present(static_cast<const VkPhysicalDeviceFeatures &>(optional_features));
 }
 
 mr::VulkanState::VulkanState(VulkanGlobalState *state)
