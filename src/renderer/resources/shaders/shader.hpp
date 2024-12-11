@@ -20,6 +20,7 @@ namespace mr {
       std::array<vk::PipelineShaderStageCreateInfo, max_shader_modules> _stages;
       std::atomic<uint> _num_of_loaded_shaders;
       std::string _define_string;
+      std::string _include_string;
 
     public:
       using Resource = std::variant<UniformBuffer *, StorageBuffer *, Texture *, Image *>;

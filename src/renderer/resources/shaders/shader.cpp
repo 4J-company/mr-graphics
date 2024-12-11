@@ -6,7 +6,9 @@
 mr::Shader::Shader(const VulkanState &state, std::string_view filename, const std::unordered_map<std::string, std::string> &define_map)
     : _path(std::filesystem::current_path())
 {
-  _path.append("bin").append("shaders").append(filename);
+  _path.append("bin").append("shaders");
+  _include_string = std::string(" -I ") + _path.string() + " ";
+  _path.append(filename);
 
   std::stringstream ss;
   for (auto &[name, value] : define_map) {
@@ -71,15 +73,9 @@ void mr::Shader::compile(Shader::Stage stage) const noexcept
   std::filesystem::path dst_path = _path;
   dst_path.append(stage_type).replace_extension("spv");
 
-  if (0 && stage == mr::Shader::Stage::Vertex) {
-    std::system(("glslc " + _define_string + "-E " + src_path.string() + " > " +
-                 src_path.string() + ".txt")
-                  .c_str());
-    std::cout << "Preprocessed shader:\n"
-              << std::fstream(src_path.string() + ".txt").rdbuf() << std::endl;
-  }
-
-  std::system(("glslc " + _define_string + src_path.string() + " -o " + dst_path.string()).c_str());
+  auto argstr = ("glslc " + _define_string + _include_string +
+                 src_path.string() + " -o " + dst_path.string());
+  std::system(argstr.c_str());
 }
 
 std::optional<std::vector<char>> mr::Shader::load(Shader::Stage stage) noexcept
