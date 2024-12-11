@@ -10,14 +10,6 @@ layout(input_attachment_index = 3, set = 0, binding = 3) uniform subpassInput In
 layout(input_attachment_index = 4, set = 0, binding = 4) uniform subpassInput InOcclusion;
 layout(input_attachment_index = 5, set = 0, binding = 5) uniform subpassInput InColorTrans;
 
-struct PointData {
-  vec3 LightDir;
-  vec3 LightColor;
-
-  vec3 Pos;
-  vec3 Norm;
-};
-
 #include "phong_logic.h"
 #include "pbr_logic.h"
 
