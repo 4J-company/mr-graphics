@@ -73,7 +73,7 @@ void mr::Shader::compile(Shader::Stage stage) const noexcept
   std::filesystem::path dst_path = _path;
   dst_path.append(stage_type).replace_extension("spv");
 
-  auto argstr = ("glslc " + _define_string + _include_string +
+  auto argstr = ("glslc " + _define_string + _include_string + " -O " +
                  src_path.string() + " -o " + dst_path.string());
   std::system(argstr.c_str());
 }
