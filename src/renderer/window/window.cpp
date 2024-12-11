@@ -16,7 +16,7 @@ mr::Window::Window(const VulkanState &state, size_t width, size_t height)
   // hints.transparentFramebuffer = true;
 
   auto [result_code, window] =
-    vkfw::createWindowUnique(640, 480, "CGSGFOREVER", hints);
+    vkfw::createWindowUnique(width, height, "CGSGFOREVER", hints);
   if (result_code != vkfw::Result::eSuccess) {
     exit(1);
   }
