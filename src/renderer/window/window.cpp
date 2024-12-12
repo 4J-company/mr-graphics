@@ -1,4 +1,5 @@
 #include "window.hpp"
+#include "camera/camera.hpp"
 
 // size-based constructor
 // arguments:
@@ -8,6 +9,9 @@ mr::Window::Window(const VulkanState &state, size_t width, size_t height)
     : _width(width)
     , _height(height)
 {
+  static mr::FPSCamera camera = state;
+  _cam = &camera;
+
   // TODO: retry a couple of times
   vkfw::WindowHints hints{};
   hints.resizable = true;
@@ -22,11 +26,45 @@ mr::Window::Window(const VulkanState &state, size_t width, size_t height)
   }
 
   _window = std::move(window);
-  _window->callbacks()->on_key = [](const vkfw::Window &win, vkfw::Key key,
+
+  glfwSetInputMode(_window.get(), GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+
+  _window->callbacks()->on_cursor_move = [this](const vkfw::Window &win, double dx, double dy) {
+      if (2 * dx == _width && 2 * dy == _height) {
+        return;
+      }
+      camera.turn({
+          2 * dx / _width - 1,
+          2 * dy / _height - 1,
+          0});
+
+      _window->setCursorPos(_width / 2.0, _height / 2.0);
+  };
+  _window->callbacks()->on_key = [&](const vkfw::Window &win, vkfw::Key key,
                                     int scan_code, vkfw::KeyAction action,
                                     vkfw::ModifierKeyFlags flags) {
     if (key == vkfw::Key::eEscape) {
       win.setShouldClose(true);
+    }
+
+    // camera controls
+    if (key == vkfw::Key::eW) {
+      camera.move(-mr::axis::z);
+    }
+    if (key == vkfw::Key::eA) {
+      camera.move(-mr::axis::x);
+    }
+    if (key == vkfw::Key::eS) {
+      camera.move(mr::axis::z);
+    }
+    if (key == vkfw::Key::eD) {
+      camera.move(mr::axis::x);
+    }
+    if (key == vkfw::Key::eSpace) {
+      camera.move(mr::axis::y);
+    }
+    if (key == vkfw::Key::eRightShift) {
+      camera.move(-mr::axis::y);
     }
 
     if (key == vkfw::Key::eF11) {
@@ -44,12 +82,13 @@ mr::Window::Window(const VulkanState &state, size_t width, size_t height)
 void mr::Window::start_main_loop() {
   std::jthread render_thread {
     [&](std::stop_token stop_token) {
-      while (not stop_token.stop_requested()) { render(); }
+      while (not stop_token.stop_requested()) {  }
     }
   };
 
   // TMP theme
   while (!_window->shouldClose().value) {
     vkfw::pollEvents();
+    render();
   }
 }

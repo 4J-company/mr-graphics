@@ -15,11 +15,12 @@ static mr::Material load_material(const mr::VulkanState &state,
                                   vk::RenderPass render_pass,
                                   const tinygltf::Model &model,
                                   const tinygltf::Material &material,
+                                  mr::FPSCamera &cam,
                                   mr::Matr4f transform) noexcept;
 static mr::Matr4f calculate_transform(const tinygltf::Node &node,
                                       const mr::Matr4f &parent_transform) noexcept;
 
-mr::Model::Model(const VulkanState &state, vk::RenderPass render_pass, std::string_view filename) noexcept
+mr::Model::Model(const VulkanState &state, vk::RenderPass render_pass, std::string_view filename, mr::FPSCamera &cam) noexcept
 {
   tinygltf::Model model;
   tinygltf::TinyGLTF loader;
@@ -47,7 +48,7 @@ mr::Model::Model(const VulkanState &state, vk::RenderPass render_pass, std::stri
   const auto &scene = model.scenes[0];
   for (int i = 0; i < scene.nodes.size(); i++) {
     const auto &node = model.nodes[scene.nodes[i]];
-    _process_node(state, render_pass, model, mr::Matr4f::identity, node);
+    _process_node(state, render_pass, model, mr::Matr4f::identity, cam, node);
   }
 
   std::cout << "loading finished\n";
@@ -67,6 +68,7 @@ void mr::Model::_process_node(const mr::VulkanState &state,
                               const vk::RenderPass &render_pass,
                               tinygltf::Model &model,
                               const mr::Matr4f &parent_transform,
+                              mr::FPSCamera &cam,
                               const tinygltf::Node &node) noexcept
 {
   std::array attributes {
@@ -83,7 +85,7 @@ void mr::Model::_process_node(const mr::VulkanState &state,
   mr::Matr4f transform = calculate_transform(node, parent_transform);
 
   for (auto child : node.children) {
-    _process_node(state, render_pass, model, transform, model.nodes[child]);
+    _process_node(state, render_pass, model, transform, cam, model.nodes[child]);
   }
 
   for (auto &primitive : mesh.primitives) {
@@ -179,7 +181,7 @@ void mr::Model::_process_node(const mr::VulkanState &state,
     tinygltf::Material material = model.materials[primitive.material];
 
     _meshes.emplace_back(std::move(vbuf), std::move(ibuf));
-    _materials.emplace_back(load_material(state, render_pass, model, material, transform));
+    _materials.emplace_back(load_material(state, render_pass, model, material, cam, transform));
   }
 }
 
@@ -216,6 +218,7 @@ static mr::Material load_material(
     vk::RenderPass render_pass,
     const tinygltf::Model &model,
     const tinygltf::Material &material,
+    mr::FPSCamera &cam,
     mr::Matr4f transform) noexcept
 {
   /*
@@ -250,16 +253,15 @@ static mr::Material load_material(
   std::optional<mr::Texture> occlusion_texture_optional          = load_texture(state, model, material.occlusionTexture.index);
   std::optional<mr::Texture> normal_texture_optional             = load_texture(state, model, material.normalTexture.index);
 
-  mr::Camera cam { {0, 0, 1} };
-
   mr::MaterialBuilder builder = mr::MaterialBuilder(state, render_pass, "default");
   builder
-    .add_value(transform * cam.perspective() * cam.frustum())
+    .add_value(transform)
     .add_texture("BASE_COLOR_MAP", std::move(base_color_texture_optional), base_color_factor)
     .add_texture("METALLIC_ROUGHNESS_MAP", std::move(metallic_roughness_texture_optional.value()))
     .add_texture("EMISSIVE_MAP", std::move(emissive_texture_optional), emissive_color_factor)
     .add_texture("OCCLUSION_MAP", std::move(occlusion_texture_optional))
-    .add_texture("NORMAL_MAP", std::move(normal_texture_optional));
+    .add_texture("NORMAL_MAP", std::move(normal_texture_optional))
+    .add_camera(cam);
   builders.emplace_back(std::move(builder));
   return builders.back().build();
 }

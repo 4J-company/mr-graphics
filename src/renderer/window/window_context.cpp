@@ -254,13 +254,13 @@ void mr::WindowContext::create_framebuffers(const VulkanState &state)
   }
 }
 
-void mr::WindowContext::render()
+void mr::WindowContext::render(mr::FPSCamera &cam)
 {
   static DescriptorAllocator descriptor_alloc = DescriptorAllocator(_state);
 
   static CommandUnit command_unit {_state};
 
-  static Model model = Model(_state, _render_pass.get(), "ABeautifulGame/ABeautifulGame.gltf");
+  static Model model = Model(_state, _render_pass.get(), "ABeautifulGame/ABeautifulGame.gltf", cam);
 
   /// light
   const std::vector<float> light_vertexes {-1, -1, 1, -1, 1, 1, -1, 1};

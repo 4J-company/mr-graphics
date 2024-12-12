@@ -12,6 +12,14 @@ layout(location = 3) out vec4 metallic_roughness;
 layout(location = 4) out vec4 emissive;
 layout(location = 5) out vec4 occlusion;
 
+layout(set = 0, binding = 0) uniform CameraUbo {
+  mat4 vp;
+  float fov;
+  float gamma;
+  float speed;
+  float sens;
+} cam_ubo;
+
 #include "pbr_params.h"
 
 void main()
@@ -30,5 +38,5 @@ void main()
   emissive = emissive_color;
   occlusion = occlusion_color;
 
-  gl_Position = ubo.transform * position;
+  gl_Position = cam_ubo.vp * (ubo.transform * position);
 }

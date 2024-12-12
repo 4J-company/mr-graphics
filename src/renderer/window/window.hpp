@@ -3,6 +3,7 @@
 
 #include "pch.hpp"
 #include "window_context.hpp"
+#include "camera/camera.hpp"
 
 namespace mr {
   class Window {
@@ -10,6 +11,7 @@ namespace mr {
       std::size_t _width, _height;
       vkfw::UniqueWindow _window;
       mr::WindowContext _context;
+      mr::FPSCamera *_cam;
 
     public:
       // constructors
@@ -30,7 +32,7 @@ namespace mr {
 
       // methods
       void start_main_loop();
-      void render() { _context.render(); }
+      void render() { _context.render(*_cam); }
   };
 } // namespace mr
 #endif // __window_hpp_
