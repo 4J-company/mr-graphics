@@ -14,7 +14,7 @@ endif()
 CPMFindPackage(
   NAME mr-math
   GITHUB_REPOSITORY 4j-company/mr-math
-  GIT_TAG fix/cmake
+  GIT_TAG master
 )
 
 CPMFindPackage(

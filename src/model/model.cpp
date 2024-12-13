@@ -48,7 +48,7 @@ mr::Model::Model(const VulkanState &state, vk::RenderPass render_pass, std::stri
   const auto &scene = model.scenes[0];
   for (int i = 0; i < scene.nodes.size(); i++) {
     const auto &node = model.nodes[scene.nodes[i]];
-    _process_node(state, render_pass, model, mr::Matr4f::identity, cam, node);
+    _process_node(state, render_pass, model, mr::Matr4f::identity(), cam, node);
   }
 
   std::cout << "loading finished\n";
@@ -268,7 +268,7 @@ static mr::Material load_material(
 
 static mr::Matr4f calculate_transform(const tinygltf::Node &node, const mr::Matr4f &parent_transform) noexcept {
   // calculate local transform
-  mr::Matr4f transform = mr::Matr4f::identity;
+  mr::Matr4f transform = mr::Matr4f::identity();
   if (node.scale.size() == 3) {
     transform *= mr::Matr4f::scale(
       mr::Vec3f(
@@ -278,12 +278,13 @@ static mr::Matr4f calculate_transform(const tinygltf::Node &node, const mr::Matr
         ));
   }
   if (node.rotation.size() == 4) {
-    transform *= mr::Matr4f::rotate(mr::Radiansf(
-                                        node.rotation[3]),
-                                    mr::Norm3f(
+    transform *= mr::Matr4f::rotate(mr::Norm3f(
                                         node.rotation[0],
                                         node.rotation[1],
-                                        node.rotation[2]));
+                                        node.rotation[2]),
+                                    mr::Radiansf(
+                                        node.rotation[3])
+    );
   }
   if (node.translation.size() == 3) {
     transform *= mr::Matr4f::translate(mr::Vec3f(
