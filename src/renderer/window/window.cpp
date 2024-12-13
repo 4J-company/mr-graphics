@@ -49,22 +49,22 @@ mr::Window::Window(const VulkanState &state, size_t width, size_t height)
 
     // camera controls
     if (key == vkfw::Key::eW) {
-      camera.move(-mr::axis::z);
+      camera.move(camera.cam().direction());
     }
     if (key == vkfw::Key::eA) {
-      camera.move(-mr::axis::x);
+      camera.move(-camera.cam().right());
     }
     if (key == vkfw::Key::eS) {
-      camera.move(mr::axis::z);
+      camera.move(-camera.cam().direction());
     }
     if (key == vkfw::Key::eD) {
-      camera.move(mr::axis::x);
+      camera.move(camera.cam().right());
     }
     if (key == vkfw::Key::eSpace) {
-      camera.move(mr::axis::y);
+      camera.move(-camera.cam().up());
     }
-    if (key == vkfw::Key::eRightShift) {
-      camera.move(-mr::axis::y);
+    if (key == vkfw::Key::eLeftShift) {
+      camera.move(camera.cam().up());
     }
 
     if (key == vkfw::Key::eF11) {
@@ -82,13 +82,12 @@ mr::Window::Window(const VulkanState &state, size_t width, size_t height)
 void mr::Window::start_main_loop() {
   std::jthread render_thread {
     [&](std::stop_token stop_token) {
-      while (not stop_token.stop_requested()) {  }
+      while (not stop_token.stop_requested()) { render(); }
     }
   };
 
   // TMP theme
   while (!_window->shouldClose().value) {
     vkfw::pollEvents();
-    render();
   }
 }

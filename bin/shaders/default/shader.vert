@@ -31,12 +31,13 @@ void main()
   vec4 occlusion_color = get_occlusion_color(tex_coord);
   vec4 normal_color = get_normal_color(tex_coord);
 
-  position = vec4(InPos.x, -InPos.y, InPos.z, 1.0);
-  normal = normal_color;
+  position = ubo.transform * vec4(InPos.xyz, 1.0);
+  normal = transpose(inverse(ubo.transform)) * normal_color;
   color = base_color;
   metallic_roughness = metallic_roughness_color;
   emissive = emissive_color;
   occlusion = occlusion_color;
 
-  gl_Position = cam_ubo.vp * (ubo.transform * position);
+  gl_Position = cam_ubo.vp * ubo.transform * vec4(InPos.xyz, 1.0);
+  gl_Position = vec4(gl_Position.x, -gl_Position.y, gl_Position.z, gl_Position.w);
 }
