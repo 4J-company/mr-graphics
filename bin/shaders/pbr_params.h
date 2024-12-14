@@ -14,7 +14,9 @@
 #define NORMAL_MAP_PRESENT 0
 #endif
 
-layout(set = 0, binding = 0) uniform PrimitiveUbo {
+#define PBR_SET_INDEX 0
+
+layout(set = PBR_SET_INDEX, binding = 1) uniform PrimitiveUbo {
   mat4 transform;
 
   vec4 base_color_factor;
@@ -25,19 +27,19 @@ layout(set = 0, binding = 0) uniform PrimitiveUbo {
 } ubo;
 
 #if BASE_COLOR_MAP_PRESENT
-layout(set = 0, binding = 1) uniform sampler2D BaseColor;
+layout(set = PBR_SET_INDEX, binding = 2) uniform sampler2D BaseColor;
 #endif
 #if METALLIC_ROUGHNESS_MAP_PRESENT
-layout(set = 0, binding = 2) uniform sampler2D MetallicRoughness;
+layout(set = PBR_SET_INDEX, binding = 3) uniform sampler2D MetallicRoughness;
 #endif
 #if EMISSIVE_MAP_PRESENT
-layout(set = 0, binding = 3) uniform sampler2D Emissive;
+layout(set = PBR_SET_INDEX, binding = 4) uniform sampler2D Emissive;
 #endif
 #if OCCLUSION_MAP_PRESENT
-layout(set = 0, binding = 4) uniform sampler2D Occlusion;
+layout(set = PBR_SET_INDEX, binding = 5) uniform sampler2D Occlusion;
 #endif
 #if NORMAL_MAP_PRESENT
-layout(set = 0, binding = 5) uniform sampler2D Normal;
+layout(set = PBR_SET_INDEX, binding = 6) uniform sampler2D Normal;
 #endif
 
 vec4 get_base_color(vec2 tex_coord) {

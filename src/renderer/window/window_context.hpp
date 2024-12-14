@@ -4,6 +4,7 @@
 #include "pch.hpp"
 #include "resources/resources.hpp"
 #include "vulkan_application.hpp"
+#include "camera/camera.hpp"
 
 namespace mr {
   class Window;
@@ -42,7 +43,7 @@ namespace mr {
       void create_depthbuffer(const VulkanState &state);
       void create_render_pass(const VulkanState &state);
       void resize(size_t width, size_t height);
-      void render();
+      void render(mr::FPSCamera &cam);
   };
 } // namespace mr
 #endif // __window_context_hpp_

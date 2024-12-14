@@ -37,7 +37,7 @@ namespace mr {
 
   public:
     Material(const VulkanState state, const vk::RenderPass render_pass, Shader shader,
-             std::span<float> ubo_data, std::span<std::optional<mr::Texture>> textures) noexcept;
+             std::span<float> ubo_data, std::span<std::optional<mr::Texture>> textures, mr::FPSCamera &cam) noexcept;
 
     void bind(CommandUnit &unit) const noexcept;
   };
@@ -50,6 +50,7 @@ namespace mr {
     std::unordered_map<std::string, std::string> _defines;
     std::vector<float> _ubo_data;
     std::vector<std::optional<mr::Texture>> _textures;
+    mr::FPSCamera *_cam;
 
     std::string_view _shader_filename;
 
@@ -93,6 +94,12 @@ namespace mr {
       return *this;
     }
 
+    MaterialBuilder & add_camera(mr::FPSCamera &cam)
+    {
+      _cam = &cam;
+      return *this;
+    }
+
     Material build() noexcept
     {
       return Material {
@@ -102,7 +109,8 @@ namespace mr {
                    _shader_filename,
                    _defines),
         std::span {_ubo_data},
-        std::span {_textures}
+        std::span {_textures},
+        *_cam
       };
     }
   };

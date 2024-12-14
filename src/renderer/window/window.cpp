@@ -1,4 +1,5 @@
 #include "window.hpp"
+#include "camera/camera.hpp"
 
 // size-based constructor
 // arguments:
@@ -8,6 +9,9 @@ mr::Window::Window(const VulkanState &state, size_t width, size_t height)
     : _width(width)
     , _height(height)
 {
+  static mr::FPSCamera camera = state;
+  _cam = &camera;
+
   // TODO: retry a couple of times
   vkfw::WindowHints hints{};
   hints.resizable = true;
@@ -22,11 +26,45 @@ mr::Window::Window(const VulkanState &state, size_t width, size_t height)
   }
 
   _window = std::move(window);
-  _window->callbacks()->on_key = [](const vkfw::Window &win, vkfw::Key key,
+
+  glfwSetInputMode(_window.get(), GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+
+  _window->callbacks()->on_cursor_move = [this](const vkfw::Window &win, double dx, double dy) {
+      if (2 * dx == _width && 2 * dy == _height) {
+        return;
+      }
+      camera.turn({
+          2 * dx / _width - 1,
+          2 * dy / _height - 1,
+          0});
+
+      _window->setCursorPos(_width / 2.0, _height / 2.0);
+  };
+  _window->callbacks()->on_key = [&](const vkfw::Window &win, vkfw::Key key,
                                     int scan_code, vkfw::KeyAction action,
                                     vkfw::ModifierKeyFlags flags) {
     if (key == vkfw::Key::eEscape) {
       win.setShouldClose(true);
+    }
+
+    // camera controls
+    if (key == vkfw::Key::eW) {
+      camera.move(camera.cam().direction());
+    }
+    if (key == vkfw::Key::eA) {
+      camera.move(-camera.cam().right());
+    }
+    if (key == vkfw::Key::eS) {
+      camera.move(-camera.cam().direction());
+    }
+    if (key == vkfw::Key::eD) {
+      camera.move(camera.cam().right());
+    }
+    if (key == vkfw::Key::eSpace) {
+      camera.move(-camera.cam().up());
+    }
+    if (key == vkfw::Key::eLeftShift) {
+      camera.move(camera.cam().up());
     }
 
     if (key == vkfw::Key::eF11) {

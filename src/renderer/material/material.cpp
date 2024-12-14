@@ -3,19 +3,22 @@
 mr::Material::Material(const VulkanState state, const vk::RenderPass render_pass,
                        Shader shader,
                        std::span<float> ubo_data,
-                       std::span<std::optional<mr::Texture>> textures) noexcept
+                       std::span<std::optional<mr::Texture>> textures,
+                       mr::FPSCamera &cam) noexcept
     : _ubo(state, ubo_data)
     , _shader(std::move(shader))
     , _descriptor_allocator(state)
 {
   std::vector<Shader::ResourceView> attachments;
   attachments.reserve(textures.size());
-  attachments.emplace_back(0, 0, &_ubo);
+
+  attachments.emplace_back(0, 0, &cam.ubo());
+  attachments.emplace_back(0, 1, &_ubo);
   for (unsigned int i = 0; i < textures.size(); i++) {
     if (!textures[i].has_value()) {
       continue;
     }
-    attachments.emplace_back(0, i + 1, &textures[i].value());
+    attachments.emplace_back(0, i + 2, &textures[i].value());
   }
 
   _descriptor_set =
