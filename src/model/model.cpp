@@ -222,11 +222,6 @@ static mr::Material load_material(
     mr::Matr4f transform) noexcept
 {
   /*
-    Blinn-Phong textures:
-        - ambient
-        - diffuse
-        - specular
-        - shininess
     PBR textures:
         - base color
         - roughness
@@ -236,11 +231,6 @@ static mr::Material load_material(
   */
 
   static std::vector<mr::MaterialBuilder> builders;
-
-  mr::Vec4f ambient_color  {1, 1, 0, 1};
-  mr::Vec4f diffuse_color  {0.8, 0.8, 0.8, 1};
-  mr::Vec4f specular_color {0.1, 0.1, 0.1, 1};
-  float shininess = 0.5;
 
   mr::Vec4f base_color_factor = load_constant(material.pbrMetallicRoughness.baseColorFactor);
   mr::Vec4f emissive_color_factor = load_constant(material.emissiveFactor);
