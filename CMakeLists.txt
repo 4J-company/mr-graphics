@@ -1,6 +1,19 @@
 cmake_minimum_required(VERSION 3.27)
 project(model-renderer)
 
+# set config dirs
+set(MR_PROJECT_DIR ${CMAKE_CURRENT_LIST_DIR})
+if (NOT DEFINED MR_RES_DIR)
+  set(MR_RES_FULL_DIR ${MR_PROJECT_DIR}/bin)
+else()
+  set(MR_RES_FULL_DIR ${MR_PROJECT_DIR}/${MR_RES_DIR})
+endif()
+
+message(STATUS "Generating with following config paths: ")
+message(STATUS "  Project dir: ${MR_PROJECT_DIR}")
+message(STATUS "  Resource dir: ${MR_RES_FULL_DIR}")
+message("")
+
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/options.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/settings.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/dependencies.cmake)
@@ -23,6 +36,8 @@ target_include_directories(
 target_compile_definitions(
   ${CMAKE_PROJECT_NAME} PRIVATE
   ${DEPS_DEFINITIONS}
+  MR_PROJECT_DIR="${CMAKE_CURRENT_LIST_DIR}"
+  MR_RES_DIR="${MR_RES_FULL_DIR}"
 )
 
 # source
