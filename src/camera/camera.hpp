@@ -20,6 +20,7 @@ namespace mr {
     void update() noexcept {
       struct {
           mr::Matr4f vp;
+          mr::Vec4f campos;
           float fov;
           float gamma;
           float speed;
@@ -27,6 +28,7 @@ namespace mr {
       } tmp;
 
       tmp.vp = viewproj();
+      tmp.campos = _cam.position();
       tmp.fov = _fov._data;
       tmp.gamma = _gamma;
       tmp.speed = _speed;
@@ -40,6 +42,7 @@ namespace mr {
         : _state(state)
         , _ubo(state
             , sizeof(mr::Matr4f)   // VP matrix
+            + sizeof(mr::Vec4f)    // campos
             + sizeof(mr::Degreesf) // FOV
             + sizeof(float)        // gamma
             + sizeof(float)        // speed

@@ -14,6 +14,7 @@ layout(location = 5) out vec4 occlusion;
 
 layout(set = 0, binding = 0) uniform CameraUbo {
   mat4 vp;
+  vec4 pos;
   float fov;
   float gamma;
   float speed;
