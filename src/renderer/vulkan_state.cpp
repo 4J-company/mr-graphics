@@ -79,7 +79,6 @@ void mr::VulkanGlobalState::_create_phys_device()
   const auto phys_device = selector
     .defer_surface_initialization()
     .add_required_extensions({VK_KHR_SWAPCHAIN_EXTENSION_NAME})
-    .add_desired_extensions({VK_EXT_VALIDATION_CACHE_EXTENSION_NAME})
     .select();
   if (not phys_device) {
     std::cerr << "Cannot create VkPhysicalDevice: " << phys_device.error().message() << "\n";
