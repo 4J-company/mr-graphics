@@ -50,14 +50,14 @@ namespace mr {
         ) {
       update();
     }
-    inline constexpr FPSCamera(FPSCamera &&) noexcept = default;
-    inline constexpr FPSCamera & operator=(FPSCamera &&) noexcept = default;
+    inline FPSCamera(FPSCamera &&) noexcept = default;
+    inline FPSCamera & operator=(FPSCamera &&) noexcept = default;
 
     inline FPSCamera & turn(mr::Vec3f delta) noexcept {
       delta *= _sensetivity;
       _cam += mr::Yaw(mr::Radiansf(delta.x()));
       _cam += mr::Pitch(mr::Radiansf(delta.y()));
-      _cam += mr::Roll(mr::Radiansf(delta.z()));
+      _cam += mr::Roll(mr::Radiansf(std::acos(_cam.right() & mr::axis::y)) - mr::pi / 2 + mr::Radiansf(delta.z()));
       update();
       return *this;
     }
@@ -70,7 +70,7 @@ namespace mr {
 
     inline mr::Matr4f viewproj() const noexcept {
       return _cam.perspective() * _cam.frustum();
-    } 
+    }
 
     // getters
     inline mr::UniformBuffer & ubo() noexcept { return _ubo; }
