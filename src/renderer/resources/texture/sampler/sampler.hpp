@@ -2,7 +2,7 @@
 #define __sampler_hpp_
 
 #include "pch.hpp"
-#include "vulkan_application.hpp"
+#include "vulkan_state.hpp"
 
 namespace mr {
   class Sampler {

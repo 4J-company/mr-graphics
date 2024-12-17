@@ -28,6 +28,12 @@ CPMFindPackage(
 )
 
 CPMFindPackage(
+  NAME vk-bootstrap
+  GITHUB_REPOSITORY charles-lunarg/vk-bootstrap
+  GIT_TAG v1.3.290
+)
+
+CPMFindPackage(
   NAME assimp
   URL "https://github.com/assimp/assimp/archive/refs/tags/v5.4.2.zip"
   OPTIONS
@@ -51,12 +57,14 @@ set(DEPS_LIBRARIES
   Vulkan::Vulkan
   assimp::assimp
   glfw
+  vk-bootstrap::vk-bootstrap
 )
 
 set(DEPS_INCLUDE_DIRS
   ${assimp_INCLUDE_DIRS}
   ${CMAKE_CURRENT_BINARY_DIR}/_deps/stb-src
   ${vkfw_SOURCE_DIR}/include
+  ${vk-bootstrap_SOURCE_DIR}/src
 )
 
 set(DEPS_DEFINITIONS

@@ -10,17 +10,17 @@ namespace mr {
       vk::Rect2D scissors {};
   };
 
-  class WindowContext;
+  class RenderContext;
 
   class Framebuffer {
-      friend class WindowContext;
+      friend class RenderContext;
 
     private:
       static inline const size_t max_presentable_images = 2, max_gbuffers = 1;
 
       vk::UniqueFramebuffer _framebuffer;
 
-      uint _width, _height;
+      Extent _extent;
       std::array<Image, max_presentable_images> _swapchain_images;
       std::array<Image, max_gbuffers> _gbuffers;
 
@@ -30,7 +30,7 @@ namespace mr {
       Framebuffer() = default;
 
       Framebuffer(const VulkanState &state, vk::RenderPass render_pass,
-                  uint width, uint height,
+                  Extent extent,
                   Image final_target,
                   std::array<Image, 6 /* constant... */> &gbuffers,
                   Image &depthbuffer);

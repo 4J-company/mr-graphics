@@ -7,146 +7,65 @@
 #include "vkfw/vkfw.hpp"
 #include <vulkan/vulkan_enums.hpp>
 
-mr::WindowContext::WindowContext(Window *parent, const VulkanState &state)
-    : _state(state)
-    , _parent(parent)
+mr::RenderContext::RenderContext(VulkanGlobalState *state, Window *parent)
+  : _parent(parent)
+  , _state(state)
+  , _extent(parent->extent())
+  , _swapchain({}, {_state.device()})
 {
-  _surface =
-    vkfw::createWindowSurfaceUnique(state.instance(), parent->window());
+  _surface = vkfw::createWindowSurfaceUnique(_state.instance(), _parent->window());
 
-  size_t universal_queue_family_id = 0;
-
-  // Choose surface format
-  const auto avaible_formats =
-    state.phys_device().getSurfaceFormatsKHR(_surface.get()).value;
-  _swapchain_format = avaible_formats[0].format;
-  for (const auto format : avaible_formats) {
-    if (format.format == vk::Format::eB8G8R8A8Unorm) // Preferred format
-    {
-      _swapchain_format = format.format;
-      break;
-    }
-    else if (format.format == vk::Format::eR8G8B8A8Unorm) {
-      _swapchain_format = format.format;
-    }
-  }
-
-  // Choose surface extent
-  vk::SurfaceCapabilitiesKHR surface_capabilities;
-  surface_capabilities =
-    state.phys_device().getSurfaceCapabilitiesKHR(_surface.get()).value;
-  if (surface_capabilities.currentExtent.width ==
-      std::numeric_limits<uint>::max()) {
-    // If the surface size is undefined, the size is set to the size of the images requested.
-    _extent.width = std::clamp(static_cast<uint32_t>(_parent->width()),
-                               surface_capabilities.minImageExtent.width,
-                               surface_capabilities.maxImageExtent.width);
-    _extent.height = std::clamp(static_cast<uint32_t>(_parent->height()),
-                                surface_capabilities.minImageExtent.height,
-                                surface_capabilities.maxImageExtent.height);
-  }
-  else { // If the surface size is defined, the swap chain size must match
-    _extent = surface_capabilities.currentExtent;
-  }
-
-  // Choose surface present mode
-  const auto avaible_present_modes =
-    state.phys_device().getSurfacePresentModesKHR(_surface.get()).value;
-  const auto iter = std::find(avaible_present_modes.begin(),
-                              avaible_present_modes.end(),
-                              vk::PresentModeKHR::eMailbox);
-  auto present_mode =
-    (iter != avaible_present_modes.end())
-      ? *iter
-      : vk::PresentModeKHR::eFifo; // FIFO is required to be supported (by spec)
-
-  // Choose surface transform
-  vk::SurfaceTransformFlagBitsKHR pre_transform =
-    (surface_capabilities.supportedTransforms &
-     vk::SurfaceTransformFlagBitsKHR::eIdentity)
-      ? vk::SurfaceTransformFlagBitsKHR::eIdentity
-      : surface_capabilities.currentTransform;
-
-  // Choose composite alpha
-  vk::CompositeAlphaFlagBitsKHR composite_alpha =
-    (surface_capabilities.supportedCompositeAlpha &
-     vk::CompositeAlphaFlagBitsKHR::ePreMultiplied)
-      ? vk::CompositeAlphaFlagBitsKHR::ePreMultiplied
-    : (surface_capabilities.supportedCompositeAlpha &
-       vk::CompositeAlphaFlagBitsKHR::ePostMultiplied)
-      ? vk::CompositeAlphaFlagBitsKHR::ePostMultiplied
-    : (surface_capabilities.supportedCompositeAlpha &
-       vk::CompositeAlphaFlagBitsKHR::eInherit)
-      ? vk::CompositeAlphaFlagBitsKHR::eInherit
-      : vk::CompositeAlphaFlagBitsKHR::eOpaque;
-
-  // _swapchain_format = vk::Format::eB8G8R8A8Srgb; // ideal, we have eB8G8R8A8Unorm
-  _swapchain_format = vk::Format::eB8G8R8A8Unorm;
-  vk::SwapchainCreateInfoKHR swapchain_create_info {
-    .flags = {},
-    .surface = _surface.get(),
-    .minImageCount = Framebuffer::max_presentable_images,
-    .imageFormat = _swapchain_format,
-    .imageColorSpace = vk::ColorSpaceKHR::eSrgbNonlinear,
-    .imageExtent = _extent,
-    .imageArrayLayers = 1,
-    .imageUsage = vk::ImageUsageFlagBits::eColorAttachment,
-    .imageSharingMode = vk::SharingMode::eExclusive,
-    .queueFamilyIndexCount = {},
-    .pQueueFamilyIndices = {},
-    .preTransform = pre_transform,
-    .compositeAlpha = composite_alpha,
-    .presentMode = present_mode,
-    .clipped = true,
-    .oldSwapchain = nullptr};
-
-  uint32_t indeces[1] {static_cast<uint32_t>(universal_queue_family_id)};
-  swapchain_create_info.queueFamilyIndexCount = 1;
-  swapchain_create_info.pQueueFamilyIndices = indeces;
-
-  _swapchain =
-    state.device().createSwapchainKHRUnique(swapchain_create_info).value;
-
-  create_depthbuffer(_state);
-  create_render_pass(_state);
-  create_framebuffers(_state);
+  _create_swapchain();
+  _create_depthbuffer();
+  _create_render_pass();
+  _create_framebuffers();
 
   _image_available_semaphore = _state.device().createSemaphoreUnique({}).value;
   _render_finished_semaphore = _state.device().createSemaphoreUnique({}).value;
-  _image_fence = _state.device()
-                   .createFenceUnique({.flags = vk::FenceCreateFlagBits::eSignaled})
-                   .value;
+  _image_fence = _state.device().createFenceUnique({.flags = vk::FenceCreateFlagBits::eSignaled}).value;
 }
 
-mr::WindowContext::~WindowContext() {
+mr::RenderContext::~RenderContext() {
   _state.queue().waitIdle();
 }
 
-void mr::WindowContext::create_depthbuffer(const VulkanState &state)
+void mr::RenderContext::_create_swapchain()
+{
+  vkb::SwapchainBuilder builder{_state.phys_device(), _state.device(), _surface.get()};
+  auto swapchain = builder
+    .set_desired_format({static_cast<VkFormat>(_swapchain_format), VK_COLORSPACE_SRGB_NONLINEAR_KHR})
+    .set_image_usage_flags(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
+    .set_required_min_image_count(Framebuffer::max_presentable_images)
+    .build();
+  if (not swapchain) {
+    std::cerr << "Cannot create VkSwapchainKHR: " << swapchain.error().message() << "\n";
+  }
+
+  _swapchain.reset(swapchain.value().swapchain);
+}
+
+void mr::RenderContext::_create_depthbuffer()
 {
   auto format = Image::find_supported_format(
-    state,
-    {vk::Format::eD32Sfloat,
-     vk::Format::eD32SfloatS8Uint,
-     vk::Format::eD24UnormS8Uint},
+    _state,
+    {vk::Format::eD32Sfloat, vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint},
     vk::ImageTiling::eOptimal,
-    vk::FormatFeatureFlagBits::eDepthStencilAttachment);
-  _depthbuffer = Image(state,
-                       _extent.width,
-                       _extent.height,
+    vk::FormatFeatureFlagBits::eDepthStencilAttachment
+  );
+  _depthbuffer = Image(_state,
+                       _extent,
                        format,
                        vk::ImageUsageFlagBits::eDepthStencilAttachment,
                        vk::ImageAspectFlagBits::eDepth);
-  _depthbuffer.switch_layout(state,
+  _depthbuffer.switch_layout(_state,
                              vk::ImageLayout::eDepthStencilAttachmentOptimal);
 }
 
-void mr::WindowContext::create_render_pass(const VulkanState &state)
+void mr::RenderContext::_create_render_pass()
 {
   for (unsigned i = 0; i < gbuffers_number; i++) {
-    _gbuffers[i] = Image(state,
-                         _extent.width,
-                         _extent.height,
+    _gbuffers[i] = Image(_state,
+                         _extent,
                          vk::Format::eR32G32B32A32Sfloat,
                          vk::ImageUsageFlagBits::eColorAttachment |
                            vk::ImageUsageFlagBits::eInputAttachment,
@@ -235,25 +154,24 @@ void mr::WindowContext::create_render_pass(const VulkanState &state)
     _state.device().createRenderPassUnique(render_pass_create_info).value;
 }
 
-void mr::WindowContext::create_framebuffers(const VulkanState &state)
+void mr::RenderContext::_create_framebuffers()
 {
   // *** Swamp Chain Images™ ***
   auto swampchain_images =
-    state.device().getSwapchainImagesKHR(_swapchain.get()).value;
+    _state.device().getSwapchainImagesKHR(_swapchain.get()).value;
 
   for (uint i = 0; i < Framebuffer::max_presentable_images; i++) {
-    Image image{state, _extent.width, _extent.height, _swapchain_format, swampchain_images[i], true};
-    _framebuffers[i] = Framebuffer(state,
+    Image image{_state, _extent, _swapchain_format, swampchain_images[i], true};
+    _framebuffers[i] = Framebuffer(_state,
                                    _render_pass.get(),
-                                   _extent.width,
-                                   _extent.height,
+                                   _extent,
                                    std::move(image),
                                    _gbuffers,
                                    _depthbuffer);
   }
 }
 
-void mr::WindowContext::render()
+void mr::RenderContext::render()
 {
   static Shader _shader = Shader(_state, "default");
   static std::vector<vk::VertexInputAttributeDescription> descrs {
