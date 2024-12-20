@@ -59,4 +59,7 @@ namespace mr {
   template<typename... Ts> struct Overloads : Ts... { using Ts::operator()...; };
 } // namespace mr
 
+using namespace std::literals;
+using namespace mr::literals;
+
 #endif // __pch_hpp_

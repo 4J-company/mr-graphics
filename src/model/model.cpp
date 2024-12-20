@@ -1,5 +1,6 @@
 #include "model/model.hpp"
 #include "renderer/renderer.hpp"
+#include "utils/path.hpp"
 
 #define TINYGLTF_NO_INCLUDE_RAPIDJSON
 #define TINYGLTF_IMPLEMENTATION
@@ -27,9 +28,7 @@ mr::Model::Model(const VulkanState &state, vk::RenderPass render_pass, std::stri
   std::string err;
   std::string warn;
 
-  std::filesystem::path bin_dir = std::filesystem::current_path().append("bin");
-  std::filesystem::path model_path = bin_dir.append("models").append(filename);
-  std::filesystem::path shader_path = bin_dir.append("shaders").append("default");
+  std::filesystem::path model_path = path::models_dir / filename;
 
   bool ret;
   if (model_path.extension() == ".gltf") {

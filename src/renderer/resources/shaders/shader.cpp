@@ -1,4 +1,6 @@
 #include "resources/shaders/shader.hpp"
+#include "utils/path.hpp"
+
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -6,9 +8,9 @@
 mr::Shader::Shader(const VulkanState &state, std::string_view filename, const std::unordered_map<std::string, std::string> &define_map)
     : _path(std::filesystem::current_path())
 {
-  _path.append("bin").append("shaders");
+  _path /= path::shaders_dir;
   _include_string = std::string(" -I ") + _path.string() + " ";
-  _path.append(filename);
+  _path /= filename;
 
   std::stringstream ss;
   for (auto &[name, value] : define_map) {
