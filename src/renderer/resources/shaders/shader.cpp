@@ -5,6 +5,8 @@
 #include <fstream>
 #include <sstream>
 
+#include "utils/log.hpp"
+
 mr::Shader::Shader(const VulkanState &state, std::string_view filename, const std::unordered_map<std::string, std::string> &define_map)
     : _path(std::filesystem::current_path())
 {
@@ -65,6 +67,8 @@ mr::Shader::Shader(const VulkanState &state, std::string_view filename, const st
 // TODO: replace with Google's libshaderc
 void mr::Shader::compile(Shader::Stage stage) const noexcept
 {
+  MR_INFO("Compiling shader {}\n", _path.string());
+
   std::string stage_type = get_stage_name(stage);
 
   std::filesystem::path src_path = _path;

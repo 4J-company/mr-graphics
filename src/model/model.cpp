@@ -1,6 +1,7 @@
 #include "model/model.hpp"
 #include "renderer/renderer.hpp"
 #include "utils/path.hpp"
+#include "utils/log.hpp"
 
 #define TINYGLTF_NO_INCLUDE_RAPIDJSON
 #define TINYGLTF_IMPLEMENTATION
@@ -23,6 +24,8 @@ static mr::Matr4f calculate_transform(const tinygltf::Node &node,
 
 mr::Model::Model(const VulkanState &state, vk::RenderPass render_pass, std::string_view filename, mr::FPSCamera &cam) noexcept
 {
+  MR_INFO("Loading model {}", filename);
+
   tinygltf::Model model;
   tinygltf::TinyGLTF loader;
   std::string err;
@@ -38,8 +41,8 @@ mr::Model::Model(const VulkanState &state, vk::RenderPass render_pass, std::stri
     ret = loader.LoadBinaryFromFile(&model, &err, &warn, model_path.string());
   }
   if (!ret) {
-    std::cout << "GLTF ERROR: " << err;
-    std::cout << "GLTF WARNING: " << warn;
+    MR_ERROR("GLTF ERROR: {}", err);
+    MR_WARNING("GLTF WARNING: {}", warn);
     exit(-1);
   }
 
@@ -50,7 +53,7 @@ mr::Model::Model(const VulkanState &state, vk::RenderPass render_pass, std::stri
     _process_node(state, render_pass, model, mr::Matr4f::identity(), cam, node);
   }
 
-  std::cout << "loading finished\n";
+  MR_INFO("Loading model {} finished\n", filename);
 }
 
 void mr::Model::draw(CommandUnit &unit) const noexcept
