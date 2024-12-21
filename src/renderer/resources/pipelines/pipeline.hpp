@@ -4,7 +4,7 @@
 #include "pch.hpp"
 #include "resources/attachment/attachment.hpp"
 #include "resources/shaders/shader.hpp"
-#include "vulkan_application.hpp"
+#include "vulkan_state.hpp"
 
 namespace mr {
   class Pipeline {

@@ -40,6 +40,18 @@ if (${vkfw_ADDED})
 endif()
 
 CPMFindPackage(
+  NAME vk-bootstrap
+  GITHUB_REPOSITORY charles-lunarg/vk-bootstrap
+  GIT_TAG v1.3.290
+)
+
+if (${vk-bootstrap_ADDED})
+  add_library(vk-bootstrap-lib INTERFACE "")
+  target_link_libraries(vk-bootstrap-lib INTERFACE vk-bootstrap::vk-bootstrap)
+  target_include_directories(vk-bootstrap-lib INTERFACE ${vk-bootstrap_SOURCE_DIR}/src)
+endif()
+
+CPMFindPackage(
   NAME tinygltf
   GITHUB_REPOSITORY syoyo/tinygltf
   GIT_TAG release
@@ -68,6 +80,7 @@ set(DEPS_LIBRARIES
   tinygltf
   libvkfw
   libstb-image
+  vk-bootstrap-lib
 )
 
 # install CMake scripts

@@ -37,6 +37,11 @@ target_precompile_headers(${CMAKE_PROJECT_NAME} PRIVATE
   ${CMAKE_CURRENT_LIST_DIR}/src/pch.hpp
   ${CMAKE_CURRENT_LIST_DIR}/src/renderer/renderer.hpp
   )
+target_compile_definitions(
+  ${CMAKE_PROJECT_NAME} PRIVATE
+  MR_PROJECT_DIR="${CMAKE_CURRENT_LIST_DIR}"
+  MR_RES_DIR="${MR_RES_FULL_DIR}"
+)
 
 set(TARGET_DEPS write-licenses)
 if (GENERATE_DEPENDENCY_GRAPH)

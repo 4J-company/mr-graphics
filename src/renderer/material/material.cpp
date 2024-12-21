@@ -1,6 +1,6 @@
 #include "material/material.hpp"
 
-mr::Material::Material(const VulkanState state, const vk::RenderPass render_pass,
+mr::Material::Material(const VulkanState &state, const vk::RenderPass render_pass,
                        Shader shader,
                        std::span<float> ubo_data,
                        std::span<std::optional<mr::Texture>> textures,

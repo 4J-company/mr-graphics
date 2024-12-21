@@ -31,8 +31,6 @@
 #include <variant>
 #include <vector>
 
-using namespace std::literals;
-
 // user includes
 #define VULKAN_HPP_NO_EXCEPTIONS
 #define VULKAN_HPP_NO_NODISCARD_WARNINGS
@@ -50,16 +48,11 @@ using namespace std::literals;
 #undef max
 #undef min
 
+namespace std { namespace fs = filesystem; }
+
 namespace mr {
   using uint = unsigned int;
   using byte = unsigned char;
-
-  struct Boundbox {
-      mr::Vec3f min;
-      mr::Vec3f max;
-  };
-
-  template<typename... Ts> struct Overloads : Ts... { using Ts::operator()...; };
 } // namespace mr
 
 using namespace std::literals;

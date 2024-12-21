@@ -33,7 +33,7 @@ namespace mr {
 
   class Material {
   public:
-    Material(const VulkanState state, const vk::RenderPass render_pass, Shader shader,
+    Material(const VulkanState &state, const vk::RenderPass render_pass, Shader shader,
              std::span<float> ubo_data, std::span<std::optional<mr::Texture>> textures, mr::FPSCamera &cam) noexcept;
 
     void bind(CommandUnit &unit) const noexcept;
@@ -74,7 +74,7 @@ namespace mr {
       const mr::VulkanState &state,
       const vk::RenderPass &render_pass,
       std::string_view filename)
-        : _state(state)
+        : _state(&state)
         , _render_pass(render_pass)
         , _shader_filename(filename)
     {
@@ -128,9 +128,9 @@ namespace mr {
     Material build() noexcept
     {
       return Material {
-        _state,
+        *_state,
         _render_pass,
-        mr::Shader(_state,
+        mr::Shader(*_state,
                    _shader_filename,
                    _generate_shader_defines()),
         std::span {_ubo_data},
@@ -151,7 +151,7 @@ namespace mr {
       return defines;
     }
 
-    mr::VulkanState _state;
+    const mr::VulkanState *_state{nullptr};
     vk::RenderPass _render_pass;
 
     std::vector<byte> _specialization_data;

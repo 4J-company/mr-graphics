@@ -80,8 +80,8 @@ mr::GraphicsPipeline::GraphicsPipeline(
   std::vector<vk::PipelineColorBlendAttachmentState> color_blend_attachments;
   switch (subpass) {
     case Subpass::OpaqueGeometry:
-      color_blend_attachments.resize(WindowContext::gbuffers_number);
-      for (unsigned i = 0; i < WindowContext::gbuffers_number; i++) {
+      color_blend_attachments.resize(RenderContext::gbuffers_number);
+      for (unsigned i = 0; i < RenderContext::gbuffers_number; i++) {
         color_blend_attachments[i].blendEnable = false;
         color_blend_attachments[i].srcColorBlendFactor = vk::BlendFactor::eOne;
         color_blend_attachments[i].dstColorBlendFactor = vk::BlendFactor::eZero;

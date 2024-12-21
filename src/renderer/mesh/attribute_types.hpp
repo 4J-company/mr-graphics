@@ -7,6 +7,6 @@ using NormalType = mr::Vec3f;
 using TexCoordType = mr::Vec2f;
 using ColorType = mr::Vec4f;
 using BoneType = int;
-using BoundboxType = mr::Boundbox;
+using BoundboxType = mr::AABBf;
 
 #endif // __attribute_types_hpp_

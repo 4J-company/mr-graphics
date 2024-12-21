@@ -5,7 +5,7 @@
 
 
 #include "resources/command_unit/command_unit.hpp"
-#include "vulkan_application.hpp"
+#include "vulkan_state.hpp"
 
 namespace mr {
   class Buffer {

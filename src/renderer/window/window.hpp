@@ -3,30 +3,25 @@
 
 #include "pch.hpp"
 #include "window_context.hpp"
+#include "utils/misc.hpp"
 #include "camera/camera.hpp"
 
 namespace mr {
   class Window {
     private:
-      std::size_t _width, _height;
+      Extent _extent;
       vkfw::UniqueWindow _window;
-      mr::WindowContext _context;
+      mr::RenderContext _context;
       mr::FPSCamera *_cam;
 
     public:
-      // constructors
-      Window(const mr::VulkanState &state, std::size_t width = 800,
-             std::size_t height = 600);
+      Window(VulkanGlobalState *state, Extent extent = {800, 600});
+
       Window(Window &&other) noexcept = default;
       Window &operator=(Window &&other) noexcept = default;
-
-      // destructor
       ~Window() = default;
 
-      // getters
-      size_t width() const { return _width; }
-
-      size_t height() const { return _height; }
+      Extent extent() const noexcept { return _extent; }
 
       vkfw::Window window() { return _window.get(); }
 
