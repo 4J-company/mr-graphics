@@ -6,6 +6,7 @@
 namespace mr {
   struct ShaderCameraData {
     mr::Matr4f vp;
+    mr::Vec4f campos;
     float fov;
     float gamma;
     float speed;
@@ -27,6 +28,7 @@ namespace mr {
       ShaderCameraData tmp;
 
       tmp.vp = viewproj();
+      tmp.campos = _cam.position();
       tmp.fov = _fov._data;
       tmp.gamma = _gamma;
       tmp.speed = _speed;
@@ -48,7 +50,7 @@ namespace mr {
       delta *= _sensetivity;
       _cam += mr::Yaw(mr::Radiansf(delta.x()));
       _cam += mr::Pitch(mr::Radiansf(delta.y()));
-      _cam += mr::Roll(mr::Radiansf(delta.z()));
+      _cam += mr::Roll(mr::Radiansf(std::acos(_cam.right() & mr::axis::y)) - mr::pi / 2 + mr::Radiansf(delta.z()));
       update();
       return *this;
     }
@@ -61,7 +63,7 @@ namespace mr {
 
     mr::Matr4f viewproj() const noexcept {
       return _cam.perspective() * _cam.frustum();
-    } 
+    }
 
     // getters
     mr::UniformBuffer & ubo() noexcept { return _ubo; }

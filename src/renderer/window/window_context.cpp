@@ -280,6 +280,7 @@ void mr::WindowContext::render(mr::FPSCamera &cam)
   for (unsigned i = 0; i < gbuffers_number; i++) {
     light_attach.emplace_back(0, i, &_gbuffers[i]);
   }
+  light_attach.emplace_back(0, gbuffers_number, &cam.ubo());
   static DescriptorSet light_set =
     descriptor_alloc.allocate_set(Shader::Stage::Fragment, light_attach).value_or(DescriptorSet());
   static vk::DescriptorSetLayout light_layout = light_set.layout();

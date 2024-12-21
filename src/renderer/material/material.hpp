@@ -42,8 +42,8 @@ namespace mr {
     mr::UniformBuffer _ubo;
     mr::Shader _shader;
 
-    mr::DescriptorAllocator _descriptor_allocator; 
-    mr::DescriptorSet _descriptor_set; 
+    mr::DescriptorAllocator _descriptor_allocator;
+    mr::DescriptorSet _descriptor_set;
     mr::GraphicsPipeline _pipeline;
 
     std::array<vk::VertexInputAttributeDescription, 3> _descrs {
@@ -105,7 +105,11 @@ namespace mr {
 
     MaterialBuilder & add_value(const auto &value)
     {
+#ifdef __cpp_lib_containers_ranges
       _ubo_data.append_range(std::span {(float *)&value, sizeof(value) / sizeof(float)});
+#else
+      _ubo_data.insert(_ubo_data.end(), (float *)&value, (float *)(&value + 1));
+#endif
       return *this;
     }
 
@@ -160,4 +164,4 @@ namespace mr {
   };
 } // namespace mr
 
-#endif __material_cpp_
+#endif // __material_cpp_

@@ -27,18 +27,13 @@ mr::Window::Window(const VulkanState &state, size_t width, size_t height)
 
   _window = std::move(window);
 
-  glfwSetInputMode(_window.get(), GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+  glfwSetInputMode(_window.get(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
   _window->callbacks()->on_cursor_move = [this](const vkfw::Window &win, double dx, double dy) {
-      if (2 * dx == _width && 2 * dy == _height) {
-        return;
-      }
-      camera.turn({
-          2 * dx / _width - 1,
-          2 * dy / _height - 1,
-          0});
-
-      _window->setCursorPos(_width / 2.0, _height / 2.0);
+    camera.turn({
+        2 * dx / _width - 1,
+        2 * dy / _height - 1,
+        0});
   };
   _window->callbacks()->on_key = [&](const vkfw::Window &win, vkfw::Key key,
                                     int scan_code, vkfw::KeyAction action,
