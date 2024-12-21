@@ -15,16 +15,6 @@ target_link_libraries(
     ${DEPS_LIBRARIES}
 )
 
-target_include_directories(
-  ${CMAKE_PROJECT_NAME} PUBLIC
-  ${DEPS_INCLUDE_DIRS}
-)
-
-target_compile_definitions(
-  ${CMAKE_PROJECT_NAME} PRIVATE
-  ${DEPS_DEFINITIONS}
-)
-
 # source
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
   ${CMAKE_CURRENT_LIST_DIR}/src

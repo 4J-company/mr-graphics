@@ -33,19 +33,31 @@ CPMFindPackage(
   GIT_TAG glfw-3.4
 )
 
+if (${vkfw_ADDED})
+  add_library(libvkfw INTERFACE "")
+  target_link_libraries(libvkfw INTERFACE glfw)
+  target_include_directories(libvkfw INTERFACE ${vkfw_SOURCE_DIR}/include)
+endif()
+
 CPMFindPackage(
   NAME tinygltf
   GITHUB_REPOSITORY syoyo/tinygltf
   GIT_TAG release
+  OPTIONS
+    "TINYGLTF_BUILD_LOADER_EXAMPLE OFF"
 )
 
-# download a single file from stb
-file(
-  DOWNLOAD
-  https://raw.githubusercontent.com/nothings/stb/master/stb_image.h
-  ${CMAKE_CURRENT_BINARY_DIR}/_deps/stb-src/stb/stb_image.h
-  EXPECTED_HASH SHA256=594c2fe35d49488b4382dbfaec8f98366defca819d916ac95becf3e75f4200b3
-)
+if (NOT TARGET libstb-image)
+  # download a single file from stb
+  file(
+    DOWNLOAD
+    https://raw.githubusercontent.com/nothings/stb/master/stb_image.h
+    ${CMAKE_CURRENT_BINARY_DIR}/_deps/stb-src/stb/stb_image.h
+    EXPECTED_HASH SHA256=594c2fe35d49488b4382dbfaec8f98366defca819d916ac95becf3e75f4200b3
+  )
+  add_library(libstb-image INTERFACE "")
+  target_include_directories(libstb-image INTERFACE ${CMAKE_CURRENT_BINARY_DIR}/_deps/stb-src/)
+endif()
 
 find_package(Vulkan)
 
@@ -53,17 +65,9 @@ find_package(Vulkan)
 set(DEPS_LIBRARIES
   Vulkan::Vulkan
   mr-math-lib
-  glfw
-)
-
-set(DEPS_INCLUDE_DIRS
-  ${assimp_INCLUDE_DIRS}
-  ${CMAKE_CURRENT_BINARY_DIR}/_deps/stb-src
-  ${vkfw_SOURCE_DIR}/include
-  ${tinygltf_SOURCE_DIR}
-)
-
-set(DEPS_DEFINITIONS
+  tinygltf
+  libvkfw
+  libstb-image
 )
 
 # install CMake scripts
