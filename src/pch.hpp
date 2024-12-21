@@ -31,6 +31,8 @@
 #include <variant>
 #include <vector>
 
+using namespace std::literals;
+
 // user includes
 #define VULKAN_HPP_NO_EXCEPTIONS
 #define VULKAN_HPP_NO_NODISCARD_WARNINGS

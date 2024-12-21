@@ -14,11 +14,11 @@ mr::Material::Material(const VulkanState state, const vk::RenderPass render_pass
 
   attachments.emplace_back(0, 0, &cam.ubo());
   attachments.emplace_back(0, 1, &_ubo);
-  for (unsigned int i = 0; i < textures.size(); i++) {
+  for (size_t i = 0; i < textures.size(); i++) {
     if (!textures[i].has_value()) {
       continue;
     }
-    attachments.emplace_back(0, i + 2, &textures[i].value());
+    attachments.emplace_back(0, static_cast<uint32_t>(i + 2), &textures[i].value());
   }
 
   _descriptor_set =

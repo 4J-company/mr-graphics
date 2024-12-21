@@ -201,20 +201,6 @@ static std::optional<mr::Texture> load_texture(const mr::VulkanState &state,
   return mr::Texture(state, image.image.data(), image.height, image.width, format);
 }
 
-static mr::Vec4f load_constant(const std::vector<double> &constant) noexcept
-{
-  std::array<float, 4> tmp {};
-  for (int i = 0; i < constant.size(); i++) {
-    tmp[i] = constant[i];
-  }
-  return {
-    tmp[0],
-    tmp[1],
-    tmp[2],
-    tmp[3],
-  };
-}
-
 static mr::Material load_material(
     const mr::VulkanState &state,
     vk::RenderPass render_pass,
@@ -244,8 +230,8 @@ static mr::Material load_material(
   mr::Vec4f specular_color {0.1, 0.1, 0.1, 1};
   float shininess = 0.5;
 
-  mr::Vec4f base_color_factor = load_constant(material.pbrMetallicRoughness.baseColorFactor);
-  mr::Vec4f emissive_color_factor = load_constant(material.emissiveFactor);
+  mr::Vec4f base_color_factor {std::span {material.pbrMetallicRoughness.baseColorFactor}};
+  mr::Vec4f emissive_color_factor {std::span {material.emissiveFactor}};
   float metallic_factor = material.pbrMetallicRoughness.metallicFactor;
   float roughness_factor = material.pbrMetallicRoughness.roughnessFactor;
 
@@ -255,14 +241,15 @@ static mr::Material load_material(
   std::optional<mr::Texture> occlusion_texture_optional          = load_texture(state, model, material.occlusionTexture.index);
   std::optional<mr::Texture> normal_texture_optional             = load_texture(state, model, material.normalTexture.index);
 
+  using enum mr::MaterialParameter;
   mr::MaterialBuilder builder = mr::MaterialBuilder(state, render_pass, "default");
   builder
     .add_value(transform)
-    .add_texture("BASE_COLOR_MAP", std::move(base_color_texture_optional), base_color_factor)
-    .add_texture("METALLIC_ROUGHNESS_MAP", std::move(metallic_roughness_texture_optional.value()))
-    .add_texture("EMISSIVE_MAP", std::move(emissive_texture_optional), emissive_color_factor)
-    .add_texture("OCCLUSION_MAP", std::move(occlusion_texture_optional))
-    .add_texture("NORMAL_MAP", std::move(normal_texture_optional))
+    .add_texture(BaseColor, std::move(base_color_texture_optional), base_color_factor)
+    .add_texture(MetallicRoughness, std::move(metallic_roughness_texture_optional))
+    .add_texture(EmissiveColor, std::move(emissive_texture_optional), emissive_color_factor)
+    .add_texture(OcclusionMap, std::move(occlusion_texture_optional))
+    .add_texture(NormalMap, std::move(normal_texture_optional))
     .add_camera(cam);
   builders.emplace_back(std::move(builder));
   return builders.back().build();
