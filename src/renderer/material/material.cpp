@@ -4,7 +4,7 @@ mr::Material::Material(const VulkanState &state, const vk::RenderPass render_pas
                        Shader shader,
                        std::span<float> ubo_data,
                        std::span<std::optional<mr::Texture>> textures,
-                       mr::FPSCamera &cam) noexcept
+                       mr::UniformBuffer &cam_ubo) noexcept
     : _ubo(state, ubo_data)
     , _shader(std::move(shader))
     , _descriptor_allocator(state)
@@ -12,7 +12,7 @@ mr::Material::Material(const VulkanState &state, const vk::RenderPass render_pas
   std::vector<Shader::ResourceView> attachments;
   attachments.reserve(textures.size());
 
-  attachments.emplace_back(0, 0, &cam.ubo());
+  attachments.emplace_back(0, 0, &cam_ubo);
   attachments.emplace_back(0, 1, &_ubo);
   for (size_t i = 0; i < textures.size(); i++) {
     if (!textures[i].has_value()) {

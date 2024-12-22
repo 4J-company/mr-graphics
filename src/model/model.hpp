@@ -22,13 +22,13 @@ namespace mr {
                          const vk::RenderPass &render_pass,
                          tinygltf::Model &model,
                          const mr::Matr4f &parent_transform,
-                         mr::FPSCamera &cam,
+                         mr::UniformBuffer &cam_ubo,
                          const tinygltf::Node &node) noexcept;
 
     public:
       Model() = default;
 
-      Model(const VulkanState &state, vk::RenderPass render_pass, std::string_view filename, mr::FPSCamera &cam) noexcept;
+      Model(const VulkanState &state, vk::RenderPass render_pass, std::string_view filename, mr::UniformBuffer &cam_ubo) noexcept;
 
       Model(const Model &other) noexcept = default;
       Model &operator=(const Model &other) noexcept = default;

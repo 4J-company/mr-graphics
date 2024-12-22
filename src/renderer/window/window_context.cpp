@@ -37,6 +37,7 @@ void mr::RenderContext::_create_swapchain()
     .set_desired_format({static_cast<VkFormat>(_swapchain_format), VK_COLORSPACE_SRGB_NONLINEAR_KHR})
     .set_image_usage_flags(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
     .set_required_min_image_count(Framebuffer::max_presentable_images)
+    .set_desired_extent(_extent.width, _extent.height)
     .build();
   if (not swapchain) {
     MR_ERROR("Cannot create VkSwapchainKHR. {}\n", swapchain.error().message());
@@ -172,13 +173,29 @@ void mr::RenderContext::_create_framebuffers()
   }
 }
 
-void mr::WindowContext::render(mr::FPSCamera &cam)
+static void update_camera(mr::FPSCamera &cam, mr::UniformBuffer &cam_ubo) noexcept
 {
-  static DescriptorAllocator descriptor_alloc = DescriptorAllocator(_state);
+  mr::ShaderCameraData cam_data;
 
-  static CommandUnit command_unit {_state};
+  cam_data.vp = cam.viewproj();
+  cam_data.campos = cam.cam().position();
+  cam_data.fov = static_cast<float>(cam.fov());
+  cam_data.gamma = cam.gamma();
+  cam_data.speed = cam.speed();
+  cam_data.sens = cam.sensetivity();
 
-  static Model model = Model(_state, _render_pass.get(), "ABeautifulGame/ABeautifulGame.gltf", cam);
+  cam_ubo.write(std::span<mr::ShaderCameraData> {&cam_data, 1});
+}
+
+void mr::RenderContext::render(mr::FPSCamera &cam)
+{
+  static DescriptorAllocator descriptor_alloc(_state);
+
+  static CommandUnit command_unit(_state);
+
+  static UniformBuffer cam_ubo(_state, sizeof(ShaderCameraData));
+
+  static Model model(_state, _render_pass.get(), "ABeautifulGame/ABeautifulGame.gltf", cam_ubo);
 
   /// light
   const std::vector<float> light_vertexes {-1, -1, 1, -1, 1, 1, -1, 1};
@@ -198,7 +215,7 @@ void mr::WindowContext::render(mr::FPSCamera &cam)
   for (unsigned i = 0; i < gbuffers_number; i++) {
     light_attach.emplace_back(0, i, &_gbuffers[i]);
   }
-  light_attach.emplace_back(0, gbuffers_number, &cam.ubo());
+  light_attach.emplace_back(0, gbuffers_number, &cam_ubo);
   static DescriptorSet light_set =
     descriptor_alloc.allocate_set(Shader::Stage::Fragment, light_attach).value_or(DescriptorSet());
   static vk::DescriptorSetLayout light_layout = light_set.layout();
@@ -239,6 +256,7 @@ void mr::WindowContext::render(mr::FPSCamera &cam)
   command_unit->beginRenderPass(render_pass_info, vk::SubpassContents::eInline);
   command_unit->setViewport(0, _framebuffers[image_index].viewport());
   command_unit->setScissor(0, _framebuffers[image_index].scissors());
+  update_camera(cam, cam_ubo);
   model.draw(command_unit);
   command_unit->nextSubpass(vk::SubpassContents::eInline);
   command_unit->bindPipeline(vk::PipelineBindPoint::eGraphics,

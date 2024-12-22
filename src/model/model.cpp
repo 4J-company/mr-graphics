@@ -17,12 +17,12 @@ static mr::Material load_material(const mr::VulkanState &state,
                                   vk::RenderPass render_pass,
                                   const tinygltf::Model &model,
                                   const tinygltf::Material &material,
-                                  mr::FPSCamera &cam,
+                                  mr::UniformBuffer &cam_ubo,
                                   mr::Matr4f transform) noexcept;
 static mr::Matr4f calculate_transform(const tinygltf::Node &node,
                                       const mr::Matr4f &parent_transform) noexcept;
 
-mr::Model::Model(const VulkanState &state, vk::RenderPass render_pass, std::string_view filename, mr::FPSCamera &cam) noexcept
+mr::Model::Model(const VulkanState &state, vk::RenderPass render_pass, std::string_view filename, mr::UniformBuffer &cam_ubo) noexcept
 {
   MR_INFO("Loading model {}", filename);
 
@@ -50,7 +50,7 @@ mr::Model::Model(const VulkanState &state, vk::RenderPass render_pass, std::stri
   const auto &scene = model.scenes[0];
   for (int i = 0; i < scene.nodes.size(); i++) {
     const auto &node = model.nodes[scene.nodes[i]];
-    _process_node(state, render_pass, model, mr::Matr4f::identity(), cam, node);
+    _process_node(state, render_pass, model, mr::Matr4f::identity(), cam_ubo, node);
   }
 
   MR_INFO("Loading model {} finished\n", filename);
@@ -70,7 +70,7 @@ void mr::Model::_process_node(const mr::VulkanState &state,
                               const vk::RenderPass &render_pass,
                               tinygltf::Model &model,
                               const mr::Matr4f &parent_transform,
-                              mr::FPSCamera &cam,
+                              mr::UniformBuffer &cam_ubo,
                               const tinygltf::Node &node) noexcept
 {
   std::array attributes {
@@ -87,7 +87,7 @@ void mr::Model::_process_node(const mr::VulkanState &state,
   mr::Matr4f transform = calculate_transform(node, parent_transform);
 
   for (auto child : node.children) {
-    _process_node(state, render_pass, model, transform, cam, model.nodes[child]);
+    _process_node(state, render_pass, model, transform, cam_ubo, model.nodes[child]);
   }
 
   for (auto &primitive : mesh.primitives) {
@@ -183,7 +183,7 @@ void mr::Model::_process_node(const mr::VulkanState &state,
     tinygltf::Material material = model.materials[primitive.material];
 
     _meshes.emplace_back(std::move(vbuf), std::move(ibuf));
-    _materials.emplace_back(load_material(state, render_pass, model, material, cam, transform));
+    _materials.emplace_back(load_material(state, render_pass, model, material, cam_ubo, transform));
   }
 }
 
@@ -198,7 +198,7 @@ static std::optional<mr::Texture> load_texture(const mr::VulkanState &state,
 
   // NOTE: most devices dont support 3 component texels
   vk::Format format = image.component == 3 ? vk::Format::eR8G8B8Srgb : vk::Format::eR8G8B8A8Srgb;
-  return mr::Texture(state, image.image.data(), image.height, image.width, format);
+  return mr::Texture(state, image.image.data(), {static_cast<uint32_t>(image.width), static_cast<uint32_t>(image.height)}, format);
 }
 
 static mr::Material load_material(
@@ -206,7 +206,7 @@ static mr::Material load_material(
     vk::RenderPass render_pass,
     const tinygltf::Model &model,
     const tinygltf::Material &material,
-    mr::FPSCamera &cam,
+    mr::UniformBuffer &cam_ubo,
     mr::Matr4f transform) noexcept
 {
   /*
@@ -220,8 +220,8 @@ static mr::Material load_material(
 
   static std::vector<mr::MaterialBuilder> builders;
 
-  mr::Vec4f base_color_factor = load_constant(material.pbrMetallicRoughness.baseColorFactor);
-  mr::Vec4f emissive_color_factor = load_constant(material.emissiveFactor);
+  mr::Vec4f base_color_factor = std::span(material.pbrMetallicRoughness.baseColorFactor);
+  mr::Vec4f emissive_color_factor = std::span(material.emissiveFactor);
   float metallic_factor = material.pbrMetallicRoughness.metallicFactor;
   float roughness_factor = material.pbrMetallicRoughness.roughnessFactor;
 
@@ -240,7 +240,7 @@ static mr::Material load_material(
     .add_texture(EmissiveColor, std::move(emissive_texture_optional), emissive_color_factor)
     .add_texture(OcclusionMap, std::move(occlusion_texture_optional))
     .add_texture(NormalMap, std::move(normal_texture_optional))
-    .add_camera(cam);
+    .add_camera(cam_ubo);
   builders.emplace_back(std::move(builder));
   return builders.back().build();
 }

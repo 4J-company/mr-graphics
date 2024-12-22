@@ -5,7 +5,7 @@
 mr::Window::Window(VulkanGlobalState *state, Extent extent)
   : _extent(extent)
 {
-  static mr::FPSCamera camera = state;
+  static mr::FPSCamera camera;
   _cam = &camera;
 
   // TODO: retry a couple of times
@@ -31,6 +31,13 @@ mr::Window::Window(VulkanGlobalState *state, Extent extent)
         2 * dx / _width - 1,
         2 * dy / _height - 1,
         0});
+  _window->callbacks()->on_cursor_move =
+    [this](const vkfw::Window &win, double x, double y) {
+    static mr::Vec2d old_pos;
+    mr::Vec2d pos = {x, y};
+    mr::Vec2d delta = pos - old_pos;
+    old_pos = pos;
+    camera.turn({delta.x() / _extent.width, delta.y() / _extent.height, 0});
   };
   _window->callbacks()->on_key = [&](const vkfw::Window &win, vkfw::Key key,
                                     int scan_code, vkfw::KeyAction action,
@@ -68,7 +75,7 @@ mr::Window::Window(VulkanGlobalState *state, Extent extent)
       }
     }
   };
-  _context = mr::WindowContext(this, state);
+  _context = mr::RenderContext(state, this);
 }
 
 void mr::Window::start_main_loop() {
