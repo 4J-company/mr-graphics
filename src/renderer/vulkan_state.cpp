@@ -1,5 +1,6 @@
 #include "vulkan_state.hpp"
 #include "utils/logic_guards.hpp"
+#include "utils/path.hpp"
 
 mr::VulkanGlobalState::VulkanGlobalState()
 {
@@ -10,8 +11,9 @@ mr::VulkanGlobalState::VulkanGlobalState()
   _create_phys_device();
 
   // TODO: create caches depending on program arguments for easier benchmarking
-  _pipeline_cache.open(_cache_dir / "pipeline.cache");
-  _validation_cache.open(_cache_dir / "validation.cache");
+  std::fs::path pipeline_cache_path = path::cache_dir / "pipeline.cache";
+  MR_INFO("Reading pipeline cache from {}", pipeline_cache_path.string());
+  _pipeline_cache.open_or_create(std::move(pipeline_cache_path));
 }
 
 mr::VulkanGlobalState::~VulkanGlobalState()
@@ -108,14 +110,11 @@ mr::VulkanState::VulkanState(VulkanGlobalState *state)
 {
   _create_device();
   _create_pipeline_cache();
-  _create_validation_cache();
 }
 
 mr::VulkanState::~VulkanState()
 {
   _destroy_pipeline_cache();
-  _destroy_validation_cache();
-  //_device.destroy();
 }
 
 void mr::VulkanState::_create_device()
@@ -168,70 +167,6 @@ void mr::VulkanState::_destroy_pipeline_cache()
   cache_bytes.resize(cache_size);
   result = device().getPipelineCacheData(pipeline_cache(), &cache_size, cache_bytes.data());
   if (result != vk::Result::eSuccess) {
-    return;
-  }
-}
-
-void mr::VulkanState::_create_validation_cache()
-{
-  if (not _global->_phys_device.is_extension_present(VK_EXT_VALIDATION_CACHE_EXTENSION_NAME)) {
-    return;
-  }
-
-  // TODO: search for an easier way to load functions (volk?)
-  auto create_cache = reinterpret_cast<PFN_vkCreateValidationCacheEXT>(
-    instance().getProcAddr("vkCreateValidationCacheEXT")
-  );
-  if (create_cache == nullptr) {
-    return;
-  }
-
-  const auto &cache_bytes = _global->_validation_cache.bytes();
-  const vk::ValidationCacheCreateInfoEXT create_info {
-    .initialDataSize = cache_bytes.size(),
-    .pInitialData = cache_bytes.data()
-  };
-
-  create_cache(
-    device(),
-    reinterpret_cast<const VkValidationCacheCreateInfoEXT *>(&create_info),
-    nullptr,
-    reinterpret_cast<VkValidationCacheEXT *>(&_validation_cache)
-  );
-}
-
-void mr::VulkanState::_destroy_validation_cache()
-{
-  if (not _validation_cache) {
-    return;
-  }
-
-  on_scope_exit {
-    auto destroy_cache = reinterpret_cast<PFN_vkDestroyValidationCacheEXT>(
-      instance().getProcAddr("vkDestroyValidationCacheEXT")
-    );
-    if (destroy_cache != nullptr) {
-      destroy_cache(*_device, _validation_cache, nullptr);
-    }
-  };
-
-  auto get_cache_data = reinterpret_cast<PFN_vkGetValidationCacheDataEXT>(
-    instance().getProcAddr("vkGetValidationCacheDataEXT")
-  );
-  if (get_cache_data == nullptr) {
-    return;
-  }
-
-  size_t cache_size = 0;
-  VkResult result = get_cache_data(device(), _validation_cache, &cache_size, nullptr);
-  if (result != VK_SUCCESS) {
-    return;
-  }
-
-  auto &cache_bytes = _global->_validation_cache.bytes();
-  cache_bytes.resize(cache_size);
-  result = get_cache_data(device(), _validation_cache, &cache_size, cache_bytes.data());
-  if (result != VK_SUCCESS) {
     return;
   }
 }

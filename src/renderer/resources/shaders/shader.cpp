@@ -36,19 +36,13 @@ mr::Shader::Shader(const VulkanState &state, std::string_view filename, const st
 
       int ind = _num_of_loaded_shaders++;
 
-      vk::StructureChain<vk::ShaderModuleCreateInfo, vk::ShaderModuleValidationCacheCreateInfoEXT>
-        create_info {
-          {
-            .codeSize = source->size(),
-            .pCode = reinterpret_cast<const uint *>(source->data())
-          },
-          {
-            .validationCache = state.validation_cache()
-          }
-        };
+      vk::ShaderModuleCreateInfo create_info {
+       .codeSize = source->size(),
+       .pCode = reinterpret_cast<const uint *>(source->data())
+      };
 
       auto [result, module] =
-        state.device().createShaderModuleUnique(create_info.get());
+        state.device().createShaderModuleUnique(create_info);
       assert(result == vk::Result::eSuccess);
       _modules[ind] = std::move(module);
 
