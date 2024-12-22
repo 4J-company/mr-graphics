@@ -26,10 +26,17 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
   VkDebugUtilsMessageTypeFlagsEXT message_type,
   const VkDebugUtilsMessengerCallbackDataEXT *callback_data, void *user_data)
 {
-  const auto severity = vkb::to_string_message_severity(message_severity);
-  const auto type = vkb::to_string_message_type(message_type);
-  std::cerr << callback_data->messageIdNumber << ' ' << type << ' ' << severity
-    << ": " << callback_data->pMessage << "\n\n";
+  switch (message_severity) {
+  case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
+    MR_ERROR("{}\n", callback_data->pMessage);
+    break;
+  case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
+    MR_WARNING("{}\n", callback_data->pMessage);
+    break;
+  default:
+    MR_INFO("{}\n", callback_data->pMessage);
+    break;
+  }
   return false;
 }
 
@@ -70,7 +77,7 @@ void mr::VulkanGlobalState::_create_instance()
 
   const auto instance = builder.build();
   if (not instance) {
-    std::cerr << "Cannot create VkInstance: " << instance.error().message() << "\n";
+    MR_ERROR("Cannot create VkInstance. {}\n", instance.error().message());
   }
   _instance = instance.value();
 }
@@ -83,7 +90,7 @@ void mr::VulkanGlobalState::_create_phys_device()
     .add_required_extensions({VK_KHR_SWAPCHAIN_EXTENSION_NAME})
     .select();
   if (not phys_device) {
-    std::cerr << "Cannot create VkPhysicalDevice: " << phys_device.error().message() << "\n";
+    MR_ERROR("Cannot create VkPhysicalDevice. {}\n", phys_device.error().message());
   }
   _phys_device = phys_device.value();
 
@@ -95,7 +102,7 @@ void mr::VulkanGlobalState::_create_phys_device()
     .samplerAnisotropy = true,
   };
   if (not _phys_device.enable_features_if_present(static_cast<const VkPhysicalDeviceFeatures &>(required_features))) {
-    std::cerr << "VkPhysicalDevice does not support required features\n";
+    MR_ERROR("VkPhysicalDevice does not support required features\n");
   }
 
   const vk::PhysicalDeviceFeatures optional_features {
@@ -130,13 +137,13 @@ void mr::VulkanState::_create_device()
   vkb::DeviceBuilder builder{_global->_phys_device};
   auto device = builder.custom_queue_setup(queue_descrs).build();
   if (not device) {
-    std::cerr << "Cannot create VkDevice: " << device.error().message() << "\n";
+    MR_ERROR("Cannot create VkDevice. {}\n", device.error().message());
   }
   _device.reset(device.value().device);
 
   auto queue = device.value().get_queue(vkb::QueueType::graphics);
   if (not queue) {
-    std::cerr << "Cannot create VkQueue: " << queue.error().message() << "\n";
+    MR_ERROR("Cannot create VkQueue {}\n ", queue.error().message());
   }
   _queue = queue.value();
 }

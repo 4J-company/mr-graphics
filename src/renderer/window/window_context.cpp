@@ -39,7 +39,7 @@ void mr::RenderContext::_create_swapchain()
     .set_required_min_image_count(Framebuffer::max_presentable_images)
     .build();
   if (not swapchain) {
-    std::cerr << "Cannot create VkSwapchainKHR: " << swapchain.error().message() << "\n";
+    MR_ERROR("Cannot create VkSwapchainKHR. {}\n", swapchain.error().message());
   }
 
   _swapchain.reset(swapchain.value().swapchain);

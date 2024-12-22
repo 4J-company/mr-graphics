@@ -1,5 +1,6 @@
 #include "window.hpp"
 #include "camera/camera.hpp"
+#include "utils/log.hpp"
 
 mr::Window::Window(VulkanGlobalState *state, Extent extent)
   : _extent(extent)
@@ -17,6 +18,7 @@ mr::Window::Window(VulkanGlobalState *state, Extent extent)
   auto [result_code, window] =
     vkfw::createWindowUnique(_extent.width, _extent.height, "CGSGFOREVER", hints);
   if (result_code != vkfw::Result::eSuccess) {
+    MR_FATAL("Cannot create window. vkfw::createWindowUnique failed with: {}", vkfw::to_string(result_code));
     std::exit(1);
   }
 

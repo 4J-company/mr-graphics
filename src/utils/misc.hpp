@@ -2,6 +2,7 @@
 #define __misc_hpp_
 
 #include "pch.hpp"
+#include "utils/log.hpp"
 
 namespace mr {
   template <typename... Ts>
@@ -56,7 +57,7 @@ namespace mr {
 
     CacheFile(std::fs::path file_path)
     {
-      open(file_path);
+      open_or_create(std::move(file_path));
     }
 
     bool open(std::fs::path file_path)
@@ -68,9 +69,7 @@ namespace mr {
       _file_path = std::move(file_path);
       std::ifstream file(_file_path, std::ios::binary);
       if (not file.is_open()) {
-#ifndef NDEBUG
-        std::cerr << "Cannot open file " << _file_path << "\n\t Error: " << std::strerror(errno) << "\n\n";
-#endif
+        MR_ERROR("Cannot open file {}. {}\n", _file_path.string(), std::strerror(errno));
         return false;
       }
 
@@ -81,6 +80,24 @@ namespace mr {
       _bytes.resize(data_size);
       file.seekg(0, std::ios::beg);
       file.read(reinterpret_cast<char *>(_bytes.data()), data_size);
+
+      return true;
+    }
+
+    bool open_or_create(std::fs::path file_path)
+    {
+      if (not open(std::move(file_path))) {
+        MR_INFO("Creating file instead...");
+
+        std::error_code error;
+        std::fs::create_directory(_file_path.parent_path(), error);
+
+        std::ofstream file(_file_path, std::ios::binary);
+        if (not file.is_open()) {
+          MR_ERROR("Cannot create file {}. {}\n", _file_path.string(), std::strerror(errno));
+          return false;
+        }
+      }
 
       return true;
     }
