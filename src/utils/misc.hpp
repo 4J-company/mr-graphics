@@ -28,7 +28,7 @@ namespace mr {
     Extent() = default;
 
     constexpr Extent(ValueT width_, ValueT height_) noexcept
-      : width{height_}, height{height_} {}
+      : width{width_}, height{height_} {}
 
     // converting to/from other extents
     template <ExtentLike Other>
