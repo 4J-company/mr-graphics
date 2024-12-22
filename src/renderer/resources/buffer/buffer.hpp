@@ -9,7 +9,27 @@
 
 namespace mr {
   class Buffer {
+    public:
+      Buffer() = default;
+      Buffer(const VulkanState &state, size_t byte_size,
+             vk::BufferUsageFlags usage_flag,
+             vk::MemoryPropertyFlags memory_properties);
+      Buffer(Buffer &&) = default;
+      Buffer &operator=(Buffer &&) = default;
+      virtual ~Buffer() = default;
+
+      void resize(size_t byte_size);
+
+      static uint find_memory_type(const VulkanState &state, uint filter,
+                                   vk::MemoryPropertyFlags properties) noexcept;
+
+      vk::Buffer buffer() const noexcept { return _buffer.get(); }
+
+      size_t byte_size() const noexcept { return _size; }
+
     protected:
+      const VulkanState *_state{nullptr};
+
       size_t _size;
 
       vk::UniqueBuffer _buffer;
@@ -20,27 +40,7 @@ namespace mr {
       // VMA data
       // VmaAllocation _allocation;
       // VmaMemoryUsage _memory_usage;
-
-    public:
-      Buffer() = default;
-      Buffer(const VulkanState &state, size_t byte_size,
-             vk::BufferUsageFlags usage_flag,
-             vk::MemoryPropertyFlags memory_properties);
-      Buffer(Buffer &&) = default;
-      Buffer &operator=(Buffer &&) = default;
-      virtual ~Buffer() = 0;
-
-      void resize(size_t byte_size);
-
-      static uint find_memory_type(const VulkanState &state, uint filter,
-                                   vk::MemoryPropertyFlags properties) noexcept;
-
-      vk::Buffer buffer() const noexcept { return _buffer.get(); }
-
-      size_t byte_size() const noexcept { return _size; }
   };
-
-  inline Buffer::~Buffer() {}
 
   class HostBuffer : public Buffer {
     public:
@@ -61,16 +61,17 @@ namespace mr {
       HostBuffer &operator=(HostBuffer &&) = default;
 
       template <typename T, size_t Extent>
-      HostBuffer &write(const VulkanState &state, std::span<T, Extent> src)
+      HostBuffer &write(std::span<T, Extent> src)
       {
         // std::span<const T, Extent> cannot be constructed from non-const
 
         size_t byte_size = src.size() * sizeof(T);
         assert(byte_size <= _size);
 
-        auto ptr = state.device().mapMemory(_memory.get(), 0, byte_size).value;
+        assert(_state != nullptr);
+        auto ptr = _state->device().mapMemory(_memory.get(), 0, byte_size).value;
         memcpy(ptr, src.data(), byte_size);
-        state.device().unmapMemory(_memory.get());
+        _state->device().unmapMemory(_memory.get());
         return *this;
       }
   };
@@ -91,20 +92,21 @@ namespace mr {
       }
 
       template <typename T, size_t Extent>
-      DeviceBuffer &write(const VulkanState &state, std::span<T, Extent> src)
+      DeviceBuffer &write(std::span<T, Extent> src)
       {
         // std::span<const T, Extent> cannot be constructed from non-const
 
         size_t byte_size = src.size() * sizeof(T);
         assert(byte_size <= _size);
 
+        assert(_state != nullptr);
         auto buf =
-          HostBuffer(state, _size, vk::BufferUsageFlagBits::eTransferSrc);
-        buf.write(state, src);
+          HostBuffer(*_state, _size, vk::BufferUsageFlagBits::eTransferSrc);
+        buf.write(src);
 
         vk::BufferCopy buffer_copy {.size = byte_size};
 
-        static CommandUnit command_unit(state);
+        static CommandUnit command_unit(*_state);
         command_unit.begin();
         command_unit->copyBuffer(buf.buffer(), _buffer.get(), {buffer_copy});
         command_unit.end();
@@ -114,9 +116,9 @@ namespace mr {
           .commandBufferCount = bufs_number,
           .pCommandBuffers = bufs,
         };
-        auto fence = state.device().createFence({}).value;
-        state.queue().submit(submit_info, fence);
-        state.device().waitForFences({fence}, VK_TRUE, UINT64_MAX);
+        auto fence = _state->device().createFence({}).value;
+        _state->queue().submit(submit_info, fence);
+        _state->device().waitForFences({fence}, VK_TRUE, UINT64_MAX);
 
         return *this;
       }
@@ -124,6 +126,8 @@ namespace mr {
 
   class UniformBuffer : public HostBuffer {
     public:
+      UniformBuffer() = default;
+
       UniformBuffer(const VulkanState &state, size_t size)
           : HostBuffer(state, size, vk::BufferUsageFlagBits::eUniformBuffer)
       {
@@ -134,7 +138,7 @@ namespace mr {
           : UniformBuffer(state, src.size() * sizeof(T))
       {
         assert(src.data());
-        write(state, src);
+        write(src);
       }
   };
 
@@ -162,7 +166,7 @@ namespace mr {
           : VertexBuffer(state, src.size() * sizeof(T))
       {
         assert(src.data());
-        write(state, src);
+        write(src);
       }
   };
 
@@ -189,7 +193,7 @@ namespace mr {
           : IndexBuffer(state, src.size() * sizeof(T))
       {
         assert(src.data());
-        write(state, src);
+        write(src);
 
         _element_count = src.size();
 

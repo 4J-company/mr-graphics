@@ -50,7 +50,7 @@ namespace mr {
 
         auto stage_buffer =
           HostBuffer(state, _size, vk::BufferUsageFlagBits::eTransferSrc);
-        stage_buffer.write(state, std::span {src});
+        stage_buffer.write(std::span {src});
 
         vk::ImageSubresourceLayers range {
           .aspectMask = _aspect_flags,
