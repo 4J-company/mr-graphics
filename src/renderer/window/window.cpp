@@ -26,11 +26,6 @@ mr::Window::Window(VulkanGlobalState *state, Extent extent)
 
   glfwSetInputMode(_window.get(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
-  _window->callbacks()->on_cursor_move = [this](const vkfw::Window &win, double dx, double dy) {
-    camera.turn({
-        2 * dx / _width - 1,
-        2 * dy / _height - 1,
-        0});
   _window->callbacks()->on_cursor_move =
     [this](const vkfw::Window &win, double x, double y) {
     static mr::Vec2d old_pos;
