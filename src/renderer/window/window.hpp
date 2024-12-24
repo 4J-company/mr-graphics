@@ -2,7 +2,7 @@
 #define __window_hpp_
 
 #include "pch.hpp"
-#include "window_context.hpp"
+#include "render_context.hpp"
 #include "utils/misc.hpp"
 #include "camera/camera.hpp"
 
