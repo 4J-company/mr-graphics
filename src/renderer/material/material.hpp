@@ -4,6 +4,7 @@
 #include "pch.hpp"
 #include "resources/resources.hpp"
 #include "utils/misc.hpp"
+#include "manager/manager.hpp"
 
 namespace mr {
   enum class MaterialParameter {
@@ -31,10 +32,10 @@ namespace mr {
     return defines[enum_cast(param)];
   }
 
-  class Material {
+  class Material : public ResourceBase<Material> {
   public:
     Material(const VulkanState &state, const vk::RenderPass render_pass, Shader shader,
-             std::span<float> ubo_data, std::span<std::optional<mr::Texture>> textures, mr::UniformBuffer &cam_ubo) noexcept;
+             std::span<float> ubo_data, std::span<std::optional<mr::TextureHandle>> textures, mr::UniformBuffer &cam_ubo) noexcept;
 
     void bind(CommandUnit &unit) const noexcept;
 
@@ -68,6 +69,8 @@ namespace mr {
     };
   };
 
+  MR_DECLARE_HANDLE(Material)
+
   class MaterialBuilder {
   public:
     MaterialBuilder(
@@ -86,9 +89,10 @@ namespace mr {
 
     MaterialBuilder &add_texture(
       MaterialParameter param,
-      std::optional<mr::Texture> tex,
+      std::optional<mr::TextureHandle> tex,
       Color factor = {1.0, 1.0, 1.0, 1.0})
     {
+      assert(!tex.has_value() || *tex != nullptr);
       _textures[enum_cast(param)] = std::move(tex);
       add_value(factor);
       return *this;
@@ -125,9 +129,10 @@ namespace mr {
       return *this;
     }
 
-    Material build() noexcept
+    MaterialHandle build() noexcept
     {
-      return Material {
+      auto &manager = ResourceManager<Material>::get();
+      return manager.create(unnamed,
         *_state,
         _render_pass,
         mr::Shader(*_state,
@@ -136,7 +141,7 @@ namespace mr {
         std::span {_ubo_data},
         std::span {_textures},
         *_cam_ubo
-      };
+      );
     }
 
   private:
@@ -157,7 +162,7 @@ namespace mr {
     std::vector<byte> _specialization_data;
     std::unordered_map<std::string, std::string> _defines;
     std::vector<float> _ubo_data;
-    std::vector<std::optional<mr::Texture>> _textures;
+    std::vector<std::optional<mr::TextureHandle>> _textures;
     mr::UniformBuffer *_cam_ubo;
 
     std::string_view _shader_filename;

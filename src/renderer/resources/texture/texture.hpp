@@ -2,9 +2,10 @@
 #define __texture_hpp_
 
 #include "resources/texture/sampler/sampler.hpp"
+#include "manager/resource.hpp"
 
 namespace mr {
-  class Texture {
+  class Texture : public ResourceBase<Texture> {
     private:
       Image _image;
       Sampler _sampler;
@@ -19,6 +20,8 @@ namespace mr {
 
       const Sampler &sampler() const { return _sampler; }
   };
+
+  MR_DECLARE_HANDLE(Texture)
 } // namespace mr
 
 #endif // __texture_hpp_

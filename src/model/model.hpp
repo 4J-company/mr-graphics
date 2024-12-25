@@ -14,7 +14,7 @@ namespace mr {
   class Model {
     private:
       std::vector<mr::Mesh> _meshes;
-      std::vector<mr::Material> _materials;
+      std::vector<mr::MaterialHandle> _materials;
 
       std::string _name;
 

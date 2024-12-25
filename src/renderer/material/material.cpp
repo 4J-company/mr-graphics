@@ -3,7 +3,7 @@
 mr::Material::Material(const VulkanState &state, const vk::RenderPass render_pass,
                        Shader shader,
                        std::span<float> ubo_data,
-                       std::span<std::optional<mr::Texture>> textures,
+                       std::span<std::optional<mr::TextureHandle>> textures,
                        mr::UniformBuffer &cam_ubo) noexcept
     : _ubo(state, ubo_data)
     , _shader(std::move(shader))
@@ -18,7 +18,7 @@ mr::Material::Material(const VulkanState &state, const vk::RenderPass render_pas
     if (!textures[i].has_value()) {
       continue;
     }
-    attachments.emplace_back(0, static_cast<uint32_t>(i + 2), &textures[i].value());
+    attachments.emplace_back(0, static_cast<uint32_t>(i + 2), textures[i].value().get());
   }
 
   _descriptor_set =

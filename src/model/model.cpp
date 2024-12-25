@@ -3,6 +3,9 @@
 #include "utils/path.hpp"
 #include "utils/log.hpp"
 
+// for tmp singleton
+#include "manager/manager.hpp"
+
 #define TINYGLTF_NO_INCLUDE_RAPIDJSON
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
@@ -10,15 +13,15 @@
 #define TINYGLTF_NOEXCEPTION
 #include "tiny_gltf.h"
 
-static std::optional<mr::Texture> load_texture(const mr::VulkanState &state,
-                                               const tinygltf::Model &image,
-                                               const int index) noexcept;
-static mr::Material load_material(const mr::VulkanState &state,
-                                  vk::RenderPass render_pass,
-                                  const tinygltf::Model &model,
-                                  const tinygltf::Material &material,
-                                  mr::UniformBuffer &cam_ubo,
-                                  mr::Matr4f transform) noexcept;
+static std::optional<mr::TextureHandle> load_texture(const mr::VulkanState &state,
+                                                     const tinygltf::Model &image,
+                                                     const int index) noexcept;
+static mr::MaterialHandle load_material(const mr::VulkanState &state,
+                                        vk::RenderPass render_pass,
+                                        const tinygltf::Model &model,
+                                        const tinygltf::Material &material,
+                                        mr::UniformBuffer &cam_ubo,
+                                        mr::Matr4f transform) noexcept;
 static mr::Matr4f calculate_transform(const tinygltf::Node &node,
                                       const mr::Matr4f &parent_transform) noexcept;
 
@@ -59,7 +62,7 @@ mr::Model::Model(const VulkanState &state, vk::RenderPass render_pass, std::stri
 void mr::Model::draw(CommandUnit &unit) const noexcept
 {
   for (const auto &[material, mesh] : std::views::zip(_materials, _meshes)) {
-    material.bind(unit);
+    material->bind(unit);
     unit->bindVertexBuffers(0, mesh.vbuf().buffer(), {0});
     unit->bindIndexBuffer(mesh.ibuf().buffer(), 0, mesh.ibuf().index_type());
     unit->drawIndexed(mesh.ibuf().element_count(), mesh.num_of_instances(), 0, 0, 0);
@@ -187,7 +190,7 @@ void mr::Model::_process_node(const mr::VulkanState &state,
   }
 }
 
-static std::optional<mr::Texture> load_texture(const mr::VulkanState &state,
+static std::optional<mr::TextureHandle> load_texture(const mr::VulkanState &state,
                                                const tinygltf::Model &model,
                                                const int index) noexcept
 {
@@ -196,12 +199,15 @@ static std::optional<mr::Texture> load_texture(const mr::VulkanState &state,
   const tinygltf::Texture &texture = model.textures[index];
   const tinygltf::Image   &image = model.images[texture.source];
 
+  mr::Extent extent ={static_cast<uint32_t>(image.width), static_cast<uint32_t>(image.height)};
   // NOTE: most devices dont support 3 component texels
   vk::Format format = image.component == 3 ? vk::Format::eR8G8B8Srgb : vk::Format::eR8G8B8A8Srgb;
-  return mr::Texture(state, image.image.data(), {static_cast<uint32_t>(image.width), static_cast<uint32_t>(image.height)}, format);
+
+  static auto &manager = mr::ResourceManager<mr::Texture>::get();
+  return manager.create(mr::unnamed, state, image.image.data(), extent, format);
 }
 
-static mr::Material load_material(
+static mr::MaterialHandle load_material(
     const mr::VulkanState &state,
     vk::RenderPass render_pass,
     const tinygltf::Model &model,
@@ -225,11 +231,11 @@ static mr::Material load_material(
   float metallic_factor = material.pbrMetallicRoughness.metallicFactor;
   float roughness_factor = material.pbrMetallicRoughness.roughnessFactor;
 
-  std::optional<mr::Texture> base_color_texture_optional         = load_texture(state, model, material.pbrMetallicRoughness.baseColorTexture.index);
-  std::optional<mr::Texture> metallic_roughness_texture_optional = load_texture(state, model, material.pbrMetallicRoughness.metallicRoughnessTexture.index);
-  std::optional<mr::Texture> emissive_texture_optional           = load_texture(state, model, material.emissiveTexture.index);
-  std::optional<mr::Texture> occlusion_texture_optional          = load_texture(state, model, material.occlusionTexture.index);
-  std::optional<mr::Texture> normal_texture_optional             = load_texture(state, model, material.normalTexture.index);
+  std::optional<mr::TextureHandle> base_color_texture_optional         = load_texture(state, model, material.pbrMetallicRoughness.baseColorTexture.index);
+  std::optional<mr::TextureHandle> metallic_roughness_texture_optional = load_texture(state, model, material.pbrMetallicRoughness.metallicRoughnessTexture.index);
+  std::optional<mr::TextureHandle> emissive_texture_optional           = load_texture(state, model, material.emissiveTexture.index);
+  std::optional<mr::TextureHandle> occlusion_texture_optional          = load_texture(state, model, material.occlusionTexture.index);
+  std::optional<mr::TextureHandle> normal_texture_optional             = load_texture(state, model, material.normalTexture.index);
 
   using enum mr::MaterialParameter;
   mr::MaterialBuilder builder = mr::MaterialBuilder(state, render_pass, "default");
