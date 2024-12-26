@@ -1,5 +1,5 @@
-#if !defined(__pipeline_hpp_)
-#define __pipeline_hpp_
+#ifndef __MR_PIPELINE_HPP_
+#define __MR_PIPELINE_HPP_
 
 #include "pch.hpp"
 #include "resources/attachment/attachment.hpp"
@@ -30,4 +30,4 @@ namespace mr {
   };
 } // namespace mr
 
-#endif // __pipeline_hpp_
+#endif // __MR_PIPELINE_HPP_

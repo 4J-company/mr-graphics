@@ -1,5 +1,5 @@
-#if !defined(__command_unit_hpp_)
-#define __command_unit_hpp_
+#ifndef __MR_COMMAND_UNIT_HPP_
+#define __MR_COMMAND_UNIT_HPP_
 
 #include "pch.hpp"
 
@@ -28,4 +28,4 @@ namespace mr {
   };
 } // namespace mr
 
-#endif // __command_unit_hpp_
+#endif // __MR_COMMAND_UNIT_HPP_

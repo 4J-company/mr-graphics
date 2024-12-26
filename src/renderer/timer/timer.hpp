@@ -1,5 +1,5 @@
-#if !defined(__timer_hpp_)
-#define __timer_hpp_
+#ifndef __MR_TIMER_HPP_
+#define __MR_TIMER_HPP_
 
 #include "pch.hpp"
 
@@ -61,4 +61,4 @@ namespace mr {
   };
 } // namespace mr
 
-#endif // __timer_hpp_
+#endif // __MR_TIMER_HPP_

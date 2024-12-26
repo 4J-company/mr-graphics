@@ -1,5 +1,5 @@
-#ifndef __mesh_cpp_
-#define __mesh_cpp_
+#ifndef __MR_MESH_HPP_
+#define __MR_MESH_HPP_
 
 #include "pch.hpp"
 #include "resources/resources.hpp"
@@ -58,4 +58,4 @@ namespace mr {
   };
 };     // namespace mr
 
-#endif // __mesh_cpp_
+#endif // __MR_MESH_HPP_

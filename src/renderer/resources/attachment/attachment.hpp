@@ -1,8 +1,8 @@
-#if !defined(__attachment_hpp_)
-#define __attachment_hpp_
+#ifndef __MR_ATTACHMENT_HPP_
+#define __MR_ATTACHMENT_HPP_
 
 namespace mr {
 
 } // namespace mr
 
-#endif // __attachment_hpp_
+#endif // __MR_ATTACHMENT_HPP_

@@ -1,5 +1,5 @@
-#if !defined(__resources_hpp_)
-#define __resources_hpp_
+#ifndef __MR_RESOURCES_HPP_
+#define __MR_RESOURCES_HPP_
 
 #include "resources/attachment/attachment.hpp"
 
@@ -21,4 +21,4 @@
 #include "resources/texture/sampler/sampler.hpp"
 #include "resources/texture/texture.hpp"
 
-#endif // __resources_hpp_
+#endif // __MR_RESOURCES_HPP_

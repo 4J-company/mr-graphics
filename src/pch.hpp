@@ -1,5 +1,5 @@
-#ifndef __pch_hpp_
-#define __pch_hpp_
+#ifndef __MR_PCH_HPP_
+#define __MR_PCH_HPP_
 
 // libraries includes
 #include <algorithm>
@@ -56,4 +56,4 @@ namespace mr {
   using byte = unsigned char;
 } // namespace mr
 
-#endif // __pch_hpp_
+#endif // __MR_PCH_HPP_

@@ -1,5 +1,5 @@
-#if !defined(__texture_hpp_)
-#define __texture_hpp_
+#ifndef __MR_TEXTURE_HPP_
+#define __MR_TEXTURE_HPP_
 
 #include "resources/texture/sampler/sampler.hpp"
 
@@ -20,4 +20,4 @@ namespace mr {
   };
 } // namespace mr
 
-#endif // __texture_hpp_
+#endif // __MR_TEXTURE_HPP_

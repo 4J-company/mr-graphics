@@ -1,5 +1,5 @@
-#ifndef __model_hpp_
-#define __model_hpp_
+#ifndef __MR_MODEL_HPP_
+#define __MR_MODEL_HPP_
 
 #include "renderer/renderer.hpp"
 
@@ -19,4 +19,4 @@ namespace mr {
   };
 } // namespace mr
 
-#endif // __model_hpp_
+#endif // __MR_MODEL_HPP_

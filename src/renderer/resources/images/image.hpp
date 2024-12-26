@@ -1,5 +1,5 @@
-#ifndef __image_hpp_
-#define __image_hpp_
+#ifndef __MR_IMAGE_HPP_
+#define __MR_IMAGE_HPP_
 
 #include "pch.hpp"
 
@@ -100,4 +100,4 @@ namespace mr {
   };
 } // namespace mr
 
-#endif // __image_hpp_
+#endif // __MR_IMAGE_HPP_
