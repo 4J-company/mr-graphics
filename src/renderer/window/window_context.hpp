@@ -1,5 +1,5 @@
-#if !defined(__window_context_hpp_)
-#define __window_context_hpp_
+#ifndef __MR_WINDOW_CONTEXT_HPP_
+#define __MR_WINDOW_CONTEXT_HPP_
 
 #include "pch.hpp"
 #include "resources/resources.hpp"
@@ -49,4 +49,4 @@ namespace mr {
       vk::UniqueFence _image_fence;
   };
 } // namespace mr
-#endif // __window_context_hpp_
+#endif // __MR_WINDOW_CONTEXT_HPP_

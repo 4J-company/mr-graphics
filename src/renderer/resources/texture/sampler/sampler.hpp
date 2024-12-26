@@ -1,5 +1,5 @@
-#if !defined(__sampler_hpp_)
-#define __sampler_hpp_
+#ifndef __MR_SAMPLER_HPP_
+#define __MR_SAMPLER_HPP_
 
 #include "pch.hpp"
 #include "vulkan_state.hpp"
@@ -23,4 +23,4 @@ namespace mr {
   };
 } // namespace mr
 
-#endif // __sampler_hpp_
+#endif // __MR_SAMPLER_HPP_

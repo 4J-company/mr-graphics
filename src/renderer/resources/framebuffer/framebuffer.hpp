@@ -1,5 +1,5 @@
-#if !defined(__framebuffer_hpp_)
-#define __framebuffer_hpp_
+#ifndef __MR_FRAMEBUFFER_HPP_
+#define __MR_FRAMEBUFFER_HPP_
 
 #include "pch.hpp"
 #include "resources/images/image.hpp"
@@ -45,4 +45,4 @@ namespace mr {
   };
 } // namespace mr
 
-#endif // __framebuffer_hpp_
+#endif // __MR_FRAMEBUFFER_HPP_

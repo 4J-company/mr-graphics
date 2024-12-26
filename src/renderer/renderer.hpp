@@ -1,9 +1,9 @@
-#include "mesh/attribute_types.hpp"
-#if !defined(__renderer_hpp_)
-#define __renderer_hpp_
+#ifndef __MR_RENDERER_HPP_
+#define __MR_RENDERER_HPP_
 
 #include "pch.hpp"
 
+#include "mesh/attribute_types.hpp"
 #include "resources/resources.hpp"
 #include "timer/timer.hpp"
 #include "vulkan_state.hpp"
@@ -42,4 +42,4 @@ namespace mr {
   };
 } // namespace mr
 
-#endif // __renderer_hpp_
+#endif // __MR_RENDERER_HPP_
