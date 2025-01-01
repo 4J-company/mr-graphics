@@ -58,13 +58,13 @@ namespace mr {
         .location = 1,
         .binding = 1,
         .format = vk::Format::eR32G32B32Sfloat,
-        .offset = 3 * sizeof(float)
+        .offset = 0
       },
       vk::VertexInputAttributeDescription {
         .location = 2,
         .binding = 2,
         .format = vk::Format::eR32G32Sfloat,
-        .offset = 6 * sizeof(float)
+        .offset = 0
       },
     };
   };
