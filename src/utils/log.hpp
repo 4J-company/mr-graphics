@@ -12,22 +12,22 @@ namespace mr::detail::term_modifier {
 }
 
 #ifndef NDEBUG
-#define MR_LOG(category, modifier, format, ...)\
+#define MR_LOG(category, modifier, ...)\
   do\
   {\
     std::print("{}{}: ", modifier, category);\
-    std::println(format, __VA_ARGS__);\
+    std::println(__VA_ARGS__);\
     std::print("{}", mr::detail::term_modifier::reset);\
   } while (false)
 
 #else
-#define MR_LOG(category, format, ...) static_cast<void>(0)
+#define MR_LOG(...) static_cast<void>(0)
 #endif // NDEBUG
 
-#define MR_INFO(format, ...) MR_LOG("INFO", mr::detail::term_modifier::reset, format, __VA_ARGS__)
-#define MR_DEBUG(format, ...) MR_LOG("DEBUG", mr::detail::term_modifier::magenta, format, __VA_ARGS__)
-#define MR_WARNING(format, ...) MR_LOG("WARNING", mr::detail::term_modifier::yellow, format, __VA_ARGS__)
-#define MR_ERROR(format, ...) MR_LOG("ERROR", mr::detail::term_modifier::red, format, __VA_ARGS__)
-#define MR_FATAL(format, ...) MR_LOG("FATAL", mr::detail::term_modifier::red, format, __VA_ARGS__)
+#define MR_INFO(...) MR_LOG("INFO", mr::detail::term_modifier::reset, __VA_ARGS__)
+#define MR_DEBUG(...) MR_LOG("DEBUG", mr::detail::term_modifier::magenta, __VA_ARGS__)
+#define MR_WARNING(...) MR_LOG("WARNING", mr::detail::term_modifier::yellow, __VA_ARGS__)
+#define MR_ERROR(...) MR_LOG("ERROR", mr::detail::term_modifier::red, __VA_ARGS__)
+#define MR_FATAL(...) MR_LOG("FATAL", mr::detail::term_modifier::red, __VA_ARGS__)
 
 #endif // __trace_hpp_
