@@ -63,9 +63,8 @@ void mr::Model::draw(CommandUnit &unit) const noexcept
 {
   for (const auto &[material, mesh] : std::views::zip(_materials, _meshes)) {
     material->bind(unit);
-    unit->bindVertexBuffers(0, mesh.vbuf().buffer(), {0});
-    unit->bindIndexBuffer(mesh.ibuf().buffer(), 0, mesh.ibuf().index_type());
-    unit->drawIndexed(mesh.ibuf().element_count(), mesh.num_of_instances(), 0, 0, 0);
+    mesh.bind(unit);
+    mesh.draw(unit);
   }
 }
 
@@ -94,14 +93,7 @@ void mr::Model::_process_node(const mr::VulkanState &state,
   }
 
   for (auto &primitive : mesh.primitives) {
-    struct Vertex {
-        float position_x, position_y, position_z;
-        float normal_x, normal_y, normal_z;
-        float tex_coord_x, tex_coord_y;
-    };
-
-    std::vector<Vertex> vertexes;
-    VertexBuffer vbuf;
+    std::vector<VertexBuffer> vbufs;
     IndexBuffer ibuf;
 
     for (const char * attribute : attributes) {
@@ -118,38 +110,8 @@ void mr::Model::_process_node(const mr::VulkanState &state,
       const float *attribute_buffer = (float *)&(model.buffers[view.buffer].data[accessor.byteOffset + view.byteOffset]);
       const size_t attribute_count = accessor.count;
 
-      // convert from AoS to SoA
-      if (vertexes.size() == 0) {
-        vertexes.resize(accessor.count);
-      }
-
-      if (std::strcmp(attribute, "POSITION") == 0) {
-        for (int i = 0; i < vertexes.size(); i++) {
-          vertexes[i].position_x = attribute_buffer[i * attribute_size + 0];
-          vertexes[i].position_y = attribute_buffer[i * attribute_size + 1];
-          vertexes[i].position_z = attribute_buffer[i * attribute_size + 2];
-                                   1 ;
-        }
-      }
-      else if (std::strcmp(attribute, "NORMAL") == 0) {
-        for (int i = 0; i < vertexes.size(); i++) {
-          vertexes[i].normal_x = attribute_buffer[i * attribute_size + 0];
-          vertexes[i].normal_y = attribute_buffer[i * attribute_size + 1];
-          vertexes[i].normal_z = attribute_buffer[i * attribute_size + 2];
-                                 1 ;
-        }
-      }
-      else if (std::strcmp(attribute, "TEXCOORD_0") == 0) {
-        for (int i = 0; i < vertexes.size(); i++) {
-          vertexes[i].tex_coord_x = attribute_buffer[i * attribute_size + 0];
-          vertexes[i].tex_coord_y = attribute_buffer[i * attribute_size + 1];
-                                    0;
-                                    1;
-        }
-      }
+      vbufs.emplace_back(state, std::span {attribute_buffer, accessor.count * attribute_size});
     }
-
-    vbuf = VertexBuffer(state, std::span {vertexes});
 
     const auto &accessor = model.accessors[primitive.indices];
     const auto &view = model.bufferViews[accessor.bufferView];
@@ -185,7 +147,7 @@ void mr::Model::_process_node(const mr::VulkanState &state,
     int material_index = primitive.material;
     tinygltf::Material material = model.materials[primitive.material];
 
-    _meshes.emplace_back(std::move(vbuf), std::move(ibuf));
+    _meshes.emplace_back(std::move(vbufs), std::move(ibuf));
     _materials.emplace_back(load_material(state, render_pass, model, material, cam_ubo, transform));
   }
 }

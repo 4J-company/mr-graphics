@@ -8,5 +8,5 @@ using TexCoordType = mr::Vec2f;
 using ColorType = mr::Vec4f;
 using BoneType = int;
 using BoundboxType = mr::AABBf;
-
+ 
 #endif // __attribute_types_hpp_

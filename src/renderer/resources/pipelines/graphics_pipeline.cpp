@@ -2,7 +2,7 @@
 
 mr::GraphicsPipeline::GraphicsPipeline(
   const VulkanState &state, vk::RenderPass render_pass, Subpass subpass,
-  Shader *shader,
+  mr::Handle<Shader> shader,
   std::span<const vk::VertexInputAttributeDescription> attributes,
   std::span<const vk::DescriptorSetLayout> descriptor_layouts)
     : Pipeline(state, shader, descriptor_layouts)
@@ -15,24 +15,26 @@ mr::GraphicsPipeline::GraphicsPipeline(
     .dynamicStateCount = static_cast<uint>(_dynamic_states.size()),
     .pDynamicStates = _dynamic_states.data()};
 
-  uint size = 0;
-  for (auto &atr : attributes) {
-    size += atr.format == vk::Format::eR32G32B32A32Sfloat ? 4
-            : atr.format == vk::Format::eR32G32B32Sfloat  ? 3
-            : atr.format == vk::Format::eR32G32Sfloat     ? 2
-                                                          : 1;
-  }
-  size *= 4;
-
-  vk::VertexInputBindingDescription binding_description {
-    .binding = 0,
-    .stride = size,
-    .inputRate = vk::VertexInputRate::eVertex,
+  auto fmt2uint = [](vk::Format fmt) -> uint32_t {
+    return sizeof(float) * (
+      fmt == vk::Format::eR32G32B32A32Sfloat ? 4
+      : fmt == vk::Format::eR32G32B32Sfloat  ? 3
+      : fmt == vk::Format::eR32G32Sfloat     ? 2
+                                             : 1);
   };
 
+  std::array<vk::VertexInputBindingDescription, 16> binding_descriptions {};
+  for (int i = 0; i < attributes.size(); i++) {
+    binding_descriptions[i] = vk::VertexInputBindingDescription {
+      .binding = attributes[i].binding,
+      .stride = fmt2uint(attributes[i].format),
+      .inputRate = vk::VertexInputRate::eVertex,
+    };
+  }
+
   vk::PipelineVertexInputStateCreateInfo vertex_input_create_info {
-    .vertexBindingDescriptionCount = static_cast<bool>(attributes.size()),
-    .pVertexBindingDescriptions = &binding_description,
+    .vertexBindingDescriptionCount = (uint)attributes.size(),
+    .pVertexBindingDescriptions = binding_descriptions.data(),
     .vertexAttributeDescriptionCount = static_cast<uint>(attributes.size()),
     .pVertexAttributeDescriptions = attributes.data()};
 

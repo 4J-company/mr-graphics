@@ -68,7 +68,7 @@ mr::Shader::Shader(const VulkanState &state, std::string_view filename, const st
 // TODO: replace with Google's libshaderc
 void mr::Shader::compile(Shader::Stage stage) const noexcept
 {
-  MR_INFO("Compiling shader {}\n", _path.string());
+  MR_INFO("Compiling shader {}\n\t with defines {}\n", _path.string(), _define_string);
 
   std::string stage_type = get_stage_name(stage);
 

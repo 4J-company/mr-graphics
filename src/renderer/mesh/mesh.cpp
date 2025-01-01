@@ -1,10 +1,10 @@
 #include "mesh/mesh.hpp"
 
 mr::Mesh::Mesh(
-	VertexBuffer vbuf,
+	std::vector<VertexBuffer> vbufs,
 	IndexBuffer ibuf) noexcept
   : _ibuf(std::move(ibuf))
-  , _vbuf(std::move(vbuf))
+  , _vbufs(std::move(vbufs))
   , _instance_count(1)
 {
 }
