@@ -209,7 +209,7 @@ void mr::RenderContext::render(mr::FPSCamera &cam)
                                                    .format =
                                                      vk::Format::eR32G32Sfloat,
                                                    .offset = 0};
-  static Shader light_shader = Shader(_state, "light");
+  static mr::Handle<Shader> light_shader = mr::ResourceManager<Shader>::get().create(mr::unnamed, _state, "light");
   std::vector<Shader::ResourceView> light_attach;
   light_attach.reserve(gbuffers_number);
   for (unsigned i = 0; i < gbuffers_number; i++) {
@@ -222,7 +222,7 @@ void mr::RenderContext::render(mr::FPSCamera &cam)
   static GraphicsPipeline light_pipeline = GraphicsPipeline(_state,
                                                             _render_pass.get(),
                                                             GraphicsPipeline::Subpass::OpaqueLighting,
-                                                            &light_shader,
+                                                            light_shader,
                                                             {&light_descr, 1},
                                                             {&light_layout, 1});
 

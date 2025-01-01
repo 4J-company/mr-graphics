@@ -4,6 +4,7 @@
 #include "pch.hpp"
 
 #include "vulkan_state.hpp"
+#include "manager/resource.hpp"
 
 namespace mr {
   class UniformBuffer;
@@ -11,7 +12,7 @@ namespace mr {
   class Texture;
   class Image;
 
-  class Shader {
+  class Shader : public ResourceBase<Shader> {
     private:
       static inline const size_t max_shader_modules = 6;
 

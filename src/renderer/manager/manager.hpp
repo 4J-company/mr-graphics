@@ -42,7 +42,7 @@ namespace mr {
     HandleT find(const std::string &name)
     {
       if (auto it = _resources.find(name); it != _resources.end())
-        return it->lock();
+        return it->second.lock();
 
       return nullptr;
     }

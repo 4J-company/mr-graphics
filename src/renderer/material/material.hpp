@@ -34,14 +34,14 @@ namespace mr {
 
   class Material : public ResourceBase<Material> {
   public:
-    Material(const VulkanState &state, const vk::RenderPass render_pass, Shader shader,
+    Material(const VulkanState &state, const vk::RenderPass render_pass, mr::Handle<Shader> shader,
              std::span<float> ubo_data, std::span<std::optional<mr::TextureHandle>> textures, mr::UniformBuffer &cam_ubo) noexcept;
 
     void bind(CommandUnit &unit) const noexcept;
 
   protected:
     mr::UniformBuffer _ubo;
-    mr::Shader _shader;
+    mr::Handle<Shader> _shader;
 
     mr::DescriptorAllocator _descriptor_allocator;
     mr::DescriptorSet _descriptor_set;
@@ -56,13 +56,13 @@ namespace mr {
       },
       vk::VertexInputAttributeDescription {
         .location = 1,
-        .binding = 0,
+        .binding = 1,
         .format = vk::Format::eR32G32B32Sfloat,
         .offset = 3 * sizeof(float)
       },
       vk::VertexInputAttributeDescription {
         .location = 2,
-        .binding = 0,
+        .binding = 2,
         .format = vk::Format::eR32G32Sfloat,
         .offset = 6 * sizeof(float)
       },
@@ -131,13 +131,18 @@ namespace mr {
 
     MaterialHandle build() noexcept
     {
-      auto &manager = ResourceManager<Material>::get();
-      return manager.create(unnamed,
+      auto &mtlmanager = ResourceManager<Material>::get();
+
+      auto &shdmanager = ResourceManager<Shader>::get();
+      auto definestr = _generate_shader_defines_str();
+      auto shdname = std::string(_shader_filename) + ":" + definestr;
+      auto shdfindres = shdmanager.find(shdname);
+      auto shdhandle = shdfindres ? shdfindres : shdmanager.create(shdname, *_state, _shader_filename, _generate_shader_defines());
+
+      return mtlmanager.create(unnamed,
         *_state,
         _render_pass,
-        mr::Shader(*_state,
-                   _shader_filename,
-                   _generate_shader_defines()),
+        shdhandle,
         std::span {_ubo_data},
         std::span {_textures},
         *_cam_ubo
@@ -145,6 +150,16 @@ namespace mr {
     }
 
   private:
+    std::string _generate_shader_defines_str() const noexcept
+    {
+      std::unordered_map<std::string, std::string> defines = _generate_shader_defines();
+      std::stringstream ss;
+      for (auto &[name, value] : defines) {
+        ss << "-D" << name << '=' << value << ' ';
+      }
+      return ss.str();
+    }
+
     std::unordered_map<std::string, std::string> _generate_shader_defines() const noexcept
     {
       std::unordered_map<std::string, std::string> defines;

@@ -14,12 +14,12 @@ namespace mr {
       // std::vector?<Attachment> _attachments;
       // std::vector?<Constant> _constants;
 
-      Shader *_shader;
+      mr::Handle<Shader> _shader;
 
     public:
       Pipeline() = default;
 
-      Pipeline(const VulkanState &state, Shader *_shader,
+      Pipeline(const VulkanState &state, mr::Handle<Shader> _shader,
                std::span<const vk::DescriptorSetLayout> bindings);
 
       const vk::Pipeline pipeline() const { return _pipeline.get(); }
