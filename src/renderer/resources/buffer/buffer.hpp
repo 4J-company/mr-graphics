@@ -1,5 +1,5 @@
-#if !defined(__buffer_hpp_)
-#define __buffer_hpp_
+#ifndef __MR_BUFFER_HPP_
+#define __MR_BUFFER_HPP_
 
 #include "pch.hpp"
 
@@ -190,4 +190,4 @@ namespace mr {
   };
 } // namespace mr
 
-#endif // __buffer_hpp_
+#endif // __MR_BUFFER_HPP_
