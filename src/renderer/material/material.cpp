@@ -1,7 +1,7 @@
 #include "material/material.hpp"
 
 mr::Material::Material(const VulkanState &state, const vk::RenderPass render_pass,
-                       mr::Handle<Shader> shader,
+                       mr::ShaderHandle shader,
                        std::span<float> ubo_data,
                        std::span<std::optional<mr::TextureHandle>> textures,
                        mr::UniformBuffer &cam_ubo) noexcept

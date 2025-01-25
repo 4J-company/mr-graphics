@@ -27,7 +27,7 @@ namespace mr {
 
       GraphicsPipeline(
         const VulkanState &state, vk::RenderPass render_pass, Subpass subpass,
-        mr::Handle<Shader> shader,
+        mr::ShaderHandle shader,
         std::span<const vk::VertexInputAttributeDescription> attributes,
         std::span<const vk::DescriptorSetLayout> descriptor_layouts);
 

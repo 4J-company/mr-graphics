@@ -91,6 +91,8 @@ namespace mr {
       uint stage_number() const noexcept { return _num_of_loaded_shaders; }
   };
 
+  MR_DECLARE_HANDLE(Shader)
+
   constexpr vk::ShaderStageFlagBits get_stage_flags(std::integral auto stage) noexcept
   {
     constexpr std::array stage_bits {

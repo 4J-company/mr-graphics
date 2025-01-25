@@ -209,7 +209,7 @@ void mr::RenderContext::render(mr::FPSCamera &cam)
                                                    .format =
                                                      vk::Format::eR32G32Sfloat,
                                                    .offset = 0};
-  static mr::Handle<Shader> light_shader = mr::ResourceManager<Shader>::get().create(mr::unnamed, _state, "light");
+  static mr::ShaderHandle light_shader = mr::ResourceManager<Shader>::get().create(mr::unnamed, _state, "light");
   std::vector<Shader::ResourceView> light_attach;
   light_attach.reserve(gbuffers_number);
   for (unsigned i = 0; i < gbuffers_number; i++) {

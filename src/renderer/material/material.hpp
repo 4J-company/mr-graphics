@@ -34,14 +34,14 @@ namespace mr {
 
   class Material : public ResourceBase<Material> {
   public:
-    Material(const VulkanState &state, const vk::RenderPass render_pass, mr::Handle<Shader> shader,
+    Material(const VulkanState &state, const vk::RenderPass render_pass, mr::ShaderHandle shader,
              std::span<float> ubo_data, std::span<std::optional<mr::TextureHandle>> textures, mr::UniformBuffer &cam_ubo) noexcept;
 
     void bind(CommandUnit &unit) const noexcept;
 
   protected:
     mr::UniformBuffer _ubo;
-    mr::Handle<Shader> _shader;
+    mr::ShaderHandle _shader;
 
     mr::DescriptorAllocator _descriptor_allocator;
     mr::DescriptorSet _descriptor_set;
