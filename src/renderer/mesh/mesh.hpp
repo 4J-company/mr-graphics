@@ -39,7 +39,7 @@ namespace mr {
     int num_of_instances() const noexcept { return _instance_count.load(); }
     void bind(mr::CommandUnit &unit) const noexcept {
       static std::array<vk::Buffer, 16> vbufs {};
-      static std::array<unsigned long int, 16> offsets {};
+      static std::array<vk::DeviceSize, 16> offsets {};
 
       for (int i = 0; i < _vbufs.size(); i++) {
         vbufs[i] = _vbufs[i].buffer();
