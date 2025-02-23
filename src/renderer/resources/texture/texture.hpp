@@ -11,14 +11,34 @@ namespace mr {
       Sampler _sampler;
 
     public:
-      Texture() = default;
+      /**
+ * @brief Constructs a Texture object with default initialization.
+ *
+ * This default constructor creates a Texture instance with its image and sampler
+ * members default-initialized. No additional resource loading or setup is performed.
+ */
+Texture() = default;
 
       Texture(const VulkanState &state, std::string_view filename) noexcept;
       Texture(const VulkanState &state, const byte *data, Extent extent, vk::Format format) noexcept;
 
-      const Image &image() const { return _image; }
+      /**
+ * @brief Returns a constant reference to the texture's image.
+ *
+ * Provides access to the underlying image resource associated with the texture.
+ *
+ * @return const Image& Reference to the texture's image.
+ */
+const Image &image() const { return _image; }
 
-      const Sampler &sampler() const { return _sampler; }
+      /**
+ * @brief Retrieves the texture's sampler.
+ *
+ * Returns a constant reference to the sampler used to control how the texture is sampled during rendering.
+ *
+ * @return A constant reference to the texture's Sampler.
+ */
+const Sampler &sampler() const { return _sampler; }
   };
 
   MR_DECLARE_HANDLE(Texture)

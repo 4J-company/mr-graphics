@@ -1,5 +1,20 @@
 #include "resources/pipelines/graphics_pipeline.hpp"
 
+/**
+ * @brief Constructs a GraphicsPipeline by configuring Vulkan pipeline states and creating a unique graphics pipeline.
+ *
+ * This constructor initializes the graphics pipeline with the provided shader, render pass, vertex input
+ * attributes, and descriptor set layouts. It sets up dynamic states (viewport and scissor), vertex input and
+ * input assembly configurations, viewport state, rasterization state, multisampling, and color blending settings.
+ * When the pipeline subpass type is OpaqueGeometry, a depth stencil state is configured for depth testing.
+ *
+ * @param state Reference to the current Vulkan state.
+ * @param render_pass Vulkan render pass used for pipeline rendering.
+ * @param subpass Specifies the subpass type, affecting color blending and depth stencil configuration.
+ * @param shader Handle to the shader, providing the pipeline stages.
+ * @param attributes Span of vertex input attribute descriptions defining vertex binding layouts.
+ * @param descriptor_layouts Span of descriptor set layouts used for creating the pipeline layout.
+ */
 mr::GraphicsPipeline::GraphicsPipeline(
   const VulkanState &state, vk::RenderPass render_pass, Subpass subpass,
   mr::ShaderHandle shader,

@@ -1,6 +1,19 @@
 #include "resources/images/image.hpp"
 #include "resources/buffer/buffer.hpp"
 
+/**
+ * @brief Selects the first image format that supports the specified tiling and features.
+ *
+ * Iterates over a list of candidate image formats by querying the physical device properties,
+ * and returns the first format that supports the required feature flags for the given tiling mode.
+ * If none of the candidates satisfy the criteria, an assertion failure is triggered and an empty format is returned.
+ *
+ * @param state The Vulkan state used to access physical device properties.
+ * @param candidates List of candidate image formats to evaluate.
+ * @param tiling The desired image tiling mode (e.g., linear or optimal).
+ * @param features The set of format feature flags that must be supported.
+ * @return vk::Format A supported image format that meets the specified criteria.
+ */
 vk::Format mr::Image::find_supported_format(
   const VulkanState &state, const std::vector<vk::Format> &candidates,
   vk::ImageTiling tiling, vk::FormatFeatureFlags features)
@@ -22,6 +35,23 @@ vk::Format mr::Image::find_supported_format(
   return {};
 }
 
+/**
+ * @brief Computes the total size in bytes of an image based on its dimensions and format.
+ *
+ * This function determines the texel size from the provided Vulkan image format and calculates
+ * the overall image size by multiplying the texel size with the total number of pixels (width * height)
+ * in the given extent. The current implementation handles a few specific cases:
+ * - For `vk::Format::eR8G8B8A8Srgb`, a texel size of 4 bytes is used.
+ * - For `vk::Format::eR8G8B8Srgb`, a texel size of 3 bytes is used.
+ * - For `vk::Format::eR8G8B8Srgb`, a texel size of 2 bytes is used.
+ * - For any other format, a default texel size of 1 byte is assumed.
+ *
+ * @note The function does not yet support float formats.
+ *
+ * @param extent The dimensions of the image (width and height).
+ * @param format The Vulkan image format that influences the texel size.
+ * @return The total image size in bytes.
+ */
 static size_t calculate_image_size(mr::Extent extent, vk::Format format)
 {
   // TODO: support float formats
@@ -33,6 +63,20 @@ static size_t calculate_image_size(mr::Extent extent, vk::Format format)
   return extent.width * extent.height * texel_size;
 }
 
+/**
+ * @brief Constructs an Image from an existing Vulkan image handle.
+ *
+ * This constructor initializes an Image instance using a pre-created Vulkan image. It sets the
+ * image dimensions based on the provided extent (with a fixed depth of 1), calculates the total
+ * image size using the calculate_image_size function, and assigns the image format and initial
+ * layout. The default mip level is set to 1 and the aspect flags are configured for color.
+ * An image view is created as part of the initialization, using the supplied Vulkan state.
+ *
+ * @param extent The dimensions (width and height) of the image.
+ * @param format The format of the Vulkan image.
+ * @param image The pre-existing Vulkan image handle.
+ * @param swapchain_image Indicates whether the image is part of a swapchain.
+ */
 mr::Image::Image(const VulkanState &state, Extent extent,
                  vk::Format format, vk::Image image, bool swapchain_image)
   : _image{image}
@@ -47,6 +91,19 @@ mr::Image::Image(const VulkanState &state, Extent extent,
   craete_image_view(state);
 }
 
+/**
+ * @brief Constructs an Image by creating a Vulkan image with allocated device memory and an associated image view.
+ *
+ * This constructor initializes an Image using the provided extent, format, usage flags, aspect flags, and mip levels.
+ * It calculates the image size based on the extent and format, creates a Vulkan image with optimal tiling and exclusive sharing,
+ * allocates device-local memory for the image, binds the memory, and sets up an image view.
+ *
+ * @param extent The dimensions of the image (width and height; depth is set to 1).
+ * @param format The pixel format of the image.
+ * @param usage_flags Flags specifying the permitted usage for the image (e.g., sampled, color attachment).
+ * @param aspect_flags Flags indicating which aspect(s) of the image are accessible (e.g., color, depth).
+ * @param mip_level The number of mipmap levels for the image.
+ */
 mr::Image::Image(const VulkanState &state, Extent extent,
                  vk::Format format, vk::ImageUsageFlags usage_flags,
                  vk::ImageAspectFlags aspect_flags, uint mip_level)

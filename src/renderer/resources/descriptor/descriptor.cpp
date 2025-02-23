@@ -16,6 +16,21 @@ get_descriptor_type(const mr::Shader::Resource &attachment) noexcept
   return types[attachment.index()];
 }
 
+/**
+ * @brief Creates descriptor set layout bindings for a set of shader resource views.
+ *
+ * Iterates through the provided span of shader resource views and constructs a corresponding
+ * vector of Vulkan descriptor set layout bindings. Each binding is configured with:
+ * - The binding index from the resource view.
+ * - A descriptor type determined by the resource view.
+ * - A fixed descriptor count of 1.
+ * - Shader stage flags derived from the provided shader stage.
+ * - An immutable sampler pointer set to nullptr (with a note to replace it with the appropriate sampler).
+ *
+ * @param stage The shader stage for which the descriptor layout bindings are created.
+ * @param attachment_set A span of shader resource views representing the attachments.
+ * @return std::vector<vk::DescriptorSetLayoutBinding> The vector of configured descriptor set layout bindings.
+ */
 static std::vector<vk::DescriptorSetLayoutBinding>
 get_bindings(mr::Shader::Stage stage,
              std::span<const mr::Shader::ResourceView> attachment_set) noexcept
@@ -35,6 +50,15 @@ get_bindings(mr::Shader::Stage stage,
   return set_bindings;
 }
 
+/**
+ * @brief Updates the descriptor set with new shader resource attachments.
+ *
+ * Processes a span of shader resource views by preparing and applying corresponding write
+ * descriptor structures. Depending on the resource type (buffer or image), the function populates
+ * the appropriate descriptor information and updates the underlying Vulkan descriptor set.
+ *
+ * @param attachments Span of shader resource views specifying the resources to bind.
+ */
 void mr::DescriptorSet::update(
   const VulkanState &state,
   std::span<const Shader::ResourceView> attachments) noexcept

@@ -42,6 +42,14 @@ namespace mr {
       void get_pixel(const vk::Extent2D &coords) const;
 
       template <typename T>
+      /**
+       * @brief Uploads data from a host span to the Vulkan image.
+       *
+       * This method stages the provided data in a temporary host buffer and then transfers it to the image by enqueuing a buffer-to-image copy command. The total byte size of the source data must not exceed the image's allocated size.
+       *
+       * @tparam T The type of the elements in the source data span.
+       * @param src A span of contiguous data to be written to the image.
+       */
       void write(const VulkanState &state, std::span<const T> src)
       {
         size_t byte_size = src.size() * sizeof(T);

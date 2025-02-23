@@ -36,8 +36,23 @@ namespace mr {
       vk::Instance instance() const noexcept { return _global->_instance.instance; }
       vk::PhysicalDevice phys_device() const noexcept { return _global->_phys_device.physical_device; }
       vk::Device device() const noexcept { return *_device; }
-      vk::Queue queue() const noexcept { return _queue; }
-      vk::PipelineCache pipeline_cache() const noexcept { return *_pipeline_cache; }
+      /**
+ * @brief Retrieves the Vulkan queue used for submitting commands.
+ *
+ * This method returns the Vulkan queue handle maintained within the state, which is used for command submissions.
+ *
+ * @return vk::Queue The Vulkan queue.
+ */
+vk::Queue queue() const noexcept { return _queue; }
+      /**
+ * @brief Retrieves the Vulkan pipeline cache.
+ *
+ * This function returns the pipeline cache associated with the current Vulkan state by 
+ * dereferencing its internal unique pointer.
+ *
+ * @return vk::PipelineCache The pipeline cache.
+ */
+vk::PipelineCache pipeline_cache() const noexcept { return *_pipeline_cache; }
 
     private:
       void _create_device();

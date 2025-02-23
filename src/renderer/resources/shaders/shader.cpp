@@ -7,6 +7,20 @@
 
 #include "utils/log.hpp"
 
+/**
+ * @brief Constructs a Shader object by compiling and loading its shader stages.
+ *
+ * This constructor initializes a Shader instance by setting up the shader file path relative
+ * to the current working directory and a predefined shaders directory. It creates an include string
+ * for the shader compiler and processes a mapping of preprocessor definitions into a command-line
+ * compatible define string. It then iterates over the available shader stages, compiling each stage
+ * if a corresponding source file exists, validating the stage, and creating a unique Vulkan shader
+ * module using the device from the application state. The resulting shader modules and their pipeline
+ * stage information are stored internally.
+ *
+ * @param filename Relative filename of the shader source to be compiled.
+ * @param define_map Mapping of preprocessor definitions to be applied during shader compilation.
+ */
 mr::Shader::Shader(const VulkanState &state, std::string_view filename, const std::unordered_map<std::string, std::string> &define_map)
     : _path(std::filesystem::current_path())
 {
@@ -65,7 +79,19 @@ mr::Shader::Shader(const VulkanState &state, std::string_view filename, const st
     });
 }
 
-// TODO: replace with Google's libshaderc
+/**
+ * @brief Compiles the shader source code for a specific stage into a SPIR-V binary.
+ *
+ * This function constructs the source and destination file paths based on the shader's base
+ * directory and the provided shader stage. It logs the compilation action, checks for the existence
+ * of the shader source file, and if present, invokes the glslc compiler with defined preprocessor
+ * directives and include paths to compile the shader into a SPIR-V binary.
+ *
+ * @param stage The shader stage to compile (e.g., Vertex, Fragment).
+ *
+ * @note The current implementation utilizes the glslc command-line tool and may be replaced with
+ *       Google's libshaderc in the future.
+ */
 void mr::Shader::compile(Shader::Stage stage) const noexcept
 {
   MR_INFO("Compiling shader {}\n\t with defines {}\n", _path.string(), _define_string);
@@ -85,6 +111,15 @@ void mr::Shader::compile(Shader::Stage stage) const noexcept
   std::system(argstr.c_str());
 }
 
+/**
+ * @brief Loads the binary content of a compiled shader for the specified stage.
+ *
+ * Constructs the full file path by appending the shader stage's name and the ".spv" extension to the current shader path.
+ * If the file exists, its contents are read into a vector of characters and returned; otherwise, an empty optional is returned.
+ *
+ * @param stage The shader stage to load (e.g., vertex, fragment).
+ * @return std::optional<std::vector<char>> The binary contents of the shader file if it exists, or std::nullopt otherwise.
+ */
 std::optional<std::vector<char>> mr::Shader::load(Shader::Stage stage) noexcept
 {
   std::filesystem::path stage_file_path = _path;

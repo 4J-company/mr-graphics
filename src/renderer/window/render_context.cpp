@@ -30,6 +30,14 @@ mr::RenderContext::~RenderContext() {
   _state.queue().waitIdle();
 }
 
+/**
+ * @brief Creates the Vulkan swapchain used for rendering.
+ *
+ * This function initializes a swapchain builder with the physical device, logical device, and
+ * window surface, then configures the swapchain using a specified color format, image usage flags,
+ * minimum image count, and desired extent. If the swapchain construction fails, an error is logged
+ * using the MR_ERROR macro.
+ */
 void mr::RenderContext::_create_swapchain()
 {
   vkb::SwapchainBuilder builder{_state.phys_device(), _state.device(), _surface.get()};
@@ -156,9 +164,16 @@ void mr::RenderContext::_create_render_pass()
     _state.device().createRenderPassUnique(render_pass_create_info).value;
 }
 
+/**
+ * @brief Creates framebuffers for rendering.
+ *
+ * Retrieves the swapchain images from the Vulkan device and constructs a framebuffer for each image.
+ * Each framebuffer is initialized with the active render pass, a wrapped swapchain image, G-buffers, and the depth buffer.
+ * The number of framebuffers created is limited by Framebuffer::max_presentable_images.
+ */
 void mr::RenderContext::_create_framebuffers()
 {
-  // *** Swamp Chain Images™ ***
+  // *** Swamp Chain Imagesâ„¢ ***
   auto swampchain_images =
     _state.device().getSwapchainImagesKHR(_swapchain.get()).value;
 
@@ -173,6 +188,17 @@ void mr::RenderContext::_create_framebuffers()
   }
 }
 
+/**
+ * @brief Updates the uniform buffer with current camera parameters.
+ *
+ * This function retrieves the camera's view-projection matrix, position, field
+ * of view, gamma, speed, and sensitivity, and writes them into a shader data
+ * structure. The uniform buffer is then updated with this data for use in
+ * rendering operations.
+ *
+ * @param cam The camera object providing the current state.
+ * @param cam_ubo The uniform buffer that will be updated with the camera data.
+ */
 static void update_camera(mr::FPSCamera &cam, mr::UniformBuffer &cam_ubo) noexcept
 {
   mr::ShaderCameraData cam_data;
@@ -187,6 +213,19 @@ static void update_camera(mr::FPSCamera &cam, mr::UniformBuffer &cam_ubo) noexce
   cam_ubo.write(std::span<mr::ShaderCameraData> {&cam_data, 1});
 }
 
+/**
+ * @brief Renders a frame using the provided FPS camera.
+ *
+ * This method encapsulates the complete rendering workflow for a single frame. It:
+ * - Synchronizes with previous frame operations using a fence.
+ * - Acquires the next swapchain image.
+ * - Begins command recording and sets up the render pass with clear values.
+ * - Updates the camera uniform buffer via the supplied FPS camera.
+ * - Draws the main scene model followed by a light geometry in a secondary subpass.
+ * - Submits the command buffer and presents the rendered image.
+ *
+ * @param cam FPS camera whose state is used to update the view-projection matrix and related camera parameters.
+ */
 void mr::RenderContext::render(mr::FPSCamera &cam)
 {
   static DescriptorAllocator descriptor_alloc(_state);

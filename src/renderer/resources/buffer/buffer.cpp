@@ -1,6 +1,17 @@
 #include "resources/buffer/buffer.hpp"
 
-// constructor
+/**
+ * @brief Constructs a Buffer by creating a Vulkan buffer and allocating its memory.
+ *
+ * Initializes the Buffer instance by creating a Vulkan buffer with the provided size and usage flag,
+ * retrieving the memory requirements for the buffer, allocating device memory that matches the specified
+ * memory property flags, and binding the allocated memory to the buffer.
+ *
+ * @param state The Vulkan state context for device operations.
+ * @param byte_size The size of the buffer in bytes.
+ * @param usage_flag Buffer usage flags specifying the buffer's intended operations.
+ * @param memory_properties Flags defining the required memory properties for allocation.
+ */
 mr::Buffer::Buffer(const VulkanState &state, size_t byte_size,
                    vk::BufferUsageFlags usage_flag,
                    vk::MemoryPropertyFlags memory_properties)

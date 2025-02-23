@@ -44,12 +44,24 @@ namespace mr {
         operator const Resource&() const { return res; }
       };
 
-      Shader() = default;
+      /**
+ * @brief Default constructor for the Shader class.
+ *
+ * Initializes a new Shader instance with default settings. No shader modules or stages are loaded until explicitly configured.
+ */
+Shader() = default;
 
       Shader(const VulkanState &state, std::string_view filename,
              const std::unordered_map<std::string, std::string> &define_map = {});
 
-      // move semantics
+      /**
+       * @brief Move constructor for Shader.
+       *
+       * Transfers ownership of shader resources (file path, shader modules, shader stages, and
+       * the count of loaded shaders) from the specified instance, leaving it in a valid but unspecified state.
+       *
+       * @param other The Shader instance to move resources from.
+       */
       Shader(Shader &&other) noexcept
           : _path(std::move(other._path))
           , _modules(std::move(other._modules))
@@ -93,7 +105,23 @@ namespace mr {
 
   MR_DECLARE_HANDLE(Shader)
 
-  constexpr vk::ShaderStageFlagBits get_stage_flags(std::integral auto stage) noexcept
+  constexpr /**
+   * @brief Retrieves the Vulkan shader stage flag corresponding to a stage index.
+   *
+   * This function maps an integral stage index to its associated Vulkan shader stage flag. The mapping is:
+   * - 0: Compute
+   * - 1: Vertex
+   * - 2: Tessellation Control
+   * - 3: Tessellation Evaluation
+   * - 4: Geometry
+   * - 5: Fragment
+   *
+   * An assertion is made to ensure that the provided index is within the valid range.
+   *
+   * @param stage The integral index of the shader stage.
+   * @return vk::ShaderStageFlagBits The Vulkan shader stage flag corresponding to the given index.
+   */
+  vk::ShaderStageFlagBits get_stage_flags(std::integral auto stage) noexcept
   {
     constexpr std::array stage_bits {
       vk::ShaderStageFlagBits::eCompute,

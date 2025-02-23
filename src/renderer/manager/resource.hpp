@@ -18,7 +18,13 @@ namespace mr {
   template<typename ResourceT>
   class ResourceBase : public std::enable_shared_from_this<ResourceT> {
   protected:
-    ResourceBase() = default;
+    /**
+ * @brief Default constructor for ResourceBase.
+ *
+ * This constructor is defaulted and protected to ensure that ResourceBase is only instantiated
+ * as a base class for derived resource types, supporting shared pointer semantics.
+ */
+ResourceBase() = default;
 
     friend class ResourceManager<ResourceT>;
   };

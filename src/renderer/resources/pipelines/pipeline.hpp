@@ -17,12 +17,26 @@ namespace mr {
       mr::ShaderHandle _shader;
 
     public:
-      Pipeline() = default;
+      /**
+ * @brief Default constructor for the Pipeline class.
+ *
+ * Constructs an uninitialized Pipeline object. For proper initialization of Vulkan resources,
+ * use the parameterized constructor.
+ */
+Pipeline() = default;
 
       Pipeline(const VulkanState &state, mr::ShaderHandle _shader,
                std::span<const vk::DescriptorSetLayout> bindings);
 
-      const vk::Pipeline pipeline() const { return _pipeline.get(); }
+      /**
+ * @brief Retrieves the Vulkan pipeline handle.
+ *
+ * This method returns the Vulkan pipeline handle managed by the Pipeline instance,
+ * allowing access to the underlying Vulkan pipeline resource.
+ *
+ * @return The Vulkan pipeline handle.
+ */
+const vk::Pipeline pipeline() const { return _pipeline.get(); }
 
       const vk::PipelineLayout layout() const { return _layout.get(); }
 

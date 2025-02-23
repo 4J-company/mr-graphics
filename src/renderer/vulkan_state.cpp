@@ -2,6 +2,16 @@
 #include "utils/logic_guards.hpp"
 #include "utils/path.hpp"
 
+/**
+ * @brief Constructs and initializes the Vulkan global state.
+ *
+ * This constructor repeatedly calls `vkfw::init()` until the Vulkan framework is successfully initialized.
+ * It then creates the Vulkan instance and selects a physical device by invoking `_create_instance()` and 
+ * `_create_phys_device()`, respectively. Finally, it sets up the pipeline cache by constructing its file path 
+ * using the cache directory and initializing it with `open_or_create`, logging the cache location for reference.
+ *
+ * @note Future enhancements may adjust cache creation based on program arguments for benchmarking purposes.
+ */
 mr::VulkanGlobalState::VulkanGlobalState()
 {
   while (vkfw::init() != vkfw::Result::eSuccess)
@@ -16,11 +26,31 @@ mr::VulkanGlobalState::VulkanGlobalState()
   _pipeline_cache.open_or_create(std::move(pipeline_cache_path));
 }
 
+/**
+ * @brief Destructor for VulkanGlobalState.
+ *
+ * Releases the Vulkan instance by calling vkb::destroy_instance, ensuring that all associated
+ * Vulkan resources are properly cleaned up.
+ */
 mr::VulkanGlobalState::~VulkanGlobalState()
 {
   vkb::destroy_instance(_instance);
 }
 
+/**
+ * @brief Callback for logging Vulkan debug messages.
+ *
+ * This function processes Vulkan debug messages and logs them based on their severity.
+ * Error messages are logged using MR_ERROR, warnings with MR_WARNING, and less severe messages
+ * with MR_INFO. It always returns VK_FALSE to indicate that the callback does not interrupt execution.
+ *
+ * @param message_severity The severity level of the debug message.
+ * @param message_type The type of the debug message.
+ * @param callback_data Pointer containing details about the debug message.
+ * @param user_data Unused user-defined data.
+ *
+ * @return VK_FALSE always.
+ */
 static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
   VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
   VkDebugUtilsMessageTypeFlagsEXT message_type,
@@ -40,6 +70,14 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
   return false;
 }
 
+/**
+ * @brief Creates and configures the Vulkan instance.
+ *
+ * Initializes a Vulkan instance using a builder that sets the application and engine details,
+ * requires Vulkan API version 1.3, and enables necessary extensions including GLFW surface extensions.
+ * In debug builds, it also enables debug utilities and validation layers, and sets up a debug callback
+ * for enhanced error reporting. Logs an error if the instance creation fails.
+ */
 void mr::VulkanGlobalState::_create_instance()
 {
   vkb::InstanceBuilder builder;
@@ -82,6 +120,15 @@ void mr::VulkanGlobalState::_create_instance()
   _instance = instance.value();
 }
 
+/**
+ * @brief Selects and configures the Vulkan physical device.
+ *
+ * Uses a device selector to choose a physical device that supports the swapchain extension while deferring
+ * surface initialization. If no device is selected, an error is logged. Once a device is chosen, the function
+ * conditionally enables the VK_EXT_VALIDATION_CACHE_EXTENSION_NAME extension, attempts to enable essential features
+ * (geometry shader, tessellation shader, sampler anisotropy), and logs an error if these are not available.
+ * It also attempts to enable the optional multi-draw indirect feature.
+ */
 void mr::VulkanGlobalState::_create_phys_device()
 {
   vkb::PhysicalDeviceSelector selector{_instance};
@@ -111,6 +158,14 @@ void mr::VulkanGlobalState::_create_phys_device()
   _phys_device.enable_features_if_present(static_cast<const VkPhysicalDeviceFeatures &>(optional_features));
 }
 
+/**
+ * @brief Constructs a VulkanState instance.
+ *
+ * Initializes device resources and sets up a pipeline cache using the provided global Vulkan state.
+ * This prepares the VulkanState for subsequent device operations.
+ *
+ * @param state Pointer to the global Vulkan state containing the Vulkan context.
+ */
 mr::VulkanState::VulkanState(VulkanGlobalState *state)
   : _global(state)
   , _device({}, {nullptr})
@@ -119,11 +174,24 @@ mr::VulkanState::VulkanState(VulkanGlobalState *state)
   _create_pipeline_cache();
 }
 
+/**
+ * @brief Destroys the Vulkan state and releases associated resources.
+ *
+ * This destructor ensures that the Vulkan pipeline cache is properly cleaned up by invoking _destroy_pipeline_cache().
+ */
 mr::VulkanState::~VulkanState()
 {
   _destroy_pipeline_cache();
 }
 
+/**
+ * @brief Creates a Vulkan device and initializes the graphics queue.
+ *
+ * This method selects a graphics-supporting queue family from the global physical device and constructs
+ * a Vulkan device with a custom queue configuration. Upon successful creation, it sets the device
+ * and retrieves the corresponding graphics queue. Error messages are logged if the device or queue 
+ * cannot be created.
+ */
 void mr::VulkanState::_create_device()
 {
   std::vector<vkb::CustomQueueDescription> queue_descrs;
@@ -158,6 +226,13 @@ void mr::VulkanState::_create_pipeline_cache()
   _pipeline_cache = device().createPipelineCacheUnique(create_info).value;
 }
 
+/**
+ * @brief Retrieves and stores pipeline cache data for later reuse.
+ *
+ * If a valid pipeline cache exists, this function queries its size using the Vulkan device,
+ * resizes the global pipeline cache's data buffer accordingly, and retrieves the cache data.
+ * The operation is aborted silently if the pipeline cache is not set or if any Vulkan call fails.
+ */
 void mr::VulkanState::_destroy_pipeline_cache()
 {
   if (not _pipeline_cache) {

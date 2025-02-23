@@ -27,7 +27,13 @@ namespace mr {
 
       // methods
       void start_main_loop();
-      void render() { _context.render(*_cam); }
+      /**
+ * @brief Renders the current frame using the active FPS camera.
+ *
+ * Delegates the drawing process to the rendering context by passing the current camera
+ * instance, which provides the necessary viewpoint for rendering the scene.
+ */
+void render() { _context.render(*_cam); }
   };
 } // namespace mr
 #endif // __MR_WINDOW_HPP_

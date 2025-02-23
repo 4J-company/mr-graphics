@@ -25,6 +25,15 @@ static mr::MaterialHandle load_material(const mr::VulkanState &state,
 static mr::Matr4f calculate_transform(const tinygltf::Node &node,
                                       const mr::Matr4f &parent_transform) noexcept;
 
+/**
+ * @brief Loads and initializes a 3D model from a GLTF file.
+ *
+ * This constructor loads a GLTF model using TinyGLTF by selecting ASCII or binary loading based on the file extension.
+ * It processes the first scene's nodes recursively to create meshes and materials for Vulkan rendering. If the model
+ * fails to load, it logs the error and warning messages before terminating the program.
+ *
+ * @param filename The GLTF model file name relative to the models directory.
+ */
 mr::Model::Model(const VulkanState &state, vk::RenderPass render_pass, std::string_view filename, mr::UniformBuffer &cam_ubo) noexcept
 {
   MR_INFO("Loading model {}", filename);
@@ -59,6 +68,13 @@ mr::Model::Model(const VulkanState &state, vk::RenderPass render_pass, std::stri
   MR_INFO("Loading model {} finished\n", filename);
 }
 
+/**
+ * @brief Renders the model by drawing each mesh with its corresponding material.
+ *
+ * Iterates over the material and mesh pairs, binding each material and issuing draw commands for the associated mesh using the provided command unit.
+ *
+ * @param unit The command unit used to record drawing commands.
+ */
 void mr::Model::draw(CommandUnit &unit) const noexcept
 {
   for (const auto &[material, mesh] : std::views::zip(_materials, _meshes)) {
@@ -68,6 +84,23 @@ void mr::Model::draw(CommandUnit &unit) const noexcept
   }
 }
 
+/**
+ * @brief Recursively processes a GLTF node to extract mesh primitives and load associated materials.
+ *
+ * This function computes the node's transformation matrix by combining its local transform with the
+ * provided parent transformation. If the node references a valid mesh (i.e., node.mesh is non-negative),
+ * it iterates through each mesh primitive to extract supported vertex attributes (POSITION, NORMAL, TEXCOORD_0)
+ * and creates corresponding vertex and index buffers. The material for each primitive is then loaded and both
+ * the mesh and material are stored internally for later rendering.
+ *
+ * The function also recursively processes all child nodes using the computed transformation.
+ *
+ * @note If the node does not reference a mesh (i.e., node.mesh is negative), the function returns immediately.
+ *
+ * @param model The GLTF model containing mesh, buffer, and accessor data.
+ * @param parent_transform The transformation matrix inherited from the parent node.
+ * @param node The current GLTF node to process.
+ */
 void mr::Model::_process_node(const mr::VulkanState &state,
                               const vk::RenderPass &render_pass,
                               tinygltf::Model &model,
@@ -152,6 +185,20 @@ void mr::Model::_process_node(const mr::VulkanState &state,
   }
 }
 
+/**
+ * @brief Loads a texture from a GLTF model.
+ *
+ * This function attempts to load a texture specified by the given index from the GLTF model. If
+ * the index is negative, std::nullopt is returned. Otherwise, it retrieves the corresponding texture and
+ * associated image data, determines the appropriate Vulkan format based on the number of image components
+ * (using a 3-component format if necessary, though most devices require 4 components), and creates a texture
+ * using the shared resource manager.
+ *
+ * @param state Vulkan state used during texture creation.
+ * @param model GLTF model containing texture and image data.
+ * @param index Index of the texture to load.
+ * @return std::optional<mr::TextureHandle> Handle to the created texture on success, or std::nullopt if the index is invalid.
+ */
 static std::optional<mr::TextureHandle> load_texture(const mr::VulkanState &state,
                                                const tinygltf::Model &model,
                                                const int index) noexcept
@@ -169,6 +216,23 @@ static std::optional<mr::TextureHandle> load_texture(const mr::VulkanState &stat
   return manager.create(mr::unnamed, state, image.image.data(), extent, format);
 }
 
+/**
+ * @brief Creates a material for physically-based rendering from GLTF material properties.
+ *
+ * Constructs a material by extracting PBR parameters—such as base color, metallic-roughness, emissive, occlusion,
+ * and normal textures—from the provided GLTF material. It loads available textures from the GLTF model, applies
+ * associated color factors, and incorporates a transformation matrix into the material. A camera uniform is also
+ * attached to support rendering.
+ *
+ * @param model GLTF model supplying image data for texture lookup.
+ * @param material GLTF material descriptor specifying PBR properties and texture indices.
+ * @param transform Transformation matrix applied to the material.
+ *
+ * @return mr::MaterialHandle Handle to the constructed material.
+ *
+ * @note Parameters like Vulkan state, render pass, and camera uniform buffer are common services and are omitted.
+ *       Material builders are stored in a static collection across function invocations.
+ */
 static mr::MaterialHandle load_material(
     const mr::VulkanState &state,
     vk::RenderPass render_pass,
@@ -213,6 +277,18 @@ static mr::MaterialHandle load_material(
   return builders.back().build();
 }
 
+/**
+ * @brief Computes the final transformation matrix for a GLTF node.
+ *
+ * Calculates the node's local transformation using its scale, rotation, and translation properties.
+ * If an explicit 4x4 transformation matrix is provided within the node, it replaces the computed
+ * local transform. The resulting matrix is then combined with the parent's transformation to produce
+ * the final transform.
+ *
+ * @param node The GLTF node containing transformation data.
+ * @param parent_transform The transformation matrix of the parent node.
+ * @return mr::Matr4f The combined transformation matrix.
+ */
 static mr::Matr4f calculate_transform(const tinygltf::Node &node, const mr::Matr4f &parent_transform) noexcept {
   // calculate local transform
   mr::Matr4f transform = mr::Matr4f::identity();

@@ -1,5 +1,21 @@
 #include "material/material.hpp"
 
+/**
+ * @brief Constructs a Material and initializes its rendering resources.
+ *
+ * This constructor sets up a material for rendering by initializing the uniform buffers,
+ * shader handle, and descriptor allocator. It creates descriptor attachments for the camera
+ * uniform buffer, the material's own uniform buffer, and any additional textures provided.
+ * A descriptor set is then allocated for the vertex shader stage based on these resource views,
+ * and a graphics pipeline is configured for opaque geometry rendering.
+ *
+ * @param state A reference to the Vulkan context.
+ * @param render_pass The Vulkan render pass used for pipeline creation.
+ * @param shader The shader handle used for rendering the material.
+ * @param ubo_data A span containing uniform buffer object data for the material.
+ * @param textures A span of optional texture handles associated with the material.
+ * @param cam_ubo A reference to the camera uniform buffer.
+ */
 mr::Material::Material(const VulkanState &state, const vk::RenderPass render_pass,
                        mr::ShaderHandle shader,
                        std::span<float> ubo_data,
@@ -37,6 +53,14 @@ mr::Material::Material(const VulkanState &state, const vk::RenderPass render_pas
                          std::span {layouts});
 }
 
+/**
+ * @brief Binds the material's graphics pipeline and descriptor sets to a command unit.
+ *
+ * This method activates the material's graphics pipeline and associated descriptor set, ensuring
+ * that the appropriate rendering state and resources are used for subsequent draw calls.
+ *
+ * @param unit The command unit to which the pipeline and descriptor sets are bound.
+ */
 void mr::Material::bind(CommandUnit &unit) const noexcept
 {
   unit->bindPipeline(vk::PipelineBindPoint::eGraphics, _pipeline.pipeline());

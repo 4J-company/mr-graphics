@@ -2,6 +2,22 @@
 #include "camera/camera.hpp"
 #include "utils/log.hpp"
 
+/**
+ * @brief Constructs a Vulkan window and sets up input callbacks for camera control.
+ *
+ * This constructor creates a Vulkan-based window with the specified dimensions, sets window hints to
+ * enable resizability, visibility, and focus behavior, and establishes a static FPS camera for navigation.
+ * It uses vkfw::createWindowUnique to generate the window and terminates the application if window creation fails.
+ *
+ * The constructor also disables the system cursor and registers two callbacks:
+ * - A cursor movement callback that calculates the position delta and updates the camera's orientation.
+ * - A key input callback supporting camera movement with W, A, S, D, Space (move down), Left Shift (move up),
+ *   window closure via Escape, and window resizing/toggling using F11 (with Shift to set a fixed 640x480 size).
+ *
+ * @param extent The desired window dimensions.
+ *
+ * @note The Vulkan global state parameter is considered a common service and is omitted from parameter documentation.
+ */
 mr::Window::Window(VulkanGlobalState *state, Extent extent)
   : _extent(extent)
 {
@@ -73,6 +89,12 @@ mr::Window::Window(VulkanGlobalState *state, Extent extent)
   _context = mr::RenderContext(state, this);
 }
 
+/**
+ * @brief Starts the main loop for rendering and event handling.
+ *
+ * Spawns a rendering thread that continuously calls the `render()` function until a stop request is signaled.
+ * Simultaneously, the function polls for window events until the window is marked to close.
+ */
 void mr::Window::start_main_loop() {
   std::jthread render_thread {
     [&](std::stop_token stop_token) {
