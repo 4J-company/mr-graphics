@@ -44,7 +44,7 @@ vec4 get_metallic_roughness_color(vec2 tex_coord) {
 
 vec4 get_emissive_color(vec2 tex_coord) {
 #ifdef EMISSIVE_MAP_BINDING
-  return texture(Emissive, tex_coord) * ubo.emissive_factor
+  return texture(Emissive, tex_coord) * ubo.emissive_factor;
 #else
   return ubo.emissive_factor;
 #endif
