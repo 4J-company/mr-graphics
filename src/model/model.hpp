@@ -1,5 +1,5 @@
-#ifndef __model_hpp_
-#define __model_hpp_
+#ifndef __MR_MODEL_HPP_
+#define __MR_MODEL_HPP_
 
 #define TINYGLTF_NO_INCLUDE_RAPIDJSON
 #define TINYGLTF_NOEXCEPTION
@@ -40,4 +40,4 @@ namespace mr {
   };
 } // namespace mr
 
-#endif // __model_hpp_
+#endif // __MR_MODEL_HPP_

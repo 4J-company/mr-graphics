@@ -1,5 +1,5 @@
-#ifndef __vulkan_state_hpp_
-#define __vulkan_state_hpp_
+#ifndef __MR_VULKAN_STATE_HPP_
+#define __MR_VULKAN_STATE_HPP_
 
 #include "pch.hpp"
 #include "utils/misc.hpp"
@@ -51,4 +51,4 @@ namespace mr {
   };
 } // namespace mr
 
-#endif // __vulkan_state_hpp_
+#endif // __MR_VULKAN_STATE_HPP_

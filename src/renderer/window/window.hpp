@@ -1,5 +1,5 @@
-#ifndef __window_hpp_
-#define __window_hpp_
+#ifndef __MR_WINDOW_HPP_
+#define __MR_WINDOW_HPP_
 
 #include "pch.hpp"
 #include "render_context.hpp"
@@ -30,4 +30,4 @@ namespace mr {
       void render() { _context.render(*_cam); }
   };
 } // namespace mr
-#endif // __window_hpp_
+#endif // __MR_WINDOW_HPP_

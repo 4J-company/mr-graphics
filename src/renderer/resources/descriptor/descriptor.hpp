@@ -1,5 +1,5 @@
-#if !defined(__descriptor_hpp_)
-#define __descriptor_hpp_
+#ifndef __MR_DESCRIPTOR_HPP_
+#define __MR_DESCRIPTOR_HPP_
 
 #include "pch.hpp"
 #include "resources/images/image.hpp"
@@ -68,4 +68,4 @@ namespace mr {
   };
 } // namespace mr
 
-#endif // __descriptor_hpp_
+#endif // __MR_DESCRIPTOR_HPP_

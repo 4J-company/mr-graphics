@@ -1,7 +1,7 @@
-#ifndef __system_hpp_
-#define __system_hpp_
+#ifndef __MR_SYSTEM_HPP_
+#define __MR_SYSTEM_HPP_
 
 #include "pch.hpp"
 #include "renderer/renderer.hpp"
 
-#endif // __system_hpp_
+#endif // __MR_SYSTEM_HPP_

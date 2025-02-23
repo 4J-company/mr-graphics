@@ -1,5 +1,5 @@
-#ifndef __graphics_pipeline_hpp_
-#define __graphics_pipeline_hpp_
+#ifndef __MR_GRAPHICS_PIPELINE_HPP_
+#define __MR_GRAPHICS_PIPELINE_HPP_
 
 #include "resources/pipelines/pipeline.hpp"
 
@@ -36,4 +36,4 @@ namespace mr {
       void apply(vk::CommandBuffer cmd_buffer) const override;
   };
 } // namespace mr
-#endif // __graphics_pipeline_hpp_
+#endif // __MR_GRAPHICS_PIPELINE_HPP_

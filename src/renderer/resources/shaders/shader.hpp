@@ -1,5 +1,5 @@
-#if !defined(__shader_hpp_)
-#define __shader_hpp_
+#ifndef __MR_SHADER_HPP_
+#define __MR_SHADER_HPP_
 
 #include "pch.hpp"
 
@@ -133,4 +133,4 @@ namespace mr {
   }
 } // namespace mr
 
-#endif // __shader_hpp_
+#endif // __MR_SHADER_HPP_

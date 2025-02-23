@@ -1,5 +1,5 @@
-#ifndef __attribute_types_hpp_
-#define __attribute_types_hpp_
+#ifndef __MR_ATTRIBUTE_TYPES_HPP_
+#define __MR_ATTRIBUTE_TYPES_HPP_
 
 using PositionType = mr::Vec3f;
 using IndexType = int;
@@ -9,4 +9,4 @@ using ColorType = mr::Vec4f;
 using BoneType = int;
 using BoundboxType = mr::AABBf;
  
-#endif // __attribute_types_hpp_
+#endif // __MR_ATTRIBUTE_TYPES_HPP_

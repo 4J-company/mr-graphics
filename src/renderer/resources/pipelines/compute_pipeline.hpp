@@ -1,5 +1,5 @@
-#if !defined(__compute_pipeline_hpp_)
-#define __compute_pipeline_hpp_
+#ifndef __MR_COMPUTE_PIPELINE_HPP_
+#define __MR_COMPUTE_PIPELINE_HPP_
 
 #include "resources/pipelines/pipeline.hpp"
 
@@ -14,4 +14,4 @@ namespace mr {
       uint32_t PipelineParametersFlag;
   };
 } // namespace mr
-#endif // __compute_pipeline_hpp_
+#endif // __MR_COMPUTE_PIPELINE_HPP_
