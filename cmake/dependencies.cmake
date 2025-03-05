@@ -11,11 +11,10 @@ else()
 endif()
 
 # install libraries with no binaries available
-CPMFindPackage(
-  NAME mr-math
-  GITHUB_REPOSITORY 4j-company/mr-math
-  GIT_TAG master
-)
+CPMAddPackage("gh:4j-company/mr-math#master")
+CPMAddPackage("gh:Cvelth/vkfw#glfw-3.4")
+CPMAddPackage("gh:charles-lunarg/vk-bootstrap@1.3.290")
+CPMAddPackage("gh:zeux/meshoptimizer#master")
 
 CPMFindPackage(
   NAME glfw3
@@ -27,23 +26,11 @@ CPMFindPackage(
     "GLFW_BULID_DOCS OFF"
 )
 
-CPMFindPackage(
-  NAME vkfw
-  GITHUB_REPOSITORY Cvelth/vkfw
-  GIT_TAG glfw-3.4
-)
-
 if (${vkfw_ADDED})
   add_library(libvkfw INTERFACE "")
   target_link_libraries(libvkfw INTERFACE glfw)
   target_include_directories(libvkfw INTERFACE ${vkfw_SOURCE_DIR}/include)
 endif()
-
-CPMFindPackage(
-  NAME vk-bootstrap
-  GITHUB_REPOSITORY charles-lunarg/vk-bootstrap
-  GIT_TAG v1.3.290
-)
 
 if (${vk-bootstrap_ADDED})
   add_library(vk-bootstrap-lib INTERFACE "")
@@ -81,7 +68,14 @@ set(DEPS_LIBRARIES
   libvkfw
   libstb-image
   vk-bootstrap-lib
+  meshoptimizer
 )
+
+# TBB is required since it's dependency of PSTL on GCC and Clang
+if (NOT MSVC)
+  find_package(TBB REQUIRED tbb)
+  set(DEPS_LIBRARIES ${DEPS_LIBRARIES} tbb)
+endif()
 
 # install CMake scripts
 include(${CMAKE_SOURCE_DIR}/cmake/scripts.cmake)
