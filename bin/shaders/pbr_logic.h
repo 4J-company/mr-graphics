@@ -89,11 +89,5 @@ vec3 ShadePBR( PointData point_data,
 
   outcolor = emissive + occlusion * outcolor;
 
-  // tone mapping
-  outcolor = outcolor / (outcolor + vec3(1.0));
-
-  // gamma correction
-  outcolor = pow(outcolor, vec3(1.0/2.2));
-
   return outcolor;
 }

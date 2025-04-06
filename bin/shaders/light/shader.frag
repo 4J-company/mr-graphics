@@ -18,6 +18,9 @@ layout(set = 0, binding = 6) uniform CameraUbo {
   float sens;
 } cam_ubo;
 
+#include "gamma_correction.h"
+#include "tone_mapping.h"
+
 #include "phong_logic.h"
 #include "pbr_logic.h"
 
@@ -36,5 +39,11 @@ void main( void )
 
   PointData pd = PointData(vec3(1.0), vec3(1.0), pos.xyz, norm);
 
-  OutColor = vec4(ShadePBR(pd, color, emissive, occlusion, metallic, roughness), 1.0);
+  vec3 shaded_color = ShadePBR(pd, color, emissive, occlusion, metallic, roughness);
+  vec3 tonemapped_color = tm_aces(shaded_color);
+  vec3 gamma_corrected_color = gc_linear(tonemapped_color);
+
+  vec3 final_color = gamma_corrected_color;
+
+  OutColor = vec4(final_color, 1.0);
 }
