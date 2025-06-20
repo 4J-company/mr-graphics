@@ -1,27 +1,7 @@
 #include "resources/images/image.hpp"
 #include "resources/buffer/buffer.hpp"
 
-vk::Format mr::Image::find_supported_format(
-  const VulkanState &state, const std::vector<vk::Format> &candidates,
-  vk::ImageTiling tiling, vk::FormatFeatureFlags features)
-{
-  for (auto format : candidates) {
-    vk::FormatProperties props =
-      state.phys_device().getFormatProperties(format);
-
-    if (tiling == vk::ImageTiling::eLinear &&
-        (props.linearTilingFeatures & features) == features) {
-      return format;
-    }
-    else if (tiling == vk::ImageTiling::eOptimal &&
-             (props.optimalTilingFeatures & features) == features) {
-      return format;
-    }
-  }
-  assert(false); // cant find format
-  return {};
-}
-
+// Utility function for image size calculation
 static size_t calculate_image_size(mr::Extent extent, vk::Format format)
 {
   // TODO: support float formats
@@ -33,30 +13,20 @@ static size_t calculate_image_size(mr::Extent extent, vk::Format format)
   return extent.width * extent.height * texel_size;
 }
 
-mr::Image::Image(const VulkanState &state, Extent extent,
-                 vk::Format format, vk::Image image, bool swapchain_image)
-  : _image{image}
-  , _extent{extent.width, extent.height, 1}
-  , _size{calculate_image_size(extent, format)}
-  , _format{format}
-  , _layout{vk::ImageLayout::eUndefined}
-  , _holds_swapchain_image{swapchain_image}
-{
-  _mip_level = 1;
-  _aspect_flags = vk::ImageAspectFlagBits::eColor;
-  craete_image_view(state);
-}
+// ---- Base Image ----
 
-mr::Image::Image(const VulkanState &state, Extent extent,
-                 vk::Format format, vk::ImageUsageFlags usage_flags,
-                 vk::ImageAspectFlags aspect_flags, uint mip_level)
-  : _mip_level{mip_level}
+mr::Image::Image(const VulkanState &state, Extent extent, vk::Format format,
+                 vk::ImageUsageFlags usage_flags, vk::ImageAspectFlags aspect_flags,
+                 vk::MemoryPropertyFlags memory_properties, uint mip_level)
+  : _state(&state)
+  , _mip_level(mip_level)
   , _extent{extent.width, extent.height, 1}
   , _size{calculate_image_size(extent, format)}
-  , _format{format}
-  , _layout{vk::ImageLayout::eUndefined}
-  , _usage_flags{usage_flags}
-  , _aspect_flags{aspect_flags}
+  , _format(format)
+  , _layout(vk::ImageLayout::eUndefined)
+  , _usage_flags(usage_flags)
+  , _aspect_flags(aspect_flags)
+  , _memory_properties(memory_properties)
 {
   vk::ImageCreateInfo image_create_info {
     .imageType = vk::ImageType::e2D,
@@ -79,23 +49,86 @@ mr::Image::Image(const VulkanState &state, Extent extent,
     .memoryTypeIndex =
       Buffer::find_memory_type(state,
                                mem_requirements.memoryTypeBits,
-                               vk::MemoryPropertyFlagBits::eDeviceLocal),
+                               _memory_properties),
   };
 
   _memory = state.device().allocateMemoryUnique(alloc_info, nullptr).value;
   state.device().bindImageMemory(_image.get(), _memory.get(), 0);
 
-  craete_image_view(state);
+  create_image_view(state);
 }
 
-mr::Image::~Image() {
-  // swapchain images are destroyed with owning swapchain
-  if (_holds_swapchain_image)
-    _image.release();
+mr::Image::~Image() {}
+
+void mr::Image::switch_layout(const VulkanState &state, vk::ImageLayout new_layout) {
+  vk::ImageSubresourceRange range {
+    .aspectMask = _aspect_flags,
+    .baseMipLevel = 0,
+    .levelCount = _mip_level,
+    .baseArrayLayer = 0,
+    .layerCount = 1,
+  };
+
+  vk::ImageMemoryBarrier barrier {
+    .oldLayout = _layout,
+    .newLayout = new_layout,
+    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+    .image = _image.get(),
+    .subresourceRange = range
+  };
+
+  vk::PipelineStageFlags source_stage;
+  vk::PipelineStageFlags destination_stage;
+
+  if (_layout == vk::ImageLayout::eUndefined &&
+      new_layout == vk::ImageLayout::eTransferDstOptimal) {
+    barrier.srcAccessMask = vk::AccessFlagBits::eNone;
+    barrier.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
+    source_stage = vk::PipelineStageFlagBits::eTopOfPipe;
+    destination_stage = vk::PipelineStageFlagBits::eTransfer;
+  }
+  else if (_layout == vk::ImageLayout::eTransferDstOptimal &&
+           new_layout == vk::ImageLayout::eShaderReadOnlyOptimal) {
+    barrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
+    barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
+    source_stage = vk::PipelineStageFlagBits::eTransfer;
+    destination_stage = vk::PipelineStageFlagBits::eFragmentShader;
+  }
+  else if (_layout == vk::ImageLayout::eUndefined &&
+           new_layout == vk::ImageLayout::eDepthStencilAttachmentOptimal) {
+    barrier.srcAccessMask = {};
+    barrier.dstAccessMask = vk::AccessFlagBits::eDepthStencilAttachmentRead |
+                            vk::AccessFlagBits::eDepthStencilAttachmentWrite;
+    source_stage = vk::PipelineStageFlagBits::eTopOfPipe;
+    destination_stage = vk::PipelineStageFlagBits::eEarlyFragmentTests;
+  }
+  else {
+    assert(false); // can't choose layout
+  }
+
+  static CommandUnit command_unit(state);
+  command_unit.begin();
+  command_unit->pipelineBarrier(
+    source_stage, destination_stage, {}, {}, {}, {barrier});
+  command_unit.end();
+
+  auto [bufs, size] = command_unit.submit_info();
+  vk::SubmitInfo submit_info {
+    .commandBufferCount = size,
+    .pCommandBuffers = bufs,
+  };
+  auto fence = state.device().createFence({}).value;
+  state.queue().submit(submit_info, fence);
+  state.device().waitForFences({fence}, VK_TRUE, UINT64_MAX);
+
+  _layout = new_layout;
 }
 
-void mr::Image::craete_image_view(const VulkanState &state)
-{
+void mr::Image::copy_to_host() const {}
+void mr::Image::get_pixel(const vk::Extent2D &coords) const {}
+
+void mr::Image::create_image_view(const VulkanState &state) {
   vk::ImageSubresourceRange range {
     .aspectMask = _aspect_flags,
     .baseMipLevel = 0,
@@ -118,77 +151,80 @@ void mr::Image::craete_image_view(const VulkanState &state)
   _image_view = state.device().createImageViewUnique(create_info).value;
 }
 
-void mr::Image::switch_layout(const VulkanState &state,
-                              vk::ImageLayout new_layout)
+// Template write implementation
+// (kept as a template in the header)
+
+vk::Format mr::Image::find_supported_format(
+  const VulkanState &state, const std::vector<vk::Format> &candidates,
+  vk::ImageTiling tiling, vk::FormatFeatureFlags features)
 {
-  vk::ImageSubresourceRange range {
-    .aspectMask = _aspect_flags,
-    .baseMipLevel = 0,
-    .levelCount = _mip_level,
-    .baseArrayLayer = 0,
-    .layerCount = 1,
-  };
+  for (auto format : candidates) {
+    vk::FormatProperties props =
+      state.phys_device().getFormatProperties(format);
 
-  vk::ImageMemoryBarrier barrier {
-    .oldLayout = _layout,
-    .newLayout = new_layout,
-    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-
-    .image = _image.get(),
-    .subresourceRange = range};
-
-  vk::PipelineStageFlags source_stage;
-  vk::PipelineStageFlags destination_stage;
-
-  if (_layout == vk::ImageLayout::eUndefined &&
-      new_layout == vk::ImageLayout::eTransferDstOptimal) {
-    barrier.srcAccessMask = vk::AccessFlagBits::eNone;
-    barrier.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
-
-    source_stage = vk::PipelineStageFlagBits::eTopOfPipe;
-    destination_stage = vk::PipelineStageFlagBits::eTransfer;
+    if (tiling == vk::ImageTiling::eLinear &&
+        (props.linearTilingFeatures & features) == features) {
+      return format;
+    }
+    else if (tiling == vk::ImageTiling::eOptimal &&
+             (props.optimalTilingFeatures & features) == features) {
+      return format;
+    }
   }
-  else if (_layout == vk::ImageLayout::eTransferDstOptimal &&
-           new_layout == vk::ImageLayout::eShaderReadOnlyOptimal) {
-    barrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
-    barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
-
-    source_stage = vk::PipelineStageFlagBits::eTransfer;
-    destination_stage = vk::PipelineStageFlagBits::eFragmentShader;
-  }
-  else if (_layout == vk::ImageLayout::eUndefined &&
-           new_layout == vk::ImageLayout::eDepthStencilAttachmentOptimal) {
-    barrier.srcAccessMask = {};
-    barrier.dstAccessMask = vk::AccessFlagBits::eDepthStencilAttachmentRead |
-                            vk::AccessFlagBits::eDepthStencilAttachmentWrite;
-
-    source_stage = vk::PipelineStageFlagBits::eTopOfPipe;
-    destination_stage = vk::PipelineStageFlagBits::eEarlyFragmentTests;
-  }
-  else {
-    assert(false); // cant chose layout
-  }
-
-  // TODO: delete static
-  static CommandUnit command_unit(state);
-  command_unit.begin();
-  command_unit->pipelineBarrier(
-    source_stage, destination_stage, {}, {}, {}, {barrier});
-  command_unit.end();
-
-  auto [bufs, size] = command_unit.submit_info();
-  vk::SubmitInfo submit_info {
-    .commandBufferCount = size,
-    .pCommandBuffers = bufs,
-  };
-  auto fence = state.device().createFence({}).value;
-  state.queue().submit(submit_info, fence);
-  state.device().waitForFences({fence}, VK_TRUE, UINT64_MAX);
-
-  _layout = new_layout;
+  assert(false); // cant find format
+  return {};
 }
 
-void mr::Image::copy_to_host() const {}
+// ---- HostImage ----
+mr::HostImage::HostImage(const VulkanState &state, Extent extent, vk::Format format,
+                        vk::ImageUsageFlags usage_flags, vk::ImageAspectFlags aspect_flags,
+                        uint mip_level)
+  : Image(state, extent, format, usage_flags, aspect_flags,
+          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, mip_level)
+{}
 
-void mr::Image::get_pixel(const vk::Extent2D &coords) const {}
+// ---- DeviceImage ----
+mr::DeviceImage::DeviceImage(const VulkanState &state, Extent extent, vk::Format format,
+                            vk::ImageUsageFlags usage_flags, vk::ImageAspectFlags aspect_flags,
+                            uint mip_level)
+  : Image(state, extent, format, usage_flags, aspect_flags,
+          vk::MemoryPropertyFlagBits::eDeviceLocal, mip_level)
+{}
+
+// ---- SwapchainImage ----
+mr::SwapchainImage::SwapchainImage(const VulkanState &state, Extent extent, vk::Format format, vk::Image image)
+{
+  _image.reset(image); // Wrap, do not own
+  _extent = {extent.width, extent.height, 1};
+  _size = calculate_image_size(extent, format);
+  _format = format;
+  _mip_level = 1;
+  _aspect_flags = vk::ImageAspectFlagBits::eColor;
+  _layout = vk::ImageLayout::eUndefined;
+  create_image_view(state);
+}
+
+mr::SwapchainImage::~SwapchainImage() {
+  // Do not destroy swapchain image, just release wrapper
+  _image.release();
+}
+
+// ---- TextureImage ----
+mr::TextureImage::TextureImage(const VulkanState &state, Extent extent, vk::Format format, vk::ImageUsageFlags usage_flags, uint mip_level)
+  : DeviceImage(state, extent, format, usage_flags, vk::ImageAspectFlagBits::eColor, mip_level)
+{}
+
+// ---- DepthImage ----
+mr::DepthImage::DepthImage(const VulkanState &state, Extent extent, vk::Format format, uint mip_level)
+  : DeviceImage(state, extent, format, vk::ImageUsageFlagBits::eDepthStencilAttachment, vk::ImageAspectFlagBits::eDepth, mip_level)
+{}
+
+// ---- ColorAttachmentImage ----
+mr::ColorAttachmentImage::ColorAttachmentImage(const VulkanState &state, Extent extent, vk::Format format, uint mip_level)
+  : DeviceImage(state, extent, format, vk::ImageUsageFlagBits::eColorAttachment, vk::ImageAspectFlagBits::eColor, mip_level)
+{}
+
+// ---- StorageImage ----
+mr::StorageImage::StorageImage(const VulkanState &state, Extent extent, vk::Format format, uint mip_level)
+  : DeviceImage(state, extent, format, vk::ImageUsageFlagBits::eStorage, vk::ImageAspectFlagBits::eColor, mip_level)
+{}

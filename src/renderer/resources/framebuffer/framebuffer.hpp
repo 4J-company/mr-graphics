@@ -16,13 +16,13 @@ namespace mr {
       friend class RenderContext;
 
     private:
-      static inline const size_t max_presentable_images = 2, max_gbuffers = 1;
+      static inline const size_t max_presentable_images = 1, max_gbuffers = 6;
 
       vk::UniqueFramebuffer _framebuffer;
 
       Extent _extent;
-      std::array<Image, max_presentable_images> _swapchain_images;
-      std::array<Image, max_gbuffers> _gbuffers;
+      std::array<SwapchainImage, max_presentable_images> _swapchain_images;
+      std::array<ColorAttachmentImage, max_gbuffers> _gbuffers;
 
       Viewport _viewport;
 
@@ -31,9 +31,9 @@ namespace mr {
 
       Framebuffer(const VulkanState &state, vk::RenderPass render_pass,
                   Extent extent,
-                  Image final_target,
-                  std::array<Image, 6 /* constant... */> &gbuffers,
-                  Image &depthbuffer);
+                  SwapchainImage final_target,
+                  std::array<ColorAttachmentImage, max_gbuffers> &gbuffers,
+                  DepthImage &depthbuffer);
 
       void resize(size_t width, size_t height);
 

@@ -4,6 +4,7 @@
 #include "resources/buffer/buffer.hpp"
 #include "resources/command_unit/command_unit.hpp"
 #include "resources/descriptor/descriptor.hpp"
+#include "resources/images/image.hpp"
 #include "resources/pipelines/graphics_pipeline.hpp"
 #include "vkfw/vkfw.hpp"
 #include <vulkan/vulkan_enums.hpp>
@@ -12,18 +13,26 @@ mr::RenderContext::RenderContext(VulkanGlobalState *state, Window *parent)
   : _parent(parent)
   , _state(state)
   , _extent(parent->extent())
-  , _swapchain({}, {_state.device()})
+  , _surface(vkfw::createWindowSurfaceUnique(_state.instance(), _parent->window()))
+  , _swapchain([this, state, parent]{
+      _create_swapchain();
+      return std::move(_swapchain);
+    }())
+  , _depthbuffer([this, state, parent]{
+      _create_depthbuffer();
+      return std::move(_depthbuffer);
+    }())
+  , _render_pass([this, state, parent]{
+      _create_render_pass();
+      return std::move(_render_pass);
+    }())
+  , _framebuffers([this, state, parent]{
+      return std::move(_framebuffers);
+    }())
+  , _image_available_semaphore (_state.device().createSemaphoreUnique({}).value)
+  , _render_finished_semaphore (_state.device().createSemaphoreUnique({}).value)
+  , _image_fence (_state.device().createFenceUnique({.flags = vk::FenceCreateFlagBits::eSignaled}).value)
 {
-  _surface = vkfw::createWindowSurfaceUnique(_state.instance(), _parent->window());
-
-  _create_swapchain();
-  _create_depthbuffer();
-  _create_render_pass();
-  _create_framebuffers();
-
-  _image_available_semaphore = _state.device().createSemaphoreUnique({}).value;
-  _render_finished_semaphore = _state.device().createSemaphoreUnique({}).value;
-  _image_fence = _state.device().createFenceUnique({.flags = vk::FenceCreateFlagBits::eSignaled}).value;
 }
 
 mr::RenderContext::~RenderContext() {
@@ -54,30 +63,26 @@ void mr::RenderContext::_create_depthbuffer()
     vk::ImageTiling::eOptimal,
     vk::FormatFeatureFlagBits::eDepthStencilAttachment
   );
-  _depthbuffer = Image(_state,
-                       _extent,
-                       format,
-                       vk::ImageUsageFlagBits::eDepthStencilAttachment,
-                       vk::ImageAspectFlagBits::eDepth);
+  _depthbuffer = DepthImage(_state, _extent, format);
   _depthbuffer.switch_layout(_state,
                              vk::ImageLayout::eDepthStencilAttachmentOptimal);
 }
 
 void mr::RenderContext::_create_render_pass()
 {
-  for (unsigned i = 0; i < gbuffers_number; i++) {
-    _gbuffers[i] = Image(_state,
-                         _extent,
-                         vk::Format::eR32G32B32A32Sfloat,
-                         vk::ImageUsageFlagBits::eColorAttachment |
-                           vk::ImageUsageFlagBits::eInputAttachment,
-                         vk::ImageAspectFlagBits::eColor);
-  }
+  std::array<ColorAttachmentImage, gbuffers_number> gbuffers {
+    mr::ColorAttachmentImage(_state, _extent, vk::Format::eR32G32B32A32Sfloat),
+    mr::ColorAttachmentImage(_state, _extent, vk::Format::eR32G32B32A32Sfloat),
+    mr::ColorAttachmentImage(_state, _extent, vk::Format::eR32G32B32A32Sfloat),
+    mr::ColorAttachmentImage(_state, _extent, vk::Format::eR32G32B32A32Sfloat),
+    mr::ColorAttachmentImage(_state, _extent, vk::Format::eR32G32B32A32Sfloat),
+    mr::ColorAttachmentImage(_state, _extent, vk::Format::eR32G32B32A32Sfloat),
+  };
 
   std::vector<vk::AttachmentDescription> color_attachments(
     gbuffers_number + 2,
     {
-      .format = _gbuffers[0].format(),
+      .format = gbuffers[0].format(),
       .samples = vk::SampleCountFlagBits::e1,
       .loadOp = vk::AttachmentLoadOp::eClear,
       .storeOp = vk::AttachmentStoreOp::eStore,
@@ -154,21 +159,18 @@ void mr::RenderContext::_create_render_pass()
 
   _render_pass =
     _state.device().createRenderPassUnique(render_pass_create_info).value;
-}
 
-void mr::RenderContext::_create_framebuffers()
-{
-  // *** Swamp Chain Images™ ***
+  // *** Swamp Chain Images ***
   auto swampchain_images =
     _state.device().getSwapchainImagesKHR(_swapchain.get()).value;
 
   for (uint i = 0; i < Framebuffer::max_presentable_images; i++) {
-    Image image{_state, _extent, _swapchain_format, swampchain_images[i], true};
+    SwapchainImage image {_state, _extent, _swapchain_format, swampchain_images[i]};
     _framebuffers[i] = Framebuffer(_state,
                                    _render_pass.get(),
                                    _extent,
                                    std::move(image),
-                                   _gbuffers,
+                                   gbuffers,
                                    _depthbuffer);
   }
 }
@@ -213,7 +215,7 @@ void mr::RenderContext::render(mr::FPSCamera &cam)
   std::vector<Shader::ResourceView> light_attach;
   light_attach.reserve(gbuffers_number);
   for (unsigned i = 0; i < gbuffers_number; i++) {
-    light_attach.emplace_back(0, i, &_gbuffers[i]);
+    light_attach.emplace_back(0, i, &_gbuffers.get()[i]);
   }
   light_attach.emplace_back(0, gbuffers_number, &cam_ubo);
   static DescriptorSet light_set =

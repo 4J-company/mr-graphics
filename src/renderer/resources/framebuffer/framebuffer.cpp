@@ -1,19 +1,22 @@
 #include "resources/framebuffer/framebuffer.hpp"
+#include "resources/images/image.hpp"
 
 mr::Framebuffer::Framebuffer(const VulkanState &state,
                              vk::RenderPass render_pass,
                              Extent extent,
-                             Image final_target,
-                             std::array<Image, 6 /* constant... */> &gbuffers,
-                             Image &depthbuffer)
+                             SwapchainImage final_target,
+                             std::array<ColorAttachmentImage, max_gbuffers> &gbuffers,
+                             DepthImage &depthbuffer)
   : _extent{extent}
+  , _swapchain_images{[&final_target] {
+      std::array<SwapchainImage, max_presentable_images> tmp {std::move(final_target)};
+      return tmp;
+    }()}
+  , _gbuffers{std::move(gbuffers)}
 {
-  // assert(images.size() == max_presentable_images);
-  _swapchain_images[0] = std::move(final_target);
-
   std::array<vk::ImageView, 6 + 2> attachments;
   attachments[0] = _swapchain_images[0].image_view();
-  for (int i = 0; i < 6; i++) { attachments[i + 1] = gbuffers[i].image_view(); }
+  for (int i = 0; i < 6; i++) { attachments[i + 1] = _gbuffers[i].image_view(); }
   attachments.back() = depthbuffer.image_view();
 
   vk::FramebufferCreateInfo framebuffer_create_info {

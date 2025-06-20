@@ -11,7 +11,7 @@ namespace mr {
     private:
       Extent _extent;
       vkfw::UniqueWindow _window;
-      mr::RenderContext _context;
+      std::optional<mr::RenderContext> _context;
       mr::FPSCamera *_cam;
 
     public:
@@ -27,7 +27,7 @@ namespace mr {
 
       // methods
       void start_main_loop();
-      void render() { _context.render(*_cam); }
+      void render() { _context->render(*_cam); }
   };
 } // namespace mr
 #endif // __MR_WINDOW_HPP_

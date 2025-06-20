@@ -2,6 +2,7 @@
 #define __MR_WINDOW_CONTEXT_HPP_
 
 #include "pch.hpp"
+#include "resources/images/image.hpp"
 #include "resources/resources.hpp"
 #include "vulkan_state.hpp"
 #include "utils/misc.hpp"
@@ -12,7 +13,7 @@ namespace mr {
 
   class RenderContext {
     public:
-      static inline const uint gbuffers_number = 6;
+      static inline constexpr uint gbuffers_number = 6;
 
       RenderContext() = default;
       RenderContext(RenderContext &&other) noexcept = default;
@@ -40,8 +41,8 @@ namespace mr {
       vk::UniqueSwapchainKHR _swapchain;
 
       std::array<Framebuffer, Framebuffer::max_presentable_images> _framebuffers;
-      std::array<Image, gbuffers_number> _gbuffers;
-      Image _depthbuffer;
+      std::reference_wrapper<std::array<ColorAttachmentImage, gbuffers_number>> _gbuffers = _framebuffers[0]._gbuffers;
+      DepthImage _depthbuffer;
 
       vk::UniqueRenderPass _render_pass;
 
