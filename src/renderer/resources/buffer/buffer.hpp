@@ -116,9 +116,9 @@ namespace mr {
           .commandBufferCount = bufs_number,
           .pCommandBuffers = bufs,
         };
-        auto fence = _state->device().createFence({}).value;
-        _state->queue().submit(submit_info, fence);
-        _state->device().waitForFences({fence}, VK_TRUE, UINT64_MAX);
+        auto fence = _state->device().createFenceUnique({}).value;
+        _state->queue().submit(submit_info, fence.get());
+        _state->device().waitForFences({fence.get()}, VK_TRUE, UINT64_MAX);
 
         return *this;
       }
