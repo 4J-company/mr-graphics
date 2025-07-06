@@ -3,7 +3,6 @@
 
 #include "pch.hpp"
 #include "render_context.hpp"
-#include "utils/misc.hpp"
 #include "camera/camera.hpp"
 
 namespace mr {

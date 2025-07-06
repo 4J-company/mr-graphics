@@ -1,6 +1,5 @@
 #include "vulkan_state.hpp"
-#include "utils/logic_guards.hpp"
-#include "utils/path.hpp"
+#include <vulkan/vulkan_core.h>
 
 mr::VulkanGlobalState::VulkanGlobalState()
 {
@@ -84,31 +83,46 @@ void mr::VulkanGlobalState::_create_instance()
 
 void mr::VulkanGlobalState::_create_phys_device()
 {
+  vk::PhysicalDeviceFeatures features {
+    .geometryShader = true,
+    .tessellationShader = true,
+    .multiDrawIndirect = true,
+    .samplerAnisotropy = true,
+  };
+
+  vk::PhysicalDeviceVulkan12Features features12{
+    .descriptorIndexing = true,
+    .bufferDeviceAddress = true,
+  };
+
+  vk::PhysicalDeviceVulkan13Features features13{
+    .synchronization2 = true,
+    .dynamicRendering = true,
+  };
+
+  vk::PhysicalDeviceVulkan14Features features14 {
+    .dynamicRenderingLocalRead = true,
+  };
+
   vkb::PhysicalDeviceSelector selector{_instance};
   const auto phys_device = selector
+    .set_minimum_version(1, 3)
     .defer_surface_initialization()
-    .add_required_extensions({VK_KHR_SWAPCHAIN_EXTENSION_NAME})
+    .set_required_features(features)
+    .set_required_features_12(features12)
+    .set_required_features_13(features13)
+    .set_required_features_14(features14)
+    .add_required_extensions({
+      VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+      VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME})
     .select();
+
   if (not phys_device) {
     MR_ERROR("Cannot create VkPhysicalDevice. {}\n", phys_device.error().message());
   }
   _phys_device = phys_device.value();
 
   _phys_device.enable_extensions_if_present({VK_EXT_VALIDATION_CACHE_EXTENSION_NAME});
-
-  const vk::PhysicalDeviceFeatures required_features {
-    .geometryShader = true,
-    .tessellationShader = true,
-    .samplerAnisotropy = true,
-  };
-  if (not _phys_device.enable_features_if_present(static_cast<const VkPhysicalDeviceFeatures &>(required_features))) {
-    MR_ERROR("VkPhysicalDevice does not support required features\n");
-  }
-
-  const vk::PhysicalDeviceFeatures optional_features {
-    .multiDrawIndirect = true,
-  };
-  _phys_device.enable_features_if_present(static_cast<const VkPhysicalDeviceFeatures &>(optional_features));
 }
 
 mr::VulkanState::VulkanState(VulkanGlobalState *state)

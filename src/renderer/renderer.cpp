@@ -1,27 +1,7 @@
 #include "renderer.hpp"
 #include "resources/command_unit/command_unit.hpp"
 #include "window/render_context.hpp"
-#include "utils/log.hpp"
 #include "manager/manager.hpp"
-
-static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
-  VkDebugUtilsMessageSeverityFlagBitsEXT MessageSeverity,
-  VkDebugUtilsMessageTypeFlagsEXT MessageType,
-  const VkDebugUtilsMessengerCallbackDataEXT *CallbackData, void *UserData)
-{
-  switch (MessageSeverity) {
-  case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
-    MR_ERROR("{}\n", CallbackData->pMessage);
-    break;
-  case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
-    MR_WARNING("{}\n", CallbackData->pMessage);
-    break;
-  default:
-    MR_INFO("{}\n", CallbackData->pMessage);
-    break;
-  }
-  return false;
-}
 
 // mr::Application class defualt constructor (initializes vulkan instance, device ...)
 mr::Application::Application()

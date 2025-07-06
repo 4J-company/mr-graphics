@@ -1,11 +1,8 @@
 #include "resources/shaders/shader.hpp"
-#include "utils/path.hpp"
 
 #include <filesystem>
 #include <fstream>
 #include <sstream>
-
-#include "utils/log.hpp"
 
 mr::Shader::Shader(const VulkanState &state, std::string_view filename, const std::unordered_map<std::string, std::string> &define_map)
     : _path(std::filesystem::current_path())
