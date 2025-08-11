@@ -2,21 +2,58 @@
 #define __MR_WINDOW_CONTEXT_HPP_
 
 #include "pch.hpp"
+#include "resources/images/image.hpp"
 #include "resources/resources.hpp"
 #include "vulkan_state.hpp"
-#include "utils/misc.hpp"
 #include "camera/camera.hpp"
+#include "swapchain.hpp"
+
+#include <VkBootstrap.h>
 
 namespace mr {
   class Window;
 
   class RenderContext {
     public:
-      static inline const uint gbuffers_number = 6;
+      static inline constexpr int gbuffers_number = 6;
+      static inline constexpr int max_images_number = 8; // max teoretical swapchain images number
 
-      RenderContext() = default;
+      // GBuffers names
+      enum struct GBuffer : uint32_t {
+        Position = 0,
+        NormalIsShade = 1,
+        OMR = 2, // Occlusion Metallic Roughness
+        Emissive = 3,
+        Occlusion = 4,
+        ColorTrans = 5
+      };
+
+    private:
+      Window *_parent;
+      VulkanState _state;
+      Extent _extent;
+
+      vk::UniqueSurfaceKHR _surface;
+      Swapchain _swapchain;
+
+      // TODO(dk6): use Framedata instead
+      beman::inplace_vector<ColorAttachmentImage, gbuffers_number> _gbuffers;
+      DepthImage _depthbuffer;
+
+      // semaphores for waiting swapchain image is ready before light pass
+      beman::inplace_vector<vk::UniqueSemaphore, max_images_number> _image_available_semaphore;
+      // semaphores for waiting frame is ready before presentin
+      beman::inplace_vector<vk::UniqueSemaphore, max_images_number> _render_finished_semaphore;
+      // semaphore for sync opaque models rendering and light shading
+      vk::UniqueSemaphore _models_render_finished_semaphore;
+      vk::UniqueFence _image_fence; // fence for swapchain image?
+
+    public:
       RenderContext(RenderContext &&other) noexcept = default;
       RenderContext &operator=(RenderContext &&other) noexcept = default;
+
+      RenderContext(const RenderContext &other) noexcept = delete;
+      RenderContext &operator=(const RenderContext &other) noexcept = delete;
 
       RenderContext(VulkanGlobalState *state, Window *parent);
 
@@ -26,28 +63,8 @@ namespace mr {
       void render(mr::FPSCamera &cam);
 
     private:
-      void _create_swapchain();
-      void _create_framebuffers();
-      void _create_depthbuffer();
-      void _create_render_pass();
-
-      Window *_parent;
-      VulkanState _state;
-      Extent _extent;
-
-      vk::UniqueSurfaceKHR _surface;
-      vk::Format _swapchain_format{vk::Format::eB8G8R8A8Unorm};
-      vk::UniqueSwapchainKHR _swapchain;
-
-      std::array<Framebuffer, Framebuffer::max_presentable_images> _framebuffers;
-      std::array<Image, gbuffers_number> _gbuffers;
-      Image _depthbuffer;
-
-      vk::UniqueRenderPass _render_pass;
-
-      vk::UniqueSemaphore _image_available_semaphore;
-      vk::UniqueSemaphore _render_finished_semaphore;
-      vk::UniqueFence _image_fence;
+      void render_models(UniformBuffer &cam_ubo, CommandUnit &command_unit, mr::FPSCamera &cam);
+      void render_lights(UniformBuffer &cam_ubo, CommandUnit &command_unit, uint32_t image_index);
   };
 } // namespace mr
 #endif // __MR_WINDOW_CONTEXT_HPP_

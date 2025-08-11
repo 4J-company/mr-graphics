@@ -37,13 +37,20 @@ void main( void )
   float roughness = occlusion_roughness_metallic.g;
   float metallic  = occlusion_roughness_metallic.b;
 
-  PointData pd = PointData(vec3(1.0), vec3(1.0), pos.xyz, norm);
+  vec3 poses[] = {vec3(-1, 1, 1), vec3(1, 1, -1)};
+  vec3 result = vec3(0);
+  for (int i = 0; i < 2; i++) {
+    PointData pd = PointData(poses[i], vec3(1.0), pos.xyz, norm);
 
-  vec3 shaded_color = ShadePBR(pd, color, emissive, occlusion, metallic, roughness);
-  vec3 tonemapped_color = tm_aces(shaded_color);
-  vec3 gamma_corrected_color = gc_linear(tonemapped_color);
+    vec3 shaded_color = ShadePBR(pd, color, emissive, occlusion, metallic, roughness);
+    vec3 tonemapped_color = tm_aces(shaded_color);
+    vec3 gamma_corrected_color = gc_linear(tonemapped_color);
 
-  vec3 final_color = gamma_corrected_color;
+    vec3 final_color = gamma_corrected_color;
 
-  OutColor = vec4(final_color, 1.0);
+    result += final_color;
+  }
+  OutColor = vec4(result, 0);
 }
+
+

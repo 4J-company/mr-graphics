@@ -1,6 +1,5 @@
 #include "window.hpp"
 #include "camera/camera.hpp"
-#include "utils/log.hpp"
 
 mr::Window::Window(VulkanGlobalState *state, Extent extent)
   : _extent(extent)
@@ -12,7 +11,8 @@ mr::Window::Window(VulkanGlobalState *state, Extent extent)
   vkfw::WindowHints hints{};
   hints.resizable = true;
   hints.visible = true;
-  hints.focusOnShow = true;
+  // TODO(dk6): window options must be reworked, now it doesn't work
+  // hints.focusOnShow = true;
   // hints.transparentFramebuffer = true;
 
   auto [result_code, window] =
@@ -24,16 +24,19 @@ mr::Window::Window(VulkanGlobalState *state, Extent extent)
 
   _window = std::move(window);
 
-  glfwSetInputMode(_window.get(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+  // TODO(dk6): camera must be reworked, now it doesn't work
 
-  _window->callbacks()->on_cursor_move =
-    [this](const vkfw::Window &win, double x, double y) {
-    static mr::Vec2d old_pos;
-    mr::Vec2d pos = {x, y};
-    mr::Vec2d delta = pos - old_pos;
-    old_pos = pos;
-    camera.turn({delta.x() / _extent.width, delta.y() / _extent.height, 0});
-  };
+  // glfwSetInputMode(_window.get(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+  // _window->callbacks()->on_cursor_move =
+  //   [this](const vkfw::Window &win, double x, double y) {
+  //   static mr::Vec2d old_pos;
+  //   mr::Vec2d pos = {x, y};
+  //   mr::Vec2d delta = pos - old_pos;
+  //   old_pos = pos;
+  //   camera.turn({delta.x() / _extent.width, delta.y() / _extent.height, 0});
+  // };
+
   _window->callbacks()->on_key = [&](const vkfw::Window &win, vkfw::Key key,
                                     int scan_code, vkfw::KeyAction action,
                                     vkfw::ModifierKeyFlags flags) {

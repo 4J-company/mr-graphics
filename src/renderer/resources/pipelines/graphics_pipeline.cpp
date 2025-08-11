@@ -1,12 +1,12 @@
 #include "resources/pipelines/graphics_pipeline.hpp"
 
-mr::GraphicsPipeline::GraphicsPipeline(
-  const VulkanState &state, vk::RenderPass render_pass, Subpass subpass,
-  mr::ShaderHandle shader,
-  std::span<const vk::VertexInputAttributeDescription> attributes,
-  std::span<const vk::DescriptorSetLayout> descriptor_layouts)
-    : Pipeline(state, shader, descriptor_layouts)
-    , _subpass(subpass)
+mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state,
+                                       const RenderContext &render_context,
+                                       Subpass subpass,
+                                       mr::ShaderHandle shader,
+                                       std::span<const vk::VertexInputAttributeDescription> attributes,
+                                       std::span<const vk::DescriptorSetLayout> descriptor_layouts)
+  : Pipeline(state, shader, descriptor_layouts), _subpass(subpass)
 {
   // dynamic states of pipeline (viewport)
   _dynamic_states.push_back(vk::DynamicState::eViewport);
@@ -79,11 +79,17 @@ mr::GraphicsPipeline::GraphicsPipeline(
     .maxDepthBounds = 1.0f,
   };
 
-  std::vector<vk::PipelineColorBlendAttachmentState> color_blend_attachments;
+  vk::PipelineRenderingCreateInfoKHR pipiline_rendering_create_info {};
+
+  std::array<vk::PipelineColorBlendAttachmentState, RenderContext::gbuffers_number> color_blend_attachments;
+  std::array<vk::Format, RenderContext::gbuffers_number> color_attachments_formats;
+  uint32_t color_attacmhents_cnt = 0;
+
   switch (subpass) {
     case Subpass::OpaqueGeometry:
-      color_blend_attachments.resize(RenderContext::gbuffers_number);
-      for (unsigned i = 0; i < RenderContext::gbuffers_number; i++) {
+      color_attacmhents_cnt = RenderContext::gbuffers_number;
+
+      for (int i = 0; i < RenderContext::gbuffers_number; i++) {
         color_blend_attachments[i].blendEnable = false;
         color_blend_attachments[i].srcColorBlendFactor = vk::BlendFactor::eOne;
         color_blend_attachments[i].dstColorBlendFactor = vk::BlendFactor::eZero;
@@ -95,9 +101,17 @@ mr::GraphicsPipeline::GraphicsPipeline(
           vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
           vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
       }
+
+      for (int i = 0; i < RenderContext::gbuffers_number; i++) {
+        // TODO(dk6): remove magic number
+        color_attachments_formats[i] = vk::Format::eR32G32B32A32Sfloat;
+      }
+      pipiline_rendering_create_info.depthAttachmentFormat = mr::get_depthbuffer_format(state);
+
       break;
     case Subpass::OpaqueLighting:
-      color_blend_attachments.resize(1);
+      color_attacmhents_cnt = 1;
+
       color_blend_attachments[0].blendEnable = false;
       color_blend_attachments[0].srcColorBlendFactor = vk::BlendFactor::eOne;
       color_blend_attachments[0].dstColorBlendFactor = vk::BlendFactor::eZero;
@@ -108,40 +122,45 @@ mr::GraphicsPipeline::GraphicsPipeline(
       color_blend_attachments[0].colorWriteMask =
         vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
         vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+
+      color_attachments_formats[0] = mr::get_swapchain_format(state);
+
+      break;
+    default:
+      std::println(std::cerr, "invalid subpass option");
+      assert(false);
   }
+
+  pipiline_rendering_create_info.colorAttachmentCount = color_attacmhents_cnt;
+  pipiline_rendering_create_info.pColorAttachmentFormats = color_attachments_formats.data();
 
   vk::PipelineColorBlendStateCreateInfo color_blending_create_info {
     .logicOpEnable = false,
     .logicOp = vk::LogicOp::eCopy,
-    .attachmentCount = static_cast<uint>(color_blend_attachments.size()),
+    .attachmentCount = static_cast<uint32_t>(color_attacmhents_cnt),
     .pAttachments = color_blend_attachments.data(),
     .blendConstants = std::array<float, 4> {0.0, 0.0, 0.0, 0.0}, // ???
   };
 
-  vk::GraphicsPipelineCreateInfo pipeline_create_info {
-    .stageCount = _shader->stage_number(),
-    .pStages = _shader->get_stages().data(),
-    .pVertexInputState = &vertex_input_create_info,
-    .pInputAssemblyState = &input_assembly_create_info,
-    .pViewportState = &viewport_state_create_info,
-    .pRasterizationState = &rasterizer_create_info,
-    .pMultisampleState = &multisampling_create_info,
-    .pColorBlendState = &color_blending_create_info,
-    .pDynamicState = &dynamic_state_create_info,
-    .layout = _layout.get(),
-    .renderPass = render_pass,
-    .subpass = (uint32_t)_subpass,
-    .basePipelineHandle = VK_NULL_HANDLE, // Optional
-    .basePipelineIndex = -1,              // Optional
+  vk::StructureChain chain {
+    vk::GraphicsPipelineCreateInfo {
+      .stageCount = _shader->stage_number(),
+      .pStages = _shader->get_stages().data(),
+      .pVertexInputState = &vertex_input_create_info,
+      .pInputAssemblyState = &input_assembly_create_info,
+      .pViewportState = &viewport_state_create_info,
+      .pRasterizationState = &rasterizer_create_info,
+      .pMultisampleState = &multisampling_create_info,
+      .pDepthStencilState = &depth_stencil_create_info,
+      .pColorBlendState = &color_blending_create_info,
+      .pDynamicState = &dynamic_state_create_info,
+      .layout = _layout.get(),
+    },
+    pipiline_rendering_create_info,
   };
 
-  if (_subpass == Subpass::OpaqueGeometry) {
-    pipeline_create_info.pDepthStencilState = &depth_stencil_create_info;
-  }
-
   _pipeline = std::move(state.device()
-                          .createGraphicsPipelinesUnique(state.pipeline_cache(),
-                                                         pipeline_create_info)
+                          .createGraphicsPipelinesUnique(state.pipeline_cache(), chain.get())
                           .value[0]);
 }
 

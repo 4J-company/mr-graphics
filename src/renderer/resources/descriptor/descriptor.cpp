@@ -108,6 +108,8 @@ mr::DescriptorAllocator::DescriptorAllocator(const VulkanState &state)
   static std::vector<vk::DescriptorPoolSize> default_sizes = {
     {vk::DescriptorType::eUniformBuffer, 10},
     { vk::DescriptorType::eSampledImage,  5},
+    { vk::DescriptorType::eInputAttachment, 10},
+    { vk::DescriptorType::eCombinedImageSampler, 10},
   };
 
   if (auto pool = allocate_pool(default_sizes); pool.has_value()) {

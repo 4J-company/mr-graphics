@@ -1,7 +1,5 @@
 #include "model/model.hpp"
 #include "renderer/renderer.hpp"
-#include "utils/path.hpp"
-#include "utils/log.hpp"
 
 // for tmp singleton
 #include "manager/manager.hpp"
@@ -17,15 +15,14 @@ static std::optional<mr::TextureHandle> load_texture(const mr::VulkanState &stat
                                                      const tinygltf::Model &image,
                                                      const int index) noexcept;
 static mr::MaterialHandle load_material(const mr::VulkanState &state,
-                                        vk::RenderPass render_pass,
+                                        const mr::RenderContext &render_context,
                                         const tinygltf::Model &model,
                                         const tinygltf::Material &material,
-                                        mr::UniformBuffer &cam_ubo,
                                         mr::Matr4f transform) noexcept;
 static mr::Matr4f calculate_transform(const tinygltf::Node &node,
                                       const mr::Matr4f &parent_transform) noexcept;
 
-mr::Model::Model(const VulkanState &state, vk::RenderPass render_pass, std::string_view filename, mr::UniformBuffer &cam_ubo) noexcept
+mr::Model::Model(const VulkanState &state, const RenderContext &render_context, std::string_view filename) noexcept
 {
   MR_INFO("Loading model {}", filename);
 
@@ -53,7 +50,7 @@ mr::Model::Model(const VulkanState &state, vk::RenderPass render_pass, std::stri
   const auto &scene = model.scenes[0];
   for (int i = 0; i < scene.nodes.size(); i++) {
     const auto &node = model.nodes[scene.nodes[i]];
-    _process_node(state, render_pass, model, mr::Matr4f::identity(), cam_ubo, node);
+    _process_node(state, render_context, model, mr::Matr4f::identity(), node);
   }
 
   MR_INFO("Loading model {} finished\n", filename);
@@ -69,10 +66,9 @@ void mr::Model::draw(CommandUnit &unit) const noexcept
 }
 
 void mr::Model::_process_node(const mr::VulkanState &state,
-                              const vk::RenderPass &render_pass,
+                              const RenderContext &render_context,
                               tinygltf::Model &model,
                               const mr::Matr4f &parent_transform,
-                              mr::UniformBuffer &cam_ubo,
                               const tinygltf::Node &node) noexcept
 {
   std::array attributes {
@@ -89,7 +85,7 @@ void mr::Model::_process_node(const mr::VulkanState &state,
   mr::Matr4f transform = calculate_transform(node, parent_transform);
 
   for (auto child : node.children) {
-    _process_node(state, render_pass, model, transform, cam_ubo, model.nodes[child]);
+    _process_node(state, render_context, model, transform, model.nodes[child]);
   }
 
   for (auto &primitive : mesh.primitives) {
@@ -148,13 +144,13 @@ void mr::Model::_process_node(const mr::VulkanState &state,
     tinygltf::Material material = model.materials[primitive.material];
 
     _meshes.emplace_back(std::move(vbufs), std::move(ibuf));
-    _materials.emplace_back(load_material(state, render_pass, model, material, cam_ubo, transform));
+    _materials.emplace_back(load_material(state, render_context, model, material, transform));
   }
 }
 
 static std::optional<mr::TextureHandle> load_texture(const mr::VulkanState &state,
-                                               const tinygltf::Model &model,
-                                               const int index) noexcept
+                                                     const tinygltf::Model &model,
+                                                     const int index) noexcept
 {
   if (index < 0) { return std::nullopt; }
 
@@ -169,13 +165,15 @@ static std::optional<mr::TextureHandle> load_texture(const mr::VulkanState &stat
   return manager.create(mr::unnamed, state, image.image.data(), extent, format);
 }
 
+// TODO(dk6): workaround to pass camera data to material ubo until Scene class will be added
+extern mr::UniformBuffer *s_cam_ubo_ptr;
+
 static mr::MaterialHandle load_material(
-    const mr::VulkanState &state,
-    vk::RenderPass render_pass,
-    const tinygltf::Model &model,
-    const tinygltf::Material &material,
-    mr::UniformBuffer &cam_ubo,
-    mr::Matr4f transform) noexcept
+  const mr::VulkanState &state,
+  const mr::RenderContext &render_context,
+  const tinygltf::Model &model,
+  const tinygltf::Material &material,
+  mr::Matr4f transform) noexcept
 {
   /*
     PBR textures:
@@ -200,7 +198,7 @@ static mr::MaterialHandle load_material(
   std::optional<mr::TextureHandle> normal_texture_optional             = load_texture(state, model, material.normalTexture.index);
 
   using enum mr::MaterialParameter;
-  mr::MaterialBuilder builder = mr::MaterialBuilder(state, render_pass, "default");
+  mr::MaterialBuilder builder = mr::MaterialBuilder(state, render_context, "default");
   builder
     .add_value(transform)
     .add_texture(BaseColor, std::move(base_color_texture_optional), base_color_factor)
@@ -208,7 +206,8 @@ static mr::MaterialHandle load_material(
     .add_texture(EmissiveColor, std::move(emissive_texture_optional), emissive_color_factor)
     .add_texture(OcclusionMap, std::move(occlusion_texture_optional))
     .add_texture(NormalMap, std::move(normal_texture_optional))
-    .add_camera(cam_ubo);
+    .add_camera(*s_cam_ubo_ptr)
+    ;
   builders.emplace_back(std::move(builder));
   return builders.back().build();
 }
@@ -217,15 +216,16 @@ static mr::Matr4f calculate_transform(const tinygltf::Node &node, const mr::Matr
   // calculate local transform
   mr::Matr4f transform = mr::Matr4f::identity();
   if (node.scale.size() == 3) {
-    transform *= mr::Matr4f::scale(
-      mr::Vec3f(
+    transform *= mr::scale(
+      mr::Vec4f(
         node.scale[0],
         node.scale[1],
-        node.scale[2]
+        node.scale[2],
+        0
         ));
   }
   if (node.rotation.size() == 4) {
-    transform *= mr::Matr4f::rotate(mr::Norm3f(
+    transform *= mr::rotate(mr::Norm3f(
                                         node.rotation[0],
                                         node.rotation[1],
                                         node.rotation[2]),
@@ -234,10 +234,11 @@ static mr::Matr4f calculate_transform(const tinygltf::Node &node, const mr::Matr
     );
   }
   if (node.translation.size() == 3) {
-    transform *= mr::Matr4f::translate(mr::Vec3f(
+    transform *= mr::translate(mr::Vec4f(
         node.translation[0],
         node.translation[1],
-        node.translation[2]
+        node.translation[2],
+        0
     ));
   }
   if (node.matrix.size() == 16) {

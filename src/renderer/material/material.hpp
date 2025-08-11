@@ -3,7 +3,6 @@
 
 #include "pch.hpp"
 #include "resources/resources.hpp"
-#include "utils/misc.hpp"
 #include "manager/manager.hpp"
 
 namespace mr {
@@ -34,8 +33,12 @@ namespace mr {
 
   class Material : public ResourceBase<Material> {
   public:
-    Material(const VulkanState &state, const vk::RenderPass render_pass, mr::ShaderHandle shader,
-             std::span<float> ubo_data, std::span<std::optional<mr::TextureHandle>> textures, mr::UniformBuffer &cam_ubo) noexcept;
+    Material(const VulkanState &state,
+             const RenderContext &render_context,
+             mr::ShaderHandle shader,
+             std::span<float> ubo_data,
+             std::span<std::optional<mr::TextureHandle>> textures,
+             mr::UniformBuffer &cam_ubo) noexcept;
 
     void bind(CommandUnit &unit) const noexcept;
 
@@ -72,14 +75,21 @@ namespace mr {
   MR_DECLARE_HANDLE(Material)
 
   class MaterialBuilder {
+  private:
+    const mr::VulkanState *_state {};
+    const mr::RenderContext *_context {};
+
+    std::vector<byte> _specialization_data;
+    std::unordered_map<std::string, std::string> _defines;
+    std::vector<float> _ubo_data;
+    std::vector<std::optional<mr::TextureHandle>> _textures;
+    mr::UniformBuffer *_cam_ubo;
+
+    std::string_view _shader_filename;
+
   public:
-    MaterialBuilder(
-      const mr::VulkanState &state,
-      const vk::RenderPass &render_pass,
-      std::string_view filename)
-        : _state(&state)
-        , _render_pass(render_pass)
-        , _shader_filename(filename)
+    MaterialBuilder(const mr::VulkanState &state, const mr::RenderContext &context, std::string_view filename)
+      : _state(&state), _context(&context), _shader_filename(filename)
     {
       _textures.resize(enum_cast(MaterialParameter::EnumSize));
     }
@@ -87,10 +97,9 @@ namespace mr {
     MaterialBuilder(MaterialBuilder &&) noexcept = default;
     MaterialBuilder & operator=(MaterialBuilder &&) noexcept = default;
 
-    MaterialBuilder &add_texture(
-      MaterialParameter param,
-      std::optional<mr::TextureHandle> tex,
-      Color factor = {1.0, 1.0, 1.0, 1.0})
+    MaterialBuilder &add_texture(MaterialParameter param,
+                                 std::optional<mr::TextureHandle> tex,
+                                 Color factor = {1.0, 1.0, 1.0, 1.0})
     {
       assert(!tex.has_value() || *tex != nullptr);
       _textures[enum_cast(param)] = std::move(tex);
@@ -139,9 +148,12 @@ namespace mr {
       auto shdfindres = shdmanager.find(shdname);
       auto shdhandle = shdfindres ? shdfindres : shdmanager.create(shdname, *_state, _shader_filename, _generate_shader_defines());
 
+      ASSERT(_state != nullptr);
+      ASSERT(_context != nullptr);
+
       return mtlmanager.create(unnamed,
         *_state,
-        _render_pass,
+        *_context,
         shdhandle,
         std::span {_ubo_data},
         std::span {_textures},
@@ -170,17 +182,6 @@ namespace mr {
       }
       return defines;
     }
-
-    const mr::VulkanState *_state{nullptr};
-    vk::RenderPass _render_pass;
-
-    std::vector<byte> _specialization_data;
-    std::unordered_map<std::string, std::string> _defines;
-    std::vector<float> _ubo_data;
-    std::vector<std::optional<mr::TextureHandle>> _textures;
-    mr::UniformBuffer *_cam_ubo;
-
-    std::string_view _shader_filename;
   };
 } // namespace mr
 

@@ -4,302 +4,292 @@
 #include "resources/buffer/buffer.hpp"
 #include "resources/command_unit/command_unit.hpp"
 #include "resources/descriptor/descriptor.hpp"
+#include "resources/images/image.hpp"
 #include "resources/pipelines/graphics_pipeline.hpp"
 #include "vkfw/vkfw.hpp"
+#include <vulkan/vulkan_core.h>
 #include <vulkan/vulkan_enums.hpp>
+
+// TODO(dk6): this is temporary changes, while mr::Camera works incorrect
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
+// TODO(dk6): workaround to pass camera data to material ubo until Scene class will be added
+mr::UniformBuffer *s_cam_ubo_ptr;
 
 mr::RenderContext::RenderContext(VulkanGlobalState *state, Window *parent)
   : _parent(parent)
   , _state(state)
   , _extent(parent->extent())
-  , _swapchain({}, {_state.device()})
+  , _surface(vkfw::createWindowSurfaceUnique(_state.instance(), _parent->window()))
+  , _swapchain(_state, _surface.get(), _extent)
+  , _depthbuffer(_state, _extent)
+  , _image_fence (_state.device().createFenceUnique({.flags = vk::FenceCreateFlagBits::eSignaled}).value)
 {
-  _surface = vkfw::createWindowSurfaceUnique(_state.instance(), _parent->window());
-
-  _create_swapchain();
-  _create_depthbuffer();
-  _create_render_pass();
-  _create_framebuffers();
-
-  _image_available_semaphore = _state.device().createSemaphoreUnique({}).value;
-  _render_finished_semaphore = _state.device().createSemaphoreUnique({}).value;
-  _image_fence = _state.device().createFenceUnique({.flags = vk::FenceCreateFlagBits::eSignaled}).value;
+  for (auto _ : std::views::iota(0, gbuffers_number)) {
+    _gbuffers.emplace_back(_state, _extent, vk::Format::eR32G32B32A32Sfloat);
+  }
+  for (int i = 0; i < _swapchain._images.size(); i++) {
+    _image_available_semaphore.emplace_back(_state.device().createSemaphoreUnique({}).value);
+    _render_finished_semaphore.emplace_back(_state.device().createSemaphoreUnique({}).value);
+  }
+  _models_render_finished_semaphore = _state.device().createSemaphoreUnique({}).value;
 }
 
 mr::RenderContext::~RenderContext() {
   _state.queue().waitIdle();
 }
 
-void mr::RenderContext::_create_swapchain()
-{
-  vkb::SwapchainBuilder builder{_state.phys_device(), _state.device(), _surface.get()};
-  auto swapchain = builder
-    .set_desired_format({static_cast<VkFormat>(_swapchain_format), VK_COLORSPACE_SRGB_NONLINEAR_KHR})
-    .set_image_usage_flags(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
-    .set_required_min_image_count(Framebuffer::max_presentable_images)
-    .set_desired_extent(_extent.width, _extent.height)
-    .build();
-  if (not swapchain) {
-    MR_ERROR("Cannot create VkSwapchainKHR. {}\n", swapchain.error().message());
-  }
-
-  _swapchain.reset(swapchain.value().swapchain);
-}
-
-void mr::RenderContext::_create_depthbuffer()
-{
-  auto format = Image::find_supported_format(
-    _state,
-    {vk::Format::eD32Sfloat, vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint},
-    vk::ImageTiling::eOptimal,
-    vk::FormatFeatureFlagBits::eDepthStencilAttachment
-  );
-  _depthbuffer = Image(_state,
-                       _extent,
-                       format,
-                       vk::ImageUsageFlagBits::eDepthStencilAttachment,
-                       vk::ImageAspectFlagBits::eDepth);
-  _depthbuffer.switch_layout(_state,
-                             vk::ImageLayout::eDepthStencilAttachmentOptimal);
-}
-
-void mr::RenderContext::_create_render_pass()
-{
-  for (unsigned i = 0; i < gbuffers_number; i++) {
-    _gbuffers[i] = Image(_state,
-                         _extent,
-                         vk::Format::eR32G32B32A32Sfloat,
-                         vk::ImageUsageFlagBits::eColorAttachment |
-                           vk::ImageUsageFlagBits::eInputAttachment,
-                         vk::ImageAspectFlagBits::eColor);
-  }
-
-  std::vector<vk::AttachmentDescription> color_attachments(
-    gbuffers_number + 2,
-    {
-      .format = _gbuffers[0].format(),
-      .samples = vk::SampleCountFlagBits::e1,
-      .loadOp = vk::AttachmentLoadOp::eClear,
-      .storeOp = vk::AttachmentStoreOp::eStore,
-      .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
-      .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
-      .initialLayout = vk::ImageLayout::eUndefined,
-      .finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
-    });
-
-  color_attachments[0].format = _swapchain_format;
-  color_attachments[0].finalLayout = vk::ImageLayout::ePresentSrcKHR;
-  color_attachments.back().format = _depthbuffer.format();
-  color_attachments.back().finalLayout =
-    vk::ImageLayout::eDepthStencilAttachmentOptimal;
-
-  const int subpass_number = 2;
-  std::array<vk::SubpassDescription, subpass_number> subpasses;
-
-  vk::AttachmentReference final_target_ref {
-    .attachment = 0, .layout = vk::ImageLayout::eColorAttachmentOptimal};
-  std::array<vk::AttachmentReference, gbuffers_number> gbuffers_out_refs;
-  for (uint i = 0; i < gbuffers_number; i++) {
-    gbuffers_out_refs[i].attachment = i + 1;
-    gbuffers_out_refs[i].layout = vk::ImageLayout::eColorAttachmentOptimal;
-  }
-  std::array<vk::AttachmentReference, gbuffers_number> gbuffers_in_refs;
-  for (uint i = 0; i < gbuffers_number; i++) {
-    gbuffers_in_refs[i].attachment = i + 1;
-    gbuffers_in_refs[i].layout = vk::ImageLayout::eShaderReadOnlyOptimal;
-  }
-
-  vk::AttachmentReference depth_attachment_ref {
-    .attachment = gbuffers_number + 1,
-    .layout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
-  };
-
-  subpasses[0].pipelineBindPoint = vk::PipelineBindPoint::eGraphics,
-  subpasses[0].colorAttachmentCount =
-    static_cast<uint>(gbuffers_out_refs.size());
-  subpasses[0].pColorAttachments = gbuffers_out_refs.data();
-  subpasses[0].pDepthStencilAttachment = &depth_attachment_ref;
-
-  subpasses[1].pipelineBindPoint = vk::PipelineBindPoint::eGraphics,
-  subpasses[1].inputAttachmentCount =
-    static_cast<uint>(gbuffers_in_refs.size());
-  subpasses[1].pInputAttachments = gbuffers_in_refs.data();
-  subpasses[1].colorAttachmentCount = 1;
-  subpasses[1].pColorAttachments = &final_target_ref;
-
-  std::array<vk::SubpassDependency, subpass_number> dependencies;
-  dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
-  dependencies[0].dstSubpass = 0;
-  dependencies[0].srcStageMask =
-    vk::PipelineStageFlagBits::eColorAttachmentOutput;
-  dependencies[0].dstStageMask =
-    vk::PipelineStageFlagBits::eColorAttachmentOutput;
-  dependencies[0].srcAccessMask = vk::AccessFlagBits::eColorAttachmentRead |
-                                  vk::AccessFlagBits::eColorAttachmentWrite;
-  dependencies[0].dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
-  dependencies[0].dependencyFlags = vk::DependencyFlagBits::eByRegion;
-
-  dependencies[1] = dependencies[0];
-  dependencies[1].srcSubpass = 0;
-  dependencies[1].dstSubpass = 1;
-
-  vk::RenderPassCreateInfo render_pass_create_info {
-    .attachmentCount = static_cast<uint>(color_attachments.size()),
-    .pAttachments = color_attachments.data(),
-    .subpassCount = static_cast<uint>(subpasses.size()),
-    .pSubpasses = subpasses.data(),
-    .dependencyCount = static_cast<uint>(dependencies.size()),
-    .pDependencies = dependencies.data(),
-  };
-
-  _render_pass =
-    _state.device().createRenderPassUnique(render_pass_create_info).value;
-}
-
-void mr::RenderContext::_create_framebuffers()
-{
-  // *** Swamp Chain Images™ ***
-  auto swampchain_images =
-    _state.device().getSwapchainImagesKHR(_swapchain.get()).value;
-
-  for (uint i = 0; i < Framebuffer::max_presentable_images; i++) {
-    Image image{_state, _extent, _swapchain_format, swampchain_images[i], true};
-    _framebuffers[i] = Framebuffer(_state,
-                                   _render_pass.get(),
-                                   _extent,
-                                   std::move(image),
-                                   _gbuffers,
-                                   _depthbuffer);
-  }
-}
-
 static void update_camera(mr::FPSCamera &cam, mr::UniformBuffer &cam_ubo) noexcept
 {
-  mr::ShaderCameraData cam_data;
+  // cam.cam() = mr::Camera<float>({1}, {-1}, {0, 1, 0});
+  // cam.cam().projection() = mr::Camera<float>::Projection(0.25_pi);
 
-  cam_data.vp = cam.viewproj();
-  cam_data.campos = cam.cam().position();
-  cam_data.fov = static_cast<float>(cam.fov());
-  cam_data.gamma = cam.gamma();
-  cam_data.speed = cam.speed();
-  cam_data.sens = cam.sensetivity();
+  // TODO(dk6): this is temporary changes, while mr::Camera works incorrect
+  glm::mat4 view = glm::lookAt(glm::vec3{1.f, 1.f, 1.f}, {0.f, 0.f, 0.f}, {0.f, 1.f, 0.f});
+  glm::mat4 proj = glm::perspective(glm::radians(45.f), 1920.f / 1080.f, 0.1f, 100.f);
+  glm::mat4 vp = proj * view;
+
+  mr::Matr4f mrvp {
+    vp[0][0], vp[0][1], vp[0][2], vp[0][3],
+    vp[1][0], vp[1][1], vp[1][2], vp[1][3],
+    vp[2][0], vp[2][1], vp[2][2], vp[2][3],
+    vp[3][0], vp[3][1], vp[3][2], vp[3][3],
+  };
+
+  mr::ShaderCameraData cam_data {
+    // .vp = cam.viewproj(),
+    .vp = mrvp,
+    .campos = cam.cam().position(),
+    .fov = static_cast<float>(cam.fov()),
+    .gamma = cam.gamma(),
+    .speed = cam.speed(),
+    .sens = cam.sensetivity(),
+  };
 
   cam_ubo.write(std::span<mr::ShaderCameraData> {&cam_data, 1});
 }
 
-void mr::RenderContext::render(mr::FPSCamera &cam)
-{
+void mr::RenderContext::render_lights(UniformBuffer &cam_ubo, CommandUnit &command_unit, uint32_t image_index) {
   static DescriptorAllocator descriptor_alloc(_state);
 
-  static CommandUnit command_unit(_state);
-
-  static UniformBuffer cam_ubo(_state, sizeof(ShaderCameraData));
-
-  static Model model(_state, _render_pass.get(), "ABeautifulGame/ABeautifulGame.gltf", cam_ubo);
-
-  /// light
   const std::vector<float> light_vertexes {-1, -1, 1, -1, 1, 1, -1, 1};
   const std::vector light_indexes {0, 1, 2, 2, 3, 0};
-  static const VertexBuffer light_vertex_buffer =
-    VertexBuffer(_state, std::span {light_vertexes});
-  static const IndexBuffer light_index_buffer =
-    IndexBuffer(_state, std::span {light_indexes});
-  vk::VertexInputAttributeDescription light_descr {.location = 0,
-                                                   .binding = 0,
-                                                   .format =
-                                                     vk::Format::eR32G32Sfloat,
-                                                   .offset = 0};
+  static const VertexBuffer light_vertex_buffer {_state, std::span {light_vertexes}};
+  static const IndexBuffer light_index_buffer {_state, std::span {light_indexes}};
+  vk::VertexInputAttributeDescription light_descr {
+    .location = 0,
+    .binding = 0,
+    .format = vk::Format::eR32G32Sfloat,
+    .offset = 0
+  };
   static mr::ShaderHandle light_shader = mr::ResourceManager<Shader>::get().create(mr::unnamed, _state, "light");
-  std::vector<Shader::ResourceView> light_attach;
-  light_attach.reserve(gbuffers_number);
-  for (unsigned i = 0; i < gbuffers_number; i++) {
-    light_attach.emplace_back(0, i, &_gbuffers[i]);
+
+  std::array<Shader::ResourceView, gbuffers_number + 1> light_attach;
+  for (int i = 0; i < gbuffers_number; i++) {
+    light_attach[i] = Shader::ResourceView(0, i, &_gbuffers[i]);
   }
-  light_attach.emplace_back(0, gbuffers_number, &cam_ubo);
+  light_attach.back() = Shader::ResourceView(0, 6, &cam_ubo);
+
   static DescriptorSet light_set =
     descriptor_alloc.allocate_set(Shader::Stage::Fragment, light_attach).value_or(DescriptorSet());
   static vk::DescriptorSetLayout light_layout = light_set.layout();
   static GraphicsPipeline light_pipeline = GraphicsPipeline(_state,
-                                                            _render_pass.get(),
+                                                            *this,
                                                             GraphicsPipeline::Subpass::OpaqueLighting,
                                                             light_shader,
                                                             {&light_descr, 1},
                                                             {&light_layout, 1});
 
-  _state.device().waitForFences(_image_fence.get(), VK_TRUE, UINT64_MAX);
-  _state.device().resetFences(_image_fence.get());
+  // --------------
+  // above shit
+  // --------------
 
-  mr::uint image_index = 0;
-  _state.device().acquireNextImageKHR(_swapchain.get(),
-                                      UINT64_MAX,
-                                      _image_available_semaphore.get(),
-                                      nullptr,
-                                      &image_index);
-  command_unit.begin();
-
-  vk::ClearValue clear_color {vk::ClearColorValue(
-    std::array {0, 0, 0, 0})}; // anyone who changes that line will be fucked
-  std::array<vk::ClearValue, gbuffers_number + 2> clear_colors {};
-  for (unsigned i = 0; i < gbuffers_number + 1; i++) {
-    clear_colors[i].color = clear_color.color;
+  for (auto &gbuf : _gbuffers) {
+    gbuf.switch_layout(_state, vk::ImageLayout::eShaderReadOnlyOptimal);
   }
-  clear_colors.back().depthStencil = vk::ClearDepthStencilValue {1.0f, 0};
 
-  vk::RenderPassBeginInfo render_pass_info {
-    .renderPass = _render_pass.get(),
-    .framebuffer = _framebuffers[image_index].framebuffer(),
-    .renderArea = {{0, 0}, _extent},
-    .clearValueCount = static_cast<uint>(clear_colors.size()),
-    .pClearValues = clear_colors.data(),
+  vk::RenderingAttachmentInfoKHR swapchain_image_attachment_info {
+    .imageView = _swapchain._images[image_index].image_view(),
+    .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+    .loadOp = vk::AttachmentLoadOp::eClear,
+    .storeOp = vk::AttachmentStoreOp::eStore,
+    .clearValue = {vk::ClearColorValue( std::array {0.f, 0.f, 0.f, 0.f})},
   };
 
-  command_unit->beginRenderPass(render_pass_info, vk::SubpassContents::eInline);
-  command_unit->setViewport(0, _framebuffers[image_index].viewport());
-  command_unit->setScissor(0, _framebuffers[image_index].scissors());
-  update_camera(cam, cam_ubo);
-  model.draw(command_unit);
-  command_unit->nextSubpass(vk::SubpassContents::eInline);
+  vk::RenderingAttachmentInfoKHR depth_attachment_info {
+    .imageView = _depthbuffer.image_view(),
+    .imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
+    .loadOp = vk::AttachmentLoadOp::eClear,
+    .storeOp = vk::AttachmentStoreOp::eStore,
+    .clearValue = {vk::ClearDepthStencilValue(1.f, 0)},
+  };
+
+  vk::RenderingInfoKHR attachment_info {
+    .renderArea = { 0, 0, _extent.width, _extent.height },
+    .layerCount = 1,
+    .colorAttachmentCount = 1,
+    .pColorAttachments = &swapchain_image_attachment_info,
+  };
+
+  _swapchain._images[image_index].switch_layout(_state, vk::ImageLayout::eColorAttachmentOptimal);
+  _depthbuffer.switch_layout(_state, vk::ImageLayout::eDepthStencilAttachmentOptimal);
+
+  command_unit.begin();
+  command_unit->beginRendering(&attachment_info);
+
+  vk::Viewport viewport {
+    .x = 0, .y = 0,
+    .width = static_cast<float>(_extent.width),
+    .height = static_cast<float>(_extent.height),
+    .minDepth = 0, .maxDepth = 1,
+  };
+  command_unit->setViewport(0, viewport);
+
+  vk::Rect2D scissors {
+    .offset = {0, 0},
+    .extent = {
+      static_cast<uint32_t>(_extent.width),
+      static_cast<uint32_t>(_extent.height),
+    },
+  };
+  command_unit->setScissor(0, scissors);
+
   command_unit->bindPipeline(vk::PipelineBindPoint::eGraphics,
                              light_pipeline.pipeline());
   command_unit->bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
                                    light_pipeline.layout(),
-                                   0,
-                                   {light_set.set()},
-                                   {});
+                                   0, {light_set.set()}, {});
   command_unit->bindVertexBuffers(0, {light_vertex_buffer.buffer()}, {0});
-  command_unit->bindIndexBuffer(
-    light_index_buffer.buffer(), 0, vk::IndexType::eUint32);
+  command_unit->bindIndexBuffer(light_index_buffer.buffer(), 0, vk::IndexType::eUint32);
   command_unit->drawIndexed(light_indexes.size(), 1, 0, 0, 0);
-  command_unit->endRenderPass();
+  _swapchain._images[image_index].switch_layout(_state, vk::ImageLayout::ePresentSrcKHR);
 
+  command_unit->endRendering();
   command_unit.end();
+}
 
-  vk::Semaphore wait_semaphores[] = {_image_available_semaphore.get()};
-  vk::PipelineStageFlags wait_stages[] = {
-    vk::PipelineStageFlagBits::eColorAttachmentOutput};
-  vk::Semaphore signal_semaphores[] = {_render_finished_semaphore.get()};
+void mr::RenderContext::render_models(UniformBuffer &cam_ubo, CommandUnit &command_unit, mr::FPSCamera &cam) {
+  static Model model(_state, *this, "ABeautifulGame/ABeautifulGame.gltf");
 
-  auto [bufs, size] = command_unit.submit_info();
-  vk::SubmitInfo submit_info {
-    .waitSemaphoreCount = 1,
-    .pWaitSemaphores = wait_semaphores,
-    .pWaitDstStageMask = wait_stages,
-    .commandBufferCount = size,
-    .pCommandBuffers = bufs,
-    .signalSemaphoreCount = 1,
-    .pSignalSemaphores = signal_semaphores,
+  // --------------
+  // above shit
+  // --------------
+
+  update_camera(cam, cam_ubo);
+
+  for (auto &gbuf : _gbuffers) {
+    gbuf.switch_layout(_state, vk::ImageLayout::eColorAttachmentOptimal);
+  }
+  _depthbuffer.switch_layout(_state, vk::ImageLayout::eDepthStencilAttachmentOptimal);
+
+  auto gbufs_attachs = _gbuffers | std::views::transform([](const ColorAttachmentImage &gbuf) {
+    return gbuf.attachment_info();
+  }) | std::ranges::to<beman::inplace_vector<vk::RenderingAttachmentInfoKHR, gbuffers_number>>();
+  auto depth_attachment_info = _depthbuffer.attachment_info();
+
+  vk::RenderingInfoKHR attachment_info {
+    .renderArea = { 0, 0, _extent.width, _extent.height },
+    .layerCount = 1,
+    .colorAttachmentCount = static_cast<uint32_t>(gbufs_attachs.size()),
+    .pColorAttachments = gbufs_attachs.data(),
+    .pDepthAttachment = &depth_attachment_info,
+    // .pStencilAttachment = &depth_attachment_info,
   };
 
-  _state.queue().submit(submit_info, _image_fence.get());
+  command_unit.begin();
+  command_unit->beginRendering(&attachment_info);
 
-  vk::SwapchainKHR swapchains[] = {_swapchain.get()};
+  vk::Viewport viewport {
+    .x = 0, .y = 0,
+    .width = static_cast<float>(_extent.width),
+    .height = static_cast<float>(_extent.height),
+    .minDepth = 0, .maxDepth = 1,
+  };
+  command_unit->setViewport(0, viewport);
+
+  vk::Rect2D scissors {
+    .offset = {0, 0},
+    .extent = {
+      static_cast<uint32_t>(_extent.width),
+      static_cast<uint32_t>(_extent.height),
+    },
+  };
+  command_unit->setScissor(0, scissors);
+
+  model.draw(command_unit);
+
+  command_unit->endRendering();
+  command_unit.end();
+}
+
+void mr::RenderContext::render(mr::FPSCamera &cam)
+{
+  static UniformBuffer cam_ubo(_state, sizeof(ShaderCameraData));
+  static std::once_flag init_cam;
+  std::call_once(init_cam, [&]{s_cam_ubo_ptr = &cam_ubo;});
+
+  static CommandUnit command_unit(_state);
+
+  // --------------
+  // above shit
+  // --------------
+
+  _state.device().waitForFences(_image_fence.get(), VK_TRUE, UINT64_MAX);
+  _state.device().resetFences(_image_fence.get());
+
+  static uint32_t image_index = 0;
+  uint32_t prev_image_index = image_index;
+  _state.device().acquireNextImageKHR(_swapchain._swapchain.get(),
+                                      UINT64_MAX,
+                                      _image_available_semaphore[image_index].get(),
+                                      nullptr,
+                                      &image_index);
+
+  render_models(cam_ubo, command_unit, cam);
+
+  vk::PipelineStageFlags models_wait_stages[] = {vk::PipelineStageFlagBits::eColorAttachmentOutput};
+  std::array models_signal_semaphores = {_models_render_finished_semaphore.get()};
+
+  auto [models_bufs, models_size] = command_unit.submit_info();
+  vk::SubmitInfo models_submit_info {
+    .pWaitDstStageMask = models_wait_stages,
+    .commandBufferCount = models_size,
+    .pCommandBuffers = models_bufs,
+    .signalSemaphoreCount = models_signal_semaphores.size(),
+    .pSignalSemaphores = models_signal_semaphores.data(),
+  };
+
+  _state.queue().submit(models_submit_info);
+
+  render_lights(cam_ubo, command_unit, image_index);
+
+  std::array light_wait_semaphores = {
+    _image_available_semaphore[prev_image_index].get(),
+    _models_render_finished_semaphore.get(),
+  };
+  vk::PipelineStageFlags light_wait_stages[] = {vk::PipelineStageFlagBits::eColorAttachmentOutput};
+  std::array light_signal_semaphores = {_render_finished_semaphore[image_index].get()};
+
+  auto [light_bufs, light_size] = command_unit.submit_info();
+  vk::SubmitInfo light_submit_info {
+    .waitSemaphoreCount = light_wait_semaphores.size(),
+    .pWaitSemaphores = light_wait_semaphores.data(),
+    .pWaitDstStageMask = light_wait_stages,
+    .commandBufferCount = light_size,
+    .pCommandBuffers = light_bufs,
+    .signalSemaphoreCount = light_signal_semaphores.size(),
+    .pSignalSemaphores = light_signal_semaphores.data(),
+  };
+
+  _state.queue().submit(light_submit_info, _image_fence.get());
+
   vk::PresentInfoKHR present_info {
-    .waitSemaphoreCount = 1,
-    .pWaitSemaphores = signal_semaphores,
+    .waitSemaphoreCount = light_signal_semaphores.size(),
+    .pWaitSemaphores = light_signal_semaphores.data(),
     .swapchainCount = 1,
-    .pSwapchains = swapchains,
+    .pSwapchains = &_swapchain._swapchain.get(),
     .pImageIndices = &image_index,
-    .pResults = nullptr, // Optional
   };
   _state.queue().presentKHR(present_info);
 }
