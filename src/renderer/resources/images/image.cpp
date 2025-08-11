@@ -1,15 +1,15 @@
 #include "resources/images/image.hpp"
 #include "resources/buffer/buffer.hpp"
+#include "vulkan_state.hpp"
 
 // Utility function for image size calculation
 static size_t calculate_image_size(mr::Extent extent, vk::Format format)
 {
   // TODO: support float formats
-  size_t texel_size =
-    format == vk::Format::eR8G8B8A8Srgb ? 4
-    : format == vk::Format::eR8G8B8Srgb ? 3
-    : format == vk::Format::eR8G8B8Srgb ? 2
-                                        : 1;
+  size_t texel_size = format == vk::Format::eR8G8B8A8Srgb ? 4
+                    : format == vk::Format::eR8G8B8Srgb   ? 3
+                    : format == vk::Format::eR8G8Srgb     ? 2
+                                                          : 1;
   return extent.width * extent.height * texel_size;
 }
 
@@ -61,6 +61,10 @@ mr::Image::Image(const VulkanState &state, Extent extent, vk::Format format,
 mr::Image::~Image() {}
 
 void mr::Image::switch_layout(const VulkanState &state, vk::ImageLayout new_layout) {
+  if (new_layout == _layout) {
+    return;
+  }
+
   vk::ImageSubresourceRange range {
     .aspectMask = _aspect_flags,
     .baseMipLevel = 0,
@@ -78,33 +82,64 @@ void mr::Image::switch_layout(const VulkanState &state, vk::ImageLayout new_layo
     .subresourceRange = range
   };
 
-  vk::PipelineStageFlags source_stage;
-  vk::PipelineStageFlags destination_stage;
+  vk::PipelineStageFlags source_stage = vk::PipelineStageFlagBits::eAllCommands;
+  vk::PipelineStageFlags destination_stage = vk::PipelineStageFlagBits::eAllCommands;
 
-  if (_layout == vk::ImageLayout::eUndefined &&
-      new_layout == vk::ImageLayout::eTransferDstOptimal) {
-    barrier.srcAccessMask = vk::AccessFlagBits::eNone;
+  switch (_layout) {
+    case vk::ImageLayout::eUndefined:
+      barrier.srcAccessMask = vk::AccessFlags();
+      break;
+    case vk::ImageLayout::ePreinitialized:
+      barrier.srcAccessMask = vk::AccessFlagBits::eHostWrite;
+      break;
+    case vk::ImageLayout::eColorAttachmentOptimal:
+      barrier.srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
+      break;
+    case vk::ImageLayout::eDepthStencilAttachmentOptimal:
+      barrier.srcAccessMask = vk::AccessFlagBits::eDepthStencilAttachmentWrite;
+      break;
+    case vk::ImageLayout::eTransferSrcOptimal:
+      barrier.srcAccessMask = vk::AccessFlagBits::eTransferRead;
+      break;
+    case vk::ImageLayout::eTransferDstOptimal:
+      barrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
+      break;
+    case vk::ImageLayout::eShaderReadOnlyOptimal:
+      barrier.srcAccessMask = vk::AccessFlagBits::eShaderRead;
+      break;
+    case vk::ImageLayout::ePresentSrcKHR:
+      barrier.srcAccessMask = vk::AccessFlagBits::eNoneKHR;
+      break;
+    default:
+      assert(false);
+      break;
+  }
+
+  switch (new_layout) {
+  case vk::ImageLayout::eTransferDstOptimal:
     barrier.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
-    source_stage = vk::PipelineStageFlagBits::eTopOfPipe;
-    destination_stage = vk::PipelineStageFlagBits::eTransfer;
-  }
-  else if (_layout == vk::ImageLayout::eTransferDstOptimal &&
-           new_layout == vk::ImageLayout::eShaderReadOnlyOptimal) {
-    barrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
+    break;
+  case vk::ImageLayout::eTransferSrcOptimal:
+    barrier.dstAccessMask = vk::AccessFlagBits::eTransferRead;
+    break;
+  case vk::ImageLayout::eColorAttachmentOptimal:
+    barrier.dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
+    break;
+  case vk::ImageLayout::eDepthStencilAttachmentOptimal:
+    barrier.dstAccessMask |= vk::AccessFlagBits::eDepthStencilAttachmentWrite;
+    break;
+  case vk::ImageLayout::eShaderReadOnlyOptimal:
+    if (barrier.srcAccessMask == vk::AccessFlags()) {
+      barrier.srcAccessMask = vk::AccessFlagBits::eHostWrite | vk::AccessFlagBits::eTransferWrite;
+    }
     barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
-    source_stage = vk::PipelineStageFlagBits::eTransfer;
-    destination_stage = vk::PipelineStageFlagBits::eFragmentShader;
-  }
-  else if (_layout == vk::ImageLayout::eUndefined &&
-           new_layout == vk::ImageLayout::eDepthStencilAttachmentOptimal) {
-    barrier.srcAccessMask = {};
-    barrier.dstAccessMask = vk::AccessFlagBits::eDepthStencilAttachmentRead |
-                            vk::AccessFlagBits::eDepthStencilAttachmentWrite;
-    source_stage = vk::PipelineStageFlagBits::eTopOfPipe;
-    destination_stage = vk::PipelineStageFlagBits::eEarlyFragmentTests;
-  }
-  else {
-    assert(false); // can't choose layout
+    break;
+  case vk::ImageLayout::ePresentSrcKHR:
+    barrier.dstAccessMask = vk::AccessFlagBits::eNoneKHR;
+    break;
+  default:
+    assert(false);
+    break;
   }
 
   static CommandUnit command_unit(state);
@@ -151,9 +186,6 @@ void mr::Image::create_image_view(const VulkanState &state) {
   _image_view = state.device().createImageViewUnique(create_info).value;
 }
 
-// Template write implementation
-// (kept as a template in the header)
-
 vk::Format mr::Image::find_supported_format(
   const VulkanState &state, const std::vector<vk::Format> &candidates,
   vk::ImageTiling tiling, vk::FormatFeatureFlags features)
@@ -195,7 +227,7 @@ mr::DeviceImage::DeviceImage(const VulkanState &state, Extent extent, vk::Format
 mr::SwapchainImage::SwapchainImage(const VulkanState &state, Extent extent, vk::Format format, vk::Image image)
 {
   _image.reset(image); // Wrap, do not own
-  _extent = {extent.width, extent.height, 1};
+  _extent = vk::Extent3D{.width = extent.width, .height= extent.height, .depth = 1};
   _size = calculate_image_size(extent, format);
   _format = format;
   _mip_level = 1;
@@ -204,25 +236,74 @@ mr::SwapchainImage::SwapchainImage(const VulkanState &state, Extent extent, vk::
   create_image_view(state);
 }
 
+mr::SwapchainImage::SwapchainImage(const VulkanState &state, Extent extent, vk::Format format, vk::Image image, vk::ImageView view)
+{
+  _image.reset(image); // Wrap, do not own
+  _extent = vk::Extent3D{.width = extent.width, .height= extent.height, .depth = 1};
+  _size = calculate_image_size(extent, format);
+  _format = format;
+  _mip_level = 1;
+  _aspect_flags = vk::ImageAspectFlagBits::eColor;
+  _layout = vk::ImageLayout::eUndefined;
+  _image_view.reset(view);
+}
+
 mr::SwapchainImage::~SwapchainImage() {
   // Do not destroy swapchain image, just release wrapper
   _image.release();
 }
 
 // ---- TextureImage ----
-mr::TextureImage::TextureImage(const VulkanState &state, Extent extent, vk::Format format, vk::ImageUsageFlags usage_flags, uint mip_level)
-  : DeviceImage(state, extent, format, usage_flags, vk::ImageAspectFlagBits::eColor, mip_level)
+mr::TextureImage::TextureImage(const VulkanState &state, Extent extent, vk::Format format,
+                               vk::ImageUsageFlags usage_flags, uint mip_level)
+    // TODO: replace transfer bit with StagingImage(?)
+  : DeviceImage(state, extent, format,
+                usage_flags | vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
+                vk::ImageAspectFlagBits::eColor, mip_level)
 {}
 
 // ---- DepthImage ----
-mr::DepthImage::DepthImage(const VulkanState &state, Extent extent, vk::Format format, uint mip_level)
-  : DeviceImage(state, extent, format, vk::ImageUsageFlagBits::eDepthStencilAttachment, vk::ImageAspectFlagBits::eDepth, mip_level)
-{}
+mr::DepthImage::DepthImage(const VulkanState &state, Extent extent, uint mip_level)
+  : DeviceImage(
+      state,
+      extent,
+      get_depthbuffer_format(state),
+      vk::ImageUsageFlagBits::eDepthStencilAttachment,
+      vk::ImageAspectFlagBits::eDepth,
+      mip_level
+    )
+{
+  switch_layout(state, vk::ImageLayout::eDepthStencilAttachmentOptimal);
+}
+
+vk::RenderingAttachmentInfoKHR mr::DepthImage::attachment_info() const
+{
+  return vk::RenderingAttachmentInfoKHR {
+    .imageView = _image_view.get(),
+    .imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
+    .loadOp = vk::AttachmentLoadOp::eClear,
+    .storeOp = vk::AttachmentStoreOp::eStore,
+    .clearValue = {vk::ClearDepthStencilValue(1.f, 0)},
+  };
+}
 
 // ---- ColorAttachmentImage ----
 mr::ColorAttachmentImage::ColorAttachmentImage(const VulkanState &state, Extent extent, vk::Format format, uint mip_level)
-  : DeviceImage(state, extent, format, vk::ImageUsageFlagBits::eColorAttachment, vk::ImageAspectFlagBits::eColor, mip_level)
+  : DeviceImage(state, extent, format,
+    vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eInputAttachment,
+    vk::ImageAspectFlagBits::eColor, mip_level)
 {}
+
+vk::RenderingAttachmentInfoKHR mr::ColorAttachmentImage::attachment_info() const
+{
+  return vk::RenderingAttachmentInfoKHR {
+    .imageView = _image_view.get(),
+    .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+    .loadOp = vk::AttachmentLoadOp::eClear,
+    .storeOp = vk::AttachmentStoreOp::eStore,
+    .clearValue = {vk::ClearColorValue( std::array {0.f, 0.f, 0.f, 0.f})},
+  };
+}
 
 // ---- StorageImage ----
 mr::StorageImage::StorageImage(const VulkanState &state, Extent extent, vk::Format format, uint mip_level)

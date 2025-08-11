@@ -6,25 +6,15 @@ file(
 )
 include(${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake)
 
-if (BINARY_DEPS)
-else()
-endif()
-
 # install libraries with no binaries available
-CPMAddPackage("gh:4j-company/mr-math#master")
-CPMAddPackage("gh:Cvelth/vkfw#glfw-3.4")
-CPMAddPackage("gh:charles-lunarg/vk-bootstrap@1.3.290")
-CPMAddPackage("gh:zeux/meshoptimizer#master")
+find_package(glfw3 REQUIRED)
+find_package(meshoptimizer REQUIRED)
+find_package(mr-utils REQUIRED)
 
-CPMFindPackage(
-  NAME glfw3
-  GITHUB_REPOSITORY glfw/glfw
-  GIT_TAG 3.4
-  OPTIONS
-    "GLFW_BUILD_TESTS OFF"
-    "GLFW_BUILD_EXAMPLES OFF"
-    "GLFW_BULID_DOCS OFF"
-)
+CPMAddPackage("gh:Cvelth/vkfw#main")
+CPMAddPackage("gh:4j-company/mr-math#master")
+CPMAddPackage("gh:charles-lunarg/vk-bootstrap@1.4.321")
+CPMAddPackage("gh:bemanproject/inplace_vector#b81a3c7")
 
 if (${vkfw_ADDED})
   add_library(libvkfw INTERFACE "")
@@ -64,11 +54,13 @@ find_package(Vulkan)
 set(DEPS_LIBRARIES
   Vulkan::Vulkan
   mr-math-lib
+  mr-utils::mr-utils
   tinygltf
   libvkfw
   libstb-image
   vk-bootstrap-lib
-  meshoptimizer
+  meshoptimizer::meshoptimizer
+  beman.inplace_vector
 )
 
 # TBB is required since it's dependency of PSTL on GCC and Clang

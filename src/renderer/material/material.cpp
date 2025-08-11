@@ -1,6 +1,7 @@
 #include "material/material.hpp"
 
-mr::Material::Material(const VulkanState &state, const vk::RenderPass render_pass,
+mr::Material::Material(const VulkanState &state,
+                       const RenderContext &render_context,
                        mr::ShaderHandle shader,
                        std::span<float> ubo_data,
                        std::span<std::optional<mr::TextureHandle>> textures,
@@ -28,13 +29,12 @@ mr::Material::Material(const VulkanState &state, const vk::RenderPass render_pas
 
   std::array layouts = {_descriptor_set.layout()};
 
-  _pipeline =
-    mr::GraphicsPipeline(state,
-                         render_pass,
-                         mr::GraphicsPipeline::Subpass::OpaqueGeometry,
-                         _shader,
-                         std::span {_descrs},
-                         std::span {layouts});
+  _pipeline = mr::GraphicsPipeline(state,
+                                   render_context,
+                                   mr::GraphicsPipeline::Subpass::OpaqueGeometry,
+                                   _shader,
+                                   std::span {_descrs},
+                                   std::span {layouts});
 }
 
 void mr::Material::bind(CommandUnit &unit) const noexcept

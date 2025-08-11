@@ -2,7 +2,6 @@
 #define __MR_VULKAN_STATE_HPP_
 
 #include "pch.hpp"
-#include "utils/misc.hpp"
 #include <VkBootstrap.h>
 
 namespace mr {

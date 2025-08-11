@@ -46,16 +46,17 @@ target_compile_definitions(
   MR_RES_DIR="${MR_RES_FULL_DIR}"
 )
 
-set(TARGET_DEPS write-licenses)
 if (GENERATE_DEPENDENCY_GRAPH)
-  set(TARGET_DEPS dep-graph-${CMAKE_PROJECT_NAME})
+  add_dependencies(
+    ${CMAKE_PROJECT_NAME}
+    dep-graph-${CMAKE_PROJECT_NAME}
+  )
 endif()
 if (FORMAT_SOURCE)
-  set(TARGET_DEPS fix-format)
+  add_dependencies(
+    ${CMAKE_PROJECT_NAME}
+    fix-format
+  )
 endif()
 
-add_dependencies(
-  ${CMAKE_PROJECT_NAME}
-  ${TARGET_DEPS}
-)
 GroupSourcesByFolder(${CMAKE_PROJECT_NAME}) # better IDE integration

@@ -33,11 +33,15 @@ void main()
   vec4 normal_color = get_normal_color(tex_coord);
 
   position = ubo.transform * vec4(InPos.xyz, 1.0);
-  normal = transpose(inverse(ubo.transform)) * normal_color;
   color = base_color;
   metallic_roughness = metallic_roughness_color;
   emissive = emissive_color;
   occlusion = occlusion_color;
+
+  // TODO(dk6): added normal maps. You can see this:
+  // OutNIsShade = vec4(normalize(mix(DrawNormal, mat3(DrawTangent, DrawBitangent, DrawNormal) *
+  //               (texture(NormalMap, DrawTexCoord).rgb * 2 - vec3(1, 1, 1)), TexFlags1.y)), 1);
+  normal = vec4(InNorm, 0);
 
   gl_Position = cam_ubo.vp * ubo.transform * vec4(InPos.xyz, 1.0);
   gl_Position = vec4(gl_Position.x, -gl_Position.y, gl_Position.z, gl_Position.w);

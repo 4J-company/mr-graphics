@@ -44,6 +44,12 @@
 #include <vkfw/vkfw.hpp>
 
 #include <mr-math/math.hpp>
+#include <mr-utils/assert.hpp>
+#include <mr-utils/misc.hpp>
+#include <mr-utils/path.hpp>
+#include <mr-utils/log.hpp>
+
+#include <beman/inplace_vector/inplace_vector.hpp>
 
 // WinAPI macros undefined :(
 #undef max
