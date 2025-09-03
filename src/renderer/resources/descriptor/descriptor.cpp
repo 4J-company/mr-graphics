@@ -168,7 +168,7 @@ std::optional<vk::UniqueDescriptorPool> mr::DescriptorAllocator::allocate_pool(
 }
 
 // TODO: rewrite allocate_set in a 1-dimensional manner
-std::optional<mr::DescriptorSet> mr::DescriptorAllocator::allocate_set(DescriptorSetLayoutHandle set_layout) noexcept
+std::optional<mr::DescriptorSet> mr::DescriptorAllocator::allocate_set(DescriptorSetLayoutHandle set_layout) const noexcept
 {
   return allocate_sets({&set_layout, 1}).transform(
     [](std::vector<mr::DescriptorSet> &&v) -> mr::DescriptorSet {
@@ -178,7 +178,7 @@ std::optional<mr::DescriptorSet> mr::DescriptorAllocator::allocate_set(Descripto
 
 // TODO: handle resizing pool vector
 std::optional<std::vector<mr::DescriptorSet>> mr::DescriptorAllocator::allocate_sets(
-  std::span<const DescriptorSetLayoutHandle> set_layouts) noexcept
+  std::span<const DescriptorSetLayoutHandle> set_layouts) const noexcept
 {
   static constexpr size_t max_descriptor_set_number = 64;
   ASSERT(set_layouts.size() < max_descriptor_set_number);

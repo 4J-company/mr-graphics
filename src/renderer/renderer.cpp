@@ -5,37 +5,30 @@
 // mr::Application class defualt constructor (initializes vulkan instance, device ...)
 mr::Application::Application()
 {
-  while (vkfw::init() != vkfw::Result::eSuccess)
-    ;
-  // _state._init();
+  while (vkfw::init() != vkfw::Result::eSuccess) {}
 }
 
 // destructor
-mr::Application::~Application()
+mr::Application::~Application() {}
+
+[[nodiscard]] std::unique_ptr<mr::RenderContext> mr::Application::create_render_context(Extent extent)
 {
-  // _state._deinit();
+  return std::make_unique<RenderContext>(&_state, extent);
 }
 
-[[nodiscard]] std::unique_ptr<mr::HostBuffer>
-mr::Application::create_host_buffer() const
+void mr::Application::start_render_loop(RenderContext &render_context, const SceneHandle scene,
+                                                                       WindowHandle window) const noexcept
 {
-  return std::make_unique<HostBuffer>();
-}
+  std::jthread render_thread {
+    [&](std::stop_token stop_token) {
+      while (not stop_token.stop_requested()) {
+        render_context.render(scene, window);
+      }
+    }
+  };
 
-[[nodiscard]] std::unique_ptr<mr::DeviceBuffer>
-mr::Application::create_device_buffer() const
-{
-  return std::make_unique<DeviceBuffer>();
-}
-
-[[nodiscard]] std::unique_ptr<mr::CommandUnit>
-mr::Application::create_command_unit() const
-{
-  return std::make_unique<CommandUnit>();
-}
-
-[[nodiscard]] std::unique_ptr<mr::Window>
-mr::Application::create_window(Extent extent)
-{
-  return std::make_unique<Window>(&_state, extent);
+  // TMP theme
+  while (not window->window().shouldClose().value) {
+    vkfw::pollEvents();
+  }
 }

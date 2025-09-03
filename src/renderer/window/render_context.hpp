@@ -6,8 +6,11 @@
 #include "resources/resources.hpp"
 #include "vulkan_state.hpp"
 #include "camera/camera.hpp"
-#include "swapchain.hpp"
-#include "lights/light_render_data.hpp"
+#include "lights/lights.hpp"
+#include "model/model.hpp"
+#include "window.hpp"
+#include "scene/scene.hpp"
+#include "resources/command_unit/command_unit.hpp"
 
 #include <VkBootstrap.h>
 
@@ -31,12 +34,10 @@ inline namespace graphics {
       };
 
     private:
-      Window *_parent;
       std::shared_ptr<VulkanState> _state;
       Extent _extent;
 
-      vk::UniqueSurfaceKHR _surface;
-      Swapchain _swapchain;
+      CommandUnit _command_unit;
 
       // TODO(dk6): use Framedata instead
       InplaceVector<ColorAttachmentImage, gbuffers_number> _gbuffers;
@@ -46,6 +47,7 @@ inline namespace graphics {
       InplaceVector<vk::UniqueSemaphore, max_images_number> _image_available_semaphore;
       // semaphores for waiting frame is ready before presentin
       InplaceVector<vk::UniqueSemaphore, max_images_number> _render_finished_semaphore;
+
       // semaphore for sync opaque models rendering and light shading
       vk::UniqueSemaphore _models_render_finished_semaphore;
       vk::UniqueFence _image_fence; // fence for swapchain image?
@@ -59,18 +61,31 @@ inline namespace graphics {
       RenderContext(const RenderContext &other) noexcept = delete;
       RenderContext & operator=(const RenderContext &other) noexcept = delete;
 
-      RenderContext(VulkanGlobalState *global_state, Window *parent);
+      // TODO(dk6): change pointer to reference
+      RenderContext(VulkanGlobalState *global_state, Extent extent);
 
       ~RenderContext();
 
       void resize(Extent extent);
-      void render(mr::FPSCamera &cam);
+
+      void render(const SceneHandle scene, WindowHandle window);
+
+      const LightsRenderData & lights_render_data() const noexcept { return _lights_render_data; }
+      const VulkanState & vulkan_state() const noexcept { return *_state; }
+
+      // TODO(dk6): void delete_window(WindowHandle window);
+      WindowHandle create_window() const noexcept;
+
+      // TODO(dk6): void delete_scene(SceneHandle scene);
+      SceneHandle create_scene() const noexcept;
 
     private:
       void _init_lights_render_data();
 
-      void render_models(UniformBuffer &cam_ubo, CommandUnit &command_unit, mr::FPSCamera &cam);
-      void render_lights(UniformBuffer &cam_ubo, CommandUnit &command_unit, uint32_t image_index);
+      void _render_models(const SceneHandle scene);
+      void _render_lights(const SceneHandle scene, WindowHandle window);
+
+      void _update_camera_buffer(UniformBuffer &uniform_buffer);
   };
 }
 } // namespace mr

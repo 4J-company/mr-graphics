@@ -26,6 +26,7 @@ inline namespace graphics {
       std::string _include_string;
 
     public:
+      // TODO(dk6): think why pointers not const
       using Resource = std::variant<UniformBuffer *, StorageBuffer *, Texture *, Image *>;
 
       // TODO: consider RT shaders from extensions;

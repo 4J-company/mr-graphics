@@ -8,6 +8,7 @@
 #include "timer/timer.hpp"
 #include "vulkan_state.hpp"
 #include "window/window.hpp"
+#include "scene/scene.hpp"
 
 #include "mesh/mesh.hpp"
 
@@ -21,16 +22,10 @@ inline namespace graphics {
       Application();
       ~Application();
 
-      // resource creators
-      [[nodiscard]] std::unique_ptr<CommandUnit> create_command_unit() const;
-      [[nodiscard]] std::unique_ptr<HostBuffer> create_host_buffer() const;
-      [[nodiscard]] std::unique_ptr<DeviceBuffer> create_device_buffer() const;
-      [[nodiscard]] std::unique_ptr<Shader> create_shader() const;
-      [[nodiscard]] std::unique_ptr<Pipeline> create_graphics_pipeline() const;
-      [[nodiscard]] std::unique_ptr<Pipeline> create_compute_pipeline() const;
+      [[nodiscard]] std::unique_ptr<RenderContext> create_render_context(Extent extent);
 
-      // window creator
-      [[nodiscard]] std::unique_ptr<Window> create_window(Extent extent);
+      void start_render_loop(RenderContext &render_context, const SceneHandle scene,
+                                                            WindowHandle window) const noexcept;
   };
 }
 } // namespace mr

@@ -25,8 +25,7 @@ constexpr mr::MaterialParameter importer2graphics(mr::importer::TextureType type
 }
 
 mr::graphics::Model::Model(
-    const VulkanState &state,
-    const RenderContext &render_context,
+    const Scene &scene,
     std::fs::path filename) noexcept
 {
   MR_INFO("Loading model {}", filename.string());
@@ -40,8 +39,8 @@ mr::graphics::Model::Model(
   }
   auto& model_value = model.value();
 
-  auto defult_shader_path = mr::path::shaders_dir / "default";
-  auto defult_shader_path_str = defult_shader_path.string();
+  auto default_shader_path = mr::path::shaders_dir / "default";
+  auto default_shader_path_str = defult_shader_path.string();
 
   using enum mr::MaterialParameter;
   static std::vector<mr::MaterialBuilder> builders;
@@ -88,3 +87,4 @@ void mr::graphics::Model::draw(CommandUnit &unit) const noexcept
     mesh.draw(unit);
   }
 }
+

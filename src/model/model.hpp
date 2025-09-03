@@ -7,9 +7,12 @@
 namespace mr {
 inline namespace graphics {
   class VulkanState;
+  class Scene;
 
-  class Model {
+  class Model : public ResourceBase<Model> {
     private:
+      const Scene *_scene = nullptr;
+
       std::vector<mr::graphics::Mesh> _meshes;
       std::vector<mr::MaterialHandle> _materials;
 
@@ -18,7 +21,7 @@ inline namespace graphics {
     public:
       Model() = default;
 
-      Model(const VulkanState &state, const RenderContext &render_context, std::fs::path filename) noexcept;
+      Model(const Scene &scene, std::fs::path filename) noexcept;
 
       Model(const Model &other) noexcept = default;
       Model &operator=(const Model &other) noexcept = default;
@@ -28,7 +31,9 @@ inline namespace graphics {
 
       void draw(CommandUnit &unit) const noexcept;
   };
-}
+
+  MR_DECLARE_HANDLE(Model);
+} // namespace graphics
 } // namespace mr
 
 #endif // __MR_MODEL_HPP_

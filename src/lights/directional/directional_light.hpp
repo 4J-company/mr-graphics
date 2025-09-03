@@ -7,7 +7,7 @@
 
 namespace mr {
 inline namespace graphics {
-  class DirectionalLight : public Light {
+  class DirectionalLight : public Light, public ResourceBase<DirectionalLight> {
   public:
     struct ShaderUniformBuffer {
       Vec4f direction;
@@ -18,8 +18,8 @@ inline namespace graphics {
     Norm3f _direction = Norm3f(1, 1, 1);
 
   public:
-    DirectionalLight(const VulkanState &state, LightsRenderData &light_render_data,
-                     Norm3f direction = Norm3f(1, 1, 1), const Vec3f &color = Vec3f(1.0));
+    DirectionalLight(const Scene &scene,
+                     const Norm3f &direction = Norm3f(1, 1, 1), const Vec3f &color = Vec3f(1.0));
     ~DirectionalLight() = default;
 
     DirectionalLight & operator=(DirectionalLight &&) noexcept = default;
@@ -33,6 +33,8 @@ inline namespace graphics {
   private:
     void _update_ubo() const noexcept;
   };
+
+  MR_DECLARE_HANDLE(DirectionalLight);
 }
 }
 
