@@ -9,7 +9,7 @@
 
 #include "resources/descriptor/descriptor.hpp"
 
-#include "resources/framebuffer/framebuffer.hpp"
+#include "resources/framedata/framedata.hpp"
 
 #include "resources/images/image.hpp"
 

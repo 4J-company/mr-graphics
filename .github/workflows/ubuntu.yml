@@ -18,7 +18,7 @@ jobs:
         cpp_compiler: [g++, clang++]
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Set reusable strings
       id: strings
@@ -31,7 +31,7 @@ jobs:
 
     - name: Set up cache
       id: cache-cpm
-      uses: actions/cache@v2
+      uses: actions/cache@v4
       with:
         path: ~/cpm-cache
         key: ${{ runner.os }}-cpm-${{ hashFiles('**/') }}
@@ -40,9 +40,9 @@ jobs:
 
     # Download VulkanAPI
     - name: Setup Vulkan
-      uses: humbletim/setup-vulkan-sdk@v1.2.0
+      uses: humbletim/setup-vulkan-sdk@523828e49cd4afabce369c39c7ee6543a2b7a735
       with:
-        vulkan-query-version: 1.3.204.0
+        vulkan-query-version: latest
         vulkan-components: Vulkan-Headers Vulkan-Loader SPIRV-Headers SPIRV-Cross SPIRV-Tools SPIRV-Reflect Glslang
         vulkan-use-cache: true
 

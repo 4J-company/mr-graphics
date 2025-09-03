@@ -25,11 +25,12 @@ namespace mr {
     public:
       GraphicsPipeline() = default;
 
-      GraphicsPipeline(
-        const VulkanState &state, vk::RenderPass render_pass, Subpass subpass,
-        Shader *shader,
-        std::span<const vk::VertexInputAttributeDescription> attributes,
-        std::span<const vk::DescriptorSetLayout> descriptor_layouts);
+      GraphicsPipeline(const VulkanState &state,
+                       const RenderContext &render_context,
+                       Subpass subpass,
+                       mr::ShaderHandle shader,
+                       std::span<const vk::VertexInputAttributeDescription> attributes,
+                       std::span<const vk::DescriptorSetLayout> descriptor_layouts);
 
       void recompile();
 

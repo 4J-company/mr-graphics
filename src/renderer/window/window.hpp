@@ -2,15 +2,16 @@
 #define __MR_WINDOW_HPP_
 
 #include "pch.hpp"
-#include "window_context.hpp"
-#include "utils/misc.hpp"
+#include "render_context.hpp"
+#include "camera/camera.hpp"
 
 namespace mr {
   class Window {
     private:
       Extent _extent;
       vkfw::UniqueWindow _window;
-      mr::RenderContext _context;
+      std::optional<mr::RenderContext> _context;
+      mr::FPSCamera *_cam;
 
     public:
       Window(VulkanGlobalState *state, Extent extent = {800, 600});
@@ -25,7 +26,7 @@ namespace mr {
 
       // methods
       void start_main_loop();
-      void render() { _context.render(); }
+      void render() { _context->render(*_cam); }
   };
 } // namespace mr
 #endif // __MR_WINDOW_HPP_

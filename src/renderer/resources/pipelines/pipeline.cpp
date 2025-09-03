@@ -3,7 +3,7 @@
 void mr::Pipeline::apply(vk::CommandBuffer cmd_buffer) const {}
 
 mr::Pipeline::Pipeline(
-    const VulkanState &state, Shader *shader,
+    const VulkanState &state, mr::ShaderHandle shader,
     std::span<const vk::DescriptorSetLayout> descriptor_layouts) : _shader(shader)
 {
   vk::PipelineLayoutCreateInfo pipeline_layout_create_info {

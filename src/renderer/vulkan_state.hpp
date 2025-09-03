@@ -2,7 +2,6 @@
 #define __MR_VULKAN_STATE_HPP_
 
 #include "pch.hpp"
-#include "utils/misc.hpp"
 #include <VkBootstrap.h>
 
 namespace mr {
@@ -21,9 +20,7 @@ namespace mr {
       vkb::Instance _instance;
       vkb::PhysicalDevice _phys_device;
 
-      std::fs::path _cache_dir = ".";
       CacheFile _pipeline_cache;
-      CacheFile _validation_cache;
   };
 
   class VulkanState {
@@ -40,20 +37,16 @@ namespace mr {
       vk::Device device() const noexcept { return *_device; }
       vk::Queue queue() const noexcept { return _queue; }
       vk::PipelineCache pipeline_cache() const noexcept { return *_pipeline_cache; }
-      vk::ValidationCacheEXT validation_cache() const noexcept { return _validation_cache; }
 
     private:
       void _create_device();
       void _create_pipeline_cache();
       void _destroy_pipeline_cache();
-      void _create_validation_cache();
-      void _destroy_validation_cache();
 
       VulkanGlobalState *_global;
       vk::UniqueDevice _device;
       vk::Queue _queue;
       vk::UniquePipelineCache _pipeline_cache;
-      vk::ValidationCacheEXT _validation_cache;
   };
 } // namespace mr
 
