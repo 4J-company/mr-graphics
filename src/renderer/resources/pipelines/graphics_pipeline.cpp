@@ -1,4 +1,5 @@
 #include "resources/pipelines/graphics_pipeline.hpp"
+#include "renderer/window/render_context.hpp"
 
 mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state,
                                        const RenderContext &render_context,
