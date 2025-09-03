@@ -30,7 +30,7 @@ namespace mr {
                        Subpass subpass,
                        mr::ShaderHandle shader,
                        std::span<const vk::VertexInputAttributeDescription> attributes,
-                       std::span<const vk::DescriptorSetLayout> descriptor_layouts);
+                       std::span<const DescriptorSetLayoutHandle> descriptor_layouts);
 
       void recompile();
 

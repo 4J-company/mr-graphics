@@ -58,7 +58,8 @@ vec3 ShadePBR( PointData point_data,
   vec3 outcolor = color.xyz;
 
   vec3 N = normalize(point_data.Norm.xyz);
-  vec3 V = normalize(point_data.Pos - cam_ubo.pos.xyz);
+  // TODO(dk6): don't use cam_uniform_buffer, add camera position to function arguments
+  vec3 V = normalize(point_data.Pos - cam_uniform_buffer.pos.xyz);
   vec3 L = normalize(point_data.LightPos - point_data.Pos);
   vec3 H = normalize(V + L);
   float NdotL = max(dot(N, L), 0.0);
