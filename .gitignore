@@ -38,3 +38,12 @@ out/
 
 .cache/clangd/index
 compile_commands.json
+.vscode/*
+
+bin/cache
+bin/models
+*.spv
+
+_deps
+CMakeUserPresets.json
+

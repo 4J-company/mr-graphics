@@ -4,6 +4,7 @@
 #include "pch.hpp"
 
 #include "vulkan_state.hpp"
+#include "manager/resource.hpp"
 
 namespace mr {
   class UniformBuffer;
@@ -11,7 +12,7 @@ namespace mr {
   class Texture;
   class Image;
 
-  class Shader {
+  class Shader : public ResourceBase<Shader> {
     private:
       static inline const size_t max_shader_modules = 6;
 
@@ -19,6 +20,8 @@ namespace mr {
       std::array<vk::UniqueShaderModule, max_shader_modules> _modules;
       std::array<vk::PipelineShaderStageCreateInfo, max_shader_modules> _stages;
       std::atomic<uint> _num_of_loaded_shaders;
+      std::string _define_string;
+      std::string _include_string;
 
     public:
       using Resource = std::variant<UniformBuffer *, StorageBuffer *, Texture *, Image *>;
@@ -43,7 +46,8 @@ namespace mr {
 
       Shader() = default;
 
-      Shader(const VulkanState &state, std::string_view filename);
+      Shader(const VulkanState &state, std::string_view filename,
+             const std::unordered_map<std::string, std::string> &define_map = {});
 
       // move semantics
       Shader(Shader &&other) noexcept
@@ -86,6 +90,8 @@ namespace mr {
 
       uint stage_number() const noexcept { return _num_of_loaded_shaders; }
   };
+
+  MR_DECLARE_HANDLE(Shader)
 
   constexpr vk::ShaderStageFlagBits get_stage_flags(std::integral auto stage) noexcept
   {

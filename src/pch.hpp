@@ -21,12 +21,14 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <print>
 #include <queue>
 #include <ranges>
 #include <set>
 #include <span>
 #include <string>
 #include <thread>
+#include <unordered_map>
 #include <variant>
 #include <vector>
 
@@ -41,9 +43,13 @@
 #define VKFW_NO_STRUCT_CONSTRUCTORS
 #include <vkfw/vkfw.hpp>
 
-#include <assimp/Importer.hpp>
-#include <assimp/postprocess.h>
-#include <assimp/scene.h>
+#include <mr-math/math.hpp>
+#include <mr-utils/assert.hpp>
+#include <mr-utils/misc.hpp>
+#include <mr-utils/path.hpp>
+#include <mr-utils/log.hpp>
+
+#include <beman/inplace_vector/inplace_vector.hpp>
 
 // WinAPI macros undefined :(
 #undef max
@@ -56,4 +62,6 @@ namespace mr {
   using byte = unsigned char;
 } // namespace mr
 
+using namespace std::literals;
+using namespace mr::literals;
 #endif // __MR_PCH_HPP_
