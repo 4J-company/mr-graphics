@@ -30,12 +30,6 @@ namespace mr {
       [[nodiscard]] std::unique_ptr<Shader> create_shader() const;
       [[nodiscard]] std::unique_ptr<Pipeline> create_graphics_pipeline() const;
       [[nodiscard]] std::unique_ptr<Pipeline> create_compute_pipeline() const;
-      [[nodiscard]] Mesh*
-      create_mesh(std::span<PositionType> positions, std::span<FaceType> faces,
-                  std::span<ColorType> colors, std::span<TexCoordType> uvs,
-                  std::span<NormalType> normals, std::span<NormalType> tangents,
-                  std::span<NormalType> bitangent, std::span<BoneType> bones,
-                  BoundboxType bbox) const;
 
       // window creator
       [[nodiscard]] std::unique_ptr<Window> create_window(Extent extent);

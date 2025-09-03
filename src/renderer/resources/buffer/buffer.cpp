@@ -4,9 +4,10 @@
 mr::Buffer::Buffer(const VulkanState &state, size_t byte_size,
                    vk::BufferUsageFlags usage_flag,
                    vk::MemoryPropertyFlags memory_properties)
-    : _size(byte_size)
-    , _usage_flags(usage_flag)
-    , _memory_properties(memory_properties)
+  : _state(&state)
+  , _size(byte_size)
+  , _usage_flags(usage_flag)
+  , _memory_properties(memory_properties)
 {
   vk::BufferCreateInfo buffer_create_info {
     .size = _size,

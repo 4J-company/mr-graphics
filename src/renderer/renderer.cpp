@@ -1,6 +1,7 @@
 #include "renderer.hpp"
 #include "resources/command_unit/command_unit.hpp"
-#include "window/window_context.hpp"
+#include "window/render_context.hpp"
+#include "manager/manager.hpp"
 
 // mr::Application class defualt constructor (initializes vulkan instance, device ...)
 mr::Application::Application()
@@ -8,7 +9,7 @@ mr::Application::Application()
   while (vkfw::init() != vkfw::Result::eSuccess)
     ;
   // _state._init();
-}                                                     
+}
 
 // destructor
 mr::Application::~Application()
@@ -38,16 +39,4 @@ mr::Application::create_command_unit() const
 mr::Application::create_window(Extent extent)
 {
   return std::make_unique<Window>(&_state, extent);
-}
-
-[[nodiscard]] mr::Mesh *mr::Application::create_mesh(
-  std::span<PositionType> positions, std::span<FaceType> faces,
-  std::span<ColorType> colors, std::span<TexCoordType> uvs,
-  std::span<NormalType> normals, std::span<NormalType> tangents,
-  std::span<NormalType> bitangent, std::span<BoneType> bones,
-  BoundboxType bbox) const
-{
-  _tmp_mesh_pool.emplace_back(
-    positions, faces, colors, uvs, normals, tangents, bitangent, bones, bbox);
-  return &_tmp_mesh_pool.back();
 }
