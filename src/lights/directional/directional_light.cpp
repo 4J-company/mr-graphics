@@ -1,8 +1,9 @@
 #include "lights/directional/directional_light.hpp"
+#include "scene/scene.hpp"
+#include "renderer/window/render_context.hpp"
 
-mr::DirectionalLight::DirectionalLight(const VulkanState &state, LightsRenderData &light_render_data,
-                                       Norm3f direction, const Vec3f &color)
-  : Light(state, light_render_data, color, sizeof(ShaderUniformBuffer))
+mr::DirectionalLight::DirectionalLight(const Scene &scene, const Norm3f &direction, const Vec3f &color)
+  : Light(scene, color, sizeof(ShaderUniformBuffer))
   , _direction(direction)
 {
   auto set1_optional = descriptor_allocator().allocate_set(set_layout());
@@ -12,7 +13,7 @@ mr::DirectionalLight::DirectionalLight(const VulkanState &state, LightsRenderDat
   std::array light_shader_resources {
     Shader::ResourceView(1, 0, &_uniform_buffer)
   };
-  _set1.update(state, light_shader_resources);
+  _set1.update(_scene->render_context().vulkan_state(), light_shader_resources);
 }
 
 void mr::DirectionalLight::shade(CommandUnit &unit) const noexcept

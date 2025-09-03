@@ -1,11 +1,14 @@
 #include "window.hpp"
 #include "camera/camera.hpp"
+#include "render_context.hpp"
 
-mr::Window::Window(VulkanGlobalState *state, Extent extent)
+mr::Window::Window(const RenderContext &parent, Extent extent)
   : _extent(extent)
+  , _parent(&parent)
 {
-  static mr::FPSCamera camera;
-  _cam = &camera;
+  // --------------------------------------------------------------------------
+  // Create window
+  // --------------------------------------------------------------------------
 
   // TODO: retry a couple of times
   vkfw::WindowHints hints{};
@@ -23,6 +26,22 @@ mr::Window::Window(VulkanGlobalState *state, Extent extent)
   }
 
   _window = std::move(window);
+
+  // --------------------------------------------------------------------------
+  // Init render resources
+  // --------------------------------------------------------------------------
+
+  _surface = vkfw::createWindowSurfaceUnique(_parent->vulkan_state().instance(), _window.get());
+  _swapchain = Swapchain(_parent->vulkan_state(), _surface.get(), _extent);
+
+  for (int i = 0; i < _swapchain.value()._images.size(); i++) {
+    _image_available_semaphore.emplace_back(_parent->vulkan_state().device().createSemaphoreUnique({}).value);
+    _render_finished_semaphore.emplace_back(_parent->vulkan_state().device().createSemaphoreUnique({}).value);
+  }
+
+  // --------------------------------------------------------------------------
+  // Setup window
+  // --------------------------------------------------------------------------
 
   // TODO(dk6): camera must be reworked, now it doesn't work
 
@@ -44,25 +63,26 @@ mr::Window::Window(VulkanGlobalState *state, Extent extent)
       win.setShouldClose(true);
     }
 
+    // TODO(dk6): I moved camera in Scene. It need to be upgraded... Maybe attach actual Scene to Window?
     // camera controls
-    if (key == vkfw::Key::eW) {
-      camera.move(camera.cam().direction());
-    }
-    if (key == vkfw::Key::eA) {
-      camera.move(-camera.cam().right());
-    }
-    if (key == vkfw::Key::eS) {
-      camera.move(-camera.cam().direction());
-    }
-    if (key == vkfw::Key::eD) {
-      camera.move(camera.cam().right());
-    }
-    if (key == vkfw::Key::eSpace) {
-      camera.move(-camera.cam().up());
-    }
-    if (key == vkfw::Key::eLeftShift) {
-      camera.move(camera.cam().up());
-    }
+    // if (key == vkfw::Key::eW) {
+    //   camera.move(camera.cam().direction());
+    // }
+    // if (key == vkfw::Key::eA) {
+    //   camera.move(-camera.cam().right());
+    // }
+    // if (key == vkfw::Key::eS) {
+    //   camera.move(-camera.cam().direction());
+    // }
+    // if (key == vkfw::Key::eD) {
+    //   camera.move(camera.cam().right());
+    // }
+    // if (key == vkfw::Key::eSpace) {
+    //   camera.move(-camera.cam().up());
+    // }
+    // if (key == vkfw::Key::eLeftShift) {
+    //   camera.move(camera.cam().up());
+    // }
 
     if (key == vkfw::Key::eF11) {
       if (flags & vkfw::ModifierKeyBits::eShift) {
@@ -73,18 +93,51 @@ mr::Window::Window(VulkanGlobalState *state, Extent extent)
       }
     }
   };
-  _context = mr::RenderContext(state, this);
 }
 
-void mr::Window::start_main_loop() {
-  std::jthread render_thread {
-    [&](std::stop_token stop_token) {
-      while (not stop_token.stop_requested()) { render(); }
-    }
-  };
+vk::RenderingAttachmentInfoKHR mr::Window::get_target_image() noexcept
+{
+  prev_image_index = image_index;
+  auto device = _parent->vulkan_state().device();
+  device.acquireNextImageKHR(_swapchain.value()._swapchain.get(),
+                             UINT64_MAX,
+                             _image_available_semaphore[image_index].get(),
+                             nullptr,
+                             &image_index);
 
-  // TMP theme
-  while (!_window->shouldClose().value) {
-    vkfw::pollEvents();
-  }
+  _swapchain.value()._images[image_index].switch_layout(_parent->vulkan_state(),
+                                                        vk::ImageLayout::eColorAttachmentOptimal);
+
+  return vk::RenderingAttachmentInfoKHR {
+    .imageView = _swapchain.value()._images[image_index].image_view(),
+    .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+    .loadOp = vk::AttachmentLoadOp::eClear,
+    .storeOp = vk::AttachmentStoreOp::eStore,
+    // TODO(dk6): added bckg color as parameter
+    .clearValue = {vk::ClearColorValue( std::array {0.f, 0.f, 0.f, 0.f})},
+  };
+}
+
+void mr::Window::present() noexcept
+{
+  _swapchain.value()._images[image_index].switch_layout(_parent->vulkan_state(), vk::ImageLayout::ePresentSrcKHR);
+  std::array sems = {_render_finished_semaphore[image_index].get()};
+  vk::PresentInfoKHR present_info {
+    .waitSemaphoreCount = sems.size(),
+    .pWaitSemaphores = sems.data(),
+    .swapchainCount = 1,
+    .pSwapchains = &_swapchain.value()._swapchain.get(),
+    .pImageIndices = &image_index,
+  };
+  _parent->vulkan_state().queue().presentKHR(present_info);
+}
+
+vk::Semaphore mr::Window::image_ready_semaphore() noexcept
+{
+  return _image_available_semaphore[prev_image_index].get();
+}
+
+vk::Semaphore mr::Window::render_finished_semaphore() noexcept
+{
+  return _render_finished_semaphore[image_index].get();
 }

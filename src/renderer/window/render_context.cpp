@@ -4,7 +4,6 @@
 #include "renderer.hpp"
 
 #include "resources/buffer/buffer.hpp"
-#include "resources/command_unit/command_unit.hpp"
 #include "resources/descriptor/descriptor.hpp"
 #include "resources/images/image.hpp"
 #include "resources/pipelines/graphics_pipeline.hpp"
@@ -16,31 +15,17 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-// TODO(dk6): workaround to pass camera data to material ubo until Scene class will be added
-mr::UniformBuffer *s_cam_ubo_ptr;
-
-mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Window *parent)
-  : _parent(parent)
-  , _state(std::make_shared<VulkanState>(global_state))
-  , _extent(parent->extent())
-  , _surface(vkfw::createWindowSurfaceUnique(_state->instance(), _parent->window()))
-  , _swapchain(*_state, _surface.get(), _extent)
+mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent)
+  : _state(std::make_shared<VulkanState>(global_state))
+  , _command_unit(*_state)
+  , _extent(extent)
   , _depthbuffer(*_state, _extent)
   , _image_fence (_state->device().createFenceUnique({.flags = vk::FenceCreateFlagBits::eSignaled}).value)
 {
   for (auto _ : std::views::iota(0, gbuffers_number)) {
     _gbuffers.emplace_back(*_state, _extent, vk::Format::eR32G32B32A32Sfloat);
   }
-  for (int i = 0; i < _swapchain._images.size(); i++) {
-    _image_available_semaphore.emplace_back(_state->device().createSemaphoreUnique({}).value);
-    _render_finished_semaphore.emplace_back(_state->device().createSemaphoreUnique({}).value);
-  }
   _models_render_finished_semaphore = _state->device().createSemaphoreUnique({}).value;
-
-  // TODO(dk6): real shit
-  static UniformBuffer cam_ubo(*_state, sizeof(ShaderCameraData));
-  static std::once_flag init_cam;
-  std::call_once(init_cam, [&]{s_cam_ubo_ptr = &cam_ubo;});
 
   _init_lights_render_data();
 }
@@ -65,8 +50,8 @@ void mr::RenderContext::_init_lights_render_data() {
   for (int i = 0; i < gbuffers_number; i++) {
     shader_resources[i] = Shader::ResourceView(0, i, &_gbuffers[i]);
   }
-  // TODO(dk6): correct camera passing (from scene i think)
-  shader_resources.back() = Shader::ResourceView(0, 6, s_cam_ubo_ptr);
+  // just for pipeline layout
+  shader_resources.back() = Shader::ResourceView(0, 6, static_cast<UniformBuffer *>(nullptr));
 
   _lights_render_data.set0_layout = ResourceManager<DescriptorSetLayout>::get().create(mr::unnamed,
     *_state, vk::ShaderStageFlagBits::eFragment, shader_resources);
@@ -77,7 +62,7 @@ void mr::RenderContext::_init_lights_render_data() {
   ASSERT(set0_optional.has_value());
   _lights_render_data.set0_set = std::move(set0_optional.value());
 
-  _lights_render_data.set0_set.update(*_state, shader_resources);
+  _lights_render_data.set0_set.update(*_state, std::span(shader_resources.data(), gbuffers_number));
 
   auto light_type_data = std::views::zip(LightsRenderData::shader_names,
                                          LightsRenderData::shader_resources_descriptions);
@@ -100,12 +85,29 @@ void mr::RenderContext::_init_lights_render_data() {
   }
 }
 
+void mr::RenderContext::_update_camera_buffer(UniformBuffer &uniform_buffer)
+{
+  std::array camera_buffer_resource {Shader::ResourceView(0, 6, &uniform_buffer)};
+  _lights_render_data.set0_set.update(*_state, camera_buffer_resource);
+}
+
 mr::RenderContext::~RenderContext() {
   if (_state) {
     _state->queue().waitIdle();
   }
 }
 
+mr::WindowHandle mr::RenderContext::create_window() const noexcept
+{
+  return ResourceManager<Window>::get().create(mr::unnamed, *this, _extent);
+}
+
+mr::SceneHandle mr::RenderContext::create_scene() const noexcept
+{
+  return ResourceManager<Scene>::get().create(mr::unnamed, *this);
+}
+
+// TODO: maybe move to scene
 static void update_camera(mr::FPSCamera &cam, mr::UniformBuffer &cam_ubo) noexcept
 {
   // cam.cam() = mr::Camera<float>({1}, {-1}, {0, 1, 0});
@@ -136,35 +138,13 @@ static void update_camera(mr::FPSCamera &cam, mr::UniformBuffer &cam_ubo) noexce
   cam_ubo.write(std::span<mr::ShaderCameraData> {&cam_data, 1});
 }
 
-void mr::RenderContext::render_lights(UniformBuffer &cam_ubo, CommandUnit &command_unit, uint32_t image_index) {
-  static std::array directional_lights {
-    DirectionalLight {*_state, _lights_render_data, Norm3f(1, 1, -1)},
-    DirectionalLight {*_state, _lights_render_data, Norm3f(-1, 1, 1), Vec3f(0.3, 0.47, 0.8)},
-  };
-
-  // --------------
-  // above shit
-  // --------------
-
+void mr::RenderContext::_render_lights(const SceneHandle scene, WindowHandle window)
+{
   for (auto &gbuf : _gbuffers) {
     gbuf.switch_layout(*_state, vk::ImageLayout::eShaderReadOnlyOptimal);
   }
 
-  vk::RenderingAttachmentInfoKHR swapchain_image_attachment_info {
-    .imageView = _swapchain._images[image_index].image_view(),
-    .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
-    .loadOp = vk::AttachmentLoadOp::eClear,
-    .storeOp = vk::AttachmentStoreOp::eStore,
-    .clearValue = {vk::ClearColorValue( std::array {0.f, 0.f, 0.f, 0.f})},
-  };
-
-  vk::RenderingAttachmentInfoKHR depth_attachment_info {
-    .imageView = _depthbuffer.image_view(),
-    .imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
-    .loadOp = vk::AttachmentLoadOp::eClear,
-    .storeOp = vk::AttachmentStoreOp::eStore,
-    .clearValue = {vk::ClearDepthStencilValue(1.f, 0)},
-  };
+  vk::RenderingAttachmentInfoKHR swapchain_image_attachment_info = window->get_target_image();
 
   vk::RenderingInfoKHR attachment_info {
     .renderArea = { 0, 0, _extent.width, _extent.height },
@@ -173,11 +153,10 @@ void mr::RenderContext::render_lights(UniformBuffer &cam_ubo, CommandUnit &comma
     .pColorAttachments = &swapchain_image_attachment_info,
   };
 
-  _swapchain._images[image_index].switch_layout(*_state, vk::ImageLayout::eColorAttachmentOptimal);
   _depthbuffer.switch_layout(*_state, vk::ImageLayout::eDepthStencilAttachmentOptimal);
 
-  command_unit.begin();
-  command_unit->beginRendering(&attachment_info);
+  _command_unit.begin();
+  _command_unit->beginRendering(&attachment_info);
 
   vk::Viewport viewport {
     .x = 0, .y = 0,
@@ -185,7 +164,7 @@ void mr::RenderContext::render_lights(UniformBuffer &cam_ubo, CommandUnit &comma
     .height = static_cast<float>(_extent.height),
     .minDepth = 0, .maxDepth = 1,
   };
-  command_unit->setViewport(0, viewport);
+  _command_unit->setViewport(0, viewport);
 
   vk::Rect2D scissors {
     .offset = {0, 0},
@@ -194,31 +173,24 @@ void mr::RenderContext::render_lights(UniformBuffer &cam_ubo, CommandUnit &comma
       static_cast<uint32_t>(_extent.height),
     },
   };
-  command_unit->setScissor(0, scissors);
+  _command_unit->setScissor(0, scissors);
 
   // shade all
-  command_unit->bindVertexBuffers(0, {_lights_render_data.screen_vbuf.buffer()}, {0});
-  command_unit->bindIndexBuffer(_lights_render_data.screen_ibuf.buffer(), 0, vk::IndexType::eUint32);
+  _command_unit->bindVertexBuffers(0, {_lights_render_data.screen_vbuf.buffer()}, {0});
+  _command_unit->bindIndexBuffer(_lights_render_data.screen_ibuf.buffer(), 0, vk::IndexType::eUint32);
 
-  for (auto &light : directional_lights) {
-    light.shade(command_unit);
-  }
+  std::apply([this](const auto &lights) {
+    for (auto light_handle : lights) {
+      light_handle->shade(_command_unit);
+    }
+  }, scene->_lights);
 
-  _swapchain._images[image_index].switch_layout(*_state, vk::ImageLayout::ePresentSrcKHR);
-
-  command_unit->endRendering();
-  command_unit.end();
+  _command_unit->endRendering();
+  _command_unit.end();
 }
 
-void mr::RenderContext::render_models(UniformBuffer &cam_ubo, CommandUnit &command_unit, mr::FPSCamera &cam) {
-  static Model model(*_state, *this, "ABeautifulGame/ABeautifulGame.gltf");
-
-  // --------------
-  // above shit
-  // --------------
-
-  update_camera(cam, cam_ubo);
-
+void mr::RenderContext::_render_models(const SceneHandle scene)
+{
   for (auto &gbuf : _gbuffers) {
     gbuf.switch_layout(*_state, vk::ImageLayout::eColorAttachmentOptimal);
   }
@@ -238,8 +210,8 @@ void mr::RenderContext::render_models(UniformBuffer &cam_ubo, CommandUnit &comma
     // .pStencilAttachment = &depth_attachment_info,
   };
 
-  command_unit.begin();
-  command_unit->beginRendering(&attachment_info);
+  _command_unit.begin();
+  _command_unit->beginRendering(&attachment_info);
 
   vk::Viewport viewport {
     .x = 0, .y = 0,
@@ -247,7 +219,7 @@ void mr::RenderContext::render_models(UniformBuffer &cam_ubo, CommandUnit &comma
     .height = static_cast<float>(_extent.height),
     .minDepth = 0, .maxDepth = 1,
   };
-  command_unit->setViewport(0, viewport);
+  _command_unit->setViewport(0, viewport);
 
   vk::Rect2D scissors {
     .offset = {0, 0},
@@ -256,41 +228,33 @@ void mr::RenderContext::render_models(UniformBuffer &cam_ubo, CommandUnit &comma
       static_cast<uint32_t>(_extent.height),
     },
   };
-  command_unit->setScissor(0, scissors);
+  _command_unit->setScissor(0, scissors);
 
-  model.draw(command_unit);
+  for (ModelHandle model : scene->_models) {
+    model->draw(_command_unit);
+  }
 
-  command_unit->endRendering();
-  command_unit.end();
+  _command_unit->endRendering();
+  _command_unit.end();
 }
 
-void mr::RenderContext::render(mr::FPSCamera &cam)
+void mr::RenderContext::render(const SceneHandle scene, WindowHandle window)
 {
-  static CommandUnit command_unit(*_state);
-
-  UniformBuffer &cam_ubo = *s_cam_ubo_ptr;
-
-  // --------------
-  // above shit
-  // --------------
+  ASSERT(this == &scene->render_context());
+  ASSERT(this == &window->render_context());
 
   _state->device().waitForFences(_image_fence.get(), VK_TRUE, UINT64_MAX);
   _state->device().resetFences(_image_fence.get());
 
-  static uint32_t image_index = 0;
-  uint32_t prev_image_index = image_index;
-  _state->device().acquireNextImageKHR(_swapchain._swapchain.get(),
-                                      UINT64_MAX,
-                                      _image_available_semaphore[image_index].get(),
-                                      nullptr,
-                                      &image_index);
+  _update_camera_buffer(scene->_camera_uniform_buffer);
+  update_camera(scene->_camera, scene->_camera_uniform_buffer);
 
-  render_models(cam_ubo, command_unit, cam);
+  _render_models(scene);
 
   vk::PipelineStageFlags models_wait_stages[] = {vk::PipelineStageFlagBits::eColorAttachmentOutput};
   std::array models_signal_semaphores = {_models_render_finished_semaphore.get()};
 
-  auto [models_bufs, models_size] = command_unit.submit_info();
+  auto [models_bufs, models_size] = _command_unit.submit_info();
   vk::SubmitInfo models_submit_info {
     .pWaitDstStageMask = models_wait_stages,
     .commandBufferCount = models_size,
@@ -301,16 +265,16 @@ void mr::RenderContext::render(mr::FPSCamera &cam)
 
   _state->queue().submit(models_submit_info);
 
-  render_lights(cam_ubo, command_unit, image_index);
+  _render_lights(scene, window);
 
   std::array light_wait_semaphores = {
-    _image_available_semaphore[prev_image_index].get(),
+    window->image_ready_semaphore(),
     _models_render_finished_semaphore.get(),
   };
   vk::PipelineStageFlags light_wait_stages[] = {vk::PipelineStageFlagBits::eColorAttachmentOutput};
-  std::array light_signal_semaphores = {_render_finished_semaphore[image_index].get()};
+  std::array light_signal_semaphores = {window->render_finished_semaphore()};
 
-  auto [light_bufs, light_size] = command_unit.submit_info();
+  auto [light_bufs, light_size] = _command_unit.submit_info();
   vk::SubmitInfo light_submit_info {
     .waitSemaphoreCount = light_wait_semaphores.size(),
     .pWaitSemaphores = light_wait_semaphores.data(),
@@ -323,12 +287,5 @@ void mr::RenderContext::render(mr::FPSCamera &cam)
 
   _state->queue().submit(light_submit_info, _image_fence.get());
 
-  vk::PresentInfoKHR present_info {
-    .waitSemaphoreCount = light_signal_semaphores.size(),
-    .pWaitSemaphores = light_signal_semaphores.data(),
-    .swapchainCount = 1,
-    .pSwapchains = &_swapchain._swapchain.get(),
-    .pImageIndices = &image_index,
-  };
-  _state->queue().presentKHR(present_info);
+  window->present();
 }
