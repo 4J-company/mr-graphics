@@ -16,6 +16,7 @@ namespace mr {
   private:
     // i hope it is not like bool vector
     std::array<bool, max_keys_number> _key_pressed {};
+    std::array<bool, max_keys_number> _prev_key_pressed {};
     std::array<bool, max_keys_number> _key_tapped {};
 
     // TODO(dk6): mouse
