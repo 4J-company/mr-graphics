@@ -47,37 +47,6 @@ mr::Window::Window(const RenderContext &parent, Extent extent)
 
   _window->callbacks()->on_cursor_move = _input_state.get_mouse_callback();
   _window->callbacks()->on_key = _input_state.get_key_callback();
-
-  // TODO(dk6): move it to Scene
-
-  // _window->callbacks()->on_cursor_move =
-  //   [this](const vkfw::Window &win, double x, double y) {
-  //   static mr::Vec2d old_pos;
-  //   mr::Vec2d pos = {x, y};
-  //   mr::Vec2d delta = pos - old_pos;
-  //   old_pos = pos;
-  //   camera.turn({delta.x() / _extent.width, delta.y() / _extent.height, 0});
-  // };
-
-  // camera controls
-  // if (key == vkfw::Key::eW) {
-  //   camera.move(camera.cam().direction());
-  // }
-  // if (key == vkfw::Key::eA) {
-  //   camera.move(-camera.cam().right());
-  // }
-  // if (key == vkfw::Key::eS) {
-  //   camera.move(-camera.cam().direction());
-  // }
-  // if (key == vkfw::Key::eD) {
-  //   camera.move(camera.cam().right());
-  // }
-  // if (key == vkfw::Key::eSpace) {
-  //   camera.move(-camera.cam().up());
-  // }
-  // if (key == vkfw::Key::eLeftShift) {
-  //   camera.move(camera.cam().up());
-  // }
 }
 
 vk::RenderingAttachmentInfoKHR mr::Window::get_target_image() noexcept

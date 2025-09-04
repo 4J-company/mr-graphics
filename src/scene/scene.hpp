@@ -56,6 +56,9 @@ namespace mr {
     UniformBuffer & camera_uniform_buffer() const noexcept { return _camera_uniform_buffer; }
 
     void update(const InputState &input_state) noexcept;
+
+  private:
+    void _update_camera_buffer() noexcept;
   };
 
   MR_DECLARE_HANDLE(Scene);
