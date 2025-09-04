@@ -24,7 +24,7 @@ inline namespace graphics {
 
       [[nodiscard]] std::unique_ptr<RenderContext> create_render_context(Extent extent);
 
-      void start_render_loop(RenderContext &render_context, const SceneHandle scene,
+      void start_render_loop(RenderContext &render_context, SceneHandle scene,
                                                             WindowHandle window) const noexcept;
   };
 }

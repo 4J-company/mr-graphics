@@ -4,6 +4,7 @@
 #include "lights/lights.hpp"
 #include "model/model.hpp"
 #include "manager/resource.hpp"
+#include "renderer/window/input_state.hpp"
 
 namespace mr {
   // forward declaration of render context class
@@ -53,6 +54,8 @@ namespace mr {
 
     const RenderContext & render_context() const noexcept { return *_parent; }
     UniformBuffer & camera_uniform_buffer() const noexcept { return _camera_uniform_buffer; }
+
+    void update(const InputState &input_state) noexcept;
   };
 
   MR_DECLARE_HANDLE(Scene);

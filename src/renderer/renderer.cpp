@@ -16,12 +16,14 @@ mr::Application::~Application() {}
   return std::make_unique<RenderContext>(&_state, extent);
 }
 
-void mr::Application::start_render_loop(RenderContext &render_context, const SceneHandle scene,
+void mr::Application::start_render_loop(RenderContext &render_context, SceneHandle scene,
                                                                        WindowHandle window) const noexcept
 {
   std::jthread render_thread {
     [&](std::stop_token stop_token) {
       while (not stop_token.stop_requested()) {
+        window->update_state();
+        scene->update(window->input_state());
         render_context.render(scene, window);
       }
     }

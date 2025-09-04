@@ -26,3 +26,32 @@ mr::ModelHandle mr::Scene::create_model(std::string_view filename) noexcept
   _models.push_back(model_handle);
   return model_handle;
 }
+
+void mr::Scene::update(const InputState &input_state) noexcept
+{
+  ASSERT(_parent != nullptr);
+
+  _camera.turn({input_state.mouse_pos_delta().x() / _parent->extent().width,
+                input_state.mouse_pos_delta().y() / _parent->extent().height,
+                0});
+
+  // camera controls
+  if (input_state.key_pressed(vkfw::Key::eW)) {
+    _camera.move(_camera.cam().direction());
+  }
+  if (input_state.key_pressed(vkfw::Key::eA)) {
+    _camera.move(-_camera.cam().right());
+  }
+  if (input_state.key_pressed(vkfw::Key::eS)) {
+    _camera.move(-_camera.cam().direction());
+  }
+  if (input_state.key_pressed(vkfw::Key::eD)) {
+    _camera.move(_camera.cam().right());
+  }
+  if (input_state.key_pressed(vkfw::Key::eSpace)) {
+    _camera.move(-_camera.cam().up());
+  }
+  if (input_state.key_pressed(vkfw::Key::eLeftShift)) {
+    _camera.move(_camera.cam().up());
+  }
+}
