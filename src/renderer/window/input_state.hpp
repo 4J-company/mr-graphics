@@ -9,14 +9,31 @@ namespace mr {
   class Window;
 
   class InputState {
-    friend class Window;
-
   public:
     constexpr static uint32_t max_keys_number = std::to_underlying(vkfw::Key::eLAST);
   private:
+    // ----------------------
+    // Keyboard
+    // ----------------------
     // i hope it is not like bool vector
     std::array<bool, max_keys_number> _key_pressed {};
+    std::array<bool, max_keys_number> _prev_key_pressed {};
     std::array<bool, max_keys_number> _key_tapped {};
+
+    // ----------------------
+    // Mouse
+    // ----------------------
+
+    Vec2d _mouse_pos {};
+    Vec2d _prev_mouse_pos {};
+    Vec2d _mouse_pos_delta {};
+
+    // I think mutex here is good - we have one writer, one reader,
+    //  but reader works once per frame only for copy ~400 bytes, in other time it have no affect for writer
+    // Expected, what update(), key_pressed() and key_tapped() call in one thread,
+    // std::ranges::copy(std::execution::unseq, key_pressed_copy, _key_pressed.begin());
+    //  key callback in other
+    mutable std::mutex update_mutex;
 
     // TODO(dk6): mouse
 
@@ -28,10 +45,18 @@ namespace mr {
     bool key_pressed(vkfw::Key key) const noexcept;
     bool key_tapped(vkfw::Key key) const noexcept;
 
+    const Vec2d & mouse_pos() const noexcept { return _prev_mouse_pos; }
+    const Vec2d & mouse_pos_delta() const noexcept { return _mouse_pos_delta; }
+
   private: // for Window only
+    friend class Window;
+
     using KeyCallbackT =
       std::function<void(const vkfw::Window &, vkfw::Key, int, vkfw::KeyAction, vkfw::ModifierKeyFlags)>;
     KeyCallbackT get_key_callback() noexcept;
+
+    using MouseCallbackT = std::function<void(const vkfw::Window &, double, double)>;
+    MouseCallbackT get_mouse_callback() noexcept;
   };
 }
 

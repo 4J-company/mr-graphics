@@ -64,6 +64,7 @@ namespace mr {
 
       const LightsRenderData & lights_render_data() const noexcept { return _lights_render_data; }
       const VulkanState & vulkan_state() const noexcept { return *_state; }
+      const Extent & extent() const noexcept { return _extent; }
 
       // TODO(dk6): void delete_window(WindowHandle window);
       WindowHandle create_window() const noexcept;
