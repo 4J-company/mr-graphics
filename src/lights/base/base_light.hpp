@@ -19,6 +19,7 @@ namespace mr {
 
     // I think mutable here is nice idea, because shade is const by logic - state of light like direction don't change
     mutable UniformBuffer _uniform_buffer {};
+    // TODO(dk6): rename it, mt6 was confused
     mutable bool _updated = true;
 
   protected:

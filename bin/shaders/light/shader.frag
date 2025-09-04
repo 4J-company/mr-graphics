@@ -40,8 +40,8 @@ void main( void )
   vec3 emissive = subpassLoad(InEmissive).xyz;
 
   float occlusion = occlusion_roughness_metallic.r;
-  float roughness = occlusion_roughness_metallic.g;
-  float metallic  = occlusion_roughness_metallic.b;
+  float roughness = occlusion_roughness_metallic.b;
+  float metallic  = occlusion_roughness_metallic.g;
 
   vec3 light_dir = light_uniform_buffer.direction.xyz;
   vec3 light_color = light_uniform_buffer.color.xyz;
@@ -54,7 +54,7 @@ void main( void )
 
   vec3 final_color = gamma_corrected_color;
 
-  OutColor = vec4(final_color, 0);
+  OutColor = vec4(final_color, 1);
 }
 
 

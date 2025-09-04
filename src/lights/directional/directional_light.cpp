@@ -34,6 +34,7 @@ void mr::DirectionalLight::shade(CommandUnit &unit) const noexcept
                            pipeline().layout(),
                            1, {_set1}, {});
 
+  // TODO(dk6): use instansing here
   unit->drawIndexed(index_buffer().element_count(), 1, 0, 0, 0);
 }
 
