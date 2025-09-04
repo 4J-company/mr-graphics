@@ -1,5 +1,6 @@
 #include "file_writer.hpp"
 #include "render_context.hpp"
+#include "swapchain.hpp"
 
 mr::FileWriter::FileWriter(const RenderContext &parent, Extent extent)
   : _extent(extent)
@@ -8,7 +9,9 @@ mr::FileWriter::FileWriter(const RenderContext &parent, Extent extent)
   ASSERT(_parent != nullptr);
 
   for (uint32_t i = 0; i < images_number; i++) {
-    _images.emplace_back(_parent->vulkan_state(), _extent, vk::Format::eR32G32B32A32Sfloat);
+    // Same format as for swapchain
+    _images.emplace_back(_parent->vulkan_state(), _extent, Swapchain::default_format());
+    _render_finished_semaphore.emplace_back(_parent->vulkan_state().device().createSemaphoreUnique({}).value);
   }
 }
 
@@ -25,7 +28,7 @@ vk::RenderingAttachmentInfoKHR mr::FileWriter::get_target_image() noexcept
 void mr::FileWriter::present() noexcept
 {
   ASSERT(_parent != nullptr);
-  // TODO(dk6): implement this. Not, we must wait render_finished_semaphore
+  // TODO(dk6): implement this. Note, we must wait render_finished_semaphore
   _images[_prev_image_index].copy_to_host();
 }
 

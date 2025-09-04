@@ -16,7 +16,7 @@ inline namespace graphics {
 
   private:
     const VulkanState *_state;
-    vk::Format _format{vk::Format::eB8G8R8A8Unorm};
+    vk::Format _format = default_format();
     vk::UniqueSwapchainKHR _swapchain;
     std::vector<SwapchainImage> _images;
 
@@ -29,6 +29,8 @@ inline namespace graphics {
     void recreate(vk::SurfaceKHR surface);
 
     vk::Format format() const noexcept;
+
+    constexpr static vk::Format default_format() { return vk::Format::eB8G8R8A8Unorm; }
   };
 }
 }

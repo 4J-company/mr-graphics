@@ -237,6 +237,7 @@ void mr::RenderContext::render(const SceneHandle scene, WindowHandle window)
 
   _render_lights(scene, window);
 
+  // TODO(dk6): maybe it is unnecessary and FileWriter will use image_ready_semaphore too
   beman::inplace_vector<vk::Semaphore, 2> light_wait_semaphores = {
     _models_render_finished_semaphore.get(),
   };
