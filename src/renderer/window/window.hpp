@@ -4,6 +4,7 @@
 #include "pch.hpp"
 #include "camera/camera.hpp"
 #include "swapchain.hpp"
+#include "input_state.hpp"
 #include "resources/images/image.hpp"
 
 namespace mr {
@@ -32,6 +33,8 @@ inline namespace graphics {
 
     const RenderContext *_parent = nullptr;
 
+    InputState _input_state;
+
   public:
     Window(const RenderContext &parent, Extent extent = {800, 600});
 
@@ -52,6 +55,9 @@ inline namespace graphics {
     vk::Semaphore image_ready_semaphore() noexcept;
     // Pass this semaphore to render pass signal semaphore witch write in image
     vk::Semaphore render_finished_semaphore() noexcept;
+
+    const InputState & input_state() const noexcept { return _input_state; }
+    void update_state() noexcept;
   };
 
   MR_DECLARE_HANDLE(Window);
