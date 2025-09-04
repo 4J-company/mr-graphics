@@ -13,5 +13,7 @@ int main(int argc, const char **argv)
   // scene->create_directional_light(mr::Norm3f(-1, 1, 1));
   scene->create_model("ABeautifulGame/ABeautifulGame.gltf");
 
+  auto file_writer = render_context->create_file_writer();
+
   app.start_render_loop(*render_context, scene, window);
 }

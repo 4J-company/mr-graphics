@@ -4,6 +4,7 @@
 #include "lights/lights.hpp"
 #include "model/model.hpp"
 #include "manager/resource.hpp"
+#include "camera/camera.hpp"
 #include "renderer/window/input_state.hpp"
 
 namespace mr {

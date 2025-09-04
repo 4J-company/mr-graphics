@@ -1,6 +1,8 @@
 #ifndef __MR_WINDOW_SWAPCHAIN_HPP_
 #define __MR_WINDOW_SWAPCHAIN_HPP_
 
+#include "resources/images/image.hpp"
+
 namespace mr {
 inline namespace graphics {
   // forward declaration of Window class

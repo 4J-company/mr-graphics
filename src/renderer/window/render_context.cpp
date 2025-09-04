@@ -99,6 +99,11 @@ mr::WindowHandle mr::RenderContext::create_window() const noexcept
   return ResourceManager<Window>::get().create(mr::unnamed, *this, _extent);
 }
 
+mr::FileWriterHandle mr::RenderContext::create_file_writer() const noexcept
+{
+  return ResourceManager<FileWriter>::get().create(mr::unnamed, *this, _extent);
+}
+
 mr::SceneHandle mr::RenderContext::create_scene() const noexcept
 {
   return ResourceManager<Scene>::get().create(mr::unnamed, *this);
@@ -232,16 +237,22 @@ void mr::RenderContext::render(const SceneHandle scene, WindowHandle window)
 
   _render_lights(scene, window);
 
-  std::array light_wait_semaphores = {
-    window->image_ready_semaphore(),
+  beman::inplace_vector<vk::Semaphore, 2> light_wait_semaphores = {
     _models_render_finished_semaphore.get(),
   };
+  ASSERT(light_wait_semaphores.size() == 1);
+  auto image_ready_semaphore = window->image_ready_semaphore();
+  if (image_ready_semaphore != nullptr) {
+    light_wait_semaphores.emplace_back(image_ready_semaphore);
+    ASSERT(light_wait_semaphores.size() == 2);
+  }
+
   vk::PipelineStageFlags light_wait_stages[] = {vk::PipelineStageFlagBits::eColorAttachmentOutput};
   std::array light_signal_semaphores = {window->render_finished_semaphore()};
 
   auto [light_bufs, light_size] = _command_unit.submit_info();
   vk::SubmitInfo light_submit_info {
-    .waitSemaphoreCount = light_wait_semaphores.size(),
+    .waitSemaphoreCount = static_cast<uint32_t>(light_wait_semaphores.size()),
     .pWaitSemaphores = light_wait_semaphores.data(),
     .pWaitDstStageMask = light_wait_stages,
     .commandBufferCount = light_size,

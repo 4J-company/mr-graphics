@@ -1,5 +1,5 @@
-#ifndef __MR_WINDOW_CONTEXT_HPP_
-#define __MR_WINDOW_CONTEXT_HPP_
+#ifndef __MR_RENDER_CONTEXT_HPP_
+#define __MR_RENDER_CONTEXT_HPP_
 
 #include "pch.hpp"
 #include "resources/images/image.hpp"
@@ -9,6 +9,7 @@
 #include "lights/lights.hpp"
 #include "model/model.hpp"
 #include "window.hpp"
+#include "file_writer.hpp"
 #include "scene/scene.hpp"
 #include "resources/command_unit/command_unit.hpp"
 
@@ -77,6 +78,9 @@ inline namespace graphics {
       // TODO(dk6): void delete_window(WindowHandle window);
       WindowHandle create_window() const noexcept;
 
+      // TODO(dk6): void delete_window(WindowHandle window);
+      FileWriterHandle create_file_writer() const noexcept;
+
       // TODO(dk6): void delete_scene(SceneHandle scene);
       SceneHandle create_scene() const noexcept;
 
@@ -90,4 +94,4 @@ inline namespace graphics {
   };
 }
 } // namespace mr
-#endif // __MR_WINDOW_CONTEXT_HPP_
+#endif // __MR_RENDER_CONTEXT_HPP_
