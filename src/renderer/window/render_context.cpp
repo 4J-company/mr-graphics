@@ -11,10 +11,6 @@
 #include <vulkan/vulkan_core.h>
 #include <vulkan/vulkan_enums.hpp>
 
-// TODO(dk6): this is temporary changes, while mr::Camera works incorrect
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-
 mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent)
   : _state(std::make_shared<VulkanState>(global_state))
   , _command_unit(*_state)
@@ -105,37 +101,6 @@ mr::WindowHandle mr::RenderContext::create_window() const noexcept
 mr::SceneHandle mr::RenderContext::create_scene() const noexcept
 {
   return ResourceManager<Scene>::get().create(mr::unnamed, *this);
-}
-
-// TODO: maybe move to scene
-static void update_camera(mr::FPSCamera &cam, mr::UniformBuffer &cam_ubo) noexcept
-{
-  // cam.cam() = mr::Camera<float>({1}, {-1}, {0, 1, 0});
-  // cam.cam().projection() = mr::Camera<float>::Projection(0.25_pi);
-
-  // TODO(dk6): this is temporary changes, while mr::Camera works incorrect
-  glm::mat4 view = glm::lookAt(glm::vec3{1.f, 1.f, 1.f}, {0.f, 0.f, 0.f}, {0.f, 1.f, 0.f});
-  glm::mat4 proj = glm::perspective(glm::radians(45.f), 1920.f / 1080.f, 0.1f, 100.f);
-  glm::mat4 vp = proj * view;
-
-  mr::Matr4f mrvp {
-    vp[0][0], vp[0][1], vp[0][2], vp[0][3],
-    vp[1][0], vp[1][1], vp[1][2], vp[1][3],
-    vp[2][0], vp[2][1], vp[2][2], vp[2][3],
-    vp[3][0], vp[3][1], vp[3][2], vp[3][3],
-  };
-
-  mr::ShaderCameraData cam_data {
-    // .vp = cam.viewproj(),
-    .vp = mrvp,
-    .campos = cam.cam().position(),
-    .fov = static_cast<float>(cam.fov()),
-    .gamma = cam.gamma(),
-    .speed = cam.speed(),
-    .sens = cam.sensetivity(),
-  };
-
-  cam_ubo.write(std::span<mr::ShaderCameraData> {&cam_data, 1});
 }
 
 void mr::RenderContext::_render_lights(const SceneHandle scene, WindowHandle window)
@@ -247,7 +212,6 @@ void mr::RenderContext::render(const SceneHandle scene, WindowHandle window)
   _state->device().resetFences(_image_fence.get());
 
   _update_camera_buffer(scene->_camera_uniform_buffer);
-  update_camera(scene->_camera, scene->_camera_uniform_buffer);
 
   _render_models(scene);
 

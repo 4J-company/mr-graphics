@@ -43,56 +43,10 @@ mr::Window::Window(const RenderContext &parent, Extent extent)
   // Setup window
   // --------------------------------------------------------------------------
 
-  // TODO(dk6): camera must be reworked, now it doesn't work
-
   // glfwSetInputMode(_window.get(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
-  // _window->callbacks()->on_cursor_move =
-  //   [this](const vkfw::Window &win, double x, double y) {
-  //   static mr::Vec2d old_pos;
-  //   mr::Vec2d pos = {x, y};
-  //   mr::Vec2d delta = pos - old_pos;
-  //   old_pos = pos;
-  //   camera.turn({delta.x() / _extent.width, delta.y() / _extent.height, 0});
-  // };
-
-  _window->callbacks()->on_key = [&](const vkfw::Window &win, vkfw::Key key,
-                                    int scan_code, vkfw::KeyAction action,
-                                    vkfw::ModifierKeyFlags flags) {
-    if (key == vkfw::Key::eEscape) {
-      win.setShouldClose(true);
-    }
-
-    // TODO(dk6): I moved camera in Scene. It need to be upgraded... Maybe attach actual Scene to Window?
-    // camera controls
-    // if (key == vkfw::Key::eW) {
-    //   camera.move(camera.cam().direction());
-    // }
-    // if (key == vkfw::Key::eA) {
-    //   camera.move(-camera.cam().right());
-    // }
-    // if (key == vkfw::Key::eS) {
-    //   camera.move(-camera.cam().direction());
-    // }
-    // if (key == vkfw::Key::eD) {
-    //   camera.move(camera.cam().right());
-    // }
-    // if (key == vkfw::Key::eSpace) {
-    //   camera.move(-camera.cam().up());
-    // }
-    // if (key == vkfw::Key::eLeftShift) {
-    //   camera.move(camera.cam().up());
-    // }
-
-    if (key == vkfw::Key::eF11) {
-      if (flags & vkfw::ModifierKeyBits::eShift) {
-        win.setSize(640, 480);
-      }
-      else {
-        win.maximize();
-      }
-    }
-  };
+  _window->callbacks()->on_cursor_move = _input_state.get_mouse_callback();
+  _window->callbacks()->on_key = _input_state.get_key_callback();
 }
 
 vk::RenderingAttachmentInfoKHR mr::Window::get_target_image() noexcept
@@ -140,4 +94,22 @@ vk::Semaphore mr::Window::image_ready_semaphore() noexcept
 vk::Semaphore mr::Window::render_finished_semaphore() noexcept
 {
   return _render_finished_semaphore[image_index].get();
+}
+
+void mr::Window::update_state() noexcept
+{
+  _input_state.update();
+
+  if (_input_state.key_tapped(vkfw::Key::eEscape)) {
+    _window->setShouldClose(true);
+  }
+
+  if (_input_state.key_tapped(vkfw::Key::eF11)) {
+    if (_input_state.key_pressed(vkfw::Key::eLeftShift) ||
+        _input_state.key_pressed(vkfw::Key::eRightShift)) {
+      _window->setSize(640, 480);
+    } else {
+      _window->maximize();
+    }
+  }
 }
