@@ -6,7 +6,21 @@
 #include "vulkan_state.hpp"
 
 namespace mr {
+  class FileWriter;
+
   class Image {
+    // TODO(dk6): tmp solution because:
+    //              1. We must past semaphores to submit info
+    //              2. I think command_unit must be recieved from render_context - we must pass it to args
+    //              3. I want to move implementation of write to .cpp, (because read will be same). For this I think
+    //                 we can pass std::span<char> to 'write' and add static template method 'convert' to convert
+    //                 span<T> a -> span<char> b (just b = span(reinterpret_cast<char *>(a.data()), a.size() * sizeof(T)))
+    //                 Maybe instead char add char strong typedef Image::Byte and user must call 'convert'
+    friend FileWriter;
+
+    // HostBuffer read_to_buffer();
+    // std::vector<std::byte> read() { return read_to_buffer().read(); }
+    // Vec4f get_pixel(x, y) -> get small size (16 bytes)
     protected:
       vk::UniqueImage _image;
       vk::UniqueImageView _image_view;
@@ -36,6 +50,8 @@ namespace mr {
       virtual ~Image();
 
       void switch_layout(const VulkanState &state, vk::ImageLayout new_layout);
+
+      // Is base Image class correct for copy to host?
       virtual void copy_to_host() const;
       virtual void get_pixel(const vk::Extent2D &coords) const;
 

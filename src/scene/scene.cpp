@@ -53,6 +53,7 @@ void mr::Scene::update(const InputState &input_state) noexcept
     _camera.move(_camera.cam().right());
   }
   if (input_state.key_pressed(vkfw::Key::eSpace)) {
+    // TODO(mt6): remove here -
     _camera.move(-_camera.cam().up());
   }
   if (input_state.key_pressed(vkfw::Key::eLeftShift)) {

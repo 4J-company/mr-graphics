@@ -1,5 +1,5 @@
-#ifndef __MR_WINDOW_CONTEXT_HPP_
-#define __MR_WINDOW_CONTEXT_HPP_
+#ifndef __MR_RENDER_CONTEXT_HPP_
+#define __MR_RENDER_CONTEXT_HPP_
 
 #include "pch.hpp"
 #include "resources/images/image.hpp"
@@ -9,6 +9,7 @@
 #include "lights/lights.hpp"
 #include "model/model.hpp"
 #include "window.hpp"
+#include "file_writer.hpp"
 #include "scene/scene.hpp"
 #include "resources/command_unit/command_unit.hpp"
 
@@ -35,6 +36,9 @@ namespace mr {
       Extent _extent;
 
       CommandUnit _command_unit;
+      // RenderContext doesn't use transfer command unit, only gives it for buffers
+      // Writting commands to it doesn't affect RenderContext internal state
+      mutable CommandUnit _transfer_command_unit;
 
       // TODO(dk6): use Framedata instead
       beman::inplace_vector<ColorAttachmentImage, gbuffers_number> _gbuffers;
@@ -60,25 +64,25 @@ namespace mr {
 
       void resize(Extent extent);
 
-      void render(const SceneHandle scene, WindowHandle window);
+      void render(const SceneHandle scene, Presenter &presenter);
 
       const LightsRenderData & lights_render_data() const noexcept { return _lights_render_data; }
       const VulkanState & vulkan_state() const noexcept { return *_state; }
       const Extent & extent() const noexcept { return _extent; }
+      CommandUnit & transfer_command_unit() const noexcept { return _transfer_command_unit; }
 
-      // TODO(dk6): void delete_window(WindowHandle window);
       WindowHandle create_window() const noexcept;
+      FileWriterHandle create_file_writer() const noexcept;
 
-      // TODO(dk6): void delete_scene(SceneHandle scene);
       SceneHandle create_scene() const noexcept;
 
     private:
       void _init_lights_render_data();
 
       void _render_models(const SceneHandle scene);
-      void _render_lights(const SceneHandle scene, WindowHandle window);
+      void _render_lights(const SceneHandle scene, Presenter &presenter);
 
       void _update_camera_buffer(UniformBuffer &uniform_buffer);
   };
 } // namespace mr
-#endif // __MR_WINDOW_CONTEXT_HPP_
+#endif // __MR_RENDER_CONTEXT_HPP_

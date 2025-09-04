@@ -42,7 +42,9 @@ namespace mr {
       // VmaMemoryUsage _memory_usage;
   };
 
+  class FileWriter; // forward declaration
   class HostBuffer : public Buffer {
+    friend class FileWriter; // TODO(dk6): tmp solution for copying from buffer to RAM
     public:
       HostBuffer() = default;
 

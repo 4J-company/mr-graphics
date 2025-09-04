@@ -7,7 +7,9 @@
 #include "resources/resources.hpp"
 #include "timer/timer.hpp"
 #include "vulkan_state.hpp"
+#include "window/presenter.hpp"
 #include "window/window.hpp"
+#include "window/file_writer.hpp"
 #include "scene/scene.hpp"
 
 #include "mesh/mesh.hpp"
@@ -25,6 +27,12 @@ namespace mr {
 
       void start_render_loop(RenderContext &render_context, SceneHandle scene,
                                                             WindowHandle window) const noexcept;
+
+      void render_frames(RenderContext &render_context,
+                         SceneHandle scene,
+                         FileWriterHandle file_writer,
+                         const std::string_view filename_prefix = "frame",
+                         uint32_t frames = 1) const noexcept;
   };
 } // namespace mr
 

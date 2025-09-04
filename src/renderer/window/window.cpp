@@ -2,16 +2,14 @@
 #include "camera/camera.hpp"
 #include "render_context.hpp"
 
-mr::Window::Window(const RenderContext &parent, Extent extent)
-  : _extent(extent)
-  , _parent(&parent)
+vkfw::UniqueWindow mr::Window::_create_window(const Extent &extent) noexcept
 {
-  // --------------------------------------------------------------------------
-  // Create window
-  // --------------------------------------------------------------------------
+  std::call_once(_init_vkfw_flag, [] {
+    while (vkfw::init() != vkfw::Result::eSuccess) {}
+  });
 
   // TODO: retry a couple of times
-  vkfw::WindowHints hints{};
+  vkfw::WindowHints hints {};
   hints.resizable = true;
   hints.visible = true;
   // TODO(dk6): window options must be reworked, now it doesn't work
@@ -19,51 +17,51 @@ mr::Window::Window(const RenderContext &parent, Extent extent)
   // hints.transparentFramebuffer = true;
 
   auto [result_code, window] =
-    vkfw::createWindowUnique(_extent.width, _extent.height, "CGSGFOREVER", hints);
+    vkfw::createWindowUnique(extent.width, extent.height, "CGSGFOREVER", hints);
   if (result_code != vkfw::Result::eSuccess) {
     MR_FATAL("Cannot create window. vkfw::createWindowUnique failed with: {}", vkfw::to_string(result_code));
     std::exit(1);
   }
 
-  _window = std::move(window);
+  // glfwSetInputMode(window.get(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
-  // --------------------------------------------------------------------------
-  // Init render resources
-  // --------------------------------------------------------------------------
+  // TODO(dk6): without move compiler tries to call copy constructor, which is deleted
+  return std::move(window);
+}
 
-  _surface = vkfw::createWindowSurfaceUnique(_parent->vulkan_state().instance(), _window.get());
-  _swapchain = Swapchain(_parent->vulkan_state(), _surface.get(), _extent);
-
-  for (int i = 0; i < _swapchain.value()._images.size(); i++) {
+mr::Window::Window(const RenderContext &parent, Extent extent)
+  : Presenter(parent, extent)
+  , _window(_create_window(_extent))
+  , _surface(vkfw::createWindowSurfaceUnique(_parent->vulkan_state().instance(), _window.get()))
+  , _swapchain(_parent->vulkan_state(), _surface.get(), _extent)
+{
+  for (uint32_t i = 0; i < _swapchain._images.size(); i++) {
     _image_available_semaphore.emplace_back(_parent->vulkan_state().device().createSemaphoreUnique({}).value);
     _render_finished_semaphore.emplace_back(_parent->vulkan_state().device().createSemaphoreUnique({}).value);
   }
-
-  // --------------------------------------------------------------------------
-  // Setup window
-  // --------------------------------------------------------------------------
-
-  // glfwSetInputMode(_window.get(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
   _window->callbacks()->on_cursor_move = _input_state.get_mouse_callback();
   _window->callbacks()->on_key = _input_state.get_key_callback();
 }
 
-vk::RenderingAttachmentInfoKHR mr::Window::get_target_image() noexcept
+vk::RenderingAttachmentInfoKHR mr::Window::target_image_info() noexcept
 {
   prev_image_index = image_index;
   auto device = _parent->vulkan_state().device();
-  device.acquireNextImageKHR(_swapchain.value()._swapchain.get(),
+  device.acquireNextImageKHR(_swapchain._swapchain.get(),
                              UINT64_MAX,
-                             _image_available_semaphore[image_index].get(),
+                             _image_available_semaphore[prev_image_index].get(),
                              nullptr,
                              &image_index);
 
-  _swapchain.value()._images[image_index].switch_layout(_parent->vulkan_state(),
+  _swapchain._images[image_index].switch_layout(_parent->vulkan_state(),
                                                         vk::ImageLayout::eColorAttachmentOptimal);
 
+  _current_image_available_semaphore =_image_available_semaphore[prev_image_index].get();
+  _current_render_finished_semaphore = _render_finished_semaphore[image_index].get();
+
   return vk::RenderingAttachmentInfoKHR {
-    .imageView = _swapchain.value()._images[image_index].image_view(),
+    .imageView = _swapchain._images[image_index].image_view(),
     .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
     .loadOp = vk::AttachmentLoadOp::eClear,
     .storeOp = vk::AttachmentStoreOp::eStore,
@@ -74,26 +72,16 @@ vk::RenderingAttachmentInfoKHR mr::Window::get_target_image() noexcept
 
 void mr::Window::present() noexcept
 {
-  _swapchain.value()._images[image_index].switch_layout(_parent->vulkan_state(), vk::ImageLayout::ePresentSrcKHR);
+  _swapchain._images[image_index].switch_layout(_parent->vulkan_state(), vk::ImageLayout::ePresentSrcKHR);
   std::array sems = {_render_finished_semaphore[image_index].get()};
   vk::PresentInfoKHR present_info {
     .waitSemaphoreCount = sems.size(),
     .pWaitSemaphores = sems.data(),
     .swapchainCount = 1,
-    .pSwapchains = &_swapchain.value()._swapchain.get(),
+    .pSwapchains = &_swapchain._swapchain.get(),
     .pImageIndices = &image_index,
   };
   _parent->vulkan_state().queue().presentKHR(present_info);
-}
-
-vk::Semaphore mr::Window::image_ready_semaphore() noexcept
-{
-  return _image_available_semaphore[prev_image_index].get();
-}
-
-vk::Semaphore mr::Window::render_finished_semaphore() noexcept
-{
-  return _render_finished_semaphore[image_index].get();
 }
 
 void mr::Window::update_state() noexcept
