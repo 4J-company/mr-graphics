@@ -25,8 +25,7 @@ namespace mr {
     uint32_t _prev_image_index = 0;
 
     // semaphores for waiting swapchain image is ready before light pass
-    // TODO(d.kozenko): i think it is unnecessary
-    // beman::inplace_vector<vk::UniqueSemaphore, images_number> _image_available_semaphore;
+    beman::inplace_vector<vk::UniqueSemaphore, images_number> _image_available_semaphore;
 
     // semaphores for waiting frame is ready before presentin
     beman::inplace_vector<vk::UniqueSemaphore, images_number> _render_finished_semaphore;

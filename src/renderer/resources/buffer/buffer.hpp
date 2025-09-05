@@ -43,6 +43,7 @@ inline namespace graphics {
       // VmaMemoryUsage _memory_usage;
   };
 
+  class FileWriter; // forward declaration
   class HostBuffer : public Buffer {
   public:
     HostBuffer() = default;
