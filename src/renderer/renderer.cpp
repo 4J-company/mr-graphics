@@ -24,7 +24,7 @@ void mr::Application::start_render_loop(RenderContext &render_context, SceneHand
       while (not stop_token.stop_requested()) {
         window->update_state();
         scene->update(window->input_state());
-        render_context.render(scene, window);
+        render_context.render(scene, *window);
       }
     }
   };
@@ -33,4 +33,11 @@ void mr::Application::start_render_loop(RenderContext &render_context, SceneHand
   while (not window->window().shouldClose().value) {
     vkfw::pollEvents();
   }
+}
+
+
+void mr::Application::render_frame(RenderContext &render_context, SceneHandle scene,
+                                                                  FileWriterHandle file_writer) const noexcept
+{
+  render_context.render(scene, *file_writer);
 }

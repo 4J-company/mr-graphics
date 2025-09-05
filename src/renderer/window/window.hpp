@@ -4,6 +4,7 @@
 #include "pch.hpp"
 #include "swapchain.hpp"
 #include "input_state.hpp"
+#include "presenter.hpp"
 
 namespace mr {
 inline namespace graphics {
@@ -13,7 +14,7 @@ inline namespace graphics {
   // forward declaration of RenderContext class
   class RenderContext;
 
-  class Window : public ResourceBase<Window> {
+  class Window : public Presenter, public ResourceBase<Window> {
   private:
     Extent _extent;
     vkfw::UniqueWindow _window;
@@ -46,16 +47,16 @@ inline namespace graphics {
     const RenderContext & render_context() const noexcept { return *_parent; }
 
     // Return rendering attachment info with target image
-    vk::RenderingAttachmentInfoKHR get_target_image() noexcept;
-    void present() noexcept;
+    vk::RenderingAttachmentInfoKHR get_target_image() noexcept override;
+    void present() noexcept override;
 
     // Pass this semaphore to render pass wait semaphores witch write in image
-    vk::Semaphore image_ready_semaphore() noexcept;
+    vk::Semaphore image_ready_semaphore() noexcept override;
     // Pass this semaphore to render pass signal semaphore witch write in image
-    vk::Semaphore render_finished_semaphore() noexcept;
+    vk::Semaphore render_finished_semaphore() noexcept override;
 
     const InputState & input_state() const noexcept { return _input_state; }
-    void update_state() noexcept;
+    void update_state() noexcept override;
   };
 
   MR_DECLARE_HANDLE(Window);

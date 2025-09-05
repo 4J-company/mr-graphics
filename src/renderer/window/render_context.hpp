@@ -69,7 +69,7 @@ inline namespace graphics {
 
       void resize(Extent extent);
 
-      void render(const SceneHandle scene, WindowHandle window);
+      void render(const SceneHandle scene, Presenter &presenter);
 
       const LightsRenderData & lights_render_data() const noexcept { return _lights_render_data; }
       const VulkanState & vulkan_state() const noexcept { return *_state; }
@@ -88,7 +88,7 @@ inline namespace graphics {
       void _init_lights_render_data();
 
       void _render_models(const SceneHandle scene);
-      void _render_lights(const SceneHandle scene, WindowHandle window);
+      void _render_lights(const SceneHandle scene, Presenter &presenter);
 
       void _update_camera_buffer(UniformBuffer &uniform_buffer);
   };

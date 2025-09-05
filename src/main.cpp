@@ -15,5 +15,7 @@ int main(int argc, const char **argv)
 
   auto file_writer = render_context->create_file_writer();
 
+  app.render_frame(*render_context, scene, file_writer);
+
   app.start_render_loop(*render_context, scene, window);
 }

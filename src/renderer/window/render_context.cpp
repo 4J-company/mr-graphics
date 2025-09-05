@@ -109,13 +109,13 @@ mr::SceneHandle mr::RenderContext::create_scene() const noexcept
   return ResourceManager<Scene>::get().create(mr::unnamed, *this);
 }
 
-void mr::RenderContext::_render_lights(const SceneHandle scene, WindowHandle window)
+void mr::RenderContext::_render_lights(const SceneHandle scene, Presenter &presenter)
 {
   for (auto &gbuf : _gbuffers) {
     gbuf.switch_layout(*_state, vk::ImageLayout::eShaderReadOnlyOptimal);
   }
 
-  vk::RenderingAttachmentInfoKHR swapchain_image_attachment_info = window->get_target_image();
+  vk::RenderingAttachmentInfoKHR swapchain_image_attachment_info = presenter.get_target_image();
 
   vk::RenderingInfoKHR attachment_info {
     .renderArea = { 0, 0, _extent.width, _extent.height },
@@ -209,10 +209,10 @@ void mr::RenderContext::_render_models(const SceneHandle scene)
   _command_unit.end();
 }
 
-void mr::RenderContext::render(const SceneHandle scene, WindowHandle window)
+void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
 {
   ASSERT(this == &scene->render_context());
-  ASSERT(this == &window->render_context());
+  // ASSERT(this == &presenter.render_context());
 
   _state->device().waitForFences(_image_fence.get(), VK_TRUE, UINT64_MAX);
   _state->device().resetFences(_image_fence.get());
@@ -235,21 +235,21 @@ void mr::RenderContext::render(const SceneHandle scene, WindowHandle window)
 
   _state->queue().submit(models_submit_info);
 
-  _render_lights(scene, window);
+  _render_lights(scene, presenter);
 
   // TODO(dk6): maybe it is unnecessary and FileWriter will use image_ready_semaphore too
   beman::inplace_vector<vk::Semaphore, 2> light_wait_semaphores = {
     _models_render_finished_semaphore.get(),
   };
   ASSERT(light_wait_semaphores.size() == 1);
-  auto image_ready_semaphore = window->image_ready_semaphore();
+  auto image_ready_semaphore = presenter.image_ready_semaphore();
   if (image_ready_semaphore != nullptr) {
     light_wait_semaphores.emplace_back(image_ready_semaphore);
     ASSERT(light_wait_semaphores.size() == 2);
   }
 
   vk::PipelineStageFlags light_wait_stages[] = {vk::PipelineStageFlagBits::eColorAttachmentOutput};
-  std::array light_signal_semaphores = {window->render_finished_semaphore()};
+  std::array light_signal_semaphores = {presenter.render_finished_semaphore()};
 
   auto [light_bufs, light_size] = _command_unit.submit_info();
   vk::SubmitInfo light_submit_info {
@@ -264,5 +264,5 @@ void mr::RenderContext::render(const SceneHandle scene, WindowHandle window)
 
   _state->queue().submit(light_submit_info, _image_fence.get());
 
-  window->present();
+  presenter.present();
 }

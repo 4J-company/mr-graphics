@@ -7,7 +7,9 @@
 #include "resources/resources.hpp"
 #include "timer/timer.hpp"
 #include "vulkan_state.hpp"
+#include "window/presenter.hpp"
 #include "window/window.hpp"
+#include "window/file_writer.hpp"
 #include "scene/scene.hpp"
 
 #include "mesh/mesh.hpp"
@@ -26,6 +28,9 @@ inline namespace graphics {
 
       void start_render_loop(RenderContext &render_context, SceneHandle scene,
                                                             WindowHandle window) const noexcept;
+
+      void render_frame(RenderContext &render_context, SceneHandle scene,
+                                                       FileWriterHandle file_writer) const noexcept;
   };
 }
 } // namespace mr
