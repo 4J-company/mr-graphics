@@ -23,7 +23,10 @@ vk::RenderingAttachmentInfoKHR mr::FileWriter::get_target_image() noexcept
   _prev_image_index = _image_index;
   _image_index = (_image_index + 1) % images_number;
 
-  return _images[_prev_image_index].attachment_info();
+  auto &image = _images[_prev_image_index];
+  image.switch_layout(_parent->vulkan_state(), vk::ImageLayout::eColorAttachmentOptimal);
+
+  return image.attachment_info();
 }
 
 // #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -39,7 +42,11 @@ void mr::FileWriter::present() noexcept
   auto &image = _images[_prev_image_index];
   const auto &state = _parent->vulkan_state();
 
-  auto stage_buffer = HostBuffer(state, image.size(), vk::BufferUsageFlagBits::eTransferSrc);
+  image.switch_layout(state, vk::ImageLayout::eTransferSrcOptimal);
+
+  size_t image_size = image.size() * 4; // TODO(dk6): image lies about it byte size
+  auto stage_buffer = HostBuffer(state, image_size,
+    vk::BufferUsageFlagBits::eTransferSrc | vk::BufferUsageFlagBits::eTransferDst);
 
   vk::ImageSubresourceLayers range {
     .aspectMask = image._aspect_flags,
@@ -65,11 +72,13 @@ void mr::FileWriter::present() noexcept
 
   std::array wait_sems {_render_finished_semaphore[_prev_image_index].get()};
   std::array signal_sems {_image_available_semaphore[_prev_image_index].get()};
+  std::array<vk::PipelineStageFlags, 1> wait_stages {vk::PipelineStageFlagBits::eColorAttachmentOutput};
 
   auto [bufs, bufs_number] = command_unit.submit_info();
   vk::SubmitInfo submit_info {
     .waitSemaphoreCount = wait_sems.size(),
     .pWaitSemaphores = wait_sems.data(),
+    .pWaitDstStageMask = wait_stages.data(),
     .commandBufferCount = bufs_number,
     .pCommandBuffers = bufs,
     .signalSemaphoreCount = signal_sems.size(),
@@ -81,14 +90,31 @@ void mr::FileWriter::present() noexcept
 
   void *data;
   state.device().mapMemory(stage_buffer._memory.get(), 0, stage_buffer._size, {}, &data);
-  ASSERT(image._extent.width * image._extent.height * 4 == image.size());
-  stbi_write_png("file.png", image._extent.width, image._extent.height, 4, data, stage_buffer._size);
+  ASSERT(image._extent.width * image._extent.height * 4 == stage_buffer._size);
+  stbi_write_png("frame.png", image._extent.width, image._extent.height, 4, data, image._extent.width * 4);
+  stbi_write_tga("frame.tga", image._extent.width, image._extent.height, 4, data);
+  stbi_write_bmp("frame.bmp", image._extent.width, image._extent.height, 4, data);
+
+  char *data4comp = (char *)data;
+  std::vector<char> in_rgb(image._extent.width * image._extent.height * 3);
+  for (int i = 0; i < image._extent.width * image._extent.height; i++) {
+    int j = i * 4;
+    int k = i * 3;
+    in_rgb[k] = data4comp[j + 2];
+    in_rgb[k + 1] = data4comp[j + 1];
+    in_rgb[k + 2] = data4comp[j];
+  }
+  stbi_write_png("frame_rgb.png", image._extent.width, image._extent.height, 3, in_rgb.data(), image._extent.width * 3);
+  stbi_write_tga("frame_rgb.tga", image._extent.width, image._extent.height, 3, in_rgb.data());
+  stbi_write_bmp("frame_rgb.bmp", image._extent.width, image._extent.height, 3, in_rgb.data());
+
   state.device().unmapMemory(stage_buffer._memory.get());
 }
 
 vk::Semaphore mr::FileWriter::image_ready_semaphore() noexcept
 {
   ASSERT(_parent != nullptr);
+  return VK_NULL_HANDLE;
   return _image_available_semaphore[_prev_image_index].get();
 }
 

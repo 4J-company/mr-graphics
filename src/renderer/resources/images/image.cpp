@@ -334,7 +334,7 @@ vk::RenderingAttachmentInfoKHR mr::DepthImage::attachment_info() const
 // ---- ColorAttachmentImage ----
 mr::ColorAttachmentImage::ColorAttachmentImage(const VulkanState &state, Extent extent, vk::Format format, uint mip_level)
   : DeviceImage(state, extent, format,
-    vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eInputAttachment,
+    vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eInputAttachment | vk::ImageUsageFlagBits::eTransferSrc,
     vk::ImageAspectFlagBits::eColor, mip_level)
 {}
 
