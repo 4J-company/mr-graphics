@@ -7,10 +7,13 @@
 #include "presenter.hpp"
 
 namespace mr {
-  class Window : public Presenter, public ResourceBase<Window> {
+inline namespace graphics {
+  class Window {
   private:
-    static inline std::once_flag _init_vkfw_flag;
+    Extent _extent;
     vkfw::UniqueWindow _window;
+    std::optional<mr::RenderContext> _context;
+    mr::FPSCamera *_cam;
 
     vk::UniqueSurfaceKHR _surface;
     Swapchain _swapchain;
@@ -46,5 +49,6 @@ namespace mr {
   };
 
   MR_DECLARE_HANDLE(Window);
+}
 } // namespace mr
 #endif // __MR_WINDOW_HPP_

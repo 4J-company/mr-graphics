@@ -16,6 +16,9 @@
 #include <VkBootstrap.h>
 
 namespace mr {
+inline namespace graphics {
+  class Window;
+
   class RenderContext {
     public:
       static inline constexpr int gbuffers_number = 6;
@@ -86,5 +89,6 @@ namespace mr {
 
       void _update_camera_buffer(UniformBuffer &uniform_buffer);
   };
+}
 } // namespace mr
 #endif // __MR_RENDER_CONTEXT_HPP_

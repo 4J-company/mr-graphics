@@ -8,6 +8,7 @@
 #include "vulkan_state.hpp"
 
 namespace mr {
+inline namespace graphics {
   class Pipeline {
     protected:
       vk::UniquePipeline _pipeline;
@@ -29,6 +30,7 @@ namespace mr {
 
       virtual void apply(vk::CommandBuffer cmd_buffer) const;
   };
+}
 } // namespace mr
 
 #endif // __MR_PIPELINE_HPP_

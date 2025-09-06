@@ -15,6 +15,7 @@
 #include "mesh/mesh.hpp"
 
 namespace mr {
+inline namespace graphics {
   class Application {
     private:
       VulkanGlobalState _state;
@@ -34,6 +35,7 @@ namespace mr {
                          const std::string_view filename_prefix = "frame",
                          uint32_t frames = 1) const noexcept;
   };
+}
 } // namespace mr
 
 #endif // __MR_RENDERER_HPP_

@@ -4,6 +4,7 @@
 #include "resources/pipelines/pipeline.hpp"
 
 namespace mr {
+inline namespace graphics {
   class GraphicsPipeline : public Pipeline {
     public:
       enum struct Subpass {
@@ -36,5 +37,6 @@ namespace mr {
 
       void apply(vk::CommandBuffer cmd_buffer) const override;
   };
+}
 } // namespace mr
 #endif // __MR_GRAPHICS_PIPELINE_HPP_

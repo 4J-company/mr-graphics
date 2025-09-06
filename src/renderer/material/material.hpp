@@ -6,6 +6,7 @@
 #include "manager/manager.hpp"
 
 namespace mr {
+inline namespace graphics {
   enum class MaterialParameter {
     BaseColor,
     MetallicRoughness,
@@ -183,6 +184,7 @@ namespace mr {
       return defines;
     }
   };
+}
 } // namespace mr
 
 #endif // __material_cpp_

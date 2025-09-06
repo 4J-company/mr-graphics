@@ -4,6 +4,7 @@
 #include "pch.hpp"
 
 namespace mr {
+inline namespace graphics {
   struct ShaderCameraData {
     mr::Matr4f vp;
     mr::Vec4f campos;
@@ -56,6 +57,7 @@ namespace mr {
     float _speed = .01;
     float _sensetivity = 1;
   };
+}
 }
 
 #endif // __fps_camera_

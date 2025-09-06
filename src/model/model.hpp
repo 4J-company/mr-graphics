@@ -9,7 +9,9 @@
 #include "renderer/material/material.hpp"
 
 namespace mr {
+inline namespace graphics {
   class Scene;
+  class VulkanState;
 
   class Model : public ResourceBase<Model> {
     private:
@@ -39,6 +41,7 @@ namespace mr {
   };
 
   MR_DECLARE_HANDLE(Model);
+}
 } // namespace mr
 
 #endif // __MR_MODEL_HPP_

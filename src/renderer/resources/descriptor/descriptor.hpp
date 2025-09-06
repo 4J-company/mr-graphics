@@ -7,6 +7,7 @@
 #include "resources/texture/sampler/sampler.hpp"
 
 namespace mr {
+inline namespace graphics {
   class DescriptorAllocator;
 
   class DescriptorSetLayout : public ResourceBase<DescriptorSetLayout> {
@@ -81,6 +82,7 @@ namespace mr {
     private:
       std::optional<vk::UniqueDescriptorPool> allocate_pool(std::span<const vk::DescriptorPoolSize> sizes) noexcept;
   };
+}
 } // namespace mr
 
 #endif // __MR_DESCRIPTOR_HPP_

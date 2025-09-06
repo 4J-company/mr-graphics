@@ -7,6 +7,7 @@
 #include "manager/resource.hpp"
 
 namespace mr {
+inline namespace graphics {
   class UniformBuffer;
   class StorageBuffer;
   class Texture;
@@ -133,6 +134,7 @@ namespace mr {
   {
     return get_stage_name(std::to_underlying(stage));
   }
+}
 } // namespace mr
 
 #endif // __MR_SHADER_HPP_
