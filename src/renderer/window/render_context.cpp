@@ -243,7 +243,7 @@ void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
   };
   // TODO(dk6): maybe it is temporary workaround
   auto image_available_semaphore = presenter.image_available_semaphore();
-  if (image_available_semaphore != nullptr) {
+  if (image_available_semaphore) {
     light_wait_semaphores.emplace_back(image_available_semaphore);
   }
 

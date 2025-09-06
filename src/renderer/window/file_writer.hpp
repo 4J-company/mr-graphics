@@ -18,8 +18,12 @@ namespace mr {
     // TODO(dk6): i think here prev index is unnecessary
     uint32_t _prev_image_index = 0;
 
+    // bool is for check is semaphore usage first - we must skip first semaphore usage,
+    // because at start semaphores are not signaled and we have no way to signal instead
+    // dummy queue submit
+    using ImageAvailableSemaphoreT = std::pair<vk::UniqueSemaphore, bool>;
     // semaphores for waiting swapchain image is ready before light pass
-    beman::inplace_vector<vk::UniqueSemaphore, images_number> _image_available_semaphore;
+    beman::inplace_vector<ImageAvailableSemaphoreT, images_number> _image_available_semaphore;
     // semaphores for waiting frame is ready before presentin
     beman::inplace_vector<vk::UniqueSemaphore, images_number> _render_finished_semaphore;
 

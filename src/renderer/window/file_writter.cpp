@@ -13,7 +13,8 @@ mr::FileWriter::FileWriter(const RenderContext &parent, Extent extent) : Present
     // Same format as for swapchain
     _images.emplace_back(_parent->vulkan_state(), _extent, Swapchain::default_format);
     _render_finished_semaphore.emplace_back(_parent->vulkan_state().device().createSemaphoreUnique({}).value);
-    _image_available_semaphore.emplace_back(_parent->vulkan_state().device().createSemaphoreUnique({}).value);
+    _image_available_semaphore.emplace_back(std::make_pair(
+      _parent->vulkan_state().device().createSemaphoreUnique({}).value, true));
   }
 }
 
@@ -27,11 +28,9 @@ vk::RenderingAttachmentInfoKHR mr::FileWriter::target_image_info() noexcept
   auto &image = _images[_prev_image_index];
   image.switch_layout(_parent->vulkan_state(), vk::ImageLayout::eColorAttachmentOptimal);
 
-  // TODO(dk6): We have vulkan sync issues, we must fix them.
-  //            Now nullptr works because there is workaround for this
-  //              in render context 'render' function
-  _current_image_available_semaphore = nullptr;
-  // _current_image_available_semaphore = _image_available_semaphore[_prev_image_index].get();
+  auto &[sem, first_usage] = _image_available_semaphore[_prev_image_index];
+  _current_image_available_semaphore = first_usage ? VK_NULL_HANDLE : sem.get();
+  first_usage = false;
   _current_render_finished_semaphore = _render_finished_semaphore[_prev_image_index].get();
 
   return image.attachment_info();
@@ -41,7 +40,9 @@ void mr::FileWriter::present() noexcept
 {
   ASSERT(_parent != nullptr);
 
-  // TODO(dk6): TMP solution, this must be in image, function like 'get_stage_buffer'.
+  // TODO(dk6): move all logic in separate thread
+
+  // TODO(dk6): TMP solution, this must be in image, function like 'get_stage_buffer' or 'read'.
   //            But also it must use semaphores. Maybe pass command unit to image by argument,
   //            and set semaphores to command unit
   auto &image = _images[_prev_image_index];
@@ -68,7 +69,6 @@ void mr::FileWriter::present() noexcept
     .imageExtent = image._extent,
   };
 
-  // TODO(dk6): use from render_context
   auto &command_unit = _parent->transfer_command_unit();
   command_unit.begin();
   command_unit->copyImageToBuffer(
@@ -76,7 +76,7 @@ void mr::FileWriter::present() noexcept
   command_unit.end();
 
   std::array wait_sems {_render_finished_semaphore[_prev_image_index].get()};
-  std::array signal_sems {_image_available_semaphore[_prev_image_index].get()};
+  std::array signal_sems {_image_available_semaphore[_prev_image_index].first.get()};
   std::array<vk::PipelineStageFlags, 1> wait_stages {vk::PipelineStageFlagBits::eColorAttachmentOutput};
 
   // TODO(dk6): i think we can add setting semaphores function to command_unit and
@@ -104,18 +104,11 @@ void mr::FileWriter::present() noexcept
   ASSERT(width * height * 4 == stage_buffer._size);
 
   char *data4comp = (char *)data;
-  // std::vector<char> data_rgb(width * height * 3);
-  for (int i = 0; i < width * height; i++) {
-    int j = i * 4;
-    int k = i * 3;
-    std::swap(data4comp[j], data4comp[j + 2]);
-    // data_rgb[k] = data4comp[j];
-    // data_rgb[k + 1] = data4comp[j + 1];
-    // data_rgb[k + 2] = data4comp[j + 2];
+  // convert BGRA -> RGBA
+  for (uint32_t i = 0; i < stage_buffer._size; i += 4) {
+    std::swap(data4comp[i], data4comp[i + 2]);
   }
-
   stbi_write_png(_frame_filename.c_str(), width, height, 4, data, width * 4);
-  // stbi_write_png("frame_rgb.png", width, height, 3, data_rgb.data(), width * 3);
 
   state.device().unmapMemory(stage_buffer._memory.get());
 }

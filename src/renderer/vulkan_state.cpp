@@ -3,9 +3,6 @@
 
 mr::VulkanGlobalState::VulkanGlobalState()
 {
-  while (vkfw::init() != vkfw::Result::eSuccess)
-    ;
-
   _create_instance();
   _create_phys_device();
 

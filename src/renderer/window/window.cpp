@@ -50,7 +50,7 @@ vk::RenderingAttachmentInfoKHR mr::Window::target_image_info() noexcept
   auto device = _parent->vulkan_state().device();
   device.acquireNextImageKHR(_swapchain._swapchain.get(),
                              UINT64_MAX,
-                             _image_available_semaphore[image_index].get(),
+                             _image_available_semaphore[prev_image_index].get(),
                              nullptr,
                              &image_index);
 

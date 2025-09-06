@@ -41,6 +41,7 @@ namespace mr {
     virtual void update_state() noexcept = 0;
 
     // Pass this semaphore to render pass wait semaphores witch write in image
+    // Note what it can be VK_NULL_HANDLE, for details look in FileWriter class
     vk::Semaphore image_available_semaphore() const noexcept { return _current_image_available_semaphore; }
     // Pass this semaphore to render pass signal semaphore witch write in image
     vk::Semaphore render_finished_semaphore() const noexcept { return _current_render_finished_semaphore; }
