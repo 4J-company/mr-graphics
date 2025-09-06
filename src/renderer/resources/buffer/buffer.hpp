@@ -8,6 +8,7 @@
 #include "vulkan_state.hpp"
 
 namespace mr {
+inline namespace graphics {
   class Buffer {
     public:
       Buffer() = default;
@@ -212,6 +213,7 @@ namespace mr {
       std::size_t   element_count() const noexcept { return _element_count; }
       vk::IndexType index_type() const noexcept { return _index_type; }
   };
+}
 } // namespace mr
 
 #endif // __MR_BUFFER_HPP_

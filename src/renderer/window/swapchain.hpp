@@ -2,6 +2,7 @@
 #define __MR_WINDOW_SWAPCHAIN_HPP_
 
 namespace mr {
+inline namespace graphics {
   struct Swapchain {
     const VulkanState *_state;
     vk::Format _format{vk::Format::eB8G8R8A8Unorm};
@@ -17,6 +18,7 @@ namespace mr {
 
     vk::Format format() const noexcept;
   };
+}
 }
 
 #endif // __MR_WINDOW_SWAPCHAIN_HPP_

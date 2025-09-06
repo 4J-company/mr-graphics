@@ -6,6 +6,7 @@
 #include "beman/inplace_vector/inplace_vector.hpp"
 
 namespace mr {
+inline namespace graphics {
   enum struct LightType : uint32_t {
     Directional,
     // Spot,
@@ -64,6 +65,7 @@ namespace mr {
     LightsRenderData & operator=(LightsRenderData &&) noexcept = default;
     LightsRenderData(LightsRenderData &&) noexcept = default;
   };
+}
 } // end of mr namespace
 
 #endif // __MR_LIGHT_RENDER_DATA_HPP_

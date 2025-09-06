@@ -6,6 +6,7 @@
 #include "vulkan_state.hpp"
 
 namespace mr {
+inline namespace graphics {
   class Image {
     protected:
       vk::UniqueImage _image;
@@ -182,6 +183,7 @@ namespace mr {
       );
     return format;
   }
+}
 } // namespace mr
 
 #endif // __MR_IMAGE_HPP_

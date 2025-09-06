@@ -5,6 +5,7 @@
 #include "resources/images/image.hpp"
 
 namespace mr {
+inline namespace graphics {
   struct Viewport {
       vk::Viewport viewport {};
       vk::Rect2D scissors {};
@@ -33,6 +34,7 @@ namespace mr {
 
       vk::Rect2D scissors() const { return _viewport.scissors; }
   };
+}
 } // namespace mr
 
 #endif // __MR_FRAMEDATA_HPP_

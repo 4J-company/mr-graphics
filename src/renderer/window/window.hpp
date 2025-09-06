@@ -6,6 +6,7 @@
 #include "camera/camera.hpp"
 
 namespace mr {
+inline namespace graphics {
   class Window {
     private:
       Extent _extent;
@@ -28,5 +29,6 @@ namespace mr {
       void start_main_loop();
       void render() { _context->render(*_cam); }
   };
+}
 } // namespace mr
 #endif // __MR_WINDOW_HPP_

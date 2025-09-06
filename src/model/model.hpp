@@ -9,6 +9,7 @@
 #include "renderer/material/material.hpp"
 
 namespace mr {
+inline namespace graphics {
   class VulkanState;
 
   class Model {
@@ -37,6 +38,7 @@ namespace mr {
 
       void draw(CommandUnit &unit) const noexcept;
   };
+}
 } // namespace mr
 
 #endif // __MR_MODEL_HPP_

@@ -4,6 +4,7 @@
 #include "lights/light_render_data.hpp"
 
 namespace mr {
+inline namespace graphics {
   class DirectionalLight;
 
   class Light {
@@ -44,6 +45,7 @@ namespace mr {
     const Vec3f & color() const noexcept { return _color; }
     void color(const Vec3f &col) noexcept { _color = col; _updated = true; }
   };
+}
 }
 
 #endif // __MR_BASE_LIGHT_HPP_

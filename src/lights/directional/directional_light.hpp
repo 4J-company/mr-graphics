@@ -6,6 +6,7 @@
 #include "lights/light_render_data.hpp"
 
 namespace mr {
+inline namespace graphics {
   class DirectionalLight : public Light {
   public:
     struct ShaderUniformBuffer {
@@ -32,6 +33,7 @@ namespace mr {
   private:
     void _update_ubo() const noexcept;
   };
+}
 }
 
 #endif // __MR_DIRECTIONAL_LIGHT_HPP_

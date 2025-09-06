@@ -12,6 +12,7 @@
 #include <VkBootstrap.h>
 
 namespace mr {
+inline namespace graphics {
   class Window;
 
   class RenderContext {
@@ -71,5 +72,6 @@ namespace mr {
       void render_models(UniformBuffer &cam_ubo, CommandUnit &command_unit, mr::FPSCamera &cam);
       void render_lights(UniformBuffer &cam_ubo, CommandUnit &command_unit, uint32_t image_index);
   };
+}
 } // namespace mr
 #endif // __MR_WINDOW_CONTEXT_HPP_

@@ -6,6 +6,7 @@
 #include "vulkan_state.hpp"
 
 namespace mr {
+inline namespace graphics {
   class CommandUnit {
     private:
       vk::UniqueCommandPool _cmd_pool;
@@ -26,6 +27,7 @@ namespace mr {
 
       vk::CommandBuffer *operator->() { return &_cmd_buffer; }
   };
+}
 } // namespace mr
 
 #endif // __MR_COMMAND_UNIT_HPP_

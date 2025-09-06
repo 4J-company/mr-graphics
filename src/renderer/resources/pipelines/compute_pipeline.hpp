@@ -4,6 +4,7 @@
 #include "resources/pipelines/pipeline.hpp"
 
 namespace mr {
+inline namespace graphics {
   class ComputePipeline : public Pipeline {
     private:
       uint32_t _subpass;
@@ -13,5 +14,7 @@ namespace mr {
 
       uint32_t PipelineParametersFlag;
   };
+}
 } // namespace mr
+
 #endif // __MR_COMPUTE_PIPELINE_HPP_

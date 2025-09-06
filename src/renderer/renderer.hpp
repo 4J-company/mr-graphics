@@ -12,6 +12,7 @@
 #include "mesh/mesh.hpp"
 
 namespace mr {
+inline namespace graphics {
   class Application {
     private:
       VulkanGlobalState _state;
@@ -34,6 +35,7 @@ namespace mr {
       // window creator
       [[nodiscard]] std::unique_ptr<Window> create_window(Extent extent);
   };
+}
 } // namespace mr
 
 #endif // __MR_RENDERER_HPP_

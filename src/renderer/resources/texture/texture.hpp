@@ -5,13 +5,13 @@
 #include "manager/resource.hpp"
 
 namespace mr {
+inline namespace graphics {
   class Texture : public ResourceBase<Texture> {
     private:
       TextureImage _image;
       Sampler _sampler;
 
     public:
-      Texture() = default;
       Texture(Texture&&) = default;
       Texture & operator=(Texture&&) = default;
 
@@ -24,6 +24,7 @@ namespace mr {
   };
 
   MR_DECLARE_HANDLE(Texture)
+}
 } // namespace mr
 
 #endif // __MR_TEXTURE_HPP_
