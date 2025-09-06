@@ -149,7 +149,7 @@ mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state,
   vk::StructureChain chain {
     vk::GraphicsPipelineCreateInfo {
       .stageCount = _shader->stage_number(),
-      .pStages = _shader->get_stages().data(),
+      .pStages = _shader->stages().data(),
       .pVertexInputState = &vertex_input_create_info,
       .pInputAssemblyState = &input_assembly_create_info,
       .pViewportState = &viewport_state_create_info,

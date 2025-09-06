@@ -2,8 +2,9 @@
 #define __material_cpp_
 
 #include "pch.hpp"
-#include "resources/resources.hpp"
+
 #include "manager/manager.hpp"
+#include "manager/resource.hpp"
 
 namespace mr {
 inline namespace graphics {
@@ -100,7 +101,7 @@ inline namespace graphics {
 
     MaterialBuilder &add_texture(MaterialParameter param,
                                  std::optional<mr::TextureHandle> tex,
-                                 Color factor = {1.0, 1.0, 1.0, 1.0})
+                                 math::Color factor = {1.0, 1.0, 1.0, 1.0})
     {
       assert(!tex.has_value() || *tex != nullptr);
       _textures[enum_cast(param)] = std::move(tex);
@@ -142,8 +143,8 @@ inline namespace graphics {
     MaterialHandle build() noexcept
     {
       auto &mtlmanager = ResourceManager<Material>::get();
-
       auto &shdmanager = ResourceManager<Shader>::get();
+
       auto definestr = _generate_shader_defines_str();
       auto shdname = std::string(_shader_filename) + ":" + definestr;
       auto shdfindres = shdmanager.find(shdname);

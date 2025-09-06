@@ -1,13 +1,13 @@
 #include "material/material.hpp"
 
-mr::Material::Material(const VulkanState &state,
+mr::graphics::Material::Material(const VulkanState &state,
                        const RenderContext &render_context,
-                       mr::ShaderHandle shader,
+                       mr::graphics::ShaderHandle shader,
                        std::span<float> ubo_data,
                        std::span<std::optional<mr::TextureHandle>> textures,
                        mr::UniformBuffer &cam_ubo) noexcept
     : _ubo(state, ubo_data)
-    , _shader(std::move(shader))
+    , _shader(shader)
     , _descriptor_allocator(state)
 {
   std::vector<Shader::ResourceView> attachments;
@@ -19,16 +19,12 @@ mr::Material::Material(const VulkanState &state,
     if (!textures[i].has_value()) {
       continue;
     }
-    attachments.emplace_back(0, static_cast<uint32_t>(i + 2), textures[i].value().get());
+    attachments.emplace_back(0, static_cast<uint32_t>(i + 2), textures[i]->get());
   }
 
-  auto layout_handle = ResourceManager<DescriptorSetLayout>::get().create(mr::unnamed,
+  auto layout_handle = ResourceManager<DescriptorSetLayout>::get().create(shader->name(),
     state, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, attachments);
-  auto set_option =
-    _descriptor_allocator
-      .allocate_set(layout_handle);
-  ASSERT(set_option.has_value());
-  _descriptor_set = std::move(set_option.value());
+  _descriptor_set = *ASSERT_VAL(_descriptor_allocator.allocate_set(layout_handle));
 
   _descriptor_set.update(state, attachments);
 

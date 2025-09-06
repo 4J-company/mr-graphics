@@ -2,6 +2,7 @@
 #define __MR_TEXTURE_HPP_
 
 #include "resources/texture/sampler/sampler.hpp"
+
 #include "manager/resource.hpp"
 
 namespace mr {
@@ -15,7 +16,6 @@ inline namespace graphics {
       Texture(Texture&&) = default;
       Texture & operator=(Texture&&) = default;
 
-      Texture(const VulkanState &state, std::string_view filename) noexcept;
       Texture(const VulkanState &state, const byte *data, Extent extent, vk::Format format) noexcept;
 
       const TextureImage &image() const { return _image; }

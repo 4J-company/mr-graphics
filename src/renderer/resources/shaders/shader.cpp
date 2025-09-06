@@ -4,7 +4,7 @@
 #include <fstream>
 #include <sstream>
 
-mr::Shader::Shader(const VulkanState &state, std::string_view filename, const std::unordered_map<std::string, std::string> &define_map)
+mr::graphics::Shader::Shader(const VulkanState &state, std::string_view filename, const std::unordered_map<std::string, std::string> &define_map)
     : _path(std::filesystem::current_path())
 {
   _path /= path::shaders_dir;
@@ -63,7 +63,7 @@ mr::Shader::Shader(const VulkanState &state, std::string_view filename, const st
 }
 
 // TODO: replace with Google's libshaderc
-void mr::Shader::compile(Shader::Stage stage) const noexcept
+void mr::graphics::Shader::compile(Shader::Stage stage) const noexcept
 {
   MR_INFO("Compiling shader {}\n\t with defines {}\n", _path.string(), _define_string);
 
@@ -82,7 +82,7 @@ void mr::Shader::compile(Shader::Stage stage) const noexcept
   std::system(argstr.c_str());
 }
 
-std::optional<std::vector<char>> mr::Shader::load(Shader::Stage stage) noexcept
+std::optional<std::vector<char>> mr::graphics::Shader::load(Shader::Stage stage) noexcept
 {
   std::filesystem::path stage_file_path = _path;
 
@@ -103,7 +103,7 @@ std::optional<std::vector<char>> mr::Shader::load(Shader::Stage stage) noexcept
   return source;
 }
 
-bool mr::Shader::_validate_stage(Stage stage, bool present) const noexcept
+bool mr::graphics::Shader::_validate_stage(Stage stage, bool present) const noexcept
 {
   // TODO: add mesh & task stages
   if (not present && (stage == Stage::Vertex || stage == Stage::Fragment)) {
@@ -128,4 +128,4 @@ bool mr::Shader::_validate_stage(Stage stage, bool present) const noexcept
   return true;
 }
 
-void mr::Shader::reload() {}
+void mr::graphics::Shader::reload() {}
