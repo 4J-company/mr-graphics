@@ -40,10 +40,10 @@ inline namespace graphics {
     vkfw::Window window() { return _window.get(); }
 
     // Return rendering attachment info with target image
-    vk::RenderingAttachmentInfoKHR get_target_image() noexcept override;
-    void present() noexcept override;
+    vk::RenderingAttachmentInfoKHR get_target_image() noexcept final;
+    void present() noexcept final;
 
-    void update_state() noexcept override;
+    void update_state() noexcept final;
   };
 
   MR_DECLARE_HANDLE(Window);

@@ -23,6 +23,8 @@ namespace mr {
     // semaphores for waiting frame is ready before presentin
     beman::inplace_vector<vk::UniqueSemaphore, images_number> _render_finished_semaphore;
 
+    std::string _frame_filename = "frame";
+
   public:
     FileWriter(const RenderContext &parent, Extent extent = {800, 600});
 
@@ -31,10 +33,13 @@ namespace mr {
     ~FileWriter() = default;
 
     // Return rendering attachment info with target image
-    vk::RenderingAttachmentInfoKHR get_target_image() noexcept override;
-    void present() noexcept override;
+    vk::RenderingAttachmentInfoKHR get_target_image() noexcept final;
+    void present() noexcept final;
 
-    void update_state() noexcept override;
+    void update_state() noexcept final;
+
+    // without extension! now by default we save in .png
+    void filename(const std::string_view filename) noexcept;
   };
 
   MR_DECLARE_HANDLE(FileWriter);

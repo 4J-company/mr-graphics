@@ -29,8 +29,11 @@ inline namespace graphics {
       void start_render_loop(RenderContext &render_context, SceneHandle scene,
                                                             WindowHandle window) const noexcept;
 
-      void render_frame(RenderContext &render_context, SceneHandle scene,
-                                                       FileWriterHandle file_writer) const noexcept;
+      void render_frames(RenderContext &render_context,
+                         SceneHandle scene,
+                         FileWriterHandle file_writer,
+                         const std::string_view filename_prefix = "frame",
+                         uint32_t frames = 1) const noexcept;
   };
 }
 } // namespace mr

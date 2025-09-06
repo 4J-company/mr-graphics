@@ -27,8 +27,11 @@ vk::RenderingAttachmentInfoKHR mr::FileWriter::get_target_image() noexcept
   auto &image = _images[_prev_image_index];
   image.switch_layout(_parent->vulkan_state(), vk::ImageLayout::eColorAttachmentOptimal);
 
-  // _current_image_avaible_semaphore = _image_available_semaphore[_prev_image_index].get();
+  // TODO(dk6): We have vulkan sync issues, we must fix them.
+  //            Now nullptr works because there is workaround for this
+  //              in render context 'render' function
   _current_image_avaible_semaphore = nullptr;
+  // _current_image_avaible_semaphore = _image_available_semaphore[_prev_image_index].get();
   _current_render_finished_semaphore = _render_finished_semaphore[_prev_image_index].get();
 
   return image.attachment_info();
@@ -76,6 +79,8 @@ void mr::FileWriter::present() noexcept
   std::array signal_sems {_image_available_semaphore[_prev_image_index].get()};
   std::array<vk::PipelineStageFlags, 1> wait_stages {vk::PipelineStageFlagBits::eColorAttachmentOutput};
 
+  // TODO(dk6): i think we can add setting semaphores function to command_unit and
+  //  get vk::SumbitInfo from sumbit_info()
   auto [bufs, bufs_number] = command_unit.submit_info();
   vk::SubmitInfo submit_info {
     .waitSemaphoreCount = wait_sems.size(),
@@ -98,18 +103,18 @@ void mr::FileWriter::present() noexcept
   ASSERT(width * height * 4 == stage_buffer._size);
 
   char *data4comp = (char *)data;
-  std::vector<char> data_rgb(width * height * 3);
+  // std::vector<char> data_rgb(width * height * 3);
   for (int i = 0; i < width * height; i++) {
     int j = i * 4;
     int k = i * 3;
     std::swap(data4comp[j], data4comp[j + 2]);
-    data_rgb[k] = data4comp[j];
-    data_rgb[k + 1] = data4comp[j + 1];
-    data_rgb[k + 2] = data4comp[j + 2];
+    // data_rgb[k] = data4comp[j];
+    // data_rgb[k + 1] = data4comp[j + 1];
+    // data_rgb[k + 2] = data4comp[j + 2];
   }
 
-  stbi_write_png("frame.png", width, height, 4, data, width * 4);
-  stbi_write_png("frame_rgb.png", width, height, 3, data_rgb.data(), width * 3);
+  stbi_write_png(_frame_filename.c_str(), width, height, 4, data, width * 4);
+  // stbi_write_png("frame_rgb.png", width, height, 3, data_rgb.data(), width * 3);
 
   state.device().unmapMemory(stage_buffer._memory.get());
 }
@@ -118,3 +123,13 @@ void mr::FileWriter::update_state() noexcept
 {
   ASSERT(_parent != nullptr);
 }
+
+void mr::FileWriter::filename(const std::string_view filename) noexcept
+{
+  ASSERT(!filename.empty());
+  // I think it faster - copy in already allocated memory if it has enough size
+  //   instead allocate new memory in statement 'filename + ".png"' and move it
+  _frame_filename = filename;
+  _frame_filename += ".png";
+}
+

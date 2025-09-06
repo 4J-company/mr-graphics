@@ -35,9 +35,24 @@ void mr::Application::start_render_loop(RenderContext &render_context, SceneHand
 }
 
 
-void mr::Application::render_frame(RenderContext &render_context, SceneHandle scene,
-                                                                  FileWriterHandle file_writer) const noexcept
+void mr::Application::render_frames(RenderContext &render_context,
+                                    SceneHandle scene,
+                                    FileWriterHandle file_writer,
+                                    const std::string_view filename_prefix,
+                                    uint32_t frames) const noexcept
 {
-  scene->update(file_writer->input_state());
-  render_context.render(scene, *file_writer);
+  ASSERT(frames > 0);
+  ASSERT(not filename_prefix.empty());
+
+  file_writer->filename("frame");
+  for (uint32_t i = 0; i < frames; i++) {
+    if (frames > 1) {
+      auto str = std::format("frame{}", i);
+      file_writer->filename(str);
+    }
+
+    file_writer->update_state();
+    scene->update(file_writer->input_state());
+    render_context.render(scene, *file_writer);
+  }
 }
