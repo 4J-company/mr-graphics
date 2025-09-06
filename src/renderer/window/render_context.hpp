@@ -39,8 +39,8 @@ inline namespace graphics {
       Extent _extent;
 
       CommandUnit _command_unit;
-      // Render context only contains it and doesn't use, and writting commands to it
-      //   doesn't affect render context state
+      // RenderContext doesn't use transfer command unit, only gives it for buffers
+      // Writting commands to it doesn't affect RenderContext internal state
       mutable CommandUnit _transfer_command_unit;
 
       // TODO(dk6): use Framedata instead

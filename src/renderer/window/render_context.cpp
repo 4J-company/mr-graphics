@@ -116,7 +116,7 @@ void mr::RenderContext::_render_lights(const SceneHandle scene, Presenter &prese
     gbuf.switch_layout(*_state, vk::ImageLayout::eShaderReadOnlyOptimal);
   }
 
-  vk::RenderingAttachmentInfoKHR swapchain_image_attachment_info = presenter.get_target_image();
+  vk::RenderingAttachmentInfoKHR swapchain_image_attachment_info = presenter.target_image_info();
 
   vk::RenderingInfoKHR attachment_info {
     .renderArea = { 0, 0, _extent.width, _extent.height },
@@ -213,7 +213,7 @@ void mr::RenderContext::_render_models(const SceneHandle scene)
 void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
 {
   ASSERT(this == &scene->render_context());
-  // ASSERT(this == &presenter.render_context());
+  ASSERT(this == &presenter.render_context());
 
   _state->device().waitForFences(_image_fence.get(), VK_TRUE, UINT64_MAX);
   _state->device().resetFences(_image_fence.get());
@@ -238,15 +238,13 @@ void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
 
   _render_lights(scene, presenter);
 
-  // TODO(dk6): maybe it is unnecessary and FileWriter will use image_ready_semaphore too
   beman::inplace_vector<vk::Semaphore, 2> light_wait_semaphores = {
     _models_render_finished_semaphore.get(),
   };
-  ASSERT(light_wait_semaphores.size() == 1);
-  auto image_ready_semaphore = presenter.image_ready_semaphore();
-  if (image_ready_semaphore != nullptr) {
-    light_wait_semaphores.emplace_back(image_ready_semaphore);
-    ASSERT(light_wait_semaphores.size() == 2);
+  // TODO(dk6): maybe it is temporary workaround
+  auto image_available_semaphore = presenter.image_available_semaphore();
+  if (image_available_semaphore != nullptr) {
+    light_wait_semaphores.emplace_back(image_available_semaphore);
   }
 
   vk::PipelineStageFlags light_wait_stages[] = {vk::PipelineStageFlagBits::eColorAttachmentOutput};

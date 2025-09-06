@@ -11,13 +11,13 @@ mr::FileWriter::FileWriter(const RenderContext &parent, Extent extent) : Present
 
   for (uint32_t i = 0; i < images_number; i++) {
     // Same format as for swapchain
-    _images.emplace_back(_parent->vulkan_state(), _extent, Swapchain::default_format());
+    _images.emplace_back(_parent->vulkan_state(), _extent, Swapchain::default_format);
     _render_finished_semaphore.emplace_back(_parent->vulkan_state().device().createSemaphoreUnique({}).value);
     _image_available_semaphore.emplace_back(_parent->vulkan_state().device().createSemaphoreUnique({}).value);
   }
 }
 
-vk::RenderingAttachmentInfoKHR mr::FileWriter::get_target_image() noexcept
+vk::RenderingAttachmentInfoKHR mr::FileWriter::target_image_info() noexcept
 {
   ASSERT(_parent != nullptr);
 
@@ -30,8 +30,8 @@ vk::RenderingAttachmentInfoKHR mr::FileWriter::get_target_image() noexcept
   // TODO(dk6): We have vulkan sync issues, we must fix them.
   //            Now nullptr works because there is workaround for this
   //              in render context 'render' function
-  _current_image_avaible_semaphore = nullptr;
-  // _current_image_avaible_semaphore = _image_available_semaphore[_prev_image_index].get();
+  _current_image_available_semaphore = nullptr;
+  // _current_image_available_semaphore = _image_available_semaphore[_prev_image_index].get();
   _current_render_finished_semaphore = _render_finished_semaphore[_prev_image_index].get();
 
   return image.attachment_info();
@@ -41,7 +41,7 @@ void mr::FileWriter::present() noexcept
 {
   ASSERT(_parent != nullptr);
 
-  // TODO(dk6): tmp solution, this must be in image, function like "write in file".
+  // TODO(dk6): TMP solution, this must be in image, function like 'get_stage_buffer'.
   //            But also it must use semaphores. Maybe pass command unit to image by argument,
   //            and set semaphores to command unit
   auto &image = _images[_prev_image_index];
@@ -95,6 +95,7 @@ void mr::FileWriter::present() noexcept
   state.queue().submit(submit_info, fence.get());
   state.device().waitForFences({fence.get()}, VK_TRUE, UINT64_MAX);
 
+  // TODO(dk6): add map/unmap methods to mr::Buffer
   void *data;
   state.device().mapMemory(stage_buffer._memory.get(), 0, stage_buffer._size, {}, &data);
 

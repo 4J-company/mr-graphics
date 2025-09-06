@@ -20,7 +20,7 @@ namespace mr {
 
     // Current semaphores used to decrease virtual calls number - derived classes will set them
     // semaphores for waiting swapchain image is ready before light pass
-    vk::Semaphore _current_image_avaible_semaphore;
+    vk::Semaphore _current_image_available_semaphore;
     // semaphores for waiting frame is ready before presentin
     vk::Semaphore _current_render_finished_semaphore;
 
@@ -35,13 +35,13 @@ namespace mr {
 
   public:
     // Return rendering attachment info with target image
-    virtual vk::RenderingAttachmentInfoKHR get_target_image() noexcept = 0;
+    virtual vk::RenderingAttachmentInfoKHR target_image_info() noexcept = 0;
     virtual void present() noexcept = 0;
 
     virtual void update_state() noexcept = 0;
 
     // Pass this semaphore to render pass wait semaphores witch write in image
-    vk::Semaphore image_ready_semaphore() const noexcept { return _current_image_avaible_semaphore; }
+    vk::Semaphore image_available_semaphore() const noexcept { return _current_image_available_semaphore; }
     // Pass this semaphore to render pass signal semaphore witch write in image
     vk::Semaphore render_finished_semaphore() const noexcept { return _current_render_finished_semaphore; }
 

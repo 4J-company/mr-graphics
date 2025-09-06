@@ -20,7 +20,7 @@ inline namespace graphics {
     vkfw::UniqueWindow _window;
 
     vk::UniqueSurfaceKHR _surface;
-    std::optional<Swapchain> _swapchain;
+    Swapchain _swapchain;
 
     uint32_t image_index = 0;
     uint32_t prev_image_index = 0;
@@ -40,10 +40,13 @@ inline namespace graphics {
     vkfw::Window window() { return _window.get(); }
 
     // Return rendering attachment info with target image
-    vk::RenderingAttachmentInfoKHR get_target_image() noexcept final;
+    vk::RenderingAttachmentInfoKHR target_image_info() noexcept final;
     void present() noexcept final;
 
     void update_state() noexcept final;
+
+  private:
+    static vkfw::UniqueWindow _create_window(const Extent &extent) noexcept;
   };
 
   MR_DECLARE_HANDLE(Window);

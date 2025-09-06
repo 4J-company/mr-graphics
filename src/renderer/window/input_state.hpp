@@ -31,9 +31,7 @@ namespace mr {
 
     // I think mutex here is good - we have one writer, one reader,
     //  but reader works once per frame only for copy ~400 bytes, in other time it have no affect for writer
-    // Expected, what update(), key_pressed() and key_tapped() call in one thread,
-    // std::ranges::copy(std::execution::unseq, key_pressed_copy, _key_pressed.begin());
-    //  key callback in other
+    // Expected, what update(), key_pressed() and key_tapped() call in one thread, key callback in other
     mutable std::mutex update_mutex;
 
     // TODO(dk6): mouse

@@ -33,7 +33,7 @@ namespace mr {
     ~FileWriter() = default;
 
     // Return rendering attachment info with target image
-    vk::RenderingAttachmentInfoKHR get_target_image() noexcept final;
+    vk::RenderingAttachmentInfoKHR target_image_info() noexcept final;
     void present() noexcept final;
 
     void update_state() noexcept final;
