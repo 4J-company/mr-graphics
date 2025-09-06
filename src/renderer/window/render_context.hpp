@@ -39,6 +39,9 @@ inline namespace graphics {
       Extent _extent;
 
       CommandUnit _command_unit;
+      // Render context only contains it and doesn't use, and writting commands to it
+      //   doesn't affect render context state
+      mutable CommandUnit _transfer_command_unit;
 
       // TODO(dk6): use Framedata instead
       InplaceVector<ColorAttachmentImage, gbuffers_number> _gbuffers;
@@ -74,6 +77,7 @@ inline namespace graphics {
       const LightsRenderData & lights_render_data() const noexcept { return _lights_render_data; }
       const VulkanState & vulkan_state() const noexcept { return *_state; }
       const Extent & extent() const noexcept { return _extent; }
+      CommandUnit & transfer_command_unit() const noexcept { return _transfer_command_unit; }
 
       // TODO(dk6): void delete_window(WindowHandle window);
       WindowHandle create_window() const noexcept;

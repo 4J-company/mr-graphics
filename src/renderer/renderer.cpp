@@ -38,5 +38,6 @@ void mr::Application::start_render_loop(RenderContext &render_context, SceneHand
 void mr::Application::render_frame(RenderContext &render_context, SceneHandle scene,
                                                                   FileWriterHandle file_writer) const noexcept
 {
+  scene->update(file_writer->input_state());
   render_context.render(scene, *file_writer);
 }

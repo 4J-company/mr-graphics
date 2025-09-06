@@ -14,6 +14,7 @@
 mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent)
   : _state(std::make_shared<VulkanState>(global_state))
   , _command_unit(*_state)
+  , _transfer_command_unit(*_state)
   , _extent(extent)
   , _depthbuffer(*_state, _extent)
   , _image_fence (_state->device().createFenceUnique({.flags = vk::FenceCreateFlagBits::eSignaled}).value)

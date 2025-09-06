@@ -54,7 +54,7 @@ void main( void )
 
   vec3 final_color = gamma_corrected_color;
 
-  OutColor = vec4(final_color, 0);
+  OutColor = vec4(final_color, 1);
 }
 
 

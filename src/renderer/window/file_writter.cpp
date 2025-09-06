@@ -27,7 +27,8 @@ vk::RenderingAttachmentInfoKHR mr::FileWriter::get_target_image() noexcept
   auto &image = _images[_prev_image_index];
   image.switch_layout(_parent->vulkan_state(), vk::ImageLayout::eColorAttachmentOptimal);
 
-  _current_image_avaible_semaphore = _image_available_semaphore[_prev_image_index].get();
+  // _current_image_avaible_semaphore = _image_available_semaphore[_prev_image_index].get();
+  _current_image_avaible_semaphore = nullptr;
   _current_render_finished_semaphore = _render_finished_semaphore[_prev_image_index].get();
 
   return image.attachment_info();
@@ -37,9 +38,9 @@ void mr::FileWriter::present() noexcept
 {
   ASSERT(_parent != nullptr);
 
-  // TODO(dk6): implement this. Note, we must wait render_finished_semaphore
-
-  // TODO(dk6): tmp solution, this must be in image
+  // TODO(dk6): tmp solution, this must be in image, function like "write in file".
+  //            But also it must use semaphores. Maybe pass command unit to image by argument,
+  //            and set semaphores to command unit
   auto &image = _images[_prev_image_index];
   const auto &state = _parent->vulkan_state();
 
@@ -65,7 +66,7 @@ void mr::FileWriter::present() noexcept
   };
 
   // TODO(dk6): use from render_context
-  static CommandUnit command_unit(state);
+  auto &command_unit = _parent->transfer_command_unit();
   command_unit.begin();
   command_unit->copyImageToBuffer(
     image._image.get(), image._layout, stage_buffer.buffer(), {region});
@@ -91,23 +92,24 @@ void mr::FileWriter::present() noexcept
 
   void *data;
   state.device().mapMemory(stage_buffer._memory.get(), 0, stage_buffer._size, {}, &data);
-  ASSERT(image._extent.width * image._extent.height * 4 == stage_buffer._size);
-  stbi_write_png("frame.png", image._extent.width, image._extent.height, 4, data, image._extent.width * 4);
-  stbi_write_tga("frame.tga", image._extent.width, image._extent.height, 4, data);
-  stbi_write_bmp("frame.bmp", image._extent.width, image._extent.height, 4, data);
+
+  uint32_t height = image._extent.height;
+  uint32_t width = image._extent.width;
+  ASSERT(width * height * 4 == stage_buffer._size);
 
   char *data4comp = (char *)data;
-  std::vector<char> in_rgb(image._extent.width * image._extent.height * 3);
-  for (int i = 0; i < image._extent.width * image._extent.height; i++) {
+  std::vector<char> data_rgb(width * height * 3);
+  for (int i = 0; i < width * height; i++) {
     int j = i * 4;
     int k = i * 3;
-    in_rgb[k] = data4comp[j + 2];
-    in_rgb[k + 1] = data4comp[j + 1];
-    in_rgb[k + 2] = data4comp[j];
+    std::swap(data4comp[j], data4comp[j + 2]);
+    data_rgb[k] = data4comp[j];
+    data_rgb[k + 1] = data4comp[j + 1];
+    data_rgb[k + 2] = data4comp[j + 2];
   }
-  stbi_write_png("frame_rgb.png", image._extent.width, image._extent.height, 3, in_rgb.data(), image._extent.width * 3);
-  stbi_write_tga("frame_rgb.tga", image._extent.width, image._extent.height, 3, in_rgb.data());
-  stbi_write_bmp("frame_rgb.bmp", image._extent.width, image._extent.height, 3, in_rgb.data());
+
+  stbi_write_png("frame.png", width, height, 4, data, width * 4);
+  stbi_write_png("frame_rgb.png", width, height, 3, data_rgb.data(), width * 3);
 
   state.device().unmapMemory(stage_buffer._memory.get());
 }
