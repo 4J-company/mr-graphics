@@ -11,6 +11,7 @@ find_package(glm REQUIRED)
 find_package(glfw3 REQUIRED)
 find_package(mr-math REQUIRED)
 find_package(mr-utils REQUIRED)
+find_package(mr-manager REQUIRED)
 find_package(mr-importer REQUIRED)
 
 CPMAddPackage("gh:Cvelth/vkfw#main")
@@ -29,26 +30,6 @@ if (${vk-bootstrap_ADDED})
   target_include_directories(vk-bootstrap-lib INTERFACE ${vk-bootstrap_SOURCE_DIR}/src)
 endif()
 
-CPMFindPackage(
-  NAME tinygltf
-  GITHUB_REPOSITORY syoyo/tinygltf
-  GIT_TAG release
-  OPTIONS
-    "TINYGLTF_BUILD_LOADER_EXAMPLE OFF"
-)
-
-if (NOT TARGET libstb-image)
-  # download a single file from stb
-  file(
-    DOWNLOAD
-    https://raw.githubusercontent.com/nothings/stb/master/stb_image.h
-    ${CMAKE_CURRENT_BINARY_DIR}/_deps/stb-src/stb/stb_image.h
-    EXPECTED_HASH SHA256=594c2fe35d49488b4382dbfaec8f98366defca819d916ac95becf3e75f4200b3
-  )
-  add_library(libstb-image INTERFACE "")
-  target_include_directories(libstb-image INTERFACE ${CMAKE_CURRENT_BINARY_DIR}/_deps/stb-src/)
-endif()
-
 find_package(Vulkan)
 
 # set important variables
@@ -59,13 +40,11 @@ set(DEPS_LIBRARIES
 
   beman.inplace_vector
 
-  tinygltf
-  libstb-image
-
   glm::glm
 
   mr-math::mr-math
   mr-utils::mr-utils
+  mr-manager::mr-manager
   mr-importer::mr-importer
 )
 

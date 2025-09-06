@@ -1,6 +1,6 @@
 #include "lights/directional/directional_light.hpp"
 
-mr::DirectionalLight::DirectionalLight(const VulkanState &state, LightsRenderData &light_render_data,
+mr::graphics::DirectionalLight::DirectionalLight(const VulkanState &state, LightsRenderData &light_render_data,
                                        Norm3f direction, const Vec3f &color)
   : Light(state, light_render_data, color, sizeof(ShaderUniformBuffer))
   , _direction(direction)
@@ -15,7 +15,7 @@ mr::DirectionalLight::DirectionalLight(const VulkanState &state, LightsRenderDat
   _set1.update(state, light_shader_resources);
 }
 
-void mr::DirectionalLight::shade(CommandUnit &unit) const noexcept
+void mr::graphics::DirectionalLight::shade(CommandUnit &unit) const noexcept
 {
   // TODO(dk6): use pipeline.apply()
   unit->bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline().pipeline());
@@ -36,7 +36,7 @@ void mr::DirectionalLight::shade(CommandUnit &unit) const noexcept
   unit->drawIndexed(index_buffer().element_count(), 1, 0, 0, 0);
 }
 
-void mr::DirectionalLight::_update_ubo() const noexcept
+void mr::graphics::DirectionalLight::_update_ubo() const noexcept
 {
   if (!_updated) {
     return;

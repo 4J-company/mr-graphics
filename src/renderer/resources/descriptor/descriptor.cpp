@@ -1,3 +1,6 @@
+#include "resources/images/image.hpp"
+#include "resources/texture/sampler/sampler.hpp"
+
 #include "resources/descriptor/descriptor.hpp"
 #include "resources/shaders/shader.hpp"
 
@@ -5,7 +8,7 @@
 // Static functions
 // ============================================================================
 
-static vk::DescriptorType get_descriptor_type(const mr::Shader::Resource &attachment) noexcept
+static vk::DescriptorType get_descriptor_type(const mr::graphics::Shader::Resource &attachment) noexcept
 {
   using enum vk::DescriptorType;
   static std::array types {
@@ -21,7 +24,7 @@ static vk::DescriptorType get_descriptor_type(const mr::Shader::Resource &attach
 
 static std::vector<vk::DescriptorSetLayoutBinding>
 get_bindings(vk::ShaderStageFlags stage,
-             std::span<const mr::Shader::ResourceView> attachment_set) noexcept
+             std::span<const mr::graphics::Shader::ResourceView> attachment_set) noexcept
 {
   return attachment_set | std::views::transform([stage](auto &&set) {
     return vk::DescriptorSetLayoutBinding {
@@ -108,7 +111,7 @@ void mr::DescriptorSet::update(
 
   static constexpr size_t max_descriptor_writes = 64;
   ASSERT(attachments.size() < max_descriptor_writes);
-  beman::inplace_vector<vk::WriteDescriptorSet, max_descriptor_writes> descriptor_writes;
+  InplaceVector<vk::WriteDescriptorSet, max_descriptor_writes> descriptor_writes;
 
   for (const auto &[attach, write_info] : std::views::zip(attachments, write_infos)) {
     descriptor_writes.emplace_back(vk::WriteDescriptorSet {
@@ -179,7 +182,7 @@ std::optional<std::vector<mr::DescriptorSet>> mr::DescriptorAllocator::allocate_
 {
   static constexpr size_t max_descriptor_set_number = 64;
   ASSERT(set_layouts.size() < max_descriptor_set_number);
-  beman::inplace_vector<vk::DescriptorSetLayout, max_descriptor_set_number> layouts;
+  InplaceVector<vk::DescriptorSetLayout, max_descriptor_set_number> layouts;
 
   std::vector<DescriptorSet> sets;
   sets.reserve(set_layouts.size());

@@ -1,8 +1,6 @@
 #ifndef __MR_PIPELINE_HPP_
 #define __MR_PIPELINE_HPP_
 
-#include "pch.hpp"
-#include "resources/attachment/attachment.hpp"
 #include "resources/descriptor/descriptor.hpp"
 #include "resources/shaders/shader.hpp"
 #include "vulkan_state.hpp"

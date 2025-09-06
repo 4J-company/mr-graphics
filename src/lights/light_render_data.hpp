@@ -3,7 +3,6 @@
 
 #include "resources/buffer/buffer.hpp"
 #include "resources/pipelines/graphics_pipeline.hpp"
-#include "beman/inplace_vector/inplace_vector.hpp"
 
 namespace mr {
 inline namespace graphics {
@@ -36,7 +35,7 @@ inline namespace graphics {
     };
 
     static constexpr uint32_t max_resource_number = 2;
-    using ShaderResourceDescriptionT = beman::inplace_vector<Shader::ResourceView, max_resource_number>;
+    using ShaderResourceDescriptionT = InplaceVector<Shader::ResourceView, max_resource_number>;
     static inline std::array<ShaderResourceDescriptionT, light_type_number> shader_resources_descriptions {
       ShaderResourceDescriptionT { // LightType::Directional
         // We want just describe layout of descriptor sets, data isn't required here
@@ -52,11 +51,11 @@ inline namespace graphics {
     DescriptorSet set0_set;
 
     // Here will be light UBO and shadow map
-    beman::inplace_vector<DescriptorAllocator, light_type_number> set1_descriptor_allocators {};
-    beman::inplace_vector<DescriptorSetLayoutHandle, light_type_number> set1_layouts {};
+    InplaceVector<DescriptorAllocator, light_type_number> set1_descriptor_allocators {};
+    InplaceVector<DescriptorSetLayoutHandle, light_type_number> set1_layouts {};
 
-    beman::inplace_vector<ShaderHandle, light_type_number> shaders {};
-    beman::inplace_vector<GraphicsPipeline, light_type_number> pipelines {};
+    InplaceVector<ShaderHandle, light_type_number> shaders {};
+    InplaceVector<GraphicsPipeline, light_type_number> pipelines {};
 
     // TODO(dk6): maybe use bindless rendering and add here descriptor set and SSBO for each types
 

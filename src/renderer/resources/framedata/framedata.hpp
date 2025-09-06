@@ -22,7 +22,7 @@ inline namespace graphics {
       Extent _extent;
       Viewport _viewport;
       const SwapchainImage &_target;
-      beman::inplace_vector<ColorAttachmentImage, max_gbuffers> _gbuffers;
+      InplaceVector<ColorAttachmentImage, max_gbuffers> _gbuffers;
       DepthImage _depthbuffer;
 
     public:

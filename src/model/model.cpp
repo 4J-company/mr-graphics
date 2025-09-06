@@ -1,255 +1,32 @@
 #include "model/model.hpp"
 #include "renderer/renderer.hpp"
 
-// for tmp singleton
-#include "manager/manager.hpp"
+// TODO(dk6): workaround to pass camera data to material ubo until Scene class will be added
+extern mr::UniformBuffer *s_cam_ubo_ptr;
 
-#define TINYGLTF_NO_INCLUDE_RAPIDJSON
-#define TINYGLTF_IMPLEMENTATION
-#define STB_IMAGE_IMPLEMENTATION
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#define TINYGLTF_NOEXCEPTION
-#include "tiny_gltf.h"
-
-static std::optional<mr::TextureHandle> load_texture(const mr::VulkanState &state,
-                                                     const tinygltf::Model &image,
-                                                     const int index) noexcept;
-static mr::MaterialHandle load_material(const mr::VulkanState &state,
-                                        const mr::RenderContext &render_context,
-                                        const tinygltf::Model &model,
-                                        const tinygltf::Material &material,
-                                        mr::Matr4f transform) noexcept;
-static mr::Matr4f calculate_transform(const tinygltf::Node &node,
-                                      const mr::Matr4f &parent_transform) noexcept;
-
-mr::Model::Model(const VulkanState &state, const RenderContext &render_context, std::string_view filename) noexcept
+mr::graphics::Model::Model(const VulkanState &state, const RenderContext &render_context, std::string_view filename) noexcept
 {
   MR_INFO("Loading model {}", filename);
 
-  tinygltf::Model model;
-  tinygltf::TinyGLTF loader;
-  std::string err;
-  std::string warn;
-
   std::filesystem::path model_path = path::models_dir / filename;
 
-  bool ret;
-  if (model_path.extension() == ".gltf") {
-    ret = loader.LoadASCIIFromFile(&model, &err, &warn, model_path.string());
+  auto model = mr::import(model_path);
+  if (!model) {
+    MR_ERROR("Loading model {} failed", model_path.string());
+    return;
   }
-  else {
-    ret = loader.LoadBinaryFromFile(&model, &err, &warn, model_path.string());
-  }
-  if (!ret) {
-    MR_ERROR("GLTF ERROR: {}", err);
-    MR_WARNING("GLTF WARNING: {}", warn);
-    exit(-1);
-  }
-
-  // only load first scene since we assume only 1 model is loaded
-  const auto &scene = model.scenes[0];
-  for (int i = 0; i < scene.nodes.size(); i++) {
-    const auto &node = model.nodes[scene.nodes[i]];
-    _process_node(state, render_context, model, mr::Matr4f::identity(), node);
-  }
+  auto& model_value = model.value();
 
   MR_INFO("Loading model {} finished\n", filename);
 }
 
-void mr::Model::draw(CommandUnit &unit) const noexcept
+void mr::graphics::Model::draw(CommandUnit &unit) const noexcept
 {
+  /*
   for (const auto &[material, mesh] : std::views::zip(_materials, _meshes)) {
     material->bind(unit);
     mesh.bind(unit);
     mesh.draw(unit);
   }
-}
-
-void mr::Model::_process_node(const mr::VulkanState &state,
-                              const RenderContext &render_context,
-                              tinygltf::Model &model,
-                              const mr::Matr4f &parent_transform,
-                              const tinygltf::Node &node) noexcept
-{
-  std::array attributes {
-    "POSITION",
-    "NORMAL",
-    "TEXCOORD_0",
-  };
-
-  if (node.mesh < 0) {
-    return;
-  }
-
-  auto &mesh = model.meshes[node.mesh];
-  mr::Matr4f transform = calculate_transform(node, parent_transform);
-
-  for (auto child : node.children) {
-    _process_node(state, render_context, model, transform, model.nodes[child]);
-  }
-
-  for (auto &primitive : mesh.primitives) {
-    std::vector<VertexBuffer> vbufs;
-    IndexBuffer ibuf;
-
-    for (const char * attribute : attributes) {
-      if (primitive.attributes.find(attribute) == primitive.attributes.end()) {
-        continue;
-      }
-
-      const auto &accessor = model.accessors[primitive.attributes[attribute]];
-      const auto &view = model.bufferViews[accessor.bufferView];
-      const size_t attribute_size = std::strcmp(attribute, "POSITION") == 0     ? 3
-                                    : std::strcmp(attribute, "NORMAL") == 0     ? 3
-                                    : std::strcmp(attribute, "TEXCOORD_0") == 0 ? 2
-                                                                                : 0;
-      const float *attribute_buffer = (float *)&(model.buffers[view.buffer].data[accessor.byteOffset + view.byteOffset]);
-      const size_t attribute_count = accessor.count;
-
-      vbufs.emplace_back(state, std::span {attribute_buffer, accessor.count * attribute_size});
-    }
-
-    const auto &accessor = model.accessors[primitive.indices];
-    const auto &view = model.bufferViews[accessor.bufferView];
-    const auto &buffer = model.buffers[view.buffer];
-    size_t index_count = accessor.count;
-
-    switch (accessor.componentType) {
-      case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:
-        {
-          const uint32_t *index_buffer =
-            (uint32_t *)&(buffer.data[accessor.byteOffset + view.byteOffset]);
-          ibuf = IndexBuffer(state, std::span {index_buffer, index_count});
-        }
-        break;
-      case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
-        {
-          const uint16_t *index_buffer =
-            (uint16_t *)&(buffer.data[accessor.byteOffset + view.byteOffset]);
-          ibuf = IndexBuffer(state, std::span {index_buffer, index_count});
-        }
-        break;
-      case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE:
-        {
-          const uint8_t *index_buffer =
-            (uint8_t *)&(buffer.data[accessor.byteOffset + view.byteOffset]);
-          ibuf = IndexBuffer(state, std::span {index_buffer, index_count});
-        }
-        break;
-      default:
-        assert(0 && "that's crazy");
-    }
-
-    int material_index = primitive.material;
-    tinygltf::Material material = model.materials[primitive.material];
-
-    _meshes.emplace_back(std::move(vbufs), std::move(ibuf));
-    _materials.emplace_back(load_material(state, render_context, model, material, transform));
-  }
-}
-
-static std::optional<mr::TextureHandle> load_texture(const mr::VulkanState &state,
-                                                     const tinygltf::Model &model,
-                                                     const int index) noexcept
-{
-  if (index < 0) { return std::nullopt; }
-
-  const tinygltf::Texture &texture = model.textures[index];
-  const tinygltf::Image   &image = model.images[texture.source];
-
-  mr::Extent extent ={static_cast<uint32_t>(image.width), static_cast<uint32_t>(image.height)};
-  // NOTE: most devices dont support 3 component texels
-  vk::Format format = image.component == 3 ? vk::Format::eR8G8B8Srgb : vk::Format::eR8G8B8A8Srgb;
-
-  static auto &manager = mr::ResourceManager<mr::Texture>::get();
-  return manager.create(mr::unnamed, state, image.image.data(), extent, format);
-}
-
-// TODO(dk6): workaround to pass camera data to material ubo until Scene class will be added
-extern mr::UniformBuffer *s_cam_ubo_ptr;
-
-static mr::MaterialHandle load_material(
-  const mr::VulkanState &state,
-  const mr::RenderContext &render_context,
-  const tinygltf::Model &model,
-  const tinygltf::Material &material,
-  mr::Matr4f transform) noexcept
-{
-  /*
-    PBR textures:
-        - base color
-        - roughness
-        - metalness
-        - emissive
-        - occlusion
   */
-
-  static std::vector<mr::MaterialBuilder> builders;
-
-  mr::Vec4f base_color_factor = std::span(material.pbrMetallicRoughness.baseColorFactor);
-  mr::Vec4f emissive_color_factor = std::span(material.emissiveFactor);
-  float metallic_factor = material.pbrMetallicRoughness.metallicFactor;
-  float roughness_factor = material.pbrMetallicRoughness.roughnessFactor;
-
-  std::optional<mr::TextureHandle> base_color_texture_optional         = load_texture(state, model, material.pbrMetallicRoughness.baseColorTexture.index);
-  std::optional<mr::TextureHandle> metallic_roughness_texture_optional = load_texture(state, model, material.pbrMetallicRoughness.metallicRoughnessTexture.index);
-  std::optional<mr::TextureHandle> emissive_texture_optional           = load_texture(state, model, material.emissiveTexture.index);
-  std::optional<mr::TextureHandle> occlusion_texture_optional          = load_texture(state, model, material.occlusionTexture.index);
-  std::optional<mr::TextureHandle> normal_texture_optional             = load_texture(state, model, material.normalTexture.index);
-
-  using enum mr::MaterialParameter;
-  mr::MaterialBuilder builder = mr::MaterialBuilder(state, render_context, "default");
-  builder
-    .add_value(transform)
-    .add_texture(BaseColor, std::move(base_color_texture_optional), base_color_factor)
-    .add_texture(MetallicRoughness, std::move(metallic_roughness_texture_optional))
-    .add_texture(EmissiveColor, std::move(emissive_texture_optional), emissive_color_factor)
-    .add_texture(OcclusionMap, std::move(occlusion_texture_optional))
-    .add_texture(NormalMap, std::move(normal_texture_optional))
-    .add_camera(*s_cam_ubo_ptr)
-    ;
-  builders.emplace_back(std::move(builder));
-  return builders.back().build();
-}
-
-static mr::Matr4f calculate_transform(const tinygltf::Node &node, const mr::Matr4f &parent_transform) noexcept {
-  // calculate local transform
-  mr::Matr4f transform = mr::Matr4f::identity();
-  if (node.scale.size() == 3) {
-    transform *= mr::scale(
-      mr::Vec4f(
-        node.scale[0],
-        node.scale[1],
-        node.scale[2],
-        0
-        ));
-  }
-  if (node.rotation.size() == 4) {
-    transform *= mr::rotate(mr::Norm3f(
-                                        node.rotation[0],
-                                        node.rotation[1],
-                                        node.rotation[2]),
-                                    mr::Radiansf(
-                                        node.rotation[3])
-    );
-  }
-  if (node.translation.size() == 3) {
-    transform *= mr::translate(mr::Vec4f(
-        node.translation[0],
-        node.translation[1],
-        node.translation[2],
-        0
-    ));
-  }
-  if (node.matrix.size() == 16) {
-    transform =
-      mr::Matr4f(
-          node.matrix[0], node.matrix[4], node.matrix[ 8], node.matrix[12],
-          node.matrix[1], node.matrix[5], node.matrix[ 9], node.matrix[13],
-          node.matrix[2], node.matrix[6], node.matrix[10], node.matrix[14],
-          node.matrix[3], node.matrix[7], node.matrix[11], node.matrix[15]
-      );
-  }
-
-  return transform * parent_transform;
 }

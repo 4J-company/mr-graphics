@@ -48,8 +48,13 @@
 #include <mr-utils/misc.hpp>
 #include <mr-utils/path.hpp>
 #include <mr-utils/log.hpp>
+// #include <mr-manager/manager.hpp>
+#include <mr-importer/importer.hpp>
 
 #include <beman/inplace_vector/inplace_vector.hpp>
+namespace mr {
+  template <typename T, size_t N> using InplaceVector = beman::inplace_vector<T, N>;
+}
 
 // WinAPI macros undefined :(
 #undef max
@@ -64,4 +69,6 @@ namespace mr {
 
 using namespace std::literals;
 using namespace mr::literals;
+
 #endif // __MR_PCH_HPP_
+

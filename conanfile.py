@@ -31,14 +31,15 @@ class MrGraphicsRecipe(ConanFile):
         self.requires("glm/1.0.1")
 
         self.requires("mr-math/1.1.3")
-        self.requires("mr-manager/1.0.1")
         self.requires("mr-utils/1.0.4")
+        self.requires("mr-manager/1.0.1")
         self.requires("mr-importer/1.0.5")
 
         self.requires("onetbb/2022.2.0")
 
     def build_requirements(self):
         self.tool_requires("cmake/[>3.26]")
+        self.tool_requires("ninja/[~1.12]")
 
         if self.settings.os == "Linux":
             self.tool_requires("mold/[>=2.40]")
@@ -57,10 +58,12 @@ class MrGraphicsRecipe(ConanFile):
         cmake_layout(self)
 
     def generate(self):
+        tc = CMakeToolchain(self)
+        tc.generator = "Ninja"
+        tc.generate()
+
         deps = CMakeDeps(self)
         deps.generate()
-        tc = CMakeToolchain(self)
-        tc.generate()
 
     def build(self):
         cmake = CMake(self)

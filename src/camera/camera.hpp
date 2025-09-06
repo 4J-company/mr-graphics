@@ -38,7 +38,7 @@ inline namespace graphics {
     }
 
     // getters
-    mr::Camera<float> & cam() noexcept { return _cam; }
+    mr::math::Camera<float> & cam() noexcept { return _cam; }
     constexpr mr::Degreesf fov() const noexcept { return _fov; }
     constexpr float gamma() const noexcept { return _gamma; }
     constexpr float speed() const noexcept { return _speed; }
@@ -51,7 +51,7 @@ inline namespace graphics {
     constexpr void sensetivity(float sens) noexcept { _sensetivity = sens; }
 
   private:
-    mr::Camera<float> _cam;
+    mr::math::Camera<float> _cam;
     mr::Degreesf _fov = 90_deg;
     float _gamma = 2.2;
     float _speed = .01;

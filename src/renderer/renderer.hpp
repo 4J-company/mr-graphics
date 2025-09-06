@@ -17,9 +17,6 @@ inline namespace graphics {
     private:
       VulkanGlobalState _state;
 
-      /// TMP SOLUTION
-      mutable std::vector<mr::Mesh> _tmp_mesh_pool;
-
     public:
       Application();
       ~Application();
