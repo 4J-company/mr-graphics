@@ -21,7 +21,7 @@ namespace mr {
       vk::ImageUsageFlags _usage_flags;
       vk::ImageAspectFlags _aspect_flags;
       vk::MemoryPropertyFlags _memory_properties;
-      const VulkanState* _state{nullptr};
+      const VulkanState *_state = nullptr;
 
       // Protected constructor for use by derived classes
       Image() = default;

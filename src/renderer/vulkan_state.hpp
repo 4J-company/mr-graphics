@@ -7,6 +7,13 @@
 namespace mr {
   class VulkanGlobalState {
     private:
+      // these resources are shared between all VulkanStates
+      friend class VulkanState;
+      vkb::Instance _instance;
+      vkb::PhysicalDevice _phys_device;
+
+      CacheFile _pipeline_cache_file;
+
       // VulkanGlobalState is managed by Application
       friend class Application;
       VulkanGlobalState();
@@ -14,16 +21,15 @@ namespace mr {
 
       void _create_instance();
       void _create_phys_device();
-
-      // these resources are shared between all VulkanStates
-      friend class VulkanState;
-      vkb::Instance _instance;
-      vkb::PhysicalDevice _phys_device;
-
-      CacheFile _pipeline_cache;
   };
 
   class VulkanState {
+    private:
+      VulkanGlobalState *_global;
+      vk::UniqueDevice _device;
+      vk::Queue _queue;
+      vk::UniquePipelineCache _pipeline_cache;
+
     public:
       VulkanState() = default;
       VulkanState(VulkanState &&) = default;
@@ -42,11 +48,6 @@ namespace mr {
       void _create_device();
       void _create_pipeline_cache();
       void _destroy_pipeline_cache();
-
-      VulkanGlobalState *_global;
-      vk::UniqueDevice _device;
-      vk::Queue _queue;
-      vk::UniquePipelineCache _pipeline_cache;
   };
 } // namespace mr
 

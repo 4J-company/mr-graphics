@@ -12,7 +12,7 @@ mr::VulkanGlobalState::VulkanGlobalState()
   // TODO: create caches depending on program arguments for easier benchmarking
   std::fs::path pipeline_cache_path = path::cache_dir / "pipeline.cache";
   MR_INFO("Reading pipeline cache from {}", pipeline_cache_path.string());
-  _pipeline_cache.open_or_create(std::move(pipeline_cache_path));
+  _pipeline_cache_file.open_or_create(std::move(pipeline_cache_path));
 }
 
 mr::VulkanGlobalState::~VulkanGlobalState()
@@ -164,7 +164,7 @@ void mr::VulkanState::_create_device()
 
 void mr::VulkanState::_create_pipeline_cache()
 {
-  const auto &cache_bytes = _global->_pipeline_cache.bytes();
+  const auto &cache_bytes = _global->_pipeline_cache_file.bytes();
   vk::PipelineCacheCreateInfo create_info {
     .initialDataSize = cache_bytes.size(),
     .pInitialData = cache_bytes.data()
@@ -184,7 +184,7 @@ void mr::VulkanState::_destroy_pipeline_cache()
     return;
   }
 
-  auto &cache_bytes = _global->_pipeline_cache.bytes();
+  auto &cache_bytes = _global->_pipeline_cache_file.bytes();
   cache_bytes.resize(cache_size);
   result = device().getPipelineCacheData(pipeline_cache(), &cache_size, cache_bytes.data());
   if (result != vk::Result::eSuccess) {

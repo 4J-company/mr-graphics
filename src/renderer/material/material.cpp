@@ -22,13 +22,17 @@ mr::Material::Material(const VulkanState &state,
     attachments.emplace_back(0, static_cast<uint32_t>(i + 2), textures[i].value().get());
   }
 
-  _descriptor_set =
+  auto layout_handle = ResourceManager<DescriptorSetLayout>::get().create(mr::unnamed,
+    state, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, attachments);
+  auto set_option =
     _descriptor_allocator
-      .allocate_set(Shader::Stage::Vertex, std::span {attachments})
-      .value();
+      .allocate_set(layout_handle);
+  ASSERT(set_option.has_value());
+  _descriptor_set = std::move(set_option.value());
 
-  std::array layouts = {_descriptor_set.layout()};
+  _descriptor_set.update(state, attachments);
 
+  std::array layouts {layout_handle};
   _pipeline = mr::GraphicsPipeline(state,
                                    render_context,
                                    mr::GraphicsPipeline::Subpass::OpaqueGeometry,
