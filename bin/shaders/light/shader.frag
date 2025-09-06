@@ -16,7 +16,13 @@ layout(set = 0, binding = 6) uniform CameraUbo {
   float gamma;
   float speed;
   float sens;
-} cam_ubo;
+} cam_uniform_buffer;
+
+layout(set = 1, binding = 0) uniform LightUbo {
+  vec4 direction;
+  vec4 color;
+} light_uniform_buffer;
+
 
 #include "gamma_correction.h"
 #include "tone_mapping.h"
@@ -37,20 +43,18 @@ void main( void )
   float roughness = occlusion_roughness_metallic.g;
   float metallic  = occlusion_roughness_metallic.b;
 
-  vec3 poses[] = {vec3(-1, 1, 1), vec3(1, 1, -1)};
-  vec3 result = vec3(0);
-  for (int i = 0; i < 2; i++) {
-    PointData pd = PointData(poses[i], vec3(1.0), pos.xyz, norm);
+  vec3 light_dir = light_uniform_buffer.direction.xyz;
+  vec3 light_color = light_uniform_buffer.color.xyz;
 
-    vec3 shaded_color = ShadePBR(pd, color, emissive, occlusion, metallic, roughness);
-    vec3 tonemapped_color = tm_aces(shaded_color);
-    vec3 gamma_corrected_color = gc_linear(tonemapped_color);
+  PointData pd = PointData(light_dir, light_color, pos.xyz, norm);
 
-    vec3 final_color = gamma_corrected_color;
+  vec3 shaded_color = ShadePBR(pd, color, emissive, occlusion, metallic, roughness);
+  vec3 tonemapped_color = tm_aces(shaded_color);
+  vec3 gamma_corrected_color = gc_linear(tonemapped_color);
 
-    result += final_color;
-  }
-  OutColor = vec4(result, 0);
+  vec3 final_color = gamma_corrected_color;
+
+  OutColor = vec4(final_color, 0);
 }
 
 

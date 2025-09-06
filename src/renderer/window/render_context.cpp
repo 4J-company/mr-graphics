@@ -1,6 +1,8 @@
 #include "render_context.hpp"
 #include "model/model.hpp"
+#include "lights/lights.hpp"
 #include "renderer.hpp"
+
 #include "resources/buffer/buffer.hpp"
 #include "resources/command_unit/command_unit.hpp"
 #include "resources/descriptor/descriptor.hpp"
@@ -17,27 +19,91 @@
 // TODO(dk6): workaround to pass camera data to material ubo until Scene class will be added
 mr::UniformBuffer *s_cam_ubo_ptr;
 
-mr::RenderContext::RenderContext(VulkanGlobalState *state, Window *parent)
+mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Window *parent)
   : _parent(parent)
-  , _state(state)
+  , _state(std::make_shared<VulkanState>(global_state))
   , _extent(parent->extent())
-  , _surface(vkfw::createWindowSurfaceUnique(_state.instance(), _parent->window()))
-  , _swapchain(_state, _surface.get(), _extent)
-  , _depthbuffer(_state, _extent)
-  , _image_fence (_state.device().createFenceUnique({.flags = vk::FenceCreateFlagBits::eSignaled}).value)
+  , _surface(vkfw::createWindowSurfaceUnique(_state->instance(), _parent->window()))
+  , _swapchain(*_state, _surface.get(), _extent)
+  , _depthbuffer(*_state, _extent)
+  , _image_fence (_state->device().createFenceUnique({.flags = vk::FenceCreateFlagBits::eSignaled}).value)
 {
   for (auto _ : std::views::iota(0, gbuffers_number)) {
-    _gbuffers.emplace_back(_state, _extent, vk::Format::eR32G32B32A32Sfloat);
+    _gbuffers.emplace_back(*_state, _extent, vk::Format::eR32G32B32A32Sfloat);
   }
   for (int i = 0; i < _swapchain._images.size(); i++) {
-    _image_available_semaphore.emplace_back(_state.device().createSemaphoreUnique({}).value);
-    _render_finished_semaphore.emplace_back(_state.device().createSemaphoreUnique({}).value);
+    _image_available_semaphore.emplace_back(_state->device().createSemaphoreUnique({}).value);
+    _render_finished_semaphore.emplace_back(_state->device().createSemaphoreUnique({}).value);
   }
-  _models_render_finished_semaphore = _state.device().createSemaphoreUnique({}).value;
+  _models_render_finished_semaphore = _state->device().createSemaphoreUnique({}).value;
+
+  // TODO(dk6): real shit
+  static UniformBuffer cam_ubo(*_state, sizeof(ShaderCameraData));
+  static std::once_flag init_cam;
+  std::call_once(init_cam, [&]{s_cam_ubo_ptr = &cam_ubo;});
+
+  _init_lights_render_data();
+}
+
+// TODO(dk6): maybe create lights_render_data.cpp file and move this function?
+void mr::RenderContext::_init_lights_render_data() {
+  const std::vector<float> light_vertexes {-1, -1, 1, -1, 1, 1, -1, 1};
+  const std::vector light_indexes {0, 1, 2, 2, 3, 0};
+
+  _lights_render_data.screen_vbuf = VertexBuffer(*_state, std::span {light_vertexes});
+  _lights_render_data.screen_ibuf = IndexBuffer(*_state, std::span {light_indexes});
+
+  vk::VertexInputAttributeDescription light_descr {
+    .location = 0,
+    .binding = 0,
+    .format = vk::Format::eR32G32Sfloat,
+    .offset = 0
+  };
+
+  // Set 0 is shared for all lights type
+  std::array<Shader::ResourceView, gbuffers_number + 1> shader_resources;
+  for (int i = 0; i < gbuffers_number; i++) {
+    shader_resources[i] = Shader::ResourceView(0, i, &_gbuffers[i]);
+  }
+  // TODO(dk6): correct camera passing (from scene i think)
+  shader_resources.back() = Shader::ResourceView(0, 6, s_cam_ubo_ptr);
+
+  _lights_render_data.set0_layout = ResourceManager<DescriptorSetLayout>::get().create(mr::unnamed,
+    *_state, vk::ShaderStageFlagBits::eFragment, shader_resources);
+  _lights_render_data.set0_descriptor_allocator = DescriptorAllocator(*_state);
+
+  auto set0_optional = _lights_render_data.set0_descriptor_allocator.value()
+    .allocate_set(_lights_render_data.set0_layout);
+  ASSERT(set0_optional.has_value());
+  _lights_render_data.set0_set = std::move(set0_optional.value());
+
+  _lights_render_data.set0_set.update(*_state, shader_resources);
+
+  auto light_type_data = std::views::zip(LightsRenderData::shader_names,
+                                         LightsRenderData::shader_resources_descriptions);
+  for (const auto &[shader_name, light_shader_resources] : light_type_data) {
+    auto shader = ResourceManager<Shader>::get().create(mr::unnamed, *_state, shader_name);
+    _lights_render_data.shaders.emplace_back(shader);
+
+    auto layout_handle = ResourceManager<DescriptorSetLayout>::get().create(mr::unnamed,
+      *_state, vk::ShaderStageFlagBits::eFragment, light_shader_resources);
+    _lights_render_data.set1_layouts.emplace_back(layout_handle);
+
+    std::array set_layouts {_lights_render_data.set0_layout, layout_handle};
+
+    // TODO(dk6): here move instead inplace contruct, because without move this doesn't compile
+    _lights_render_data.pipelines.emplace_back(GraphicsPipeline(*_state, *this,
+      GraphicsPipeline::Subpass::OpaqueLighting, shader,
+      {&light_descr, 1}, set_layouts));
+
+    _lights_render_data.set1_descriptor_allocators.emplace_back(*_state);
+  }
 }
 
 mr::RenderContext::~RenderContext() {
-  _state.queue().waitIdle();
+  if (_state) {
+    _state->queue().waitIdle();
+  }
 }
 
 static void update_camera(mr::FPSCamera &cam, mr::UniformBuffer &cam_ubo) noexcept
@@ -71,42 +137,17 @@ static void update_camera(mr::FPSCamera &cam, mr::UniformBuffer &cam_ubo) noexce
 }
 
 void mr::RenderContext::render_lights(UniformBuffer &cam_ubo, CommandUnit &command_unit, uint32_t image_index) {
-  static DescriptorAllocator descriptor_alloc(_state);
-
-  const std::vector<float> light_vertexes {-1, -1, 1, -1, 1, 1, -1, 1};
-  const std::vector light_indexes {0, 1, 2, 2, 3, 0};
-  static const VertexBuffer light_vertex_buffer {_state, std::span {light_vertexes}};
-  static const IndexBuffer light_index_buffer {_state, std::span {light_indexes}};
-  vk::VertexInputAttributeDescription light_descr {
-    .location = 0,
-    .binding = 0,
-    .format = vk::Format::eR32G32Sfloat,
-    .offset = 0
+  static std::array directional_lights {
+    DirectionalLight {*_state, _lights_render_data, Norm3f(1, 1, -1)},
+    DirectionalLight {*_state, _lights_render_data, Norm3f(-1, 1, 1), Vec3f(0.3, 0.47, 0.8)},
   };
-  static mr::ShaderHandle light_shader = mr::ResourceManager<Shader>::get().create(mr::unnamed, _state, "light");
-
-  std::array<Shader::ResourceView, gbuffers_number + 1> light_attach;
-  for (int i = 0; i < gbuffers_number; i++) {
-    light_attach[i] = Shader::ResourceView(0, i, &_gbuffers[i]);
-  }
-  light_attach.back() = Shader::ResourceView(0, 6, &cam_ubo);
-
-  static DescriptorSet light_set =
-    descriptor_alloc.allocate_set(Shader::Stage::Fragment, light_attach).value_or(DescriptorSet());
-  static vk::DescriptorSetLayout light_layout = light_set.layout();
-  static GraphicsPipeline light_pipeline = GraphicsPipeline(_state,
-                                                            *this,
-                                                            GraphicsPipeline::Subpass::OpaqueLighting,
-                                                            light_shader,
-                                                            {&light_descr, 1},
-                                                            {&light_layout, 1});
 
   // --------------
   // above shit
   // --------------
 
   for (auto &gbuf : _gbuffers) {
-    gbuf.switch_layout(_state, vk::ImageLayout::eShaderReadOnlyOptimal);
+    gbuf.switch_layout(*_state, vk::ImageLayout::eShaderReadOnlyOptimal);
   }
 
   vk::RenderingAttachmentInfoKHR swapchain_image_attachment_info {
@@ -132,8 +173,8 @@ void mr::RenderContext::render_lights(UniformBuffer &cam_ubo, CommandUnit &comma
     .pColorAttachments = &swapchain_image_attachment_info,
   };
 
-  _swapchain._images[image_index].switch_layout(_state, vk::ImageLayout::eColorAttachmentOptimal);
-  _depthbuffer.switch_layout(_state, vk::ImageLayout::eDepthStencilAttachmentOptimal);
+  _swapchain._images[image_index].switch_layout(*_state, vk::ImageLayout::eColorAttachmentOptimal);
+  _depthbuffer.switch_layout(*_state, vk::ImageLayout::eDepthStencilAttachmentOptimal);
 
   command_unit.begin();
   command_unit->beginRendering(&attachment_info);
@@ -155,22 +196,22 @@ void mr::RenderContext::render_lights(UniformBuffer &cam_ubo, CommandUnit &comma
   };
   command_unit->setScissor(0, scissors);
 
-  command_unit->bindPipeline(vk::PipelineBindPoint::eGraphics,
-                             light_pipeline.pipeline());
-  command_unit->bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                                   light_pipeline.layout(),
-                                   0, {light_set.set()}, {});
-  command_unit->bindVertexBuffers(0, {light_vertex_buffer.buffer()}, {0});
-  command_unit->bindIndexBuffer(light_index_buffer.buffer(), 0, vk::IndexType::eUint32);
-  command_unit->drawIndexed(light_indexes.size(), 1, 0, 0, 0);
-  _swapchain._images[image_index].switch_layout(_state, vk::ImageLayout::ePresentSrcKHR);
+  // shade all
+  command_unit->bindVertexBuffers(0, {_lights_render_data.screen_vbuf.buffer()}, {0});
+  command_unit->bindIndexBuffer(_lights_render_data.screen_ibuf.buffer(), 0, vk::IndexType::eUint32);
+
+  for (auto &light : directional_lights) {
+    light.shade(command_unit);
+  }
+
+  _swapchain._images[image_index].switch_layout(*_state, vk::ImageLayout::ePresentSrcKHR);
 
   command_unit->endRendering();
   command_unit.end();
 }
 
 void mr::RenderContext::render_models(UniformBuffer &cam_ubo, CommandUnit &command_unit, mr::FPSCamera &cam) {
-  static Model model(_state, *this, "ABeautifulGame/ABeautifulGame.gltf");
+  static Model model(*_state, *this, "ABeautifulGame/ABeautifulGame.gltf");
 
   // --------------
   // above shit
@@ -179,9 +220,9 @@ void mr::RenderContext::render_models(UniformBuffer &cam_ubo, CommandUnit &comma
   update_camera(cam, cam_ubo);
 
   for (auto &gbuf : _gbuffers) {
-    gbuf.switch_layout(_state, vk::ImageLayout::eColorAttachmentOptimal);
+    gbuf.switch_layout(*_state, vk::ImageLayout::eColorAttachmentOptimal);
   }
-  _depthbuffer.switch_layout(_state, vk::ImageLayout::eDepthStencilAttachmentOptimal);
+  _depthbuffer.switch_layout(*_state, vk::ImageLayout::eDepthStencilAttachmentOptimal);
 
   auto gbufs_attachs = _gbuffers | std::views::transform([](const ColorAttachmentImage &gbuf) {
     return gbuf.attachment_info();
@@ -225,22 +266,20 @@ void mr::RenderContext::render_models(UniformBuffer &cam_ubo, CommandUnit &comma
 
 void mr::RenderContext::render(mr::FPSCamera &cam)
 {
-  static UniformBuffer cam_ubo(_state, sizeof(ShaderCameraData));
-  static std::once_flag init_cam;
-  std::call_once(init_cam, [&]{s_cam_ubo_ptr = &cam_ubo;});
+  static CommandUnit command_unit(*_state);
 
-  static CommandUnit command_unit(_state);
+  UniformBuffer &cam_ubo = *s_cam_ubo_ptr;
 
   // --------------
   // above shit
   // --------------
 
-  _state.device().waitForFences(_image_fence.get(), VK_TRUE, UINT64_MAX);
-  _state.device().resetFences(_image_fence.get());
+  _state->device().waitForFences(_image_fence.get(), VK_TRUE, UINT64_MAX);
+  _state->device().resetFences(_image_fence.get());
 
   static uint32_t image_index = 0;
   uint32_t prev_image_index = image_index;
-  _state.device().acquireNextImageKHR(_swapchain._swapchain.get(),
+  _state->device().acquireNextImageKHR(_swapchain._swapchain.get(),
                                       UINT64_MAX,
                                       _image_available_semaphore[image_index].get(),
                                       nullptr,
@@ -260,7 +299,7 @@ void mr::RenderContext::render(mr::FPSCamera &cam)
     .pSignalSemaphores = models_signal_semaphores.data(),
   };
 
-  _state.queue().submit(models_submit_info);
+  _state->queue().submit(models_submit_info);
 
   render_lights(cam_ubo, command_unit, image_index);
 
@@ -282,7 +321,7 @@ void mr::RenderContext::render(mr::FPSCamera &cam)
     .pSignalSemaphores = light_signal_semaphores.data(),
   };
 
-  _state.queue().submit(light_submit_info, _image_fence.get());
+  _state->queue().submit(light_submit_info, _image_fence.get());
 
   vk::PresentInfoKHR present_info {
     .waitSemaphoreCount = light_signal_semaphores.size(),
@@ -291,5 +330,5 @@ void mr::RenderContext::render(mr::FPSCamera &cam)
     .pSwapchains = &_swapchain._swapchain.get(),
     .pImageIndices = &image_index,
   };
-  _state.queue().presentKHR(present_info);
+  _state->queue().presentKHR(present_info);
 }

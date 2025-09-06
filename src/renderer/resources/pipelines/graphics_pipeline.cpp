@@ -5,7 +5,7 @@ mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state,
                                        Subpass subpass,
                                        mr::ShaderHandle shader,
                                        std::span<const vk::VertexInputAttributeDescription> attributes,
-                                       std::span<const vk::DescriptorSetLayout> descriptor_layouts)
+                                       std::span<const DescriptorSetLayoutHandle> descriptor_layouts)
   : Pipeline(state, shader, descriptor_layouts), _subpass(subpass)
 {
   // dynamic states of pipeline (viewport)
@@ -112,13 +112,16 @@ mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state,
     case Subpass::OpaqueLighting:
       color_attacmhents_cnt = 1;
 
-      color_blend_attachments[0].blendEnable = false;
+      color_blend_attachments[0].blendEnable = true;
       color_blend_attachments[0].srcColorBlendFactor = vk::BlendFactor::eOne;
-      color_blend_attachments[0].dstColorBlendFactor = vk::BlendFactor::eZero;
+      color_blend_attachments[0].dstColorBlendFactor = vk::BlendFactor::eOne;
       color_blend_attachments[0].colorBlendOp = vk::BlendOp::eAdd;
+
+      // Alpha doesn't matter now
       color_blend_attachments[0].srcAlphaBlendFactor = vk::BlendFactor::eOne;
-      color_blend_attachments[0].dstAlphaBlendFactor = vk::BlendFactor::eZero;
+      color_blend_attachments[0].dstAlphaBlendFactor = vk::BlendFactor::eOne;
       color_blend_attachments[0].alphaBlendOp = vk::BlendOp::eAdd;
+
       color_blend_attachments[0].colorWriteMask =
         vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
         vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;

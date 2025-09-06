@@ -3,6 +3,7 @@
 
 #include "pch.hpp"
 #include "resources/attachment/attachment.hpp"
+#include "resources/descriptor/descriptor.hpp"
 #include "resources/shaders/shader.hpp"
 #include "vulkan_state.hpp"
 
@@ -20,7 +21,7 @@ namespace mr {
       Pipeline() = default;
 
       Pipeline(const VulkanState &state, mr::ShaderHandle _shader,
-               std::span<const vk::DescriptorSetLayout> bindings);
+               std::span<const DescriptorSetLayoutHandle> descriptor_layouts);
 
       const vk::Pipeline pipeline() const { return _pipeline.get(); }
 

@@ -27,6 +27,7 @@ namespace mr {
       using Resource = std::variant<UniformBuffer *, StorageBuffer *, Texture *, Image *>;
 
       // TODO: consider RT shaders from extensions;
+      // TODO(dk6): remove this enum, use vk::ShaderStageFlagsBits instead
       enum struct Stage {
         Compute  = 0,
         Vertex   = 1,

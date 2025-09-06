@@ -7,6 +7,7 @@
 #include "vulkan_state.hpp"
 #include "camera/camera.hpp"
 #include "swapchain.hpp"
+#include "lights/light_render_data.hpp"
 
 #include <VkBootstrap.h>
 
@@ -30,7 +31,7 @@ namespace mr {
 
     private:
       Window *_parent;
-      VulkanState _state;
+      std::shared_ptr<VulkanState> _state;
       Extent _extent;
 
       vk::UniqueSurfaceKHR _surface;
@@ -48,14 +49,16 @@ namespace mr {
       vk::UniqueSemaphore _models_render_finished_semaphore;
       vk::UniqueFence _image_fence; // fence for swapchain image?
 
+      LightsRenderData _lights_render_data {};
+
     public:
       RenderContext(RenderContext &&other) noexcept = default;
-      RenderContext &operator=(RenderContext &&other) noexcept = default;
+      RenderContext & operator=(RenderContext &&other) noexcept = default;
 
       RenderContext(const RenderContext &other) noexcept = delete;
-      RenderContext &operator=(const RenderContext &other) noexcept = delete;
+      RenderContext & operator=(const RenderContext &other) noexcept = delete;
 
-      RenderContext(VulkanGlobalState *state, Window *parent);
+      RenderContext(VulkanGlobalState *global_state, Window *parent);
 
       ~RenderContext();
 
@@ -63,6 +66,8 @@ namespace mr {
       void render(mr::FPSCamera &cam);
 
     private:
+      void _init_lights_render_data();
+
       void render_models(UniformBuffer &cam_ubo, CommandUnit &command_unit, mr::FPSCamera &cam);
       void render_lights(UniformBuffer &cam_ubo, CommandUnit &command_unit, uint32_t image_index);
   };
