@@ -28,10 +28,14 @@ class MrGraphicsRecipe(ConanFile):
         self.requires("glfw/3.4")
         self.requires("meshoptimizer/0.23")
 
-        # self.requires("mr-math/1.1.1")
+        self.requires("glm/1.0.1")
+
+        self.requires("mr-math/1.1.3")
         self.requires("mr-manager/1.0.1")
         self.requires("mr-utils/1.0.4")
-        # self.requires("mr-importer/1.0.0")
+        self.requires("mr-importer/1.0.5")
+
+        self.requires("onetbb/2022.2.0")
 
     def build_requirements(self):
         self.tool_requires("cmake/[>3.26]")
@@ -66,7 +70,3 @@ class MrGraphicsRecipe(ConanFile):
     def package(self):
         cmake = CMake(self)
         cmake.install()
-
-    # def package_info(self):
-    #     self.cpp_info.libs = ["mr-graphics-lib"]
-

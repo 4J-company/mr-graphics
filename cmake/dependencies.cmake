@@ -7,12 +7,13 @@ file(
 include(${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake)
 
 # install libraries with no binaries available
+find_package(glm REQUIRED)
 find_package(glfw3 REQUIRED)
-find_package(meshoptimizer REQUIRED)
+find_package(mr-math REQUIRED)
 find_package(mr-utils REQUIRED)
+find_package(mr-importer REQUIRED)
 
 CPMAddPackage("gh:Cvelth/vkfw#main")
-CPMAddPackage("gh:4j-company/mr-math#master")
 CPMAddPackage("gh:charles-lunarg/vk-bootstrap@1.4.321")
 CPMAddPackage("gh:bemanproject/inplace_vector#b81a3c7")
 
@@ -53,14 +54,19 @@ find_package(Vulkan)
 # set important variables
 set(DEPS_LIBRARIES
   Vulkan::Vulkan
-  mr-math-lib
-  mr-utils::mr-utils
-  tinygltf
   libvkfw
-  libstb-image
   vk-bootstrap-lib
-  meshoptimizer::meshoptimizer
+
   beman.inplace_vector
+
+  tinygltf
+  libstb-image
+
+  glm::glm
+
+  mr-math::mr-math
+  mr-utils::mr-utils
+  mr-importer::mr-importer
 )
 
 # TBB is required since it's dependency of PSTL on GCC and Clang
