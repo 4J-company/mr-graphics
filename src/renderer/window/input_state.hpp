@@ -8,6 +8,7 @@ namespace mr {
   // forward declaration of Window class
   class Window;
 
+  // TODO(dk6): now InputState class wasn't tested
   class InputState {
   public:
     constexpr static uint32_t max_keys_number = std::to_underlying(vkfw::Key::eLAST);

@@ -2,13 +2,15 @@
 #include "camera/camera.hpp"
 #include "render_context.hpp"
 
-mr::Window::Window(const RenderContext &parent, Extent extent)
-  : _extent(extent)
-  , _parent(&parent)
+mr::Window::Window(const RenderContext &parent, Extent extent) : Presenter(parent, extent)
 {
   // --------------------------------------------------------------------------
   // Create window
   // --------------------------------------------------------------------------
+
+  std::call_once(_init_vkfw_flag, [] {
+    while (vkfw::init() != vkfw::Result::eSuccess) {}
+  });
 
   // TODO: retry a couple of times
   vkfw::WindowHints hints{};
@@ -62,6 +64,9 @@ vk::RenderingAttachmentInfoKHR mr::Window::get_target_image() noexcept
   _swapchain.value()._images[image_index].switch_layout(_parent->vulkan_state(),
                                                         vk::ImageLayout::eColorAttachmentOptimal);
 
+  _current_image_avaible_semaphore =_image_available_semaphore[prev_image_index].get();
+  _current_render_finished_semaphore = _render_finished_semaphore[image_index].get();
+
   return vk::RenderingAttachmentInfoKHR {
     .imageView = _swapchain.value()._images[image_index].image_view(),
     .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
@@ -84,16 +89,6 @@ void mr::Window::present() noexcept
     .pImageIndices = &image_index,
   };
   _parent->vulkan_state().queue().presentKHR(present_info);
-}
-
-vk::Semaphore mr::Window::image_ready_semaphore() noexcept
-{
-  return _image_available_semaphore[prev_image_index].get();
-}
-
-vk::Semaphore mr::Window::render_finished_semaphore() noexcept
-{
-  return _render_finished_semaphore[image_index].get();
 }
 
 void mr::Window::update_state() noexcept

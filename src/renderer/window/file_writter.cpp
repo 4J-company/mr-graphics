@@ -2,9 +2,10 @@
 #include "render_context.hpp"
 #include "swapchain.hpp"
 
-mr::FileWriter::FileWriter(const RenderContext &parent, Extent extent)
-  : _extent(extent)
-  , _parent(&parent)
+// #define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb/stb_image_write.h"
+
+mr::FileWriter::FileWriter(const RenderContext &parent, Extent extent) : Presenter(parent, extent)
 {
   ASSERT(_parent != nullptr);
 
@@ -26,11 +27,11 @@ vk::RenderingAttachmentInfoKHR mr::FileWriter::get_target_image() noexcept
   auto &image = _images[_prev_image_index];
   image.switch_layout(_parent->vulkan_state(), vk::ImageLayout::eColorAttachmentOptimal);
 
+  _current_image_avaible_semaphore = _image_available_semaphore[_prev_image_index].get();
+  _current_render_finished_semaphore = _render_finished_semaphore[_prev_image_index].get();
+
   return image.attachment_info();
 }
-
-// #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb/stb_image_write.h"
 
 void mr::FileWriter::present() noexcept
 {
@@ -109,19 +110,6 @@ void mr::FileWriter::present() noexcept
   stbi_write_bmp("frame_rgb.bmp", image._extent.width, image._extent.height, 3, in_rgb.data());
 
   state.device().unmapMemory(stage_buffer._memory.get());
-}
-
-vk::Semaphore mr::FileWriter::image_ready_semaphore() noexcept
-{
-  ASSERT(_parent != nullptr);
-  return VK_NULL_HANDLE;
-  return _image_available_semaphore[_prev_image_index].get();
-}
-
-vk::Semaphore mr::FileWriter::render_finished_semaphore() noexcept
-{
-  ASSERT(_parent != nullptr);
-  return _render_finished_semaphore[_prev_image_index].get();
 }
 
 void mr::FileWriter::update_state() noexcept

@@ -5,7 +5,6 @@
 // mr::Application class defualt constructor (initializes vulkan instance, device ...)
 mr::Application::Application()
 {
-  while (vkfw::init() != vkfw::Result::eSuccess) {}
 }
 
 // destructor
