@@ -46,6 +46,6 @@ mr::Buffer::find_memory_type(const VulkanState &state, uint filter,
     }
   }
 
-  assert(false); // cant find format
+  ASSERT(false, "Cannot find memory format");
   return 0;
 }

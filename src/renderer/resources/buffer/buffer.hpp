@@ -67,9 +67,9 @@ inline namespace graphics {
         // std::span<const T, Extent> cannot be constructed from non-const
 
         size_t byte_size = src.size() * sizeof(T);
-        assert(byte_size <= _size);
+        ASSERT(byte_size <= _size);
 
-        assert(_state != nullptr);
+        ASSERT(_state != nullptr);
         auto ptr = _state->device().mapMemory(_memory.get(), 0, byte_size).value;
         memcpy(ptr, src.data(), byte_size);
         _state->device().unmapMemory(_memory.get());
@@ -98,9 +98,9 @@ inline namespace graphics {
         // std::span<const T, Extent> cannot be constructed from non-const
 
         size_t byte_size = src.size() * sizeof(T);
-        assert(byte_size <= _size);
+        ASSERT(byte_size <= _size);
 
-        assert(_state != nullptr);
+        ASSERT(_state != nullptr);
         auto buf =
           HostBuffer(*_state, _size, vk::BufferUsageFlagBits::eTransferSrc);
         buf.write(src);
@@ -138,7 +138,7 @@ inline namespace graphics {
       UniformBuffer(const VulkanState &state, std::span<T, Extent> src)
           : UniformBuffer(state, src.size() * sizeof(T))
       {
-        assert(src.data());
+        ASSERT(src.data());
         write(src);
       }
   };
@@ -166,7 +166,7 @@ inline namespace graphics {
       VertexBuffer(const VulkanState &state, std::span<T, Extent> src)
           : VertexBuffer(state, src.size() * sizeof(T))
       {
-        assert(src.data());
+        ASSERT(src.data());
         write(src);
       }
   };
@@ -193,7 +193,7 @@ inline namespace graphics {
       IndexBuffer(const VulkanState &state, std::span<T, Extent> src)
           : IndexBuffer(state, src.size() * sizeof(T))
       {
-        assert(src.data());
+        ASSERT(src.data());
         write(src);
 
         _element_count = src.size();

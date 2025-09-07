@@ -45,7 +45,7 @@ inline namespace graphics {
       {
         size_t byte_size = src.size() * sizeof(T);
 
-        assert(byte_size <= _size);
+        ASSERT(byte_size <= _size);
 
         auto stage_buffer = HostBuffer(state, _size, vk::BufferUsageFlagBits::eTransferSrc);
         stage_buffer.write(std::span {src});

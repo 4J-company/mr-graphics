@@ -29,7 +29,7 @@ inline namespace graphics {
     static_assert(defines.size() == enum_cast(MaterialParameter::EnumSize),
       "Shader define is not provided for all MaterialParameter enumerators");
 
-    assert(within(0, defines.size())(enum_cast(param)));
+    ASSERT(within(0, defines.size())(enum_cast(param)));
     return defines[enum_cast(param)];
   }
 
