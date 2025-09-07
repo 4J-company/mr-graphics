@@ -51,8 +51,7 @@ void mr::FileWriter::present() noexcept
   image.switch_layout(state, vk::ImageLayout::eTransferSrcOptimal);
 
   size_t image_size = image.size() * 4; // TODO(dk6): image lies about it byte size
-  auto stage_buffer = HostBuffer(state, image_size,
-    vk::BufferUsageFlagBits::eTransferSrc | vk::BufferUsageFlagBits::eTransferDst);
+  auto stage_buffer = HostBuffer(state, image_size, vk::BufferUsageFlagBits::eTransferDst);
 
   vk::ImageSubresourceLayers range {
     .aspectMask = image._aspect_flags,

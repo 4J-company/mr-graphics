@@ -79,13 +79,9 @@ inline namespace graphics {
       const Extent & extent() const noexcept { return _extent; }
       CommandUnit & transfer_command_unit() const noexcept { return _transfer_command_unit; }
 
-      // TODO(dk6): void delete_window(WindowHandle window);
       WindowHandle create_window() const noexcept;
-
-      // TODO(dk6): void delete_window(WindowHandle window);
       FileWriterHandle create_file_writer() const noexcept;
 
-      // TODO(dk6): void delete_scene(SceneHandle scene);
       SceneHandle create_scene() const noexcept;
 
     private:

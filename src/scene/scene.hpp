@@ -18,6 +18,7 @@ namespace mr {
     const RenderContext *_parent = nullptr;
 
     // One array for each light type
+    // TODO(mt6): Maybe use https://github.com/rollbear/columnist or https://github.com/skypjack/entt here
     std::tuple<
       std::vector<DirectionalLightHandle>
     > _lights;
@@ -41,11 +42,13 @@ namespace mr {
     void remove(Handle<L> light)
     {
       lights<L>().erase(std::ranges::find(lights<L>(), light));
+      // TODO(dk6): delete handle
     }
 
     void remove(ModelHandle model)
     {
       _models.erase(std::ranges::find(_models, model));
+      // TODO(dk6): delete handle
     }
 
     Scene(Scene &&) = default;

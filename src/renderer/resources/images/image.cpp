@@ -324,7 +324,7 @@ vk::RenderingAttachmentInfoKHR mr::DepthImage::attachment_info() const
 {
   return vk::RenderingAttachmentInfoKHR {
     .imageView = _image_view.get(),
-    .imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
+    .imageLayout = _layout,
     .loadOp = vk::AttachmentLoadOp::eClear,
     .storeOp = vk::AttachmentStoreOp::eStore,
     .clearValue = {vk::ClearDepthStencilValue(1.f, 0)},
@@ -342,7 +342,7 @@ vk::RenderingAttachmentInfoKHR mr::ColorAttachmentImage::attachment_info() const
 {
   return vk::RenderingAttachmentInfoKHR {
     .imageView = _image_view.get(),
-    .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+    .imageLayout = _layout,
     .loadOp = vk::AttachmentLoadOp::eClear,
     .storeOp = vk::AttachmentStoreOp::eStore,
     .clearValue = {vk::ClearColorValue( std::array {0.f, 0.f, 0.f, 0.f})},

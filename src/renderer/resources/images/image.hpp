@@ -19,6 +19,9 @@ inline namespace graphics {
     //                 Maybe instead char add char strong typedef Image::Byte and user must call 'convert'
     friend FileWriter;
 
+    // HostBuffer read_to_buffer();
+    // std::vector<std::byte> read() { return read_to_buffer().read(); }
+    // Vec4f get_pixel(x, y) -> get small size (16 bytes)
     protected:
       vk::UniqueImage _image;
       vk::UniqueImageView _image_view;

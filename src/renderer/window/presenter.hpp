@@ -5,10 +5,17 @@
 #include "swapchain.hpp"
 #include "input_state.hpp"
 #include "resources/images/image.hpp"
+#include "resources/framedata/framedata.hpp"
 
 namespace mr {
   // forward declaration of RenderContext class
   class RenderContext;
+
+  struct PresenterData {
+    Extent _extent;
+    Viewport _viewport;
+    const Image &_target;
+  };
 
   class Presenter {
   protected:
