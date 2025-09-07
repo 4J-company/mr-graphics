@@ -138,7 +138,7 @@ void mr::Image::switch_layout(const VulkanState &state, vk::ImageLayout new_layo
       barrier.srcAccessMask = vk::AccessFlagBits::eNoneKHR;
       break;
     default:
-      assert(false);
+      ASSERT(false, "Invalid source layout");
       break;
   }
 
@@ -165,7 +165,7 @@ void mr::Image::switch_layout(const VulkanState &state, vk::ImageLayout new_layo
     barrier.dstAccessMask = vk::AccessFlagBits::eNoneKHR;
     break;
   default:
-    assert(false);
+    ASSERT(false, "Invalid destination layout");
     break;
   }
 
@@ -222,7 +222,7 @@ vk::Format mr::Image::find_supported_format(
       return format;
     }
   }
-  ASSERT(false, "cant find format");
+  ASSERT(false, "Can't find image format", candidates);
   return {};
 }
 

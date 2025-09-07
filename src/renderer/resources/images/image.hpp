@@ -38,12 +38,6 @@ inline namespace graphics {
 
       void switch_layout(const VulkanState &state, vk::ImageLayout new_layout);
 
-      template <typename T>
-      void write(const VulkanState &state, std::span<const T> data)
-      {
-        _write(state, {reinterpret_cast<const std::byte *>(data.data()), data.size_bytes()});
-      }
-
       // Copy data from to host visible buffer
       HostBuffer read_to_host_buffer(const VulkanState &state, CommandUnit &command_unit) noexcept;
 

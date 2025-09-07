@@ -77,22 +77,11 @@ inline namespace graphics {
       HostBuffer(HostBuffer &&) = default;
       HostBuffer &operator=(HostBuffer &&) = default;
 
-      template <typename T, size_t Extent>
-      HostBuffer & write(std::span<T, Extent> data) noexcept
-      {
-        // std::span<const T, Extent> cannot be constructed from non-const
-        _write({reinterpret_cast<const std::byte *>(data.data()), data.size_bytes()});
-        return *this;
-      }
-
       // This method just map device memory and collect it to span
       std::span<std::byte> read() noexcept;
 
       // This method copy to CPU memory and unmap device memory
       std::vector<std::byte> copy() noexcept;
-
-    private:
-      void _write(std::span<const std::byte> data) noexcept;
   };
 
   class DeviceBuffer : public Buffer {
@@ -109,17 +98,6 @@ inline namespace graphics {
                    memory_properties | vk::MemoryPropertyFlagBits::eDeviceLocal)
       {
       }
-
-      template <typename T, size_t Extent>
-      DeviceBuffer &write(std::span<T, Extent> data) noexcept
-      {
-        // std::span<const T, Extent> cannot be constructed from non-const
-        _write({reinterpret_cast<const std::byte *>(data.data()), data.size_bytes()});
-        return *this;
-      }
-
-    private:
-      void _write(std::span<const std::byte> data) noexcept;
   };
 
   class UniformBuffer : public HostBuffer {
@@ -133,7 +111,7 @@ inline namespace graphics {
       UniformBuffer(const VulkanState &state, std::span<T, Extent> src)
           : UniformBuffer(state, src.size() * sizeof(T))
       {
-        assert(src.data());
+        ASSERT(src.data());
         write(src);
       }
   };
@@ -161,7 +139,7 @@ inline namespace graphics {
       VertexBuffer(const VulkanState &state, std::span<T, Extent> src)
           : VertexBuffer(state, src.size() * sizeof(T))
       {
-        assert(src.data());
+        ASSERT(src.data());
         write(src);
       }
   };
@@ -188,7 +166,7 @@ inline namespace graphics {
       IndexBuffer(const VulkanState &state, std::span<T, Extent> src)
           : IndexBuffer(state, src.size() * sizeof(T))
       {
-        assert(src.data());
+        ASSERT(src.data());
         write(src);
 
         _element_count = src.size();

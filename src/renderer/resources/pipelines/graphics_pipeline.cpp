@@ -131,8 +131,7 @@ mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state,
 
       break;
     default:
-      std::println(std::cerr, "invalid subpass option");
-      assert(false);
+      ASSERT(false, "Invalid subpass option");
   }
 
   pipiline_rendering_create_info.colorAttachmentCount = color_attacmhents_cnt;

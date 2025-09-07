@@ -107,7 +107,7 @@ inline namespace graphics {
       vk::ShaderStageFlagBits::eGeometry,
       vk::ShaderStageFlagBits::eFragment
     };
-    assert(stage < stage_bits.size());
+    ASSERT(stage < stage_bits.size());
 
     return stage_bits[stage];
   }
@@ -127,7 +127,7 @@ inline namespace graphics {
       "geom",
       "frag",
     };
-    assert(stage < shader_type_names.size());
+    ASSERT(stage < shader_type_names.size());
     return shader_type_names[stage];
   }
 
