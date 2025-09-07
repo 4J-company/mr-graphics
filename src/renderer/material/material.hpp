@@ -38,7 +38,7 @@ inline namespace graphics {
     Material(const VulkanState &state,
              const RenderContext &render_context,
              mr::ShaderHandle shader,
-             std::span<float> ubo_data,
+             std::span<std::byte> ubo_data,
              std::span<std::optional<mr::TextureHandle>> textures,
              mr::UniformBuffer &cam_ubo) noexcept;
 
@@ -83,54 +83,67 @@ inline namespace graphics {
 
     std::vector<byte> _specialization_data;
     std::unordered_map<std::string, std::string> _defines;
-    std::vector<float> _ubo_data;
-    std::vector<std::optional<mr::TextureHandle>> _textures;
+    std::vector<std::byte> _ubo_data;
+    InplaceVector<std::optional<mr::TextureHandle>, enum_cast(MaterialParameter::EnumSize)> _textures;
     mr::UniformBuffer *_cam_ubo;
 
     std::string_view _shader_filename;
 
   public:
-    MaterialBuilder(const mr::VulkanState &state, const mr::RenderContext &context, std::string_view filename)
-      : _state(&state), _context(&context), _shader_filename(filename)
+    MaterialBuilder(
+        const mr::VulkanState &state,
+        const mr::RenderContext &context,
+        std::string_view filename)
+      : _state(&state)
+      , _context(&context)
+      , _shader_filename(filename)
     {
-      _textures.resize(enum_cast(MaterialParameter::EnumSize));
+      _textures.resize(_textures.capacity());
     }
 
     MaterialBuilder(MaterialBuilder &&) noexcept = default;
     MaterialBuilder & operator=(MaterialBuilder &&) noexcept = default;
 
     MaterialBuilder &add_texture(MaterialParameter param,
-                                 std::optional<mr::TextureHandle> tex,
+                                 const mr::importer::TextureData &tex_data,
                                  math::Color factor = {1.0, 1.0, 1.0, 1.0})
     {
-      assert(!tex.has_value() || *tex != nullptr);
+      mr::TextureHandle tex = ResourceManager<Texture>::get().create(mr::unnamed,
+        *_state,
+        (const std::byte*)tex_data.image.pixels.get(),
+        mr::Extent{ tex_data.image.width, tex_data.image.height },
+        vk::Format::eR8G8B8A8Srgb
+      );
+
       _textures[enum_cast(param)] = std::move(tex);
       add_value(factor);
+      return *this;
+    }
+
+    MaterialBuilder & add_value(const auto &value)
+    {
+      add_span(std::span<std::remove_reference_t<decltype(value)>>{&value, 1});
+      return *this;
+    }
+
+    template <typename T>
+    MaterialBuilder & add_span(std::span<T> span)
+    {
+      auto bytes = std::as_bytes(span);
+      _ubo_data.insert(_ubo_data.end(), bytes.begin(), bytes.end());
       return *this;
     }
 
     template<typename T, size_t N>
     MaterialBuilder & add_value(Vec<T, N> value)
     {
-      for (size_t i = 0; i < N; i++) {
-        _ubo_data.push_back(value[i]);
-      }
-      return *this;
-    }
-
-    MaterialBuilder & add_value(const auto &value)
-    {
-#ifdef __cpp_lib_containers_ranges
-      _ubo_data.append_range(std::span {(float *)&value, sizeof(value) / sizeof(float)});
-#else
-      _ubo_data.insert(_ubo_data.end(), (float *)&value, (float *)(&value + 1));
-#endif
+      add_span(std::span<T>{&value[0], N});
       return *this;
     }
 
     MaterialBuilder & add_value(float value)
     {
-      _ubo_data.push_back(value);
+      add_span(std::span<float>{&value, 1});
       return *this;
     }
 

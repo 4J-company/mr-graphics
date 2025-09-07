@@ -1,10 +1,10 @@
 #include "resources/texture/texture.hpp"
 
-mr::Texture::Texture(const VulkanState &state, const byte *data, Extent extent, vk::Format format) noexcept
+mr::Texture::Texture(const VulkanState &state, const std::byte *data, Extent extent, vk::Format format) noexcept
   : _image (state, extent, format)
   , _sampler (state, vk::Filter::eLinear, vk::SamplerAddressMode::eRepeat)
 {
   _image.switch_layout(state, vk::ImageLayout::eTransferDstOptimal);
-  _image.write<const byte>(state, std::span{data, _image.size()});
+  _image.write<const std::byte>(state, std::span{data, _image.size()});
   _image.switch_layout(state, vk::ImageLayout::eShaderReadOnlyOptimal);
 }

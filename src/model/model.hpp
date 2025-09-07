@@ -18,7 +18,7 @@ inline namespace graphics {
     public:
       Model() = default;
 
-      Model(const VulkanState &state, const RenderContext &render_context, std::string_view filename) noexcept;
+      Model(const VulkanState &state, const RenderContext &render_context, std::fs::path filename) noexcept;
 
       Model(const Model &other) noexcept = default;
       Model &operator=(const Model &other) noexcept = default;
