@@ -1,13 +1,34 @@
 #include "model/model.hpp"
-#include "renderer/renderer.hpp"
+
+#include "scene/scene.hpp"
 #include "renderer/window/render_context.hpp"
 
-// TODO(dk6): workaround to pass camera data to material ubo until Scene class will be added
-extern mr::UniformBuffer *s_cam_ubo_ptr;
-
-mr::graphics::Model::Model(const Scene &scene, std::string_view filename) noexcept
+constexpr mr::MaterialParameter importer2graphics(mr::importer::TextureType type)
 {
-  MR_INFO("Loading model {}", filename);
+  switch (type) {
+    case mr::importer::TextureType::BaseColor:
+      return mr::graphics::MaterialParameter::BaseColor;
+    case mr::importer::TextureType::OcclusionRoughnessMetallic:
+      return mr::graphics::MaterialParameter::MetallicRoughness;
+    case mr::importer::TextureType::EmissiveColor:
+      return mr::graphics::MaterialParameter::EmissiveColor;
+    case mr::importer::TextureType::NormalMap:
+      return mr::graphics::MaterialParameter::NormalMap;
+    case mr::importer::TextureType::OcclusionMap:
+      return mr::graphics::MaterialParameter::OcclusionMap;
+    default:
+      ASSERT(false, "Unhandled mr::importer::TextureType");
+      return mr::graphics::MaterialParameter::EnumSize;
+  }
+}
+
+mr::graphics::Model::Model(
+    const mr::graphics::Scene &scene,
+    std::fs::path filename) noexcept
+{
+  MR_INFO("Loading model {}", filename.string());
+
+  const auto &state = scene.render_context().vulkan_state();
 
   std::filesystem::path model_path = path::models_dir / filename;
 
@@ -18,7 +39,32 @@ mr::graphics::Model::Model(const Scene &scene, std::string_view filename) noexce
   }
   auto& model_value = model.value();
 
-  MR_INFO("Loading model {} finished\n", filename);
+  using enum mr::MaterialParameter;
+  static std::vector<mr::MaterialBuilder> builders;
+  static auto &manager = ResourceManager<Texture>::get();
+  auto io = std::ranges::iota_view {(size_t)0, model_value.meshes.size()};
+  std::for_each(std::execution::seq, io.begin(), io.end(),
+    [&, this] (size_t i) {
+      const auto &mesh = model_value.meshes[i];
+      const auto &material = model_value.materials[mesh.material];
+      const auto &transform = mesh.transforms[0];
+
+      std::vector<VertexBuffer> vbufs;
+      vbufs.emplace_back(state, std::span(mesh.positions.data(), mesh.positions.size()));
+      vbufs.emplace_back(state, std::span(mesh.attributes.data(), mesh.attributes.size()));
+      IndexBuffer ibuf {state, std::span(mesh.lods[0].indices.data(), mesh.lods[0].indices.size())};
+
+      _meshes.emplace_back(std::move(vbufs), std::move(ibuf));
+
+      mr::MaterialBuilder builder {state, scene.render_context(), filename.stem().string()};
+      builder.add_value(&material.constants);
+      for (const auto &texture : material.textures) {
+        builder.add_texture(importer2graphics(texture.type), texture);
+      }
+    }
+  );
+
+  MR_INFO("Loading model {} finished\n", filename.string());
 }
 
 void mr::graphics::Model::draw(CommandUnit &unit) const noexcept

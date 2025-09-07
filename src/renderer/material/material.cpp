@@ -3,7 +3,7 @@
 mr::graphics::Material::Material(const VulkanState &state,
                        const RenderContext &render_context,
                        mr::graphics::ShaderHandle shader,
-                       std::span<float> ubo_data,
+                       std::span<std::byte> ubo_data,
                        std::span<std::optional<mr::TextureHandle>> textures,
                        mr::UniformBuffer &cam_ubo) noexcept
     : _ubo(state, ubo_data)

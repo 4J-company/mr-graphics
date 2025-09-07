@@ -16,7 +16,7 @@ inline namespace graphics {
       Texture(Texture&&) = default;
       Texture & operator=(Texture&&) = default;
 
-      Texture(const VulkanState &state, const byte *data, Extent extent, vk::Format format) noexcept;
+      Texture(const VulkanState &state, const std::byte *data, Extent extent, vk::Format format) noexcept;
 
       const TextureImage &image() const { return _image; }
 
