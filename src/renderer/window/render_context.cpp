@@ -84,11 +84,11 @@ void mr::RenderContext::_init_lights_render_data() {
   for (const auto &[shader_name, light_shader_resources] : light_type_data) {
     std::string shader_name_str = {shader_name.begin(), shader_name.end()};
     auto shader = ResourceManager<Shader>::get().create(shader_name_str, *_state, shader_name);
-    _lights_render_data.shaders.emplace_back(std::move(shader));
+    _lights_render_data.shaders.emplace_back(shader);
 
-    auto layout_handle = ResourceManager<DescriptorSetLayout>::get().create(shader_name_str + "_layout",
+    auto layout_handle = ResourceManager<DescriptorSetLayout>::get().create(mr::unnamed,
       *_state, vk::ShaderStageFlagBits::eFragment, light_shader_resources);
-    _lights_render_data.set1_layouts.emplace_back(std::move(layout_handle));
+    _lights_render_data.set1_layouts.emplace_back(layout_handle);
 
     std::array set_layouts { _lights_render_data.set0_layout, layout_handle };
 

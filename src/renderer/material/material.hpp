@@ -108,6 +108,7 @@ inline namespace graphics {
                                  const mr::importer::TextureData &tex_data,
                                  math::Color factor = {1.0, 1.0, 1.0, 1.0})
     {
+      ASSERT(tex_data.image.pixels.get(), "Image should be valid");
       mr::TextureHandle tex = ResourceManager<Texture>::get().create(mr::unnamed,
         *_state,
         (const std::byte*)tex_data.image.pixels.get(),
@@ -117,6 +118,12 @@ inline namespace graphics {
 
       _textures[enum_cast(param)] = std::move(tex);
       add_value(factor);
+      return *this;
+    }
+
+    MaterialBuilder & add_value(const auto *value)
+    {
+      add_span(std::span<std::remove_pointer_t<decltype(value)>>{value, 1});
       return *this;
     }
 

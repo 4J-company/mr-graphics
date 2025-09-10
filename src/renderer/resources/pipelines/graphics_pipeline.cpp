@@ -144,6 +144,8 @@ mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state,
     .blendConstants = std::array<float, 4> {0.0, 0.0, 0.0, 0.0}, // ???
   };
 
+  ASSERT(_shader.get());
+
   vk::StructureChain chain {
     vk::GraphicsPipelineCreateInfo {
       .stageCount = _shader->stage_number(),
