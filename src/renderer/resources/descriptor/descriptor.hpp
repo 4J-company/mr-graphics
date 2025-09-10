@@ -44,7 +44,6 @@ namespace mr {
     public:
       DescriptorSet() noexcept = default;
 
-      // TODO(dk6): we have not unique DescriptorSet, will default move work correctly?
       DescriptorSet(DescriptorSet &&) noexcept = default;
       DescriptorSet & operator=(DescriptorSet &&) noexcept = default;
 
