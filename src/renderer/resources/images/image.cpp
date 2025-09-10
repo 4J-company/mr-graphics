@@ -251,6 +251,10 @@ vk::Format mr::Image::find_supported_format(
   return {};
 }
 
+size_t mr::Image::byte_size() const noexcept {
+  return _size * calculate_image_size(_extent, _format);
+}
+
 // ---- HostImage ----
 mr::HostImage::HostImage(const VulkanState &state, Extent extent, vk::Format format,
                         vk::ImageUsageFlags usage_flags, vk::ImageAspectFlags aspect_flags,

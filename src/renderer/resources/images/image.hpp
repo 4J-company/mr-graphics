@@ -68,8 +68,10 @@ inline namespace graphics {
       vk::ImageView image_view() const noexcept { return _image_view.get(); }
       vk::Image image() const noexcept { return _image.get(); }
       vk::Format format() const noexcept { return _format; }
-      size_t size() const noexcept { return _size; }
       vk::MemoryPropertyFlags memory_properties() const noexcept { return _memory_properties; }
+
+      size_t size() const noexcept { return _size; }
+      size_t byte_size() const noexcept;
 
       static vk::Format find_supported_format(
         const VulkanState &state, const std::vector<vk::Format> &candidates,
