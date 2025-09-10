@@ -5,11 +5,38 @@
 // Utility function for image size calculation
 static size_t calculate_image_size(mr::Extent extent, vk::Format format)
 {
-  // TODO: support float formats
-  size_t texel_size = format == vk::Format::eR8G8B8A8Srgb ? 4
-                    : format == vk::Format::eR8G8B8Srgb   ? 3
-                    : format == vk::Format::eR8G8Srgb     ? 2
-                                                          : 1;
+  static const std::array sizes_4byte {
+    vk::Format::eR8G8B8A8Srgb,
+    vk::Format::eB8G8R8A8Unorm,
+    vk::Format::eR32G32B32A32Sfloat
+  };
+  static const std::array sizes_3byte {
+    vk::Format::eR8G8B8Srgb,
+    vk::Format::eB8G8R8Unorm,
+  };
+  static const std::array sizes_2byte {
+    vk::Format::eR8G8Srgb,
+  };
+  static const std::array sizes_1byte {
+    vk::Format::eR8Srgb,
+    vk::Format::eD32Sfloat,
+    // TODO(dk6): Check is theese formats size 1 byte
+    vk::Format::eD32SfloatS8Uint,
+    vk::Format::eD24UnormS8Uint,
+  };
+
+  size_t texel_size = 0;
+  if (std::ranges::find(sizes_4byte, format) != sizes_4byte.end()) {
+    texel_size = 4;
+  } else if (std::ranges::find(sizes_3byte, format) != sizes_3byte.end()) {
+    texel_size = 3;
+  } else if (std::ranges::find(sizes_2byte, format) != sizes_2byte.end()) {
+    texel_size = 2;
+  } if (std::ranges::find(sizes_1byte, format) != sizes_1byte.end()) {
+    texel_size = 1;
+  }
+  ASSERT(texel_size != 0, "unsupported format");
+
   return extent.width * extent.height * texel_size;
 }
 
@@ -146,22 +173,14 @@ void mr::Image::switch_layout(const VulkanState &state, vk::ImageLayout new_layo
   command_unit.begin();
   command_unit->pipelineBarrier(
     source_stage, destination_stage, {}, {}, {}, {barrier});
-  command_unit.end();
+  vk::SubmitInfo submit_info = command_unit.end();
 
-  auto [bufs, size] = command_unit.submit_info();
-  vk::SubmitInfo submit_info {
-    .commandBufferCount = size,
-    .pCommandBuffers = bufs,
-  };
   auto fence = state.device().createFenceUnique({}).value;
   state.queue().submit(submit_info, fence.get());
   state.device().waitForFences({fence.get()}, VK_TRUE, UINT64_MAX);
 
   _layout = new_layout;
 }
-
-void mr::Image::copy_to_host() const {}
-void mr::Image::get_pixel(const vk::Extent2D &coords) const {}
 
 void mr::Image::create_image_view(const VulkanState &state) {
   vk::ImageSubresourceRange range {
@@ -203,8 +222,74 @@ vk::Format mr::Image::find_supported_format(
       return format;
     }
   }
-  assert(false); // cant find format
+  ASSERT(false, "cant find format");
   return {};
+}
+
+void mr::Image::_write(const VulkanState &state, std::span<const std::byte> data) noexcept
+{
+  ASSERT(data.size() <= _size);
+
+  auto stage_buffer = HostBuffer(state, _size, vk::BufferUsageFlagBits::eTransferSrc);
+  stage_buffer.write(data);
+
+  vk::ImageSubresourceLayers range {
+    .aspectMask = _aspect_flags,
+    .mipLevel = _mip_level - 1,
+    .baseArrayLayer = 0,
+    .layerCount = 1,
+  };
+  vk::BufferImageCopy region {
+    .bufferOffset = 0,
+    .bufferRowLength = 0,
+    .bufferImageHeight = 0,
+    .imageSubresource = range,
+    .imageOffset = {0, 0, 0},
+    .imageExtent = _extent,
+  };
+
+  // TODO: delete static
+  static CommandUnit command_unit(state);
+  command_unit.begin();
+  command_unit->copyBufferToImage(
+    stage_buffer.buffer(), _image.get(), _layout, {region});
+  vk::SubmitInfo submit_info = command_unit.end();
+
+  auto fence = state.device().createFenceUnique({}).value;
+  state.queue().submit(submit_info, fence.get());
+  state.device().waitForFences({fence.get()}, VK_TRUE, UINT64_MAX);
+}
+
+mr::HostBuffer mr::Image::read_to_host_buffer(const VulkanState &state, CommandUnit &command_unit) noexcept
+{
+  switch_layout(state, vk::ImageLayout::eTransferSrcOptimal);
+
+  auto stage_buffer = HostBuffer(state, _size, vk::BufferUsageFlagBits::eTransferDst);
+
+  vk::ImageSubresourceLayers range {
+    .aspectMask = _aspect_flags,
+    .mipLevel = _mip_level - 1,
+    .baseArrayLayer = 0,
+    .layerCount = 1,
+  };
+  vk::BufferImageCopy region {
+    .bufferOffset = 0,
+    .bufferRowLength = 0,
+    .bufferImageHeight = 0,
+    .imageSubresource = range,
+    .imageOffset = {0, 0, 0},
+    .imageExtent = _extent,
+  };
+
+  command_unit.begin();
+  command_unit->copyImageToBuffer(_image.get(), _layout, stage_buffer.buffer(), {region});
+  auto submit_info = command_unit.end();
+
+  auto fence = state.device().createFenceUnique({}).value;
+  state.queue().submit(submit_info, fence.get());
+  state.device().waitForFences({fence.get()}, VK_TRUE, UINT64_MAX);
+
+  return stage_buffer;
 }
 
 // ---- HostImage ----

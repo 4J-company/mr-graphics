@@ -12,8 +12,7 @@ mr::Scene::Scene(const RenderContext &render_context)
   ASSERT(_parent != nullptr);
 }
 
-mr::DirectionalLightHandle mr::Scene::create_directional_light(
-  const Norm3f &direction, const Vec3f &color) noexcept
+mr::DirectionalLightHandle mr::Scene::create_directional_light(const Norm3f &direction, const Vec3f &color) noexcept
 {
   ASSERT(_parent != nullptr);
 

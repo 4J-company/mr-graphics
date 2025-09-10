@@ -15,8 +15,6 @@ namespace mr {
     beman::inplace_vector<ColorAttachmentImage, images_number> _images;
 
     uint32_t _image_index = 0;
-    // TODO(dk6): i think here prev index is unnecessary
-    uint32_t _prev_image_index = 0;
 
     // bool is for check is semaphore usage first - we must skip first semaphore usage,
     // because at start semaphores are not signaled and we have no way to signal instead

@@ -16,7 +16,7 @@ namespace mr {
     // ----------------------
     // Keyboard
     // ----------------------
-    // i hope it is not like bool vector
+
     std::array<bool, max_keys_number> _key_pressed {};
     std::array<bool, max_keys_number> _prev_key_pressed {};
     std::array<bool, max_keys_number> _key_tapped {};
@@ -33,8 +33,6 @@ namespace mr {
     //  but reader works once per frame only for copy ~400 bytes, in other time it have no affect for writer
     // Expected, what update(), key_pressed() and key_tapped() call in one thread, key callback in other
     mutable std::mutex update_mutex;
-
-    // TODO(dk6): mouse
 
   public:
     InputState() = default;
