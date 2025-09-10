@@ -8,6 +8,8 @@ constexpr mr::MaterialParameter importer2graphics(mr::importer::TextureType type
   switch (type) {
     case mr::importer::TextureType::BaseColor:
       return mr::graphics::MaterialParameter::BaseColor;
+    case mr::importer::TextureType::RoughnessMetallic:
+      return mr::graphics::MaterialParameter::MetallicRoughness;
     case mr::importer::TextureType::OcclusionRoughnessMetallic:
       return mr::graphics::MaterialParameter::MetallicRoughness;
     case mr::importer::TextureType::EmissiveColor:
@@ -17,7 +19,7 @@ constexpr mr::MaterialParameter importer2graphics(mr::importer::TextureType type
     case mr::importer::TextureType::OcclusionMap:
       return mr::graphics::MaterialParameter::OcclusionMap;
     default:
-      ASSERT(false, "Unhandled mr::importer::TextureType");
+      ASSERT(false, "Unhandled mr::importer::TextureType", type);
       return mr::graphics::MaterialParameter::EnumSize;
   }
 }
@@ -39,6 +41,9 @@ mr::graphics::Model::Model(
   }
   auto& model_value = model.value();
 
+  auto defult_shader_path = mr::path::shaders_dir / "default";
+  auto defult_shader_path_str = defult_shader_path.string();
+
   using enum mr::MaterialParameter;
   static std::vector<mr::MaterialBuilder> builders;
   static auto &manager = ResourceManager<Texture>::get();
@@ -46,6 +51,9 @@ mr::graphics::Model::Model(
   std::for_each(std::execution::seq, io.begin(), io.end(),
     [&, this] (size_t i) {
       const auto &mesh = model_value.meshes[i];
+
+      ASSERT(mesh.material < model_value.materials.size(), "Failed to load material from GLTF file");
+
       const auto &material = model_value.materials[mesh.material];
       const auto &transform = mesh.transforms[0];
 
@@ -57,10 +65,16 @@ mr::graphics::Model::Model(
       _meshes.emplace_back(std::move(vbufs), std::move(ibuf));
 
       mr::MaterialBuilder builder {state, scene.render_context(), filename.stem().string()};
+
+      ASSERT(s_cam_ubo_ptr);
+
+      builder.add_camera(*s_cam_ubo_ptr);
       builder.add_value(&material.constants);
       for (const auto &texture : material.textures) {
         builder.add_texture(importer2graphics(texture.type), texture);
       }
+      builders.push_back(std::move(builder));
+      _materials.push_back(builders.back().build());
     }
   );
 
