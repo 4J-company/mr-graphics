@@ -43,8 +43,13 @@ inline namespace graphics {
       // VmaMemoryUsage _memory_usage;
   };
 
-  class FileWriter; // forward declaration
   class HostBuffer : public Buffer {
+    friend class FileWriter; // TODO(dk6): tmp solution for copying from buffer to RAM
+
+  private:
+    // TODO(dk6): use std::unique_ptr with custom deleted and move contructor
+    void *_mapped_data = nullptr;
+
   public:
     HostBuffer() = default;
 
@@ -59,6 +64,8 @@ inline namespace graphics {
     {
     }
 
+    ~HostBuffer();
+
     HostBuffer(HostBuffer &&) = default;
     HostBuffer &operator=(HostBuffer &&) = default;
 
@@ -66,6 +73,12 @@ inline namespace graphics {
 
     template <typename T, size_t Extent>
     HostBuffer &write(std::span<T, Extent> src) { return write(std::as_bytes(src)); }
+
+    // This method just map device memory and collect it to span
+    std::span<std::byte> read() noexcept;
+
+    // This method copy to CPU memory and unmap device memory
+    std::vector<std::byte> copy() noexcept;
   };
 
   class DeviceBuffer : public Buffer {

@@ -167,7 +167,6 @@ void mr::Image::switch_layout(const VulkanState &state, vk::ImageLayout new_layo
 void mr::Image::copy_to_host() const {}
 void mr::Image::get_pixel(const vk::Extent2D &coords) const {}
 
-
 void mr::Image::write(const VulkanState &state, std::span<const std::byte> src) {
   ASSERT(src.data());
   ASSERT(src.size() <= _size);
@@ -251,8 +250,75 @@ vk::Format mr::Image::find_supported_format(
   return {};
 }
 
-size_t mr::Image::byte_size() const noexcept {
-  return _size * calculate_image_size(_extent, _format);
+void mr::Image::_write(const VulkanState &state, std::span<const std::byte> data) noexcept
+{
+  ASSERT(data.size() <= _size);
+
+  auto stage_buffer = HostBuffer(state, _size, vk::BufferUsageFlagBits::eTransferSrc);
+  stage_buffer.write(data);
+
+  vk::ImageSubresourceLayers range {
+    .aspectMask = _aspect_flags,
+    .mipLevel = _mip_level - 1,
+    .baseArrayLayer = 0,
+    .layerCount = 1,
+  };
+  vk::BufferImageCopy region {
+    .bufferOffset = 0,
+    .bufferRowLength = 0,
+    .bufferImageHeight = 0,
+    .imageSubresource = range,
+    .imageOffset = {0, 0, 0},
+    .imageExtent = _extent,
+  };
+
+  // TODO: delete static
+  static CommandUnit command_unit(state);
+  command_unit.begin();
+  command_unit->copyBufferToImage(
+    stage_buffer.buffer(), _image.get(), _layout, {region});
+  command_unit.end();
+
+  auto [bufs, bufs_number] = command_unit.submit_info();
+  vk::SubmitInfo submit_info {
+    .commandBufferCount = bufs_number,
+    .pCommandBuffers = bufs,
+  };
+  auto fence = state.device().createFenceUnique({}).value;
+  state.queue().submit(submit_info, fence.get());
+  state.device().waitForFences({fence.get()}, VK_TRUE, UINT64_MAX);
+}
+
+mr::HostBuffer mr::Image::read_to_host_buffer(const VulkanState &state, CommandUnit &command_unit) noexcept
+{
+  switch_layout(state, vk::ImageLayout::eTransferSrcOptimal);
+
+  auto stage_buffer = HostBuffer(state, _size, vk::BufferUsageFlagBits::eTransferDst);
+
+  vk::ImageSubresourceLayers range {
+    .aspectMask = _aspect_flags,
+    .mipLevel = _mip_level - 1,
+    .baseArrayLayer = 0,
+    .layerCount = 1,
+  };
+  vk::BufferImageCopy region {
+    .bufferOffset = 0,
+    .bufferRowLength = 0,
+    .bufferImageHeight = 0,
+    .imageSubresource = range,
+    .imageOffset = {0, 0, 0},
+    .imageExtent = _extent,
+  };
+
+  command_unit.begin();
+  command_unit->copyImageToBuffer(_image.get(), _layout, stage_buffer.buffer(), {region});
+  auto submit_info = command_unit.end();
+
+  auto fence = state.device().createFenceUnique({}).value;
+  state.queue().submit(submit_info, fence.get());
+  state.device().waitForFences({fence.get()}, VK_TRUE, UINT64_MAX);
+
+  return stage_buffer;
 }
 
 // ---- HostImage ----

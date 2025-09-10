@@ -10,18 +10,6 @@ inline namespace graphics {
   class FileWriter;
 
   class Image {
-    // TODO(dk6): tmp solution because:
-    //              1. We must past semaphores to submit info
-    //              2. I think command_unit must be recieved from render_context - we must pass it to args
-    //              3. I want to move implementation of write to .cpp, (because read will be same). For this I think
-    //                 we can pass std::span<char> to 'write' and add static template method 'convert' to convert
-    //                 span<T> a -> span<char> b (just b = span(reinterpret_cast<char *>(a.data()), a.size() * sizeof(T)))
-    //                 Maybe instead char add char strong typedef Image::Byte and user must call 'convert'
-    friend FileWriter;
-
-    // HostBuffer read_to_buffer();
-    // std::vector<std::byte> read() { return read_to_buffer().read(); }
-    // Vec4f get_pixel(x, y) -> get small size (16 bytes)
     protected:
       vk::UniqueImage _image;
       vk::UniqueImageView _image_view;
@@ -61,21 +49,30 @@ inline namespace graphics {
       template <typename T>
       void write(const VulkanState &state, std::span<T> src) { write(state, std::as_bytes(src)); }
 
-    protected:
-      void create_image_view(const VulkanState &state);
+      // Copy data from to host visible buffer
+      HostBuffer read_to_host_buffer(const VulkanState &state, CommandUnit &command_unit) noexcept;
 
-    public:
+      // TODO(dk6): implement this
+      // std::vector<std::byte> read() { return read_to_buffer().read(); }
+      // Vec4f get_pixel(x, y) -> get small size (16 bytes)
+
       vk::ImageView image_view() const noexcept { return _image_view.get(); }
       vk::Image image() const noexcept { return _image.get(); }
       vk::Format format() const noexcept { return _format; }
       vk::MemoryPropertyFlags memory_properties() const noexcept { return _memory_properties; }
 
+      const vk::Extent3D & extent() const noexcept { return _extent; }
       size_t size() const noexcept { return _size; }
-      size_t byte_size() const noexcept;
 
       static vk::Format find_supported_format(
         const VulkanState &state, const std::vector<vk::Format> &candidates,
         vk::ImageTiling tiling, vk::FormatFeatureFlags features);
+
+    protected:
+      void create_image_view(const VulkanState &state);
+
+    private:
+      void _write(const VulkanState &state, std::span<const std::byte> data) noexcept;
   };
 
   // HostImage: host-visible, for staging or CPU read/write

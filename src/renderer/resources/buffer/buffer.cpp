@@ -51,7 +51,6 @@ uint32_t mr::Buffer::find_memory_type(
   return 0;
 }
 
-
 mr::DeviceBuffer & mr::DeviceBuffer::write(std::span<const std::byte> src)
 {
   ASSERT(_state != nullptr);
@@ -91,4 +90,34 @@ mr::HostBuffer & mr::HostBuffer::write(std::span<const std::byte> src)
   memcpy(ptr, src.data(), src.size());
   _state->device().unmapMemory(_memory.get());
   return *this;
+}
+
+std::span<std::byte> mr::HostBuffer::read() noexcept
+{
+  if (_mapped_data == nullptr) {
+    _state->device().mapMemory(_memory.get(), 0, _size, {}, &_mapped_data);
+  }
+  return std::span(reinterpret_cast<std::byte *>(_mapped_data), _size);
+}
+
+std::vector<std::byte> mr::HostBuffer::copy() noexcept
+{
+  std::vector<std::byte> data(_size);
+  if (_mapped_data != nullptr) {
+    memcpy(data.data(), _mapped_data, _size);
+  } else {
+    _state->device().mapMemory(_memory.get(), 0, _size, {}, &_mapped_data);
+    memcpy(data.data(), _mapped_data, _size);
+    _state->device().unmapMemory(_memory.get());
+  }
+  return data;
+}
+
+mr::HostBuffer::~HostBuffer()
+{
+  // TODO(dk6): Now, while _mapped_data is simple pointer, it can be bad after move, double memory unmap
+  if (_mapped_data != nullptr) {
+    _state->device().unmapMemory(_memory.get());
+    _mapped_data = nullptr;
+  }
 }
