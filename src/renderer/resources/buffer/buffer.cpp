@@ -121,3 +121,4 @@ mr::HostBuffer::~HostBuffer()
     _mapped_data = nullptr;
   }
 }
+

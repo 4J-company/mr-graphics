@@ -150,13 +150,8 @@ void mr::Image::switch_layout(const VulkanState &state, vk::ImageLayout new_layo
   command_unit.begin();
   command_unit->pipelineBarrier(
     source_stage, destination_stage, {}, {}, {}, {barrier});
-  command_unit.end();
+  vk::SubmitInfo submit_info = command_unit.end();
 
-  auto [bufs, size] = command_unit.submit_info();
-  vk::SubmitInfo submit_info {
-    .commandBufferCount = size,
-    .pCommandBuffers = bufs,
-  };
   auto fence = state.device().createFenceUnique({}).value;
   state.queue().submit(submit_info, fence.get());
   state.device().waitForFences({fence.get()}, VK_TRUE, UINT64_MAX);
@@ -277,13 +272,8 @@ void mr::Image::_write(const VulkanState &state, std::span<const std::byte> data
   command_unit.begin();
   command_unit->copyBufferToImage(
     stage_buffer.buffer(), _image.get(), _layout, {region});
-  command_unit.end();
+  vk::SubmitInfo submit_info = command_unit.end();
 
-  auto [bufs, bufs_number] = command_unit.submit_info();
-  vk::SubmitInfo submit_info {
-    .commandBufferCount = bufs_number,
-    .pCommandBuffers = bufs,
-  };
   auto fence = state.device().createFenceUnique({}).value;
   state.queue().submit(submit_info, fence.get());
   state.device().waitForFences({fence.get()}, VK_TRUE, UINT64_MAX);

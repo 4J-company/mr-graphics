@@ -127,7 +127,7 @@ void mr::RenderContext::_render_lights(const SceneHandle scene, Presenter &prese
 
   _depthbuffer.switch_layout(*_state, vk::ImageLayout::eDepthStencilAttachmentOptimal);
 
-  _command_unit.begin();
+  _command_unit.begin();// TODO(dk6): move it to `render` method
   _command_unit->beginRendering(&attachment_info);
 
   vk::Viewport viewport {
@@ -158,7 +158,6 @@ void mr::RenderContext::_render_lights(const SceneHandle scene, Presenter &prese
   }, scene->_lights);
 
   _command_unit->endRendering();
-  _command_unit.end();
 }
 
 void mr::RenderContext::_render_models(const SceneHandle scene)
@@ -182,7 +181,6 @@ void mr::RenderContext::_render_models(const SceneHandle scene)
     // .pStencilAttachment = &depth_attachment_info,
   };
 
-  _command_unit.begin();
   _command_unit->beginRendering(&attachment_info);
 
   vk::Viewport viewport {
@@ -207,7 +205,6 @@ void mr::RenderContext::_render_models(const SceneHandle scene)
   }
 
   _command_unit->endRendering();
-  _command_unit.end();
 }
 
 void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
@@ -218,49 +215,45 @@ void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
   _state->device().waitForFences(_image_fence.get(), VK_TRUE, UINT64_MAX);
   _state->device().resetFences(_image_fence.get());
 
+  // --------------------------------------------------------------------------
+  // Model rendering pass
+  // --------------------------------------------------------------------------
+
   _update_camera_buffer(scene->_camera_uniform_buffer);
 
+  _command_unit.begin();
   _render_models(scene);
 
-  vk::PipelineStageFlags models_wait_stages[] = {vk::PipelineStageFlagBits::eColorAttachmentOutput};
-  std::array models_signal_semaphores = {_models_render_finished_semaphore.get()};
+  _command_unit.add_signal_semaphore(_models_render_finished_semaphore.get());
 
-  auto [models_bufs, models_size] = _command_unit.submit_info();
-  vk::SubmitInfo models_submit_info {
-    .pWaitDstStageMask = models_wait_stages,
-    .commandBufferCount = models_size,
-    .pCommandBuffers = models_bufs,
-    .signalSemaphoreCount = models_signal_semaphores.size(),
-    .pSignalSemaphores = models_signal_semaphores.data(),
-  };
+  // !!! here use wait stages??
+  // _command_unit.add_wait_semaphore(_models_render_finished_semaphore.get(),
+  //                                  vk::PipelineStageFlagBits::eColorAttachmentOutput);
 
+  vk::SubmitInfo models_submit_info = _command_unit.end();
   _state->queue().submit(models_submit_info);
 
+  // --------------------------------------------------------------------------
+  // Lights shading pass
+  // --------------------------------------------------------------------------
+
+  // TODO(dk6): This must be uncommented, but now we have troubles with syncronization -
+  //            here command buffer is in use.
+  //            Or maybe added different command buffers for different passes
+  // _command_unit.begin();
   _render_lights(scene, presenter);
 
-  beman::inplace_vector<vk::Semaphore, 2> light_wait_semaphores = {
-    _models_render_finished_semaphore.get(),
-  };
-  // TODO(dk6): maybe it is temporary workaround
+  _command_unit.add_wait_semaphore(_models_render_finished_semaphore.get(),
+                                   vk::PipelineStageFlagBits::eColorAttachmentOutput);
   auto image_available_semaphore = presenter.image_available_semaphore();
   if (image_available_semaphore) {
-    light_wait_semaphores.emplace_back(image_available_semaphore);
+    _command_unit.add_wait_semaphore(image_available_semaphore,
+                                     vk::PipelineStageFlagBits::eColorAttachmentOutput);
   }
+  _command_unit.add_signal_semaphore(presenter.render_finished_semaphore());
 
-  vk::PipelineStageFlags light_wait_stages[] = {vk::PipelineStageFlagBits::eColorAttachmentOutput};
-  std::array light_signal_semaphores = {presenter.render_finished_semaphore()};
 
-  auto [light_bufs, light_size] = _command_unit.submit_info();
-  vk::SubmitInfo light_submit_info {
-    .waitSemaphoreCount = static_cast<uint32_t>(light_wait_semaphores.size()),
-    .pWaitSemaphores = light_wait_semaphores.data(),
-    .pWaitDstStageMask = light_wait_stages,
-    .commandBufferCount = light_size,
-    .pCommandBuffers = light_bufs,
-    .signalSemaphoreCount = light_signal_semaphores.size(),
-    .pSignalSemaphores = light_signal_semaphores.data(),
-  };
-
+  vk::SubmitInfo light_submit_info = _command_unit.end();
   _state->queue().submit(light_submit_info, _image_fence.get());
 
   presenter.present();
