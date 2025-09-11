@@ -21,8 +21,8 @@ class MrGraphicsRecipe(ConanFile):
     exports_sources = "CMakeLists.txt", "src/*", "cmake/*"
 
     def requirements(self):
-        self.requires("fmt/10.2.1")
-        self.requires("spdlog/1.14.1", override=True)
+        self.requires("fmt/11.2.0", override=True)
+        self.requires("spdlog/1.15.3", override=True)
         self.requires("libdwarf/0.9.1", override=True)
 
         self.requires("glfw/3.4")
@@ -35,10 +35,7 @@ class MrGraphicsRecipe(ConanFile):
 
     def build_requirements(self):
         self.tool_requires("cmake/[>3.26]")
-
-        if self.settings.os == "Linux":
-            self.tool_requires("mold/[>=2.40]")
-
+        self.tool_requires("ninja/[~1.12]")
         self.test_requires("gtest/1.14.0")
 
     def validate(self):
@@ -56,6 +53,7 @@ class MrGraphicsRecipe(ConanFile):
         deps = CMakeDeps(self)
         deps.generate()
         tc = CMakeToolchain(self)
+        tc.generator = "Ninja"
         tc.generate()
 
     def build(self):
