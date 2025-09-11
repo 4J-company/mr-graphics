@@ -52,7 +52,7 @@ inline namespace graphics {
     mr::DescriptorSet _descriptor_set;
     mr::GraphicsPipeline _pipeline;
 
-    std::array<vk::VertexInputAttributeDescription, 3> _descrs {
+    std::array<vk::VertexInputAttributeDescription, 6> _descrs {
       vk::VertexInputAttributeDescription {
         .location = 0,
         .binding = 0,
@@ -62,14 +62,32 @@ inline namespace graphics {
       vk::VertexInputAttributeDescription {
         .location = 1,
         .binding = 1,
-        .format = vk::Format::eR32G32B32Sfloat,
+        .format = vk::Format::eR32G32B32A32Sfloat,
         .offset = 0
       },
       vk::VertexInputAttributeDescription {
         .location = 2,
-        .binding = 2,
+        .binding = 1,
+        .format = vk::Format::eR32G32B32Sfloat,
+        .offset = 16
+      },
+      vk::VertexInputAttributeDescription {
+        .location = 3,
+        .binding = 1,
+        .format = vk::Format::eR32G32B32Sfloat,
+        .offset = 28
+      },
+      vk::VertexInputAttributeDescription {
+        .location = 4,
+        .binding = 1,
+        .format = vk::Format::eR32G32B32Sfloat,
+        .offset = 40
+      },
+      vk::VertexInputAttributeDescription {
+        .location = 5,
+        .binding = 1,
         .format = vk::Format::eR32G32Sfloat,
-        .offset = 0
+        .offset = 52
       },
     };
   };

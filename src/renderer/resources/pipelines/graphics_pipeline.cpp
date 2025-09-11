@@ -24,16 +24,23 @@ mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state,
   };
 
   std::array<vk::VertexInputBindingDescription, 16> binding_descriptions {};
-  for (int i = 0; i < attributes.size(); i++) {
-    binding_descriptions[i] = vk::VertexInputBindingDescription {
-      .binding = attributes[i].binding,
-      .stride = fmt2uint(attributes[i].format),
-      .inputRate = vk::VertexInputRate::eVertex,
-    };
+  uint32_t sum = 0;
+  for (int i = 1; i < attributes.size(); i++) {
+    sum += fmt2uint(attributes[i].format);
   }
+  binding_descriptions[0] = vk::VertexInputBindingDescription {
+    .binding = attributes[0].binding,
+    .stride = fmt2uint(attributes[0].format),
+    .inputRate = vk::VertexInputRate::eVertex,
+  };
+  binding_descriptions[1] = vk::VertexInputBindingDescription {
+    .binding = attributes[1].binding,
+    .stride = sum,
+    .inputRate = vk::VertexInputRate::eVertex,
+  };
 
   vk::PipelineVertexInputStateCreateInfo vertex_input_create_info {
-    .vertexBindingDescriptionCount = (uint)attributes.size(),
+    .vertexBindingDescriptionCount = (uint)2,
     .pVertexBindingDescriptions = binding_descriptions.data(),
     .vertexAttributeDescriptionCount = static_cast<uint>(attributes.size()),
     .pVertexAttributeDescriptions = attributes.data()};
