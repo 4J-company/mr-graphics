@@ -4,10 +4,11 @@ layout(set = PBR_SET_INDEX, binding = 1) uniform PrimitiveUbo {
   mat4 transform;
 
   vec4 base_color_factor;
-  vec4 metallic_roughness_factor;
-  vec4 emissive_factor;
-  vec4 occlusion_factor;
-  vec4 normal;
+  vec4 emissive_color;
+  float emissive_strength;
+  float normal_map_intensity;
+  float roughness_factor;
+  float metallic_factor;
 } ubo;
 
 #ifdef BASE_COLOR_MAP_BINDING
@@ -36,31 +37,31 @@ vec4 get_base_color(vec2 tex_coord) {
 
 vec4 get_metallic_roughness_color(vec2 tex_coord) {
 #ifdef METALLIC_ROUGHNESS_MAP_BINDING
-  return texture(MetallicRoughness, tex_coord) * ubo.metallic_roughness_factor;
+  return texture(MetallicRoughness, tex_coord) * vec4(1.f, ubo.metallic_factor, ubo.roughness_factor, 1);
 #else
-  return ubo.metallic_roughness_factor;
+  return vec4(1.f, ubo.metallic_factor, ubo.roughness_factor, 1);
 #endif
 }
 
 vec4 get_emissive_color(vec2 tex_coord) {
 #ifdef EMISSIVE_MAP_BINDING
-  return texture(Emissive, tex_coord) * ubo.emissive_factor;
+  return texture(Emissive, tex_coord) * ubo.emissive_strength;
 #else
-  return ubo.emissive_factor;
+  return ubo.emissive_color * ubo.emissive_strength;
 #endif
 }
 
 vec4 get_occlusion_color(vec2 tex_coord) {
 #ifdef OCCLUSION_MAP_BINDING
-  return texture(Occlusion, tex_coord) * ubo.occlusion_factor;
+  return texture(Occlusion, tex_coord);
 #else
-  return ubo.occlusion_factor;
+  return vec4(0.f);
 #endif
 }
 
 vec4 get_normal_color(vec2 tex_coord) {
 #ifdef NORMAL_MAP_BINDING
-  return texture(Normal, tex_coord);
+  return texture(Normal, tex_coord) * ubo.normal_map_intensity;
 #else
   return vec4(InNorm, 1.0);
 #endif
