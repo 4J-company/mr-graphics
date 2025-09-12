@@ -69,6 +69,7 @@ mr::graphics::Model::Model(
       ASSERT(s_cam_ubo_ptr);
 
       builder.add_camera(*s_cam_ubo_ptr);
+      builder.add_value(transform);
       builder.add_value(&material.constants);
       for (const auto &texture : material.textures) {
         builder.add_texture(importer2graphics(texture.type), texture);

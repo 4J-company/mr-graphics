@@ -5,37 +5,17 @@
 // Utility function for image size calculation
 static size_t calculate_image_size(mr::Extent extent, vk::Format format)
 {
-  static const std::array sizes_4byte {
-    vk::Format::eR8G8B8A8Srgb,
-    vk::Format::eB8G8R8A8Unorm,
-    vk::Format::eR32G32B32A32Sfloat
-  };
-  static const std::array sizes_3byte {
-    vk::Format::eR8G8B8Srgb,
-    vk::Format::eB8G8R8Unorm,
-  };
-  static const std::array sizes_2byte {
-    vk::Format::eR8G8Srgb,
-  };
-  static const std::array sizes_1byte {
-    vk::Format::eR8Srgb,
-    vk::Format::eD32Sfloat,
-    // TODO(dk6): Check is theese formats size 1 byte
-    vk::Format::eD32SfloatS8Uint,
-    vk::Format::eD24UnormS8Uint,
-  };
+  size_t texel_size = format == vk::Format::eR8G8B8A8Srgb       ? 4
+                    : format == vk::Format::eR8G8B8Srgb         ? 3
+                    : format == vk::Format::eR8G8Srgb           ? 2
+                    : format == vk::Format::eR8Srgb             ? 1
+                    : format == vk::Format::eR32G32B32A32Sfloat ? 16
+                    : format == vk::Format::eR32G32B32Sfloat    ? 12
+                    : format == vk::Format::eR32G32Sfloat       ? 8
+                    : format == vk::Format::eR32Sfloat          ? 4
+                                                                : 0;
 
-  size_t texel_size = 0;
-  if (std::ranges::find(sizes_4byte, format) != sizes_4byte.end()) {
-    texel_size = 4;
-  } else if (std::ranges::find(sizes_3byte, format) != sizes_3byte.end()) {
-    texel_size = 3;
-  } else if (std::ranges::find(sizes_2byte, format) != sizes_2byte.end()) {
-    texel_size = 2;
-  } if (std::ranges::find(sizes_1byte, format) != sizes_1byte.end()) {
-    texel_size = 1;
-  }
-  ASSERT(texel_size != 0, "unsupported format");
+  ASSERT(texel_size != 0);
 
   return extent.width * extent.height * texel_size;
 }

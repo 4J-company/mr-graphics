@@ -34,11 +34,13 @@ mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state,
     .stride = fmt2uint(attributes[0].format),
     .inputRate = vk::VertexInputRate::eVertex,
   };
-  binding_descriptions[1] = vk::VertexInputBindingDescription {
-    .binding = attributes[1].binding,
-    .stride = sum,
-    .inputRate = vk::VertexInputRate::eVertex,
-  };
+  if (attributes.size() > 1) {
+    binding_descriptions[1] = vk::VertexInputBindingDescription {
+      .binding = attributes[1].binding,
+      .stride = sum,
+      .inputRate = vk::VertexInputRate::eVertex,
+    };
+  }
 
   vk::PipelineVertexInputStateCreateInfo vertex_input_create_info {
     .vertexBindingDescriptionCount = (uint)2,
