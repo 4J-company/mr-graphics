@@ -43,7 +43,6 @@ inline namespace graphics {
     public:
       DescriptorSet() = default;
 
-      // TODO(dk6): we don't have UniqueDescriptorSet, will default move work correctly?
       DescriptorSet(DescriptorSet &&) noexcept = default;
       DescriptorSet & operator=(DescriptorSet &&) noexcept = default;
 

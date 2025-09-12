@@ -38,7 +38,9 @@ inline namespace graphics {
       std::shared_ptr<VulkanState> _state;
       Extent _extent;
 
-      CommandUnit _command_unit;
+      CommandUnit _models_command_unit;
+      CommandUnit _lights_command_unit;
+
       // RenderContext doesn't use transfer command unit, only gives it for buffers
       // Writting commands to it doesn't affect RenderContext internal state
       mutable CommandUnit _transfer_command_unit;

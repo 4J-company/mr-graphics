@@ -13,7 +13,8 @@
 
 mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent)
   : _state(std::make_shared<VulkanState>(global_state))
-  , _command_unit(*_state)
+  , _models_command_unit(*_state)
+  , _lights_command_unit(*_state)
   , _transfer_command_unit(*_state)
   , _extent(extent)
   , _depthbuffer(*_state, _extent)
@@ -127,8 +128,7 @@ void mr::RenderContext::_render_lights(const SceneHandle scene, Presenter &prese
 
   _depthbuffer.switch_layout(*_state, vk::ImageLayout::eDepthStencilAttachmentOptimal);
 
-  _command_unit.begin();// TODO(dk6): move it to `render` method
-  _command_unit->beginRendering(&attachment_info);
+  _lights_command_unit->beginRendering(&attachment_info);
 
   vk::Viewport viewport {
     .x = 0, .y = 0,
@@ -136,7 +136,7 @@ void mr::RenderContext::_render_lights(const SceneHandle scene, Presenter &prese
     .height = static_cast<float>(_extent.height),
     .minDepth = 0, .maxDepth = 1,
   };
-  _command_unit->setViewport(0, viewport);
+  _lights_command_unit->setViewport(0, viewport);
 
   vk::Rect2D scissors {
     .offset = {0, 0},
@@ -145,19 +145,19 @@ void mr::RenderContext::_render_lights(const SceneHandle scene, Presenter &prese
       static_cast<uint32_t>(_extent.height),
     },
   };
-  _command_unit->setScissor(0, scissors);
+  _lights_command_unit->setScissor(0, scissors);
 
   // shade all
-  _command_unit->bindVertexBuffers(0, {_lights_render_data.screen_vbuf.buffer()}, {0});
-  _command_unit->bindIndexBuffer(_lights_render_data.screen_ibuf.buffer(), 0, vk::IndexType::eUint32);
+  _lights_command_unit->bindVertexBuffers(0, {_lights_render_data.screen_vbuf.buffer()}, {0});
+  _lights_command_unit->bindIndexBuffer(_lights_render_data.screen_ibuf.buffer(), 0, vk::IndexType::eUint32);
 
   std::apply([this](const auto &lights) {
     for (auto light_handle : lights) {
-      light_handle->shade(_command_unit);
+      light_handle->shade(_lights_command_unit);
     }
   }, scene->_lights);
 
-  _command_unit->endRendering();
+  _lights_command_unit->endRendering();
 }
 
 void mr::RenderContext::_render_models(const SceneHandle scene)
@@ -181,7 +181,7 @@ void mr::RenderContext::_render_models(const SceneHandle scene)
     // .pStencilAttachment = &depth_attachment_info,
   };
 
-  _command_unit->beginRendering(&attachment_info);
+  _models_command_unit->beginRendering(&attachment_info);
 
   vk::Viewport viewport {
     .x = 0, .y = 0,
@@ -189,7 +189,7 @@ void mr::RenderContext::_render_models(const SceneHandle scene)
     .height = static_cast<float>(_extent.height),
     .minDepth = 0, .maxDepth = 1,
   };
-  _command_unit->setViewport(0, viewport);
+  _models_command_unit->setViewport(0, viewport);
 
   vk::Rect2D scissors {
     .offset = {0, 0},
@@ -198,13 +198,13 @@ void mr::RenderContext::_render_models(const SceneHandle scene)
       static_cast<uint32_t>(_extent.height),
     },
   };
-  _command_unit->setScissor(0, scissors);
+  _models_command_unit->setScissor(0, scissors);
 
   for (ModelHandle model : scene->_models) {
-    model->draw(_command_unit);
+    model->draw(_models_command_unit);
   }
 
-  _command_unit->endRendering();
+  _models_command_unit->endRendering();
 }
 
 void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
@@ -221,39 +221,30 @@ void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
 
   _update_camera_buffer(scene->_camera_uniform_buffer);
 
-  _command_unit.begin();
+  _models_command_unit.begin();
   _render_models(scene);
 
-  _command_unit.add_signal_semaphore(_models_render_finished_semaphore.get());
+  _models_command_unit.add_signal_semaphore(_models_render_finished_semaphore.get());
+  vk::SubmitInfo models_submit_info = _models_command_unit.end();
 
-  // !!! here use wait stages??
-  // _command_unit.add_wait_semaphore(_models_render_finished_semaphore.get(),
-  //                                  vk::PipelineStageFlagBits::eColorAttachmentOutput);
-
-  vk::SubmitInfo models_submit_info = _command_unit.end();
   _state->queue().submit(models_submit_info);
 
   // --------------------------------------------------------------------------
   // Lights shading pass
   // --------------------------------------------------------------------------
 
-  // TODO(dk6): This must be uncommented, but now we have troubles with syncronization -
-  //            here command buffer is in use.
-  //            Or maybe added different command buffers for different passes
-  // _command_unit.begin();
+  _lights_command_unit.begin();
   _render_lights(scene, presenter);
 
-  _command_unit.add_wait_semaphore(_models_render_finished_semaphore.get(),
+  _lights_command_unit.add_wait_semaphore(_models_render_finished_semaphore.get(),
                                    vk::PipelineStageFlagBits::eColorAttachmentOutput);
   auto image_available_semaphore = presenter.image_available_semaphore();
   if (image_available_semaphore) {
-    _command_unit.add_wait_semaphore(image_available_semaphore,
+    _lights_command_unit.add_wait_semaphore(image_available_semaphore,
                                      vk::PipelineStageFlagBits::eColorAttachmentOutput);
   }
-  _command_unit.add_signal_semaphore(presenter.render_finished_semaphore());
-
-
-  vk::SubmitInfo light_submit_info = _command_unit.end();
+  _lights_command_unit.add_signal_semaphore(presenter.render_finished_semaphore());
+  vk::SubmitInfo light_submit_info = _lights_command_unit.end();
   _state->queue().submit(light_submit_info, _image_fence.get());
 
   presenter.present();

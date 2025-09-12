@@ -22,16 +22,16 @@ vk::RenderingAttachmentInfoKHR mr::FileWriter::target_image_info() noexcept
 {
   ASSERT(_parent != nullptr);
 
-  _prev_image_index = _image_index;
+  // We start with 1st image (not 0): 1 -> 2 -> 0 -> 1 -> ...
   _image_index = (_image_index + 1) % images_number;
 
-  auto &image = _images[_prev_image_index];
+  auto &image = _images[_image_index];
   image.switch_layout(_parent->vulkan_state(), vk::ImageLayout::eColorAttachmentOptimal);
 
-  auto &[sem, first_usage] = _image_available_semaphore[_prev_image_index];
+  auto &[sem, first_usage] = _image_available_semaphore[_image_index];
   _current_image_available_semaphore = first_usage ? VK_NULL_HANDLE : sem.get();
   first_usage = false;
-  _current_render_finished_semaphore = _render_finished_semaphore[_prev_image_index].get();
+  _current_render_finished_semaphore = _render_finished_semaphore[_image_index].get();
 
   return image.attachment_info();
 }
@@ -42,12 +42,12 @@ void mr::FileWriter::present() noexcept
 
   // TODO(dk6): move all logic in separate thread
 
-  auto &image = _images[_prev_image_index];
+  auto &image = _images[_image_index];
   const auto &state = _parent->vulkan_state();
 
   auto &command_unit = _parent->transfer_command_unit();
-  command_unit.add_signal_semaphore(_image_available_semaphore[_prev_image_index].first.get());
-  command_unit.add_wait_semaphore(_render_finished_semaphore[_prev_image_index].get(),
+  command_unit.add_signal_semaphore(_image_available_semaphore[_image_index].first.get());
+  command_unit.add_wait_semaphore(_render_finished_semaphore[_image_index].get(),
                                   vk::PipelineStageFlagBits::eColorAttachmentOutput);
 
   auto stage_buffer = image.read_to_host_buffer(state, command_unit);
