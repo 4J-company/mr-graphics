@@ -6,10 +6,14 @@
 static size_t calculate_image_size(mr::Extent extent, vk::Format format)
 {
   // TODO: support float formats
-  size_t texel_size = format == vk::Format::eR8G8B8A8Srgb ? 4
-                    : format == vk::Format::eR8G8B8Srgb   ? 3
-                    : format == vk::Format::eR8G8Srgb     ? 2
-                                                          : 1;
+  size_t texel_size = format == vk::Format::eR8G8B8A8Srgb       ? 4
+                    : format == vk::Format::eR8G8B8Srgb         ? 3
+                    : format == vk::Format::eR8G8Srgb           ? 2
+                    : format == vk::Format::eR32G32B32A32Sfloat ? 16
+                    : format == vk::Format::eR32G32B32Sfloat    ? 12
+                    : format == vk::Format::eR32G32Sfloat       ? 8
+                    : format == vk::Format::eR32Sfloat          ? 4
+                                                                : 1;
   return extent.width * extent.height * texel_size;
 }
 

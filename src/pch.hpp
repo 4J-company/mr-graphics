@@ -31,7 +31,16 @@
 #include <variant>
 #include <vector>
 
+#include <mr-math/math.hpp>
+#include <mr-utils/assert.hpp>
+#include <mr-utils/misc.hpp>
+#include <mr-utils/path.hpp>
+#include <mr-utils/log.hpp>
+// #include <mr-manager/manager.hpp>
+#include <mr-importer/importer.hpp>
+
 // user includes
+#define VULKAN_HPP_ASSERT DEBUG_ASSERT
 #define VULKAN_HPP_NO_EXCEPTIONS
 #define VULKAN_HPP_NO_NODISCARD_WARNINGS
 #define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
@@ -41,14 +50,6 @@
 #define VKFW_NO_NODISCARD_WARNINGS
 #define VKFW_NO_STRUCT_CONSTRUCTORS
 #include <vkfw/vkfw.hpp>
-
-#include <mr-math/math.hpp>
-#include <mr-utils/assert.hpp>
-#include <mr-utils/misc.hpp>
-#include <mr-utils/path.hpp>
-#include <mr-utils/log.hpp>
-// #include <mr-manager/manager.hpp>
-#include <mr-importer/importer.hpp>
 
 #include <beman/inplace_vector/inplace_vector.hpp>
 namespace mr {

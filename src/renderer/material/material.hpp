@@ -131,7 +131,7 @@ inline namespace graphics {
         *_state,
         (const std::byte*)tex_data.image.pixels.get(),
         mr::Extent{ tex_data.image.width, tex_data.image.height },
-        vk::Format::eR8G8B8A8Srgb
+        vk::Format::eR32G32B32A32Sfloat
       );
 
       _textures[enum_cast(param)] = std::move(tex);
