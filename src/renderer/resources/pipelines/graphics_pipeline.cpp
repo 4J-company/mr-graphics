@@ -43,7 +43,7 @@ mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state,
   }
 
   vk::PipelineVertexInputStateCreateInfo vertex_input_create_info {
-    .vertexBindingDescriptionCount = (uint)2,
+    .vertexBindingDescriptionCount = std::min<uint>(attributes.size(), 2),
     .pVertexBindingDescriptions = binding_descriptions.data(),
     .vertexAttributeDescriptionCount = static_cast<uint>(attributes.size()),
     .pVertexAttributeDescriptions = attributes.data()};
