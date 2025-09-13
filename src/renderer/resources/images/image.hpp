@@ -45,6 +45,16 @@ inline namespace graphics {
       // std::vector<std::byte> read() { return read_to_buffer().read(); }
       // Vec4f get_pixel(x, y) -> get small size (16 bytes)
 
+    public:
+      void write(const VulkanState &state, std::span<const std::byte> src);
+
+      template <typename T>
+      void write(const VulkanState &state, std::span<T> src) { write(state, std::as_bytes(src)); }
+
+    protected:
+      void create_image_view(const VulkanState &state);
+
+    public:
       vk::ImageView image_view() const noexcept { return _image_view.get(); }
       vk::Image image() const noexcept { return _image.get(); }
       vk::Format format() const noexcept { return _format; }
@@ -56,12 +66,6 @@ inline namespace graphics {
       static vk::Format find_supported_format(
         const VulkanState &state, const std::vector<vk::Format> &candidates,
         vk::ImageTiling tiling, vk::FormatFeatureFlags features);
-
-    protected:
-      void create_image_view(const VulkanState &state);
-
-    private:
-      void _write(const VulkanState &state, std::span<const std::byte> data) noexcept;
   };
 
   // HostImage: host-visible, for staging or CPU read/write

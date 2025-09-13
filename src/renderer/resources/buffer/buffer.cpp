@@ -32,9 +32,10 @@ mr::Buffer::Buffer(const VulkanState &state, size_t byte_size,
 void resize(size_t size) {}
 
 // find memory type
-mr::uint
-mr::Buffer::find_memory_type(const VulkanState &state, uint filter,
-                             vk::MemoryPropertyFlags properties) noexcept
+uint32_t mr::Buffer::find_memory_type(
+    const VulkanState &state,
+    uint32_t filter,
+    vk::MemoryPropertyFlags properties) noexcept
 {
   vk::PhysicalDeviceMemoryProperties mem_properties =
     state.phys_device().getMemoryProperties();
@@ -48,15 +49,6 @@ mr::Buffer::find_memory_type(const VulkanState &state, uint filter,
 
   ASSERT(false, "Cannot find memory format");
   return 0;
-}
-
-void mr::HostBuffer::_write(std::span<const std::byte> data) noexcept
-{
-  ASSERT(data.size() <= _size);
-  ASSERT(_state != nullptr);
-
-  memcpy(_mapped_data.map(), data.data(), data.size());
-  _mapped_data.unmap();
 }
 
 std::span<std::byte> mr::HostBuffer::read() noexcept
@@ -81,25 +73,6 @@ std::vector<std::byte> mr::HostBuffer::copy() noexcept
 
 mr::HostBuffer::~HostBuffer() {}
 
-void mr::DeviceBuffer::_write(std::span<const std::byte> data) noexcept
-{
-  assert(_state != nullptr);
-  auto buf =
-    HostBuffer(*_state, _size, vk::BufferUsageFlagBits::eTransferSrc);
-  buf.write(data);
-
-  vk::BufferCopy buffer_copy {.size = data.size()};
-
-  static CommandUnit command_unit(*_state);
-  command_unit.begin();
-  command_unit->copyBuffer(buf.buffer(), _buffer.get(), {buffer_copy});
-  vk::SubmitInfo submit_info = command_unit.end();
-
-  auto fence = _state->device().createFenceUnique({}).value;
-  _state->queue().submit(submit_info, fence.get());
-  _state->device().waitForFences({fence.get()}, VK_TRUE, UINT64_MAX);
-}
-
 mr::HostBuffer::HostBuffer(
   const VulkanState &state, std::size_t size,
   vk::BufferUsageFlags usage_flags,
@@ -108,7 +81,6 @@ mr::HostBuffer::HostBuffer(
              memory_properties |
                vk::MemoryPropertyFlagBits::eHostVisible |
                vk::MemoryPropertyFlagBits::eHostCoherent)
-    , _mapped_data(*this)
 {
 }
 
@@ -161,3 +133,44 @@ void mr::HostBuffer::MappedData::unmap() noexcept
 
 bool mr::HostBuffer::MappedData::mapped() const noexcept { return _data != nullptr; }
 void * mr::HostBuffer::MappedData::get() noexcept { return _data; }
+
+mr::DeviceBuffer & mr::DeviceBuffer::write(std::span<const std::byte> src)
+{
+  ASSERT(_state != nullptr);
+  ASSERT(src.data());
+  ASSERT(src.size() <= _size);
+
+  auto buf = HostBuffer(*_state, _size, vk::BufferUsageFlagBits::eTransferSrc);
+  buf.write(src);
+
+  vk::BufferCopy buffer_copy {.size = src.size()};
+
+  static CommandUnit command_unit(*_state);
+  command_unit.begin();
+  command_unit->copyBuffer(buf.buffer(), _buffer.get(), {buffer_copy});
+  command_unit.end();
+
+  auto [bufs, bufs_number] = command_unit.submit_info();
+  vk::SubmitInfo submit_info {
+    .commandBufferCount = bufs_number,
+    .pCommandBuffers = bufs,
+  };
+
+  auto fence = _state->device().createFenceUnique({}).value;
+  _state->queue().submit(submit_info, fence.get());
+  _state->device().waitForFences({fence.get()}, VK_TRUE, UINT64_MAX);
+
+  return *this;
+}
+
+mr::HostBuffer & mr::HostBuffer::write(std::span<const std::byte> src)
+{
+  ASSERT(_state != nullptr);
+  ASSERT(src.data());
+  ASSERT(src.size() <= _size);
+
+  auto ptr = _state->device().mapMemory(_memory.get(), 0, src.size()).value;
+  memcpy(ptr, src.data(), src.size());
+  _state->device().unmapMemory(_memory.get());
+  return *this;
+}
