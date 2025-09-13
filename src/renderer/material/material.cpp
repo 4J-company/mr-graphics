@@ -5,13 +5,14 @@ mr::graphics::Material::Material(const VulkanState &state,
                        mr::graphics::ShaderHandle shader,
                        std::span<std::byte> ubo_data,
                        std::span<std::optional<mr::TextureHandle>> textures,
+                       std::span<mr::StorageBuffer*> buffers,
                        mr::UniformBuffer &cam_ubo) noexcept
     : _ubo(state, ubo_data)
     , _shader(shader)
     , _descriptor_allocator(state)
 {
   std::vector<Shader::ResourceView> attachments;
-  attachments.reserve(textures.size());
+  attachments.reserve(textures.size() + buffers.size() + 2);
 
   attachments.emplace_back(0, 0, &cam_ubo);
   attachments.emplace_back(0, 1, &_ubo);
@@ -20,6 +21,9 @@ mr::graphics::Material::Material(const VulkanState &state,
       continue;
     }
     attachments.emplace_back(0, static_cast<uint32_t>(i + 2), textures[i]->get());
+  }
+  for (size_t i = 0; i < buffers.size(); i++) {
+    attachments.emplace_back(0, static_cast<uint32_t>(i + textures.size() + 2), buffers[i]);
   }
 
   auto layout_handle = ResourceManager<DescriptorSetLayout>::get().create(shader->name(),

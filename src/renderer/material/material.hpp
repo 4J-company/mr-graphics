@@ -40,11 +40,14 @@ inline namespace graphics {
              mr::ShaderHandle shader,
              std::span<std::byte> ubo_data,
              std::span<std::optional<mr::TextureHandle>> textures,
+             std::span<mr::StorageBuffer*> buffers,
              mr::UniformBuffer &cam_ubo) noexcept;
 
     void bind(CommandUnit &unit) const noexcept;
 
-  protected:
+    const mr::GraphicsPipeline &pipeline() const noexcept { return _pipeline; }
+
+  private:
     mr::UniformBuffer _ubo;
     mr::ShaderHandle _shader;
 
@@ -102,7 +105,8 @@ inline namespace graphics {
     std::vector<byte> _specialization_data;
     std::unordered_map<std::string, std::string> _defines;
     std::vector<std::byte> _ubo_data;
-    InplaceVector<std::optional<mr::TextureHandle>, enum_cast(MaterialParameter::EnumSize)> _textures;
+    std::array<std::optional<mr::TextureHandle>, enum_cast(MaterialParameter::EnumSize)> _textures;
+    InplaceVector<mr::StorageBuffer *, 16> _buffers;
     mr::UniformBuffer *_cam_ubo;
 
     std::string_view _shader_filename;
@@ -116,7 +120,6 @@ inline namespace graphics {
       , _context(&context)
       , _shader_filename(filename)
     {
-      _textures.resize(_textures.capacity());
     }
 
     MaterialBuilder(MaterialBuilder &&) noexcept = default;
@@ -138,6 +141,8 @@ inline namespace graphics {
       add_value(factor);
       return *this;
     }
+
+    MaterialBuilder & add_buffer(mr::StorageBuffer *buffer) { _buffers.push_back(buffer); return *this; }
 
     MaterialBuilder & add_value(const auto *value)
     {
@@ -197,6 +202,7 @@ inline namespace graphics {
         shdhandle,
         std::span {_ubo_data},
         std::span {_textures},
+        std::span {_buffers.data(), _buffers.size()},
         *_cam_ubo
       );
     }

@@ -67,11 +67,7 @@ mr::DeviceBuffer & mr::DeviceBuffer::write(std::span<const std::byte> src)
   command_unit->copyBuffer(buf.buffer(), _buffer.get(), {buffer_copy});
   command_unit.end();
 
-  auto [bufs, bufs_number] = command_unit.submit_info();
-  vk::SubmitInfo submit_info {
-    .commandBufferCount = bufs_number,
-    .pCommandBuffers = bufs,
-  };
+  vk::SubmitInfo submit_info = command_unit.submit_info();
 
   auto fence = _state->device().createFenceUnique({}).value;
   _state->queue().submit(submit_info, fence.get());

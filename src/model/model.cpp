@@ -1,7 +1,6 @@
-#include "model/model.hpp"
+#include "renderer/window/render_context.hpp"
 
-// TODO(dk6): workaround to pass camera data to material ubo until Scene class will be added
-extern mr::UniformBuffer *s_cam_ubo_ptr;
+#include "model/model.hpp"
 
 constexpr mr::MaterialParameter importer2graphics(mr::importer::TextureType type)
 {
@@ -25,7 +24,7 @@ constexpr mr::MaterialParameter importer2graphics(mr::importer::TextureType type
 }
 
 mr::graphics::Model::Model(
-    const Scene &scene,
+    Scene &scene,
     std::fs::path filename) noexcept
 {
   MR_INFO("Loading model {}", filename.string());
@@ -38,9 +37,6 @@ mr::graphics::Model::Model(
     return;
   }
   auto& model_value = model.value();
-
-  auto default_shader_path = mr::path::shaders_dir / "default";
-  auto default_shader_path_str = defult_shader_path.string();
 
   using enum mr::MaterialParameter;
   static std::vector<mr::MaterialBuilder> builders;
@@ -55,22 +51,56 @@ mr::graphics::Model::Model(
       const auto &material = model_value.materials[mesh.material];
       const auto &transform = mesh.transforms[0];
 
+      const size_t instance_count = mesh.transforms.size();
+      const size_t instance_offset = scene._transforms_data.size();
+      const size_t mesh_offset = scene._bounds_data.size();
+
       std::vector<VertexBuffer> vbufs;
-      vbufs.emplace_back(state, std::span(mesh.positions.data(), mesh.positions.size()));
-      vbufs.emplace_back(state, std::span(mesh.attributes.data(), mesh.attributes.size()));
-      IndexBuffer ibuf {state, std::span(mesh.lods[0].indices.data(), mesh.lods[0].indices.size())};
+      vbufs.reserve(2);
+      vbufs.emplace_back(scene.render_context().vulkan_state(),
+          std::span(mesh.positions.data(), mesh.positions.size()));
+      vbufs.emplace_back(scene.render_context().vulkan_state(),
+          std::span(mesh.attributes.data(), mesh.attributes.size()));
 
-      _meshes.emplace_back(std::move(vbufs), std::move(ibuf));
+      std::vector<IndexBuffer> ibufs;
+      vbufs.reserve(mesh.lods.size());
+      for (size_t j = 0; j < mesh.lods.size(); j++) {
+        ibufs.emplace_back(scene.render_context().vulkan_state(),
+          std::span(mesh.lods[j].indices.data(), mesh.lods[j].indices.size())
+        );
+      }
 
-      ASSERT(s_cam_ubo_ptr);
+      scene._bounds_data.emplace_back();
+      scene._visibility_data.emplace_back();
+      scene._transforms_data.insert(
+        scene._transforms_data.end(),
+        mesh.transforms.begin(),
+        mesh.transforms.end()
+      );
 
-      mr::MaterialBuilder builder {state, render_context, defult_shader_path_str};
-      builder.add_camera(*s_cam_ubo_ptr);
-      builder.add_value(transform);
+      _meshes.emplace_back(
+        std::move(vbufs),
+        std::move(ibufs),
+        instance_count,
+        mesh_offset,
+        instance_offset
+      );
+
+      mr::MaterialBuilder builder {
+        scene.render_context().vulkan_state(),
+        scene.render_context(),
+        "default"
+      };
+
+      builder.add_camera(scene.camera_uniform_buffer());
       builder.add_value(&material.constants);
       for (const auto &texture : material.textures) {
         builder.add_texture(importer2graphics(texture.type), texture);
       }
+      builder.add_buffer(&scene._transforms);
+      builder.add_buffer(&scene._bounds);
+      builder.add_buffer(&scene._visibility);
+
       builders.push_back(std::move(builder));
       _materials.push_back(builders.back().build());
     }
@@ -82,7 +112,12 @@ mr::graphics::Model::Model(
 void mr::graphics::Model::draw(CommandUnit &unit) const noexcept
 {
   for (const auto &[material, mesh] : std::views::zip(_materials, _meshes)) {
+    uint32_t data[2] {
+      mesh._mesh_offset,
+      mesh._instance_offset,
+    };
     material->bind(unit);
+    unit->pushConstants(material->pipeline().layout(), vk::ShaderStageFlagBits::eFragment, 0, 8, data);
     mesh.bind(unit);
     mesh.draw(unit);
   }

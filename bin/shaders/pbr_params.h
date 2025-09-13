@@ -1,8 +1,6 @@
 #define PBR_SET_INDEX 0
 
 layout(set = PBR_SET_INDEX, binding = 1) uniform PrimitiveUbo {
-  mat4 transform;
-
   vec4 base_color_factor;
   vec4 emissive_color;
   float emissive_strength;

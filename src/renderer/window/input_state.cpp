@@ -4,17 +4,18 @@ void mr::InputState::update() noexcept
 {
   std::array<bool, max_keys_number> key_pressed_copy;
   Vec2d mouse_pos_copy;
-  /* scope for mutex lock */ {
+
+  {
     std::lock_guard lock(update_mutex);
-    // std::ranges::copy(std::execution::unseq, _key_pressed, key_pressed_copy.begin());
-    std::ranges::copy(_key_pressed, key_pressed_copy.begin());
+    std::copy(std::execution::par_unseq, _key_pressed.begin(), _key_pressed.end(), key_pressed_copy.begin());
     mouse_pos_copy = _mouse_pos;
   }
 
   for (uint32_t i = 0; i < max_keys_number; i++) {
     _key_tapped[i] = key_pressed_copy[i] && !_prev_key_pressed[i];
   }
-  std::ranges::copy(key_pressed_copy, _prev_key_pressed.begin());
+
+  std::copy(std::execution::par_unseq, key_pressed_copy.begin(), key_pressed_copy.end(), _prev_key_pressed.begin());
 
   _mouse_pos_delta = mouse_pos_copy - _prev_mouse_pos;
   _prev_mouse_pos = mouse_pos_copy;

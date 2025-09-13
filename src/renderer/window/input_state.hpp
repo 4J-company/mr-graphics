@@ -2,9 +2,9 @@
 #define __MR_INPUT_STATE_HPP_
 
 #include "pch.hpp"
-#include "vkfw/vkfw.hpp"
 
 namespace mr {
+inline namespace graphics {
   // forward declaration of Window class
   class Window;
 
@@ -36,6 +36,23 @@ namespace mr {
 
   public:
     InputState() = default;
+    InputState(InputState&& other) noexcept
+      : _key_pressed(std::move(other._key_pressed))
+      , _prev_key_pressed(std::move(other._prev_key_pressed))
+      , _key_tapped(std::move(other._key_tapped))
+      , _mouse_pos(std::move(other._mouse_pos))
+      , _prev_mouse_pos(std::move(other._prev_mouse_pos))
+      , _mouse_pos_delta(std::move(other._mouse_pos_delta))
+    {
+    }
+    InputState& operator=(InputState&& other) noexcept {
+      _key_pressed = std::move(other._key_pressed);
+      _prev_key_pressed = std::move(other._prev_key_pressed);
+      _key_tapped = std::move(other._key_tapped);
+      _mouse_pos = std::move(other._mouse_pos);
+      _prev_mouse_pos = std::move(other._prev_mouse_pos);
+      _mouse_pos_delta = std::move(other._mouse_pos_delta);
+    }
 
     void update() noexcept;
 
@@ -55,6 +72,7 @@ namespace mr {
     using MouseCallbackT = std::function<void(const vkfw::Window &, double, double)>;
     MouseCallbackT get_mouse_callback() noexcept;
   };
+}
 }
 
 #endif // __MR_INPUT_STATE_HPP_

@@ -2,8 +2,9 @@
 #include "render_context.hpp"
 #include "swapchain.hpp"
 
-// #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb/stb_image_write.h"
+#define STB_IMAGE_WRITE_STATIC
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <stb_image_write.h>
 
 mr::FileWriter::FileWriter(const RenderContext &parent, Extent extent) : Presenter(parent, extent)
 {

@@ -138,6 +138,21 @@ inline namespace graphics {
   class StorageBuffer : public DeviceBuffer {
     public:
       using DeviceBuffer::DeviceBuffer;
+
+      StorageBuffer(const VulkanState &state, size_t byte_size)
+          : DeviceBuffer(state, byte_size,
+                         vk::BufferUsageFlagBits::eStorageBuffer |
+                           vk::BufferUsageFlagBits::eTransferDst)
+      {
+      }
+
+      template <typename T, size_t Extent>
+      StorageBuffer(const VulkanState &state, std::span<T, Extent> src)
+          : StorageBuffer(state, src.size() * sizeof(T))
+      {
+        assert(src.data());
+        write(src);
+      }
   };
 
   class VertexBuffer : public DeviceBuffer {

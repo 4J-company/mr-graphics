@@ -113,8 +113,9 @@ void mr::VulkanGlobalState::_create_phys_device()
     .set_required_features_14(features14)
     .add_required_extensions({
       VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-      VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME})
-    .select();
+      VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
+      VK_EXT_CONDITIONAL_RENDERING_EXTENSION_NAME
+    }).select();
 
   if (not phys_device) {
     MR_ERROR("Cannot create VkPhysicalDevice. {}\n", phys_device.error().message());

@@ -9,13 +9,26 @@ static size_t calculate_image_size(mr::Extent extent, vk::Format format)
                     : format == vk::Format::eR8G8B8Srgb         ? 3
                     : format == vk::Format::eR8G8Srgb           ? 2
                     : format == vk::Format::eR8Srgb             ? 1
+
+                    : format == vk::Format::eR8G8B8A8Unorm      ? 4
+                    : format == vk::Format::eR8G8B8Unorm        ? 3
+                    : format == vk::Format::eR8G8Unorm          ? 2
+                    : format == vk::Format::eR8Unorm            ? 1
+
+                    : format == vk::Format::eB8G8R8A8Unorm      ? 4
+                    : format == vk::Format::eB8G8R8Unorm        ? 3
+
                     : format == vk::Format::eR32G32B32A32Sfloat ? 16
                     : format == vk::Format::eR32G32B32Sfloat    ? 12
                     : format == vk::Format::eR32G32Sfloat       ? 8
                     : format == vk::Format::eR32Sfloat          ? 4
+
+                    : format == vk::Format::eD32Sfloat          ? 4
+                    : format == vk::Format::eD32SfloatS8Uint    ? 0
+                    : format == vk::Format::eD24UnormS8Uint     ? 0
                                                                 : 0;
 
-  ASSERT(texel_size != 0);
+  ASSERT(texel_size != 0, "Unrecognized texel format", format);
 
   return extent.width * extent.height * texel_size;
 }
@@ -153,7 +166,9 @@ void mr::Image::switch_layout(const VulkanState &state, vk::ImageLayout new_layo
   command_unit.begin();
   command_unit->pipelineBarrier(
     source_stage, destination_stage, {}, {}, {}, {barrier});
-  vk::SubmitInfo submit_info = command_unit.end();
+  command_unit.end();
+
+  vk::SubmitInfo submit_info = command_unit.submit_info();
 
   auto fence = state.device().createFenceUnique({}).value;
   state.queue().submit(submit_info, fence.get());
@@ -194,11 +209,8 @@ void mr::Image::write(const VulkanState &state, std::span<const std::byte> src) 
       stage_buffer.buffer(), _image.get(), _layout, {region});
   command_unit.end();
 
-  auto [bufs, bufs_number] = command_unit.submit_info();
-  vk::SubmitInfo submit_info {
-    .commandBufferCount = bufs_number,
-      .pCommandBuffers = bufs,
-  };
+  vk::SubmitInfo submit_info = command_unit.submit_info();
+
   auto fence = state.device().createFenceUnique({}).value;
   state.queue().submit(submit_info, fence.get());
   state.device().waitForFences({fence.get()}, VK_TRUE, UINT64_MAX);
@@ -275,7 +287,9 @@ void mr::Image::_write(const VulkanState &state, std::span<const std::byte> data
   command_unit.begin();
   command_unit->copyBufferToImage(
     stage_buffer.buffer(), _image.get(), _layout, {region});
-  vk::SubmitInfo submit_info = command_unit.end();
+  command_unit.end();
+
+  vk::SubmitInfo submit_info = command_unit.submit_info();
 
   auto fence = state.device().createFenceUnique({}).value;
   state.queue().submit(submit_info, fence.get());
@@ -305,7 +319,9 @@ mr::HostBuffer mr::Image::read_to_host_buffer(const VulkanState &state, CommandU
 
   command_unit.begin();
   command_unit->copyImageToBuffer(_image.get(), _layout, stage_buffer.buffer(), {region});
-  auto submit_info = command_unit.end();
+  command_unit.end();
+
+  auto submit_info = command_unit.submit_info();
 
   auto fence = state.device().createFenceUnique({}).value;
   state.queue().submit(submit_info, fence.get());
