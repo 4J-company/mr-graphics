@@ -86,39 +86,80 @@ mr::HostBuffer & mr::HostBuffer::write(std::span<const std::byte> src)
   ASSERT(src.data());
   ASSERT(src.size() <= _size);
 
-  auto ptr = _state->device().mapMemory(_memory.get(), 0, src.size()).value;
-  memcpy(ptr, src.data(), src.size());
-  _state->device().unmapMemory(_memory.get());
+  memcpy(_mapped_data.map(), src.data(), src.size());
+  _mapped_data.unmap();
   return *this;
 }
 
 std::span<std::byte> mr::HostBuffer::read() noexcept
 {
-  if (_mapped_data == nullptr) {
-    _state->device().mapMemory(_memory.get(), 0, _size, {}, &_mapped_data);
+  if (not _mapped_data.mapped()) {
+    _mapped_data.map();
   }
-  return std::span(reinterpret_cast<std::byte *>(_mapped_data), _size);
+  return std::span(reinterpret_cast<std::byte *>(_mapped_data.get()), _size);
 }
 
 std::vector<std::byte> mr::HostBuffer::copy() noexcept
 {
   std::vector<std::byte> data(_size);
-  if (_mapped_data != nullptr) {
-    memcpy(data.data(), _mapped_data, _size);
+  if (_mapped_data.mapped()) {
+    memcpy(data.data(), _mapped_data.get(), _size);
   } else {
-    _state->device().mapMemory(_memory.get(), 0, _size, {}, &_mapped_data);
-    memcpy(data.data(), _mapped_data, _size);
-    _state->device().unmapMemory(_memory.get());
+    memcpy(data.data(), _mapped_data.map(), _size);
+    _mapped_data.unmap();
   }
   return data;
 }
 
-mr::HostBuffer::~HostBuffer()
+mr::HostBuffer::~HostBuffer() {}
+
+// ----------------------------------------------------------------------------
+// Data mapper
+// ----------------------------------------------------------------------------
+
+mr::HostBuffer::MappedData::MappedData(HostBuffer &buf) : _buf(&buf) {}
+
+mr::HostBuffer::MappedData::~MappedData()
 {
-  // TODO(dk6): Now, while _mapped_data is simple pointer, it can be bad after move, double memory unmap
-  if (_mapped_data != nullptr) {
-    _state->device().unmapMemory(_memory.get());
-    _mapped_data = nullptr;
+  if (_data != nullptr) {
+    _buf->_state->device().unmapMemory(_buf->_memory.get());
   }
 }
+
+mr::HostBuffer::MappedData & mr::HostBuffer::MappedData::operator=(MappedData &&other) noexcept
+{
+  std::swap(_buf, other._buf);
+  std::swap(_data, other._data);
+  return *this;
+}
+
+mr::HostBuffer::MappedData::MappedData(MappedData &&other) noexcept
+{
+  std::swap(_buf, other._buf);
+  std::swap(_data, other._data);
+}
+
+void * mr::HostBuffer::MappedData::map(size_t offset, size_t size) noexcept
+{
+  ASSERT(_data == nullptr);
+  ASSERT(offset < size);
+
+  _buf->_state->device().mapMemory(_buf->_memory.get(), offset, size, {}, &_data);
+  return _data;
+}
+
+void * mr::HostBuffer::MappedData::map(size_t offset) noexcept
+{
+  return map(offset, _buf->_size);
+}
+
+void mr::HostBuffer::MappedData::unmap() noexcept
+{
+  ASSERT(_data != nullptr);
+  _buf->_state->device().unmapMemory(_buf->_memory.get());
+  _data = nullptr;
+}
+
+bool mr::HostBuffer::MappedData::mapped() const noexcept { return _data != nullptr; }
+void * mr::HostBuffer::MappedData::get() noexcept { return _data; }
 

@@ -46,13 +46,29 @@ inline namespace graphics {
   class HostBuffer : public Buffer {
     friend class FileWriter; // TODO(dk6): tmp solution for copying from buffer to RAM
 
-  private:
-    // TODO(dk6): use std::unique_ptr with custom deleted and move contructor
-    void *_mapped_data = nullptr;
+    private:
+      class MappedData {
+      private:
+        HostBuffer *_buf = nullptr;
+        void *_data = nullptr;
 
-  public:
-    HostBuffer() = default;
+      public:
+        MappedData(HostBuffer &buf);
+        ~MappedData();
 
+        MappedData & operator=(MappedData &&other) noexcept;
+        MappedData(MappedData &&other) noexcept;
+
+        void * map(size_t offset = 0) noexcept;
+        void * map(size_t offset, size_t size) noexcept;
+        void unmap() noexcept;
+        bool mapped() const noexcept;
+        void * get() noexcept;
+      };
+
+      MappedData _mapped_data;
+
+    public:
     HostBuffer(
       const VulkanState &state, std::size_t size,
       vk::BufferUsageFlags usage_flags,
@@ -61,6 +77,7 @@ inline namespace graphics {
                  memory_properties |
                    vk::MemoryPropertyFlagBits::eHostVisible |
                    vk::MemoryPropertyFlagBits::eHostCoherent)
+        , _mapped_data(*this)
     {
     }
 
@@ -104,8 +121,6 @@ inline namespace graphics {
 
   class UniformBuffer : public HostBuffer {
   public:
-    UniformBuffer() = default;
-
     UniformBuffer(const VulkanState &state, size_t size)
         : HostBuffer(state, size, vk::BufferUsageFlagBits::eUniformBuffer)
     {
