@@ -21,7 +21,7 @@ mr::graphics::Shader::Shader(const VulkanState &state, std::string_view filename
   std::iota(shd_types.begin(), shd_types.end(), 0);
 
   std::for_each(
-    std::execution::seq, shd_types.begin(), shd_types.end(), [&](int shd_ind) {
+    std::execution::par, shd_types.begin(), shd_types.end(), [&](int shd_ind) {
       auto stage = static_cast<Stage>(shd_ind);
       compile(stage);
       std::optional<std::vector<char>> source = load(stage);
