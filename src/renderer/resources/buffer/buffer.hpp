@@ -44,103 +44,66 @@ inline namespace graphics {
   };
 
   class HostBuffer : public Buffer {
-    public:
-      HostBuffer() = default;
+  public:
+    HostBuffer() = default;
 
-      HostBuffer(
-        const VulkanState &state, std::size_t size,
-        vk::BufferUsageFlags usage_flags,
-        vk::MemoryPropertyFlags memory_properties = vk::MemoryPropertyFlags(0))
-          : Buffer(state, size, usage_flags,
-                   memory_properties |
-                     vk::MemoryPropertyFlagBits::eHostVisible |
-                     vk::MemoryPropertyFlagBits::eHostCoherent)
-      {
-      }
+    HostBuffer(
+      const VulkanState &state, std::size_t size,
+      vk::BufferUsageFlags usage_flags,
+      vk::MemoryPropertyFlags memory_properties = vk::MemoryPropertyFlags(0))
+        : Buffer(state, size, usage_flags,
+                 memory_properties |
+                   vk::MemoryPropertyFlagBits::eHostVisible |
+                   vk::MemoryPropertyFlagBits::eHostCoherent)
+    {
+    }
 
-      HostBuffer(HostBuffer &&) = default;
-      HostBuffer &operator=(HostBuffer &&) = default;
+    HostBuffer(HostBuffer &&) = default;
+    HostBuffer &operator=(HostBuffer &&) = default;
 
-      template <typename T, size_t Extent>
-      HostBuffer &write(std::span<T, Extent> src)
-      {
-        // std::span<const T, Extent> cannot be constructed from non-const
+    HostBuffer &write(std::span<const std::byte> src);
 
-        size_t byte_size = src.size() * sizeof(T);
-        ASSERT(byte_size <= _size);
-
-        ASSERT(_state != nullptr);
-        auto ptr = _state->device().mapMemory(_memory.get(), 0, byte_size).value;
-        memcpy(ptr, src.data(), byte_size);
-        _state->device().unmapMemory(_memory.get());
-        return *this;
-      }
+    template <typename T, size_t Extent>
+    HostBuffer &write(std::span<T, Extent> src) { return write(std::as_bytes(src)); }
   };
 
   class DeviceBuffer : public Buffer {
-    public:
-      DeviceBuffer() = default;
-      DeviceBuffer(DeviceBuffer &&) = default;
-      DeviceBuffer &operator=(DeviceBuffer &&) = default;
+  public:
+    DeviceBuffer() = default;
+    DeviceBuffer(DeviceBuffer &&) = default;
+    DeviceBuffer &operator=(DeviceBuffer &&) = default;
 
-      DeviceBuffer(
-        const VulkanState &state, std::size_t size,
-        vk::BufferUsageFlags usage_flags,
-        vk::MemoryPropertyFlags memory_properties = vk::MemoryPropertyFlags(0))
-          : Buffer(state, size, usage_flags,
-                   memory_properties | vk::MemoryPropertyFlagBits::eDeviceLocal)
-      {
-      }
+    DeviceBuffer(
+      const VulkanState &state, std::size_t size,
+      vk::BufferUsageFlags usage_flags,
+      vk::MemoryPropertyFlags memory_properties = vk::MemoryPropertyFlags(0))
+        : Buffer(state, size, usage_flags,
+                 memory_properties | vk::MemoryPropertyFlagBits::eDeviceLocal)
+    {
+    }
 
-      template <typename T, size_t Extent>
-      DeviceBuffer &write(std::span<T, Extent> src)
-      {
-        // std::span<const T, Extent> cannot be constructed from non-const
+    DeviceBuffer &write(std::span<const std::byte> src);
 
-        size_t byte_size = src.size() * sizeof(T);
-        ASSERT(byte_size <= _size);
-
-        ASSERT(_state != nullptr);
-        auto buf =
-          HostBuffer(*_state, _size, vk::BufferUsageFlagBits::eTransferSrc);
-        buf.write(src);
-
-        vk::BufferCopy buffer_copy {.size = byte_size};
-
-        static CommandUnit command_unit(*_state);
-        command_unit.begin();
-        command_unit->copyBuffer(buf.buffer(), _buffer.get(), {buffer_copy});
-        command_unit.end();
-
-        auto [bufs, bufs_number] = command_unit.submit_info();
-        vk::SubmitInfo submit_info {
-          .commandBufferCount = bufs_number,
-          .pCommandBuffers = bufs,
-        };
-        auto fence = _state->device().createFenceUnique({}).value;
-        _state->queue().submit(submit_info, fence.get());
-        _state->device().waitForFences({fence.get()}, VK_TRUE, UINT64_MAX);
-
-        return *this;
-      }
+    template <typename T, size_t Extent>
+    DeviceBuffer &write(std::span<T, Extent> src) { return write(std::as_bytes(src)); }
   };
 
   class UniformBuffer : public HostBuffer {
-    public:
-      UniformBuffer() = default;
+  public:
+    UniformBuffer() = default;
 
-      UniformBuffer(const VulkanState &state, size_t size)
-          : HostBuffer(state, size, vk::BufferUsageFlagBits::eUniformBuffer)
-      {
-      }
+    UniformBuffer(const VulkanState &state, size_t size)
+        : HostBuffer(state, size, vk::BufferUsageFlagBits::eUniformBuffer)
+    {
+    }
 
-      template <typename T, size_t Extent>
-      UniformBuffer(const VulkanState &state, std::span<T, Extent> src)
-          : UniformBuffer(state, src.size() * sizeof(T))
-      {
-        ASSERT(src.data());
-        write(src);
-      }
+    template <typename T, size_t Extent>
+    UniformBuffer(const VulkanState &state, std::span<T, Extent> src)
+        : UniformBuffer(state, src.size() * sizeof(T))
+    {
+      ASSERT(src.data());
+      write(src);
+    }
   };
 
   class StorageBuffer : public DeviceBuffer {
@@ -149,69 +112,68 @@ inline namespace graphics {
   };
 
   class VertexBuffer : public DeviceBuffer {
-    public:
-      VertexBuffer() = default;
+  public:
+    VertexBuffer() = default;
 
-      VertexBuffer(const VulkanState &state, size_t byte_size)
-          : DeviceBuffer(state, byte_size,
-                         vk::BufferUsageFlagBits::eVertexBuffer |
-                           vk::BufferUsageFlagBits::eTransferDst)
-      {
-      }
+    VertexBuffer(const VulkanState &state, size_t byte_size)
+        : DeviceBuffer(state, byte_size,
+                       vk::BufferUsageFlagBits::eVertexBuffer |
+                         vk::BufferUsageFlagBits::eTransferDst)
+    {
+    }
 
-      VertexBuffer(VertexBuffer &&) noexcept = default;
-      VertexBuffer &operator=(VertexBuffer &&) noexcept = default;
+    VertexBuffer(VertexBuffer &&) noexcept = default;
+    VertexBuffer &operator=(VertexBuffer &&) noexcept = default;
 
-      template <typename T, size_t Extent>
-      VertexBuffer(const VulkanState &state, std::span<T, Extent> src)
-          : VertexBuffer(state, src.size() * sizeof(T))
-      {
-        ASSERT(src.data());
-        write(src);
-      }
+    template <typename T, size_t Extent>
+    VertexBuffer(const VulkanState &state, std::span<T, Extent> src)
+        : VertexBuffer(state, src.size() * sizeof(T))
+    {
+      ASSERT(src.data());
+      write(src);
+    }
   };
 
   class IndexBuffer : public DeviceBuffer {
-    private:
-      vk::IndexType _index_type;
-      std::size_t _element_count;
+  private:
+    vk::IndexType _index_type;
+    std::size_t _element_count;
 
-    public:
-      IndexBuffer() = default;
+  public:
+    IndexBuffer() = default;
 
-      IndexBuffer(const VulkanState &state, size_t byte_size)
-          : DeviceBuffer(state, byte_size,
-                         vk::BufferUsageFlagBits::eIndexBuffer |
-                           vk::BufferUsageFlagBits::eTransferDst)
-      {
+    IndexBuffer(const VulkanState &state, size_t byte_size)
+        : DeviceBuffer(state, byte_size,
+                       vk::BufferUsageFlagBits::eIndexBuffer |
+                         vk::BufferUsageFlagBits::eTransferDst)
+    {
+    }
+
+    IndexBuffer(IndexBuffer &&) noexcept = default;
+    IndexBuffer &operator=(IndexBuffer &&) noexcept = default;
+
+    template <typename T, size_t Extent>
+    IndexBuffer(const VulkanState &state, std::span<T, Extent> src)
+        : IndexBuffer(state, src.size() * sizeof(T))
+    {
+      write(src);
+
+      _element_count = src.size();
+
+      // determine index type
+      if constexpr (sizeof(T) == 4) {
+        _index_type = vk::IndexType::eUint32;
       }
-
-      IndexBuffer(IndexBuffer &&) noexcept = default;
-      IndexBuffer &operator=(IndexBuffer &&) noexcept = default;
-
-      template <typename T, size_t Extent>
-      IndexBuffer(const VulkanState &state, std::span<T, Extent> src)
-          : IndexBuffer(state, src.size() * sizeof(T))
-      {
-        ASSERT(src.data());
-        write(src);
-
-        _element_count = src.size();
-
-        // determine index type
-        if constexpr (sizeof(T) == 4) {
-          _index_type = vk::IndexType::eUint32;
-        }
-        else if constexpr (sizeof(T) == 2) {
-          _index_type = vk::IndexType::eUint16;
-        }
-        else if constexpr (sizeof(T) == 1) {
-          _index_type = vk::IndexType::eUint8KHR;
-        }
+      else if constexpr (sizeof(T) == 2) {
+        _index_type = vk::IndexType::eUint16;
       }
+      else if constexpr (sizeof(T) == 1) {
+        _index_type = vk::IndexType::eUint8KHR;
+      }
+    }
 
-      std::size_t   element_count() const noexcept { return _element_count; }
-      vk::IndexType index_type() const noexcept { return _index_type; }
+    std::size_t   element_count() const noexcept { return _element_count; }
+    vk::IndexType index_type() const noexcept { return _index_type; }
   };
 }
 } // namespace mr

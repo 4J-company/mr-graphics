@@ -32,9 +32,10 @@ mr::Buffer::Buffer(const VulkanState &state, size_t byte_size,
 void resize(size_t size) {}
 
 // find memory type
-mr::uint
-mr::Buffer::find_memory_type(const VulkanState &state, uint filter,
-                             vk::MemoryPropertyFlags properties) noexcept
+uint32_t mr::Buffer::find_memory_type(
+    const VulkanState &state,
+    uint32_t filter,
+    vk::MemoryPropertyFlags properties) noexcept
 {
   vk::PhysicalDeviceMemoryProperties mem_properties =
     state.phys_device().getMemoryProperties();
@@ -48,4 +49,46 @@ mr::Buffer::find_memory_type(const VulkanState &state, uint filter,
 
   ASSERT(false, "Cannot find memory format");
   return 0;
+}
+
+
+mr::DeviceBuffer & mr::DeviceBuffer::write(std::span<const std::byte> src)
+{
+  ASSERT(_state != nullptr);
+  ASSERT(src.data());
+  ASSERT(src.size() <= _size);
+
+  auto buf = HostBuffer(*_state, _size, vk::BufferUsageFlagBits::eTransferSrc);
+  buf.write(src);
+
+  vk::BufferCopy buffer_copy {.size = src.size()};
+
+  static CommandUnit command_unit(*_state);
+  command_unit.begin();
+  command_unit->copyBuffer(buf.buffer(), _buffer.get(), {buffer_copy});
+  command_unit.end();
+
+  auto [bufs, bufs_number] = command_unit.submit_info();
+  vk::SubmitInfo submit_info {
+    .commandBufferCount = bufs_number,
+    .pCommandBuffers = bufs,
+  };
+
+  auto fence = _state->device().createFenceUnique({}).value;
+  _state->queue().submit(submit_info, fence.get());
+  _state->device().waitForFences({fence.get()}, VK_TRUE, UINT64_MAX);
+
+  return *this;
+}
+
+mr::HostBuffer & mr::HostBuffer::write(std::span<const std::byte> src)
+{
+  ASSERT(_state != nullptr);
+  ASSERT(src.data());
+  ASSERT(src.size() <= _size);
+
+  auto ptr = _state->device().mapMemory(_memory.get(), 0, src.size()).value;
+  memcpy(ptr, src.data(), src.size());
+  _state->device().unmapMemory(_memory.get());
+  return *this;
 }
