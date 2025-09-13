@@ -37,6 +37,8 @@ class MrGraphicsRecipe(ConanFile):
         self.requires("mr-manager/1.0.1")
         self.requires("mr-importer/1.3.0")
 
+        self.requires("stb/cci.20240531")
+
         self.requires("onetbb/2022.2.0")
 
     def build_requirements(self):
@@ -66,6 +68,9 @@ class MrGraphicsRecipe(ConanFile):
 
         deps = CMakeDeps(self)
         deps.generate()
+        tc = CMakeToolchain(self)
+        tc.generator = "Ninja"
+        tc.generate()
 
     def build(self):
         cmake = CMake(self)

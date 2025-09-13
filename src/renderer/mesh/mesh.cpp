@@ -2,9 +2,14 @@
 
 mr::graphics::Mesh::Mesh(
 	std::vector<VertexBuffer> vbufs,
-	IndexBuffer ibuf) noexcept
-  : _ibuf(std::move(ibuf))
+	std::vector<IndexBuffer> ibufs,
+  size_t instance_count,
+  size_t mesh_offset,
+  size_t instance_offset) noexcept
+  : _ibufs(std::move(ibufs))
   , _vbufs(std::move(vbufs))
-  , _instance_count(1)
+  , _instance_count(instance_count)
+  , _mesh_offset(mesh_offset)
+  , _instance_offset(instance_offset)
 {
 }

@@ -22,9 +22,16 @@ mr::Pipeline::Pipeline(const VulkanState &state,
     vk_descriptor_layouts.emplace_back(layout->layout());
   }
 
+  vk::PushConstantRange range {
+    .offset = 0,
+    .size = sizeof(uint32_t) * 2
+  };
+
   vk::PipelineLayoutCreateInfo pipeline_layout_create_info {
     .setLayoutCount = static_cast<uint32_t>(vk_descriptor_layouts.size()),
     .pSetLayouts = vk_descriptor_layouts.data(),
+    .pushConstantRangeCount = 1,
+    .pPushConstantRanges = &range,
   };
 
   auto [res, layout] = state.device().createPipelineLayoutUnique(pipeline_layout_create_info);
