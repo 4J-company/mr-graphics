@@ -64,11 +64,6 @@ void mr::FileWriter::present() noexcept
   stbi_write_png(_frame_filename.c_str(), width, height, 4, data.data(), width * 4);
 }
 
-void mr::FileWriter::update_state() noexcept
-{
-  ASSERT(_parent != nullptr);
-}
-
 void mr::FileWriter::filename(const std::string_view filename) noexcept
 {
   ASSERT(!filename.empty());

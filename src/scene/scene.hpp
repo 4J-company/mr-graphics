@@ -59,7 +59,8 @@ namespace mr {
     const RenderContext & render_context() const noexcept { return *_parent; }
     UniformBuffer & camera_uniform_buffer() const noexcept { return _camera_uniform_buffer; }
 
-    void update(const InputState &input_state) noexcept;
+    using OptionalInputStateReference = std::optional<std::reference_wrapper<const InputState>>;
+    void update(OptionalInputStateReference input_state = std::nullopt) noexcept;
 
   private:
     void _update_camera_buffer() noexcept;

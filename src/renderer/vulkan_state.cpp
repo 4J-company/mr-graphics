@@ -3,6 +3,8 @@
 
 mr::VulkanGlobalState::VulkanGlobalState()
 {
+  // TODO(dk6): it must be removed (it must be called only in window.cpp, because we won't initialize vkfw
+  //            if we will not create window), but now without this windows can not be created
   while (vkfw::init() != vkfw::Result::eSuccess) {}
 
   _create_instance();

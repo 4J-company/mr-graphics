@@ -38,8 +38,6 @@ namespace mr {
     vk::RenderingAttachmentInfoKHR target_image_info() noexcept final;
     void present() noexcept final;
 
-    void update_state() noexcept final;
-
     // without extension! now by default we save in .png
     void filename(const std::string_view filename) noexcept;
   };

@@ -146,7 +146,7 @@ void mr::Model::_process_node(tinygltf::Model &model,
     tinygltf::Material material = model.materials[primitive.material];
 
     _meshes.emplace_back(std::move(vbufs), std::move(ibuf));
-    // TODO(dk6): pass to material Scene too
+    // TODO(dk6): pass Scene to material too
     _materials.emplace_back(load_material(state, _scene->render_context(), _scene->camera_uniform_buffer(),
                                           model, material, transform));
   }

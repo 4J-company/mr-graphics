@@ -14,10 +14,12 @@ namespace mr {
     Number
   };
 
+  // Light base class forward decalaration
+  class Light;
   // Light types forward declarations
   class DirectionalLight;
 
-  template <typename L>
+  template <std::derived_from<Light> L>
   inline constexpr uint32_t get_light_type(void) noexcept {
     using ClearLightT = std::decay_t<L>;
     if constexpr (std::is_same_v<ClearLightT, DirectionalLight>) {
