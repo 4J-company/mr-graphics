@@ -107,10 +107,16 @@ inline namespace graphics {
 
         vk::BufferCopy buffer_copy {.size = byte_size};
 
+        static std::mutex record_mtx;
+        static std::mutex submit_mtx;
         static CommandUnit command_unit(*_state);
-        command_unit.begin();
-        command_unit->copyBuffer(buf.buffer(), _buffer.get(), {buffer_copy});
-        command_unit.end();
+
+        {
+          std::lock_guard lock(record_mtx);
+          command_unit.begin();
+          command_unit->copyBuffer(buf.buffer(), _buffer.get(), {buffer_copy});
+          command_unit.end();
+        }
 
         auto [bufs, bufs_number] = command_unit.submit_info();
         vk::SubmitInfo submit_info {
@@ -118,7 +124,10 @@ inline namespace graphics {
           .pCommandBuffers = bufs,
         };
         auto fence = _state->device().createFenceUnique({}).value;
-        _state->queue().submit(submit_info, fence.get());
+        {
+          std::lock_guard lock(submit_mtx);
+          _state->queue().submit(submit_info, fence.get());
+        }
         _state->device().waitForFences({fence.get()}, VK_TRUE, UINT64_MAX);
 
         return *this;

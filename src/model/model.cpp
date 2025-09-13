@@ -44,6 +44,7 @@ mr::graphics::Model::Model(
   auto defult_shader_path_str = defult_shader_path.string();
 
   using enum mr::MaterialParameter;
+  static std::mutex mtx;
   static std::vector<mr::MaterialBuilder> builders;
   static auto &manager = ResourceManager<Texture>::get();
   auto io = std::ranges::iota_view {(size_t)0, model_value.meshes.size()};
@@ -61,8 +62,6 @@ mr::graphics::Model::Model(
       vbufs.emplace_back(state, std::span(mesh.attributes.data(), mesh.attributes.size()));
       IndexBuffer ibuf {state, std::span(mesh.lods[0].indices.data(), mesh.lods[0].indices.size())};
 
-      _meshes.emplace_back(std::move(vbufs), std::move(ibuf));
-
       ASSERT(s_cam_ubo_ptr);
 
       mr::MaterialBuilder builder {state, render_context, defult_shader_path_str};
@@ -72,8 +71,13 @@ mr::graphics::Model::Model(
       for (const auto &texture : material.textures) {
         builder.add_texture(importer2graphics(texture.type), texture);
       }
-      builders.push_back(std::move(builder));
-      _materials.push_back(builders.back().build());
+
+      {
+        std::lock_guard lock(mtx);
+        builders.push_back(std::move(builder));
+        _meshes.emplace_back(std::move(vbufs), std::move(ibuf));
+        _materials.push_back(builders.back().build());
+      }
     }
   );
 
