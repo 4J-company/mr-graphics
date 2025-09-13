@@ -46,7 +46,6 @@ namespace mr {
     private:
       class MappedData {
       private:
-        constexpr static size_t max_size = std::numeric_limits<size_t>::max();
         HostBuffer *_buf = nullptr;
         void *_data = nullptr;
 
@@ -57,7 +56,8 @@ namespace mr {
         MappedData & operator=(MappedData &&other) noexcept;
         MappedData(MappedData &&other) noexcept;
 
-        void * map(size_t offset = 0, size_t size = max_size) noexcept;
+        void * map(size_t offset, size_t size) noexcept;
+        void * map() noexcept;
         void unmap() noexcept;
         bool mapped() const noexcept;
         void * get() noexcept;

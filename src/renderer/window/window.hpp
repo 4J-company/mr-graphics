@@ -18,6 +18,8 @@ namespace mr {
     uint32_t image_index = 0;
     uint32_t prev_image_index = 0;
 
+    InputState _input_state;
+
     // semaphores for waiting swapchain image is ready before light pass
     beman::inplace_vector<vk::UniqueSemaphore, Swapchain::max_images_number> _image_available_semaphore;
     // semaphores for waiting frame is ready before presentin
@@ -36,7 +38,8 @@ namespace mr {
     vk::RenderingAttachmentInfoKHR target_image_info() noexcept final;
     void present() noexcept final;
 
-    void update_state() noexcept final;
+    void update_state() noexcept;
+    const InputState & input_state() const noexcept { return _input_state; }
 
   private:
     static vkfw::UniqueWindow _create_window(const Extent &extent) noexcept;

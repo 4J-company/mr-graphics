@@ -23,7 +23,7 @@ void mr::Application::start_render_loop(RenderContext &render_context, SceneHand
     [&](std::stop_token stop_token) {
       while (not stop_token.stop_requested()) {
         window->update_state();
-        scene->update(window->input_state());
+        scene->update(std::optional(std::reference_wrapper(window->input_state())));
         render_context.render(scene, *window);
       }
     }
@@ -52,8 +52,7 @@ void mr::Application::render_frames(RenderContext &render_context,
       file_writer->filename(str);
     }
 
-    file_writer->update_state();
-    scene->update(file_writer->input_state());
+    scene->update();
     render_context.render(scene, *file_writer);
   }
 }

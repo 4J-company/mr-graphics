@@ -22,6 +22,8 @@ namespace mr {
     // TODO(dk6): rename it, mt6 was confused
     mutable bool _updated = true;
 
+    std::atomic_bool _enabled = true;
+
   protected:
     Light(const Scene &scene, const Vec3f &color, size_t ubo_size);
     ~Light() = default;
@@ -61,6 +63,10 @@ namespace mr {
     void color(const Vec3f &col) noexcept { _color = col; _updated = true; }
 
     void shade(CommandUnit &unit) const noexcept { ASSERT(false, "Base light class can noe be shaded"); }
+
+    void enable() noexcept { _enabled = true; }
+    void disable() noexcept { _enabled = false; }
+    bool enabled() const noexcept { return _enabled; }
   };
 }
 

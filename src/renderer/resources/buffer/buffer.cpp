@@ -142,12 +142,14 @@ mr::HostBuffer::MappedData::MappedData(MappedData &&other) noexcept
 void * mr::HostBuffer::MappedData::map(size_t offset, size_t size) noexcept
 {
   ASSERT(_data == nullptr);
-  if (size == max_size) {
-    size = _buf->_size;
-  }
   ASSERT(offset < size);
   _buf->_state->device().mapMemory(_buf->_memory.get(), offset, size, {}, &_data);
   return _data;
+}
+
+void * mr::HostBuffer::MappedData::map() noexcept
+{
+  return map(0, _buf->_size);
 }
 
 void mr::HostBuffer::MappedData::unmap() noexcept

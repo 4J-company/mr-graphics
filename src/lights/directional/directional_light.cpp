@@ -18,6 +18,10 @@ mr::DirectionalLight::DirectionalLight(const Scene &scene, const Norm3f &directi
 
 void mr::DirectionalLight::shade(CommandUnit &unit) const noexcept
 {
+  if (not _enabled) {
+    return;
+  }
+
   // TODO(dk6): use pipeline.apply()
   unit->bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline().pipeline());
   // TODO(dk6): use set.bind()

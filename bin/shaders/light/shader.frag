@@ -40,8 +40,9 @@ void main( void )
   vec3 emissive = subpassLoad(InEmissive).xyz;
 
   float occlusion = occlusion_roughness_metallic.r;
-  float roughness = occlusion_roughness_metallic.b;
+  // TODO(dk6): rename texture
   float metallic  = occlusion_roughness_metallic.g;
+  float roughness = occlusion_roughness_metallic.b;
 
   vec3 light_dir = light_uniform_buffer.direction.xyz;
   vec3 light_color = light_uniform_buffer.color.xyz;

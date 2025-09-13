@@ -17,9 +17,11 @@ namespace mr {
     // Keyboard
     // ----------------------
 
-    std::array<bool, max_keys_number> _key_pressed {};
-    std::array<bool, max_keys_number> _prev_key_pressed {};
-    std::array<bool, max_keys_number> _key_tapped {};
+    std::array<bool, max_keys_number> _key_pressed {}, _prev_key_pressed {};
+    std::span<bool> _writer_key_pressed {}, _reader_key_pressed {};
+
+    std::array<bool, max_keys_number> _key_tapped {}, _prev_key_tapped {};
+    std::span<bool> _writer_key_tapped {}, _reader_key_tapped {};
 
     // ----------------------
     // Mouse
@@ -35,7 +37,7 @@ namespace mr {
     mutable std::mutex update_mutex;
 
   public:
-    InputState() = default;
+    InputState();
 
     void update() noexcept;
 
@@ -44,6 +46,9 @@ namespace mr {
 
     const Vec2d & mouse_pos() const noexcept { return _prev_mouse_pos; }
     const Vec2d & mouse_pos_delta() const noexcept { return _mouse_pos_delta; }
+
+    InputState(InputState &&other) noexcept;
+    InputState & operator=(InputState &&other) noexcept;
 
   private: // for Window only
     friend class Window;
