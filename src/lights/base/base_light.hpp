@@ -4,6 +4,8 @@
 #include "lights/light_render_data.hpp"
 
 namespace mr {
+inline namespace graphics {
+  class DirectionalLight;
   // forward declaration of Scene class
   class Scene;
 
@@ -68,6 +70,7 @@ namespace mr {
     void disable() noexcept { _enabled = false; }
     bool enabled() const noexcept { return _enabled; }
   };
+}
 }
 
 #endif // __MR_BASE_LIGHT_HPP_

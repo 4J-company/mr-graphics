@@ -2,10 +2,12 @@
 #define __material_cpp_
 
 #include "pch.hpp"
-#include "resources/resources.hpp"
+
 #include "manager/manager.hpp"
+#include "manager/resource.hpp"
 
 namespace mr {
+inline namespace graphics {
   enum class MaterialParameter {
     BaseColor,
     MetallicRoughness,
@@ -27,7 +29,7 @@ namespace mr {
     static_assert(defines.size() == enum_cast(MaterialParameter::EnumSize),
       "Shader define is not provided for all MaterialParameter enumerators");
 
-    assert(within(0, defines.size())(enum_cast(param)));
+    ASSERT(within(0, defines.size())(enum_cast(param)));
     return defines[enum_cast(param)];
   }
 
@@ -36,7 +38,7 @@ namespace mr {
     Material(const VulkanState &state,
              const RenderContext &render_context,
              mr::ShaderHandle shader,
-             std::span<float> ubo_data,
+             std::span<std::byte> ubo_data,
              std::span<std::optional<mr::TextureHandle>> textures,
              mr::UniformBuffer &cam_ubo) noexcept;
 
@@ -50,7 +52,7 @@ namespace mr {
     mr::DescriptorSet _descriptor_set;
     mr::GraphicsPipeline _pipeline;
 
-    std::array<vk::VertexInputAttributeDescription, 3> _descrs {
+    std::array<vk::VertexInputAttributeDescription, 6> _descrs {
       vk::VertexInputAttributeDescription {
         .location = 0,
         .binding = 0,
@@ -60,14 +62,32 @@ namespace mr {
       vk::VertexInputAttributeDescription {
         .location = 1,
         .binding = 1,
-        .format = vk::Format::eR32G32B32Sfloat,
+        .format = vk::Format::eR32G32B32A32Sfloat,
         .offset = 0
       },
       vk::VertexInputAttributeDescription {
         .location = 2,
-        .binding = 2,
+        .binding = 1,
+        .format = vk::Format::eR32G32B32Sfloat,
+        .offset = 16
+      },
+      vk::VertexInputAttributeDescription {
+        .location = 3,
+        .binding = 1,
+        .format = vk::Format::eR32G32B32Sfloat,
+        .offset = 28
+      },
+      vk::VertexInputAttributeDescription {
+        .location = 4,
+        .binding = 1,
+        .format = vk::Format::eR32G32B32Sfloat,
+        .offset = 40
+      },
+      vk::VertexInputAttributeDescription {
+        .location = 5,
+        .binding = 1,
         .format = vk::Format::eR32G32Sfloat,
-        .offset = 0
+        .offset = 52
       },
     };
   };
@@ -79,56 +99,75 @@ namespace mr {
     const mr::VulkanState *_state {};
     const mr::RenderContext *_context {};
 
-    std::vector<byte> _specialization_data;
+    std::vector<std::byte> _specialization_data;
     std::unordered_map<std::string, std::string> _defines;
-    std::vector<float> _ubo_data;
-    std::vector<std::optional<mr::TextureHandle>> _textures;
+    std::vector<std::byte> _ubo_data;
+    std::array<std::optional<mr::TextureHandle>, enum_cast(MaterialParameter::EnumSize)> _textures;
     mr::UniformBuffer *_cam_ubo;
 
     std::string_view _shader_filename;
 
   public:
-    MaterialBuilder(const mr::VulkanState &state, const mr::RenderContext &context, std::string_view filename)
-      : _state(&state), _context(&context), _shader_filename(filename)
+    MaterialBuilder(
+        const mr::VulkanState &state,
+        const mr::RenderContext &context,
+        std::string_view filename)
+      : _state(&state)
+      , _context(&context)
+      , _shader_filename(filename)
     {
-      _textures.resize(enum_cast(MaterialParameter::EnumSize));
     }
 
     MaterialBuilder(MaterialBuilder &&) noexcept = default;
     MaterialBuilder & operator=(MaterialBuilder &&) noexcept = default;
 
     MaterialBuilder &add_texture(MaterialParameter param,
-                                 std::optional<mr::TextureHandle> tex,
-                                 Color factor = {1.0, 1.0, 1.0, 1.0})
+                                 const mr::importer::TextureData &tex_data,
+                                 math::Color factor = {1.0, 1.0, 1.0, 1.0})
     {
-      assert(!tex.has_value() || *tex != nullptr);
+      ASSERT(tex_data.image.pixels.get() != nullptr, "Image should be valid");
+      mr::TextureHandle tex = ResourceManager<Texture>::get().create(mr::unnamed,
+        *_state,
+        (const std::byte*)tex_data.image.pixels.get(),
+        mr::Extent{ tex_data.image.width, tex_data.image.height },
+        vk::Format::eR32G32B32A32Sfloat
+      );
+
       _textures[enum_cast(param)] = std::move(tex);
       add_value(factor);
+      return *this;
+    }
+
+    MaterialBuilder & add_value(const auto *value)
+    {
+      add_span(std::span<std::remove_pointer_t<decltype(value)>>{value, 1});
+      return *this;
+    }
+
+    MaterialBuilder & add_value(const auto &value)
+    {
+      add_span(std::span<std::remove_reference_t<decltype(value)>>{&value, 1});
+      return *this;
+    }
+
+    template <typename T>
+    MaterialBuilder & add_span(std::span<T> span)
+    {
+      auto bytes = std::as_bytes(span);
+      _ubo_data.insert(_ubo_data.end(), bytes.begin(), bytes.end());
       return *this;
     }
 
     template<typename T, size_t N>
     MaterialBuilder & add_value(Vec<T, N> value)
     {
-      for (size_t i = 0; i < N; i++) {
-        _ubo_data.push_back(value[i]);
-      }
-      return *this;
-    }
-
-    MaterialBuilder & add_value(const auto &value)
-    {
-#ifdef __cpp_lib_containers_ranges
-      _ubo_data.append_range(std::span {(float *)&value, sizeof(value) / sizeof(float)});
-#else
-      _ubo_data.insert(_ubo_data.end(), (float *)&value, (float *)(&value + 1));
-#endif
+      add_span(std::span<T>{&value[0], N});
       return *this;
     }
 
     MaterialBuilder & add_value(float value)
     {
-      _ubo_data.push_back(value);
+      add_span(std::span<float>{&value, 1});
       return *this;
     }
 
@@ -141,8 +180,8 @@ namespace mr {
     MaterialHandle build() noexcept
     {
       auto &mtlmanager = ResourceManager<Material>::get();
-
       auto &shdmanager = ResourceManager<Shader>::get();
+
       auto definestr = _generate_shader_defines_str();
       auto shdname = std::string(_shader_filename) + ":" + definestr;
       auto shdfindres = shdmanager.find(shdname);
@@ -183,6 +222,7 @@ namespace mr {
       return defines;
     }
   };
+}
 } // namespace mr
 
 #endif // __material_cpp_

@@ -7,6 +7,7 @@
 #include "presenter.hpp"
 
 namespace mr {
+inline namespace graphics {
   class Window : public Presenter, public ResourceBase<Window> {
   private:
     static inline std::once_flag _init_vkfw_flag;
@@ -21,9 +22,9 @@ namespace mr {
     InputState _input_state;
 
     // semaphores for waiting swapchain image is ready before light pass
-    beman::inplace_vector<vk::UniqueSemaphore, Swapchain::max_images_number> _image_available_semaphore;
+    InplaceVector<vk::UniqueSemaphore, Swapchain::max_images_number> _image_available_semaphore;
     // semaphores for waiting frame is ready before presentin
-    beman::inplace_vector<vk::UniqueSemaphore, Swapchain::max_images_number> _render_finished_semaphore;
+    InplaceVector<vk::UniqueSemaphore, Swapchain::max_images_number> _render_finished_semaphore;
 
   public:
     Window(const RenderContext &parent, Extent extent = {800, 600});
@@ -46,5 +47,6 @@ namespace mr {
   };
 
   MR_DECLARE_HANDLE(Window);
+}
 } // namespace mr
 #endif // __MR_WINDOW_HPP_

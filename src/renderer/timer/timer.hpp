@@ -4,6 +4,7 @@
 #include "pch.hpp"
 
 namespace mr {
+inline namespace graphics {
   template <std::floating_point T = float> class Timer {
     public:
       using TimeT = std::chrono::duration<T>;
@@ -59,6 +60,7 @@ namespace mr {
 
       static constexpr double _delta_to_sec {1.0 / DeltaT::period::den};
   };
+}
 } // namespace mr
 
 #endif // __MR_TIMER_HPP_

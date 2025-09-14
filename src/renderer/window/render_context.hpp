@@ -16,6 +16,9 @@
 #include <VkBootstrap.h>
 
 namespace mr {
+inline namespace graphics {
+  class Window;
+
   class RenderContext {
     public:
       static inline constexpr int gbuffers_number = 6;
@@ -43,14 +46,19 @@ namespace mr {
       mutable CommandUnit _transfer_command_unit;
 
       // TODO(dk6): use Framedata instead
-      beman::inplace_vector<ColorAttachmentImage, gbuffers_number> _gbuffers;
+      InplaceVector<ColorAttachmentImage, gbuffers_number> _gbuffers;
       DepthImage _depthbuffer;
+
+      // semaphores for waiting swapchain image is ready before light pass
+      InplaceVector<vk::UniqueSemaphore, max_images_number> _image_available_semaphore;
+      // semaphores for waiting frame is ready before presentin
+      InplaceVector<vk::UniqueSemaphore, max_images_number> _render_finished_semaphore;
 
       // semaphore for sync opaque models rendering and light shading
       vk::UniqueSemaphore _models_render_finished_semaphore;
       vk::UniqueFence _image_fence; // fence for swapchain image?
 
-      LightsRenderData _lights_render_data {};
+      LightsRenderData _lights_render_data;
 
     public:
       RenderContext(RenderContext &&other) noexcept = default;
@@ -86,5 +94,6 @@ namespace mr {
 
       void _update_camera_buffer(UniformBuffer &uniform_buffer);
   };
+}
 } // namespace mr
 #endif // __MR_RENDER_CONTEXT_HPP_

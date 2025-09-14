@@ -7,12 +7,14 @@ file(
 include(${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake)
 
 # install libraries with no binaries available
+find_package(glm REQUIRED)
 find_package(glfw3 REQUIRED)
-find_package(meshoptimizer REQUIRED)
+find_package(mr-math REQUIRED)
 find_package(mr-utils REQUIRED)
+find_package(mr-manager REQUIRED)
+find_package(mr-importer REQUIRED)
 
 CPMAddPackage("gh:Cvelth/vkfw#main")
-CPMAddPackage("gh:4j-company/mr-math#master")
 CPMAddPackage("gh:charles-lunarg/vk-bootstrap@1.4.321")
 CPMAddPackage("gh:bemanproject/inplace_vector#b81a3c7")
 
@@ -28,47 +30,22 @@ if (${vk-bootstrap_ADDED})
   target_include_directories(vk-bootstrap-lib INTERFACE ${vk-bootstrap_SOURCE_DIR}/src)
 endif()
 
-CPMFindPackage(
-  NAME tinygltf
-  GITHUB_REPOSITORY syoyo/tinygltf
-  GIT_TAG release
-  OPTIONS
-    "TINYGLTF_BUILD_LOADER_EXAMPLE OFF"
-)
-
-if (NOT TARGET libstb-image)
-  # download a single file from stb
-  file(
-    DOWNLOAD
-    https://raw.githubusercontent.com/nothings/stb/master/stb_image.h
-    ${CMAKE_CURRENT_BINARY_DIR}/_deps/stb-src/stb/stb_image.h
-    EXPECTED_HASH SHA256=594c2fe35d49488b4382dbfaec8f98366defca819d916ac95becf3e75f4200b3
-  )
-  add_library(libstb-image INTERFACE "")
-  target_include_directories(libstb-image INTERFACE ${CMAKE_CURRENT_BINARY_DIR}/_deps/stb-src/)
-
-  # download a single file from stb
-  file(
-    DOWNLOAD
-    https://raw.githubusercontent.com/nothings/stb/master/stb_image_write.h
-    ${CMAKE_CURRENT_BINARY_DIR}/_deps/stb-src/stb/stb_image_write.h
-    EXPECTED_HASH SHA256=cbd5f0ad7a9cf4468affb36354a1d2338034f2c12473cf1a8e32053cb6914a05
-  )
-endif()
-
 find_package(Vulkan)
 
 # set important variables
 set(DEPS_LIBRARIES
   Vulkan::Vulkan
-  mr-math-lib
-  mr-utils::mr-utils
-  tinygltf
   libvkfw
-  libstb-image
   vk-bootstrap-lib
-  meshoptimizer::meshoptimizer
+
   beman.inplace_vector
+
+  glm::glm
+
+  mr-math::mr-math
+  mr-utils::mr-utils
+  mr-manager::mr-manager
+  mr-importer::mr-importer
 )
 
 # TBB is required since it's dependency of PSTL on GCC and Clang

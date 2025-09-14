@@ -65,14 +65,15 @@ void mr::RenderContext::_init_lights_render_data() {
   auto light_type_data = std::views::zip(LightsRenderData::shader_names,
                                          LightsRenderData::shader_resources_descriptions);
   for (const auto &[shader_name, light_shader_resources] : light_type_data) {
-    auto shader = ResourceManager<Shader>::get().create(mr::unnamed, *_state, shader_name);
+    std::string shader_name_str = {shader_name.begin(), shader_name.end()};
+    auto shader = ResourceManager<Shader>::get().create(shader_name_str, *_state, shader_name);
     _lights_render_data.shaders.emplace_back(shader);
 
     auto layout_handle = ResourceManager<DescriptorSetLayout>::get().create(mr::unnamed,
       *_state, vk::ShaderStageFlagBits::eFragment, light_shader_resources);
     _lights_render_data.set1_layouts.emplace_back(layout_handle);
 
-    std::array set_layouts {_lights_render_data.set0_layout, layout_handle};
+    std::array set_layouts { _lights_render_data.set0_layout, layout_handle };
 
     // TODO(dk6): here move instead inplace contruct, because without move this doesn't compile
     _lights_render_data.pipelines.emplace_back(GraphicsPipeline(*_state, *this,
@@ -168,7 +169,7 @@ void mr::RenderContext::_render_models(const SceneHandle scene)
 
   auto gbufs_attachs = _gbuffers | std::views::transform([](const ColorAttachmentImage &gbuf) {
     return gbuf.attachment_info();
-  }) | std::ranges::to<beman::inplace_vector<vk::RenderingAttachmentInfoKHR, gbuffers_number>>();
+  }) | std::ranges::to<InplaceVector<vk::RenderingAttachmentInfoKHR, gbuffers_number>>();
   auto depth_attachment_info = _depthbuffer.attachment_info();
 
   vk::RenderingInfoKHR attachment_info {
@@ -224,7 +225,8 @@ void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
   _render_models(scene);
 
   _models_command_unit.add_signal_semaphore(_models_render_finished_semaphore.get());
-  vk::SubmitInfo models_submit_info = _models_command_unit.end();
+  _models_command_unit.end();
+  vk::SubmitInfo models_submit_info = _models_command_unit.submit_info();
 
   _state->queue().submit(models_submit_info);
 
@@ -243,7 +245,8 @@ void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
                                      vk::PipelineStageFlagBits::eColorAttachmentOutput);
   }
   _lights_command_unit.add_signal_semaphore(presenter.render_finished_semaphore());
-  vk::SubmitInfo light_submit_info = _lights_command_unit.end();
+  _lights_command_unit.end();
+  vk::SubmitInfo light_submit_info = _lights_command_unit.submit_info();
   _state->queue().submit(light_submit_info, _image_fence.get());
 
   presenter.present();

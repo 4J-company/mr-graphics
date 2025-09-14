@@ -5,6 +5,7 @@
 #include "vkfw/vkfw.hpp"
 
 namespace mr {
+inline namespace graphics {
   // forward declaration of Window class
   class Window;
 
@@ -60,6 +61,7 @@ namespace mr {
     using MouseCallbackT = std::function<void(const vkfw::Window &, double, double)>;
     MouseCallbackT get_mouse_callback() noexcept;
   };
+}
 }
 
 #endif // __MR_INPUT_STATE_HPP_

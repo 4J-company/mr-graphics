@@ -4,6 +4,7 @@
 #include "pch.hpp"
 
 namespace mr {
+inline namespace graphics {
   struct ShaderCameraData {
     mr::Matr4f vp;
     mr::Vec4f campos;
@@ -37,7 +38,7 @@ namespace mr {
     }
 
     // getters
-    mr::Camera<float> & cam() noexcept { return _cam; }
+    mr::math::Camera<float> & cam() noexcept { return _cam; }
     constexpr mr::Degreesf fov() const noexcept { return _fov; }
     constexpr float gamma() const noexcept { return _gamma; }
     constexpr float speed() const noexcept { return _speed; }
@@ -50,12 +51,13 @@ namespace mr {
     constexpr void sensetivity(float sens) noexcept { _sensetivity = sens; }
 
   private:
-    mr::Camera<float> _cam;
+    mr::math::Camera<float> _cam;
     mr::Degreesf _fov = 90_deg;
     float _gamma = 2.2;
     float _speed = .01;
     float _sensetivity = 1;
   };
+}
 }
 
 #endif // __fps_camera_

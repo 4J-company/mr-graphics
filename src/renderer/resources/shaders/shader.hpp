@@ -3,10 +3,12 @@
 
 #include "pch.hpp"
 
-#include "vulkan_state.hpp"
 #include "manager/resource.hpp"
 
+#include "vulkan_state.hpp"
+
 namespace mr {
+inline namespace graphics {
   class UniformBuffer;
   class StorageBuffer;
   class Texture;
@@ -84,13 +86,13 @@ namespace mr {
       bool _validate_stage(Stage stage, bool present)  const noexcept;
 
     public:
-      const std::array<vk::PipelineShaderStageCreateInfo, max_shader_modules> &
-      get_stages() const { return _stages; }
+      const std::array<vk::PipelineShaderStageCreateInfo, max_shader_modules> & stages() const { return _stages; }
 
-      std::array<vk::PipelineShaderStageCreateInfo, max_shader_modules> &
-      get_stages() { return _stages; }
+      std::array<vk::PipelineShaderStageCreateInfo, max_shader_modules> & stages() { return _stages; }
 
       uint stage_number() const noexcept { return _num_of_loaded_shaders; }
+
+      std::string name() const noexcept { return _path.stem(); }
   };
 
   MR_DECLARE_HANDLE(Shader)
@@ -105,7 +107,7 @@ namespace mr {
       vk::ShaderStageFlagBits::eGeometry,
       vk::ShaderStageFlagBits::eFragment
     };
-    assert(stage < stage_bits.size());
+    ASSERT(stage < stage_bits.size());
 
     return stage_bits[stage];
   }
@@ -125,7 +127,7 @@ namespace mr {
       "geom",
       "frag",
     };
-    assert(stage < shader_type_names.size());
+    ASSERT(stage < shader_type_names.size());
     return shader_type_names[stage];
   }
 
@@ -133,6 +135,7 @@ namespace mr {
   {
     return get_stage_name(std::to_underlying(stage));
   }
+}
 } // namespace mr
 
 #endif // __MR_SHADER_HPP_

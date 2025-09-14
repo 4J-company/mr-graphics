@@ -5,6 +5,7 @@
 #include <VkBootstrap.h>
 
 namespace mr {
+inline namespace graphics {
   class VulkanGlobalState {
     private:
       // these resources are shared between all VulkanStates
@@ -49,6 +50,7 @@ namespace mr {
       void _create_pipeline_cache();
       void _destroy_pipeline_cache();
   };
+}
 } // namespace mr
 
 #endif // __MR_VULKAN_STATE_HPP_

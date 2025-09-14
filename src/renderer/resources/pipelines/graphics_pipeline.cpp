@@ -1,3 +1,4 @@
+#include "resources/images/image.hpp"
 #include "resources/pipelines/graphics_pipeline.hpp"
 #include "renderer/window/render_context.hpp"
 
@@ -16,25 +17,26 @@ mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state,
     .dynamicStateCount = static_cast<uint>(_dynamic_states.size()),
     .pDynamicStates = _dynamic_states.data()};
 
-  auto fmt2uint = [](vk::Format fmt) -> uint32_t {
-    return sizeof(float) * (
-      fmt == vk::Format::eR32G32B32A32Sfloat ? 4
-      : fmt == vk::Format::eR32G32B32Sfloat  ? 3
-      : fmt == vk::Format::eR32G32Sfloat     ? 2
-                                             : 1);
-  };
-
   std::array<vk::VertexInputBindingDescription, 16> binding_descriptions {};
-  for (int i = 0; i < attributes.size(); i++) {
-    binding_descriptions[i] = vk::VertexInputBindingDescription {
-      .binding = attributes[i].binding,
-      .stride = fmt2uint(attributes[i].format),
+  uint32_t sum = 0;
+  for (int i = 1; i < attributes.size(); i++) {
+    sum += format_byte_size(attributes[i].format);
+  }
+  binding_descriptions[0] = vk::VertexInputBindingDescription {
+    .binding = attributes[0].binding,
+    .stride = (uint32_t)format_byte_size(attributes[0].format),
+    .inputRate = vk::VertexInputRate::eVertex,
+  };
+  if (attributes.size() > 1) {
+    binding_descriptions[1] = vk::VertexInputBindingDescription {
+      .binding = attributes[1].binding,
+      .stride = sum,
       .inputRate = vk::VertexInputRate::eVertex,
     };
   }
 
   vk::PipelineVertexInputStateCreateInfo vertex_input_create_info {
-    .vertexBindingDescriptionCount = (uint)attributes.size(),
+    .vertexBindingDescriptionCount = std::min<uint>(attributes.size(), 2),
     .pVertexBindingDescriptions = binding_descriptions.data(),
     .vertexAttributeDescriptionCount = static_cast<uint>(attributes.size()),
     .pVertexAttributeDescriptions = attributes.data()};
@@ -131,8 +133,7 @@ mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state,
 
       break;
     default:
-      std::println(std::cerr, "invalid subpass option");
-      assert(false);
+      ASSERT(false, "Invalid subpass option");
   }
 
   pipiline_rendering_create_info.colorAttachmentCount = color_attacmhents_cnt;
@@ -146,10 +147,12 @@ mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state,
     .blendConstants = std::array<float, 4> {0.0, 0.0, 0.0, 0.0}, // ???
   };
 
+  ASSERT(_shader.get());
+
   vk::StructureChain chain {
     vk::GraphicsPipelineCreateInfo {
       .stageCount = _shader->stage_number(),
-      .pStages = _shader->get_stages().data(),
+      .pStages = _shader->stages().data(),
       .pVertexInputState = &vertex_input_create_info,
       .pInputAssemblyState = &input_assembly_create_info,
       .pViewportState = &viewport_state_create_info,
