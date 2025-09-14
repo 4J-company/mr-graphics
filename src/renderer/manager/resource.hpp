@@ -2,7 +2,7 @@
 #define __resource_hpp_
 
 namespace mr {
-
+inline namespace graphics {
   template<typename ResourceT>
   class ResourceBase;
 
@@ -22,7 +22,7 @@ namespace mr {
 
     friend class ResourceManager<ResourceT>;
   };
-
+}
 }
 
 #define MR_DECLARE_HANDLE(ResourceT) using ResourceT##Handle = Handle<ResourceT>;

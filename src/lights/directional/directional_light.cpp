@@ -2,7 +2,7 @@
 #include "scene/scene.hpp"
 #include "renderer/window/render_context.hpp"
 
-mr::DirectionalLight::DirectionalLight(const Scene &scene, const Norm3f &direction, const Vec3f &color)
+mr::graphics::DirectionalLight::DirectionalLight(const Scene &scene, const Norm3f &direction, const Vec3f &color)
   : Light(scene, color, sizeof(ShaderUniformBuffer))
   , _direction(direction)
 {
@@ -16,7 +16,7 @@ mr::DirectionalLight::DirectionalLight(const Scene &scene, const Norm3f &directi
   _set1.update(_scene->render_context().vulkan_state(), light_shader_resources);
 }
 
-void mr::DirectionalLight::shade(CommandUnit &unit) const noexcept
+void mr::graphics::DirectionalLight::shade(CommandUnit &unit) const noexcept
 {
   if (not _enabled) {
     return;
@@ -42,7 +42,7 @@ void mr::DirectionalLight::shade(CommandUnit &unit) const noexcept
   unit->drawIndexed(index_buffer().element_count(), 1, 0, 0, 0);
 }
 
-void mr::DirectionalLight::_update_ubo() const noexcept
+void mr::graphics::DirectionalLight::_update_ubo() const noexcept
 {
   if (!_updated) {
     return;

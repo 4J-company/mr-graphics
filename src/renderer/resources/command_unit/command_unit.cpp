@@ -20,16 +20,19 @@ mr::CommandUnit::CommandUnit(const VulkanState &state)
 
 void mr::CommandUnit::begin()
 {
+  clear_semaphores();
   _cmd_buffer.reset();
   vk::CommandBufferBeginInfo
     begin_info {}; /// .flags = 0, .pInheritanceInfo = nullptr, };
   _cmd_buffer.begin(begin_info);
 }
 
-vk::SubmitInfo mr::CommandUnit::end()
+void mr::CommandUnit::end()
 {
   _cmd_buffer.end();
+}
 
+vk::SubmitInfo mr::CommandUnit::submit_info() const noexcept {
   auto &[wait_sems, wait_stage_flags] = _wait_sems;
   vk::SubmitInfo submit_info {
     .waitSemaphoreCount = static_cast<uint32_t>(wait_sems.size()),
@@ -40,7 +43,6 @@ vk::SubmitInfo mr::CommandUnit::end()
     .signalSemaphoreCount = static_cast<uint32_t>(_signal_sems.size()),
     .pSignalSemaphores = _signal_sems.data(),
   };
-  clear_semaphores();
   return submit_info;
 }
 

@@ -8,6 +8,7 @@
 #include "presenter.hpp"
 
 namespace mr {
+inline namespace graphics {
   class FileWriter : public Presenter, public ResourceBase<FileWriter> {
   public:
     constexpr static uint32_t images_number = 3;
@@ -43,5 +44,6 @@ namespace mr {
   };
 
   MR_DECLARE_HANDLE(FileWriter);
+}
 } // namespace mr
 #endif // __MR_FILE_WRITER_HPP_

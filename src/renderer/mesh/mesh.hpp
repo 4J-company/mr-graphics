@@ -5,7 +5,7 @@
 #include "resources/resources.hpp"
 
 namespace mr {
-
+inline namespace graphics {
   class Mesh {
   private:
     std::vector<VertexBuffer> _vbufs;
@@ -54,6 +54,7 @@ namespace mr {
       unit->drawIndexed(_ibuf.element_count(), num_of_instances(), 0, 0, 0);
     }
   };
+}
 }     // namespace mr
 
 #endif // __MR_MESH_HPP_

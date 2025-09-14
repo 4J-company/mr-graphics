@@ -1,7 +1,6 @@
 #include "renderer.hpp"
 #include "resources/command_unit/command_unit.hpp"
 #include "window/render_context.hpp"
-#include "manager/manager.hpp"
 
 // mr::Application class defualt constructor (initializes vulkan instance, device ...)
 mr::Application::Application()

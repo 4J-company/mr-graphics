@@ -1,6 +1,6 @@
 #include "mesh/mesh.hpp"
 
-mr::Mesh::Mesh(
+mr::graphics::Mesh::Mesh(
 	std::vector<VertexBuffer> vbufs,
 	IndexBuffer ibuf) noexcept
   : _ibuf(std::move(ibuf))

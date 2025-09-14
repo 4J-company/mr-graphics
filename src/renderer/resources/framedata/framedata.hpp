@@ -5,6 +5,7 @@
 #include "resources/images/image.hpp"
 
 namespace mr {
+inline namespace graphics {
   struct Viewport {
     vk::Viewport viewport {};
     vk::Rect2D scissors {};
@@ -20,8 +21,8 @@ namespace mr {
 
     Extent _extent;
     Viewport _viewport;
-    const Image &_target;
-    beman::inplace_vector<ColorAttachmentImage, max_gbuffers> _gbuffers;
+    const SwapchainImage &_target;
+    InplaceVector<ColorAttachmentImage, max_gbuffers> _gbuffers;
     DepthImage _depthbuffer;
 
   public:
@@ -33,6 +34,7 @@ namespace mr {
 
     vk::Rect2D scissors() const { return _viewport.scissors; }
   };
+}
 } // namespace mr
 
 #endif // __MR_FRAMEDATA_HPP_

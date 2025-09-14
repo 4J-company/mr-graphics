@@ -8,6 +8,7 @@
 #include "renderer/window/input_state.hpp"
 
 namespace mr {
+inline namespace graphics {
   // forward declaration of render context class
   class RenderContext;
 
@@ -67,6 +68,7 @@ namespace mr {
   };
 
   MR_DECLARE_HANDLE(Scene);
+}
 } // end of mr namespace
 
 #endif // __MR_SCENE_HPP_

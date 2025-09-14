@@ -4,6 +4,7 @@
 #include "resources/images/image.hpp"
 
 namespace mr {
+inline namespace graphics {
   // forward declaration of Window class
   class Window;
 
@@ -14,7 +15,6 @@ namespace mr {
     static inline constexpr int max_images_number = 8; // max teoretical swapchain images number
     static inline constexpr vk::Format default_format = vk::Format::eB8G8R8A8Unorm;
 
-  private:
     const VulkanState *_state;
     vk::Format _format = default_format;
     vk::UniqueSwapchainKHR _swapchain;
@@ -30,6 +30,7 @@ namespace mr {
 
     vk::Format format() const noexcept;
   };
+}
 }
 
 #endif // __MR_WINDOW_SWAPCHAIN_HPP_

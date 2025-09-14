@@ -1,13 +1,12 @@
 #ifndef __MR_PIPELINE_HPP_
 #define __MR_PIPELINE_HPP_
 
-#include "pch.hpp"
-#include "resources/attachment/attachment.hpp"
 #include "resources/descriptor/descriptor.hpp"
 #include "resources/shaders/shader.hpp"
 #include "vulkan_state.hpp"
 
 namespace mr {
+inline namespace graphics {
   class Pipeline {
     protected:
       vk::UniquePipeline _pipeline;
@@ -29,6 +28,7 @@ namespace mr {
 
       virtual void apply(vk::CommandBuffer cmd_buffer) const;
   };
+}
 } // namespace mr
 
 #endif // __MR_PIPELINE_HPP_

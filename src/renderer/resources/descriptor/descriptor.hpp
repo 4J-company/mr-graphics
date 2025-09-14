@@ -2,11 +2,10 @@
 #define __MR_DESCRIPTOR_HPP_
 
 #include "pch.hpp"
-#include "resources/images/image.hpp"
 #include "resources/shaders/shader.hpp"
-#include "resources/texture/sampler/sampler.hpp"
 
 namespace mr {
+inline namespace graphics {
   class DescriptorAllocator;
 
   class DescriptorSetLayout : public ResourceBase<DescriptorSetLayout> {
@@ -42,19 +41,19 @@ namespace mr {
       uint32_t _set_number;
 
     public:
-      DescriptorSet() noexcept = default;
+      DescriptorSet() = default;
 
       DescriptorSet(DescriptorSet &&) noexcept = default;
       DescriptorSet & operator=(DescriptorSet &&) noexcept = default;
 
       DescriptorSet(vk::DescriptorSet set, DescriptorSetLayoutHandle layout, uint number) noexcept
-        : _set(set), _set_layout(layout), _set_number(number) {}
+        : _set(set), _set_layout(std::move(layout)), _set_number(number) {}
 
       void update(const VulkanState &state,
                   std::span<const Shader::ResourceView> attachments) noexcept;
 
       vk::DescriptorSet set() const noexcept { return _set; }
-      DescriptorSetLayoutHandle layout_handle() const noexcept { return _set_layout; }
+      const DescriptorSetLayoutHandle& layout_handle() const noexcept { return _set_layout; }
       uint32_t set_number() const noexcept { return _set_number; }
 
       operator vk::DescriptorSet() const noexcept { return _set; }
@@ -81,6 +80,7 @@ namespace mr {
     private:
       std::optional<vk::UniqueDescriptorPool> allocate_pool(std::span<const vk::DescriptorPoolSize> sizes) noexcept;
   };
+}
 } // namespace mr
 
 #endif // __MR_DESCRIPTOR_HPP_

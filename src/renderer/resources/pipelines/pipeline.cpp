@@ -1,3 +1,5 @@
+#include "pch.hpp"
+#include "resources/attachment/attachment.hpp"
 #include "resources/pipelines/pipeline.hpp"
 
 void mr::Pipeline::apply(vk::CommandBuffer cmd_buffer) const {}
@@ -7,12 +9,16 @@ mr::Pipeline::Pipeline(const VulkanState &state,
                        std::span<const DescriptorSetLayoutHandle> descriptor_layouts)
   : _shader(shader)
 {
+  ASSERT(shader.get(), "Shader should be valid");
+
   static constexpr size_t max_pipeline_layouts_number = 64;
-  beman::inplace_vector<vk::DescriptorSetLayout, max_pipeline_layouts_number> vk_descriptor_layouts;
+  InplaceVector<vk::DescriptorSetLayout, max_pipeline_layouts_number> vk_descriptor_layouts;
 
   ASSERT(descriptor_layouts.size() < max_pipeline_layouts_number);
+
   vk_descriptor_layouts.clear();
-  for (auto &layout : descriptor_layouts) {
+  for (const auto &layout : descriptor_layouts) {
+    ASSERT(layout.get() != nullptr);
     vk_descriptor_layouts.emplace_back(layout->layout());
   }
 

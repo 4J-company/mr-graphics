@@ -6,6 +6,7 @@
 #include "vulkan_state.hpp"
 
 namespace mr {
+inline namespace graphics {
   class CommandUnit {
     private:
       constexpr static size_t max_semaphores_number = 10;
@@ -26,7 +27,8 @@ namespace mr {
       CommandUnit(const VulkanState &state);
 
       void begin();
-      vk::SubmitInfo end();
+      void end();
+      vk::SubmitInfo submit_info() const noexcept;
 
       void clear_semaphores() noexcept;
 
@@ -35,6 +37,7 @@ namespace mr {
 
       vk::CommandBuffer * operator->() { return &_cmd_buffer; }
   };
+}
 } // namespace mr
 
 #endif // __MR_COMMAND_UNIT_HPP_

@@ -1,6 +1,6 @@
 #include "window.hpp"
-#include "camera/camera.hpp"
 #include "render_context.hpp"
+#include "camera/camera.hpp"
 
 vkfw::UniqueWindow mr::Window::_create_window(const Extent &extent) noexcept
 {

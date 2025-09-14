@@ -8,6 +8,7 @@
 #include "resources/framedata/framedata.hpp"
 
 namespace mr {
+inline namespace graphics {
   // forward declaration of RenderContext class
   class RenderContext;
 
@@ -52,5 +53,6 @@ namespace mr {
     Extent extent() const noexcept { return _extent; }
     const RenderContext & render_context() const noexcept { return *_parent; }
   };
+}
 } // namespace mr
 #endif // __MR_PRESENTER_HPP_

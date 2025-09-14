@@ -6,6 +6,7 @@
 #include "vulkan_state.hpp"
 
 namespace mr {
+inline namespace graphics {
   class Image {
     protected:
       vk::UniqueImage _image;
@@ -37,12 +38,6 @@ namespace mr {
 
       void switch_layout(const VulkanState &state, vk::ImageLayout new_layout);
 
-      template <typename T>
-      void write(const VulkanState &state, std::span<const T> data)
-      {
-        _write(state, {reinterpret_cast<const std::byte *>(data.data()), data.size_bytes()});
-      }
-
       // Copy data from to host visible buffer
       HostBuffer read_to_host_buffer(const VulkanState &state, CommandUnit &command_unit) noexcept;
 
@@ -50,6 +45,16 @@ namespace mr {
       // std::vector<std::byte> read() { return read_to_buffer().read(); }
       // Vec4f get_pixel(x, y) -> get small size (16 bytes)
 
+    public:
+      void write(const VulkanState &state, std::span<const std::byte> src);
+
+      template <typename T>
+      void write(const VulkanState &state, std::span<T> src) { write(state, std::as_bytes(src)); }
+
+    protected:
+      void create_image_view(const VulkanState &state);
+
+    public:
       vk::ImageView image_view() const noexcept { return _image_view.get(); }
       vk::Image image() const noexcept { return _image.get(); }
       vk::Format format() const noexcept { return _format; }
@@ -61,12 +66,6 @@ namespace mr {
       static vk::Format find_supported_format(
         const VulkanState &state, const std::vector<vk::Format> &candidates,
         vk::ImageTiling tiling, vk::FormatFeatureFlags features);
-
-    protected:
-      void create_image_view(const VulkanState &state);
-
-    private:
-      void _write(const VulkanState &state, std::span<const std::byte> data) noexcept;
   };
 
   // HostImage: host-visible, for staging or CPU read/write
@@ -155,6 +154,41 @@ namespace mr {
       );
     return format;
   }
+
+  inline constexpr size_t format_byte_size(vk::Format format) noexcept
+  {
+    size_t texel_size = format == vk::Format::eR8G8B8A8Srgb       ? 4
+                      : format == vk::Format::eR8G8B8Srgb         ? 3
+                      : format == vk::Format::eR8G8Srgb           ? 2
+                      : format == vk::Format::eR8Srgb             ? 1
+
+                      : format == vk::Format::eB8G8R8A8Srgb       ? 4
+                      : format == vk::Format::eB8G8R8Srgb         ? 3
+
+                      : format == vk::Format::eR8G8B8A8Unorm      ? 4
+                      : format == vk::Format::eR8G8B8Unorm        ? 3
+                      : format == vk::Format::eR8G8Unorm          ? 2
+                      : format == vk::Format::eR8Unorm            ? 1
+
+                      : format == vk::Format::eB8G8R8A8Unorm      ? 4
+                      : format == vk::Format::eB8G8R8Unorm        ? 3
+
+                      : format == vk::Format::eR32G32B32A32Sfloat ? 16
+                      : format == vk::Format::eR32G32B32Sfloat    ? 12
+                      : format == vk::Format::eR32G32Sfloat       ? 8
+                      : format == vk::Format::eR32Sfloat          ? 4
+
+                      : format == vk::Format::eD32Sfloat          ? 4
+                      : format == vk::Format::eD32SfloatS8Uint    ? 0
+                      : format == vk::Format::eD24UnormS8Uint     ? 0
+
+                                                                  : 0;
+
+    ASSERT(texel_size != 0, "Unsupported image format. Needs investigation", format);
+
+    return texel_size;
+  }
+}
 } // namespace mr
 
 #endif // __MR_IMAGE_HPP_

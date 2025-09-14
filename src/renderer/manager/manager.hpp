@@ -5,7 +5,7 @@
 #include "resource.hpp"
 
 namespace mr {
-
+inline namespace graphics {
   struct UnnamedTag {};
   constexpr inline UnnamedTag unnamed;
 
@@ -55,7 +55,7 @@ namespace mr {
 
     ResourceMapT _resources;
   };
-
+}
 } // namepsce mr
 
 #endif // __manager_hpp_

@@ -5,6 +5,7 @@
 #include "vulkan_state.hpp"
 
 namespace mr {
+inline namespace graphics {
   class Sampler {
     private:
       vk::UniqueSampler _sampler;
@@ -21,6 +22,7 @@ namespace mr {
 
       const vk::Sampler sampler() const { return _sampler.get(); }
   };
+}
 } // namespace mr
 
 #endif // __MR_SAMPLER_HPP_
