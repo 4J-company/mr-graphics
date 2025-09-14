@@ -225,7 +225,8 @@ void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
   _render_models(scene);
 
   _models_command_unit.add_signal_semaphore(_models_render_finished_semaphore.get());
-  vk::SubmitInfo models_submit_info = _models_command_unit.end();
+  _models_command_unit.end();
+  vk::SubmitInfo models_submit_info = _models_command_unit.submit_info();
 
   _state->queue().submit(models_submit_info);
 
@@ -244,7 +245,8 @@ void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
                                      vk::PipelineStageFlagBits::eColorAttachmentOutput);
   }
   _lights_command_unit.add_signal_semaphore(presenter.render_finished_semaphore());
-  vk::SubmitInfo light_submit_info = _lights_command_unit.end();
+  _lights_command_unit.end();
+  vk::SubmitInfo light_submit_info = _lights_command_unit.submit_info();
   _state->queue().submit(light_submit_info, _image_fence.get());
 
   presenter.present();

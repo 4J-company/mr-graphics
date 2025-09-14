@@ -28,6 +28,8 @@ class MrGraphicsRecipe(ConanFile):
         self.requires("glfw/3.4")
         self.requires("meshoptimizer/0.23")
 
+        self.requires("stb/cci.20240531")
+
         self.requires("glm/1.0.1")
 
         self.requires("mr-math/1.1.3")

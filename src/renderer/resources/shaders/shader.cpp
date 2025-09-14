@@ -25,7 +25,7 @@ mr::graphics::Shader::Shader(const VulkanState &state, std::string_view filename
       auto stage = static_cast<Stage>(shd_ind);
       compile(stage);
       std::optional<std::vector<char>> source = load(stage);
-      ASSERT(_validate_stage(stage, source.has_value()));
+      ASSERT(_validate_stage(stage, source.has_value()), "Necessary stage failed to compile :(", _path.string(), stage);
       if (!source) {
         // TODO: check if this stage is optional
         return;

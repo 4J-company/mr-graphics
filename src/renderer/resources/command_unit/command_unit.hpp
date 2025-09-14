@@ -27,7 +27,8 @@ inline namespace graphics {
       CommandUnit(const VulkanState &state);
 
       void begin();
-      vk::SubmitInfo end();
+      void end();
+      vk::SubmitInfo submit_info() const noexcept;
 
       void clear_semaphores() noexcept;
 

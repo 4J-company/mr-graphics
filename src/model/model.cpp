@@ -41,9 +41,6 @@ mr::graphics::Model::Model(
   }
   auto& model_value = model.value();
 
-  auto defult_shader_path = mr::path::shaders_dir / "default";
-  auto defult_shader_path_str = defult_shader_path.string();
-
   using enum mr::MaterialParameter;
   static std::vector<mr::MaterialBuilder> builders;
   static auto &manager = ResourceManager<Texture>::get();
@@ -64,11 +61,9 @@ mr::graphics::Model::Model(
 
       _meshes.emplace_back(std::move(vbufs), std::move(ibuf));
 
-      mr::MaterialBuilder builder {state, scene.render_context(), filename.stem().string()};
+      mr::MaterialBuilder builder {state, scene.render_context(), "default"};
 
-      ASSERT(s_cam_ubo_ptr);
-
-      builder.add_camera(*s_cam_ubo_ptr);
+      builder.add_camera(scene.camera_uniform_buffer());
       builder.add_value(transform);
       builder.add_value(&material.constants);
       for (const auto &texture : material.textures) {

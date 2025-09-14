@@ -73,18 +73,6 @@ std::vector<std::byte> mr::HostBuffer::copy() noexcept
 
 mr::HostBuffer::~HostBuffer() {}
 
-mr::HostBuffer::HostBuffer(
-  const VulkanState &state, std::size_t size,
-  vk::BufferUsageFlags usage_flags,
-  vk::MemoryPropertyFlags memory_properties)
-    : Buffer(state, size, usage_flags,
-             memory_properties |
-               vk::MemoryPropertyFlagBits::eHostVisible |
-               vk::MemoryPropertyFlagBits::eHostCoherent)
-{
-}
-
-
 // ----------------------------------------------------------------------------
 // Data mapper
 // ----------------------------------------------------------------------------
@@ -150,11 +138,7 @@ mr::DeviceBuffer & mr::DeviceBuffer::write(std::span<const std::byte> src)
   command_unit->copyBuffer(buf.buffer(), _buffer.get(), {buffer_copy});
   command_unit.end();
 
-  auto [bufs, bufs_number] = command_unit.submit_info();
-  vk::SubmitInfo submit_info {
-    .commandBufferCount = bufs_number,
-    .pCommandBuffers = bufs,
-  };
+  vk::SubmitInfo submit_info  = command_unit.submit_info();
 
   auto fence = _state->device().createFenceUnique({}).value;
   _state->queue().submit(submit_info, fence.get());

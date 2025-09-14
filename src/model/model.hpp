@@ -21,7 +21,7 @@ inline namespace graphics {
     public:
       Model() = default;
 
-      Model(const Scene &scene, std::string_view filename) noexcept;
+      Model(const Scene &scene, std::fs::path filename) noexcept;
 
       Model(const Model &other) noexcept = default;
       Model &operator=(const Model &other) noexcept = default;
