@@ -99,10 +99,10 @@ inline namespace graphics {
     const mr::VulkanState *_state {};
     const mr::RenderContext *_context {};
 
-    std::vector<byte> _specialization_data;
+    std::vector<std::byte> _specialization_data;
     std::unordered_map<std::string, std::string> _defines;
     std::vector<std::byte> _ubo_data;
-    InplaceVector<std::optional<mr::TextureHandle>, enum_cast(MaterialParameter::EnumSize)> _textures;
+    std::array<std::optional<mr::TextureHandle>, enum_cast(MaterialParameter::EnumSize)> _textures;
     mr::UniformBuffer *_cam_ubo;
 
     std::string_view _shader_filename;
@@ -116,7 +116,6 @@ inline namespace graphics {
       , _context(&context)
       , _shader_filename(filename)
     {
-      _textures.resize(_textures.capacity());
     }
 
     MaterialBuilder(MaterialBuilder &&) noexcept = default;
@@ -126,7 +125,7 @@ inline namespace graphics {
                                  const mr::importer::TextureData &tex_data,
                                  math::Color factor = {1.0, 1.0, 1.0, 1.0})
     {
-      ASSERT(tex_data.image.pixels.get(), "Image should be valid");
+      ASSERT(tex_data.image.pixels.get() != nullptr, "Image should be valid");
       mr::TextureHandle tex = ResourceManager<Texture>::get().create(mr::unnamed,
         *_state,
         (const std::byte*)tex_data.image.pixels.get(),

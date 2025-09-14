@@ -183,6 +183,9 @@ inline namespace graphics {
     IndexBuffer(const VulkanState &state, std::span<T, Extent> src)
         : IndexBuffer(state, src.size() * sizeof(T))
     {
+      static_assert(sizeof(T) == 1 || sizeof(T) == 2 || sizeof(T) == 4,
+                    "Unsupported index element size for IndexBuffer");
+
       write(src);
 
       _element_count = src.size();

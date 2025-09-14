@@ -44,11 +44,8 @@ mr::graphics::Model::Model(
   using enum mr::MaterialParameter;
   static std::vector<mr::MaterialBuilder> builders;
   static auto &manager = ResourceManager<Texture>::get();
-  auto io = std::ranges::iota_view {(size_t)0, model_value.meshes.size()};
-  std::for_each(std::execution::seq, io.begin(), io.end(),
-    [&, this] (size_t i) {
-      const auto &mesh = model_value.meshes[i];
-
+  std::for_each(std::execution::seq, model_value.meshes.begin(), model_value.meshes.end(),
+    [&, this] (const auto &mesh) {
       ASSERT(mesh.material < model_value.materials.size(), "Failed to load material from GLTF file");
 
       const auto &material = model_value.materials[mesh.material];

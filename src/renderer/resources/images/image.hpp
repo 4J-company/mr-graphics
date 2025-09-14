@@ -7,6 +7,9 @@
 
 namespace mr {
 inline namespace graphics {
+
+  constexpr size_t format_byte_size(vk::Format format) noexcept;
+
   class Image {
     protected:
       vk::UniqueImage _image;

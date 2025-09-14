@@ -2,8 +2,7 @@
 #include "resources/buffer/buffer.hpp"
 #include "vulkan_state.hpp"
 
-// Utility function for image size calculation
-static size_t calculate_image_size(mr::Extent extent, vk::Format format)
+constexpr size_t mr::graphics::format_byte_size(vk::Format format) noexcept
 {
   size_t texel_size = format == vk::Format::eR8G8B8A8Srgb       ? 4
                     : format == vk::Format::eR8G8B8Srgb         ? 3
@@ -34,7 +33,13 @@ static size_t calculate_image_size(mr::Extent extent, vk::Format format)
 
   ASSERT(texel_size != 0, "Unsupported image format. Needs investigation", format);
 
-  return extent.width * extent.height * texel_size;
+  return texel_size;
+}
+
+// Utility function for image size calculation
+static size_t calculate_image_size(mr::Extent extent, vk::Format format)
+{
+  return extent.width * extent.height * mr::format_byte_size(format);
 }
 
 // ---- Base Image ----

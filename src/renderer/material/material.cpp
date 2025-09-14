@@ -10,8 +10,10 @@ mr::graphics::Material::Material(const VulkanState &state,
     , _shader(shader)
     , _descriptor_allocator(state)
 {
+  ASSERT(_shader.get() != nullptr, "Invalid shader passed to the material", _shader->name());
+
   std::vector<Shader::ResourceView> attachments;
-  attachments.reserve(textures.size());
+  attachments.reserve(textures.size() + 2);
 
   attachments.emplace_back(0, 0, &cam_ubo);
   attachments.emplace_back(0, 1, &_ubo);

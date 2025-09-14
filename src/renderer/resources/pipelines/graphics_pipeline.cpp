@@ -1,3 +1,4 @@
+#include "resources/images/image.hpp"
 #include "resources/pipelines/graphics_pipeline.hpp"
 #include "renderer/window/render_context.hpp"
 
@@ -16,22 +17,14 @@ mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state,
     .dynamicStateCount = static_cast<uint>(_dynamic_states.size()),
     .pDynamicStates = _dynamic_states.data()};
 
-  auto fmt2uint = [](vk::Format fmt) -> uint32_t {
-    return sizeof(float) * (
-      fmt == vk::Format::eR32G32B32A32Sfloat ? 4
-      : fmt == vk::Format::eR32G32B32Sfloat  ? 3
-      : fmt == vk::Format::eR32G32Sfloat     ? 2
-                                             : 1);
-  };
-
   std::array<vk::VertexInputBindingDescription, 16> binding_descriptions {};
   uint32_t sum = 0;
   for (int i = 1; i < attributes.size(); i++) {
-    sum += fmt2uint(attributes[i].format);
+    sum += format_byte_size(attributes[i].format);
   }
   binding_descriptions[0] = vk::VertexInputBindingDescription {
     .binding = attributes[0].binding,
-    .stride = fmt2uint(attributes[0].format),
+    .stride = (uint32_t)format_byte_size(attributes[0].format),
     .inputRate = vk::VertexInputRate::eVertex,
   };
   if (attributes.size() > 1) {

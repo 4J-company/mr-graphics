@@ -17,9 +17,8 @@ mr::Pipeline::Pipeline(const VulkanState &state,
   ASSERT(descriptor_layouts.size() < max_pipeline_layouts_number);
 
   vk_descriptor_layouts.clear();
-  for (int i = 0; i < descriptor_layouts.size(); i++) {
-    auto &layout = descriptor_layouts[i];
-    ASSERT(layout.get());
+  for (const auto &layout : descriptor_layouts) {
+    ASSERT(layout.get() != nullptr);
     vk_descriptor_layouts.emplace_back(layout->layout());
   }
 
