@@ -1,6 +1,11 @@
 #include "base_light.hpp"
+#include "scene/scene.hpp"
+#include "renderer/window/render_context.hpp"
 
-mr::Light::Light(const VulkanState &state, LightsRenderData &light_render_data, const Vec3f &color, size_t ubo_size)
-  : _light_render_data(&light_render_data), _color(color), _uniform_buffer(state, ubo_size)
+mr::Light::Light(const Scene &scene, const Vec3f &color, size_t ubo_size)
+  : _scene(&scene)
+  , _lights_render_data(&_scene->render_context().lights_render_data())
+  , _color(color)
+  , _uniform_buffer(_scene->render_context().vulkan_state(), ubo_size)
 {
 }

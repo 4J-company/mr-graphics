@@ -46,6 +46,14 @@ if (NOT TARGET libstb-image)
   )
   add_library(libstb-image INTERFACE "")
   target_include_directories(libstb-image INTERFACE ${CMAKE_CURRENT_BINARY_DIR}/_deps/stb-src/)
+
+  # download a single file from stb
+  file(
+    DOWNLOAD
+    https://raw.githubusercontent.com/nothings/stb/master/stb_image_write.h
+    ${CMAKE_CURRENT_BINARY_DIR}/_deps/stb-src/stb/stb_image_write.h
+    EXPECTED_HASH SHA256=cbd5f0ad7a9cf4468affb36354a1d2338034f2c12473cf1a8e32053cb6914a05
+  )
 endif()
 
 find_package(Vulkan)

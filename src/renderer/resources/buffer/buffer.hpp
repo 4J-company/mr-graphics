@@ -43,37 +43,55 @@ namespace mr {
   };
 
   class HostBuffer : public Buffer {
-    public:
-      HostBuffer() = default;
+    private:
+      class MappedData {
+      private:
+        HostBuffer *_buf = nullptr;
+        void *_data = nullptr;
 
+      public:
+        MappedData(HostBuffer &buf);
+        ~MappedData();
+
+        MappedData & operator=(MappedData &&other) noexcept;
+        MappedData(MappedData &&other) noexcept;
+
+        void * map(size_t offset, size_t size) noexcept;
+        void * map() noexcept;
+        void unmap() noexcept;
+        bool mapped() const noexcept;
+        void * get() noexcept;
+      };
+
+      MappedData _mapped_data;
+
+    public:
       HostBuffer(
         const VulkanState &state, std::size_t size,
         vk::BufferUsageFlags usage_flags,
-        vk::MemoryPropertyFlags memory_properties = vk::MemoryPropertyFlags(0))
-          : Buffer(state, size, usage_flags,
-                   memory_properties |
-                     vk::MemoryPropertyFlagBits::eHostVisible |
-                     vk::MemoryPropertyFlagBits::eHostCoherent)
-      {
-      }
+        vk::MemoryPropertyFlags memory_properties = vk::MemoryPropertyFlags(0));
+
+      ~HostBuffer();
 
       HostBuffer(HostBuffer &&) = default;
       HostBuffer &operator=(HostBuffer &&) = default;
 
       template <typename T, size_t Extent>
-      HostBuffer &write(std::span<T, Extent> src)
+      HostBuffer & write(std::span<T, Extent> data) noexcept
       {
         // std::span<const T, Extent> cannot be constructed from non-const
-
-        size_t byte_size = src.size() * sizeof(T);
-        assert(byte_size <= _size);
-
-        assert(_state != nullptr);
-        auto ptr = _state->device().mapMemory(_memory.get(), 0, byte_size).value;
-        memcpy(ptr, src.data(), byte_size);
-        _state->device().unmapMemory(_memory.get());
+        _write({reinterpret_cast<const std::byte *>(data.data()), data.size_bytes()});
         return *this;
       }
+
+      // This method just map device memory and collect it to span
+      std::span<std::byte> read() noexcept;
+
+      // This method copy to CPU memory and unmap device memory
+      std::vector<std::byte> copy() noexcept;
+
+    private:
+      void _write(std::span<const std::byte> data) noexcept;
   };
 
   class DeviceBuffer : public Buffer {
@@ -92,42 +110,19 @@ namespace mr {
       }
 
       template <typename T, size_t Extent>
-      DeviceBuffer &write(std::span<T, Extent> src)
+      DeviceBuffer &write(std::span<T, Extent> data) noexcept
       {
         // std::span<const T, Extent> cannot be constructed from non-const
-
-        size_t byte_size = src.size() * sizeof(T);
-        assert(byte_size <= _size);
-
-        assert(_state != nullptr);
-        auto buf =
-          HostBuffer(*_state, _size, vk::BufferUsageFlagBits::eTransferSrc);
-        buf.write(src);
-
-        vk::BufferCopy buffer_copy {.size = byte_size};
-
-        static CommandUnit command_unit(*_state);
-        command_unit.begin();
-        command_unit->copyBuffer(buf.buffer(), _buffer.get(), {buffer_copy});
-        command_unit.end();
-
-        auto [bufs, bufs_number] = command_unit.submit_info();
-        vk::SubmitInfo submit_info {
-          .commandBufferCount = bufs_number,
-          .pCommandBuffers = bufs,
-        };
-        auto fence = _state->device().createFenceUnique({}).value;
-        _state->queue().submit(submit_info, fence.get());
-        _state->device().waitForFences({fence.get()}, VK_TRUE, UINT64_MAX);
-
+        _write({reinterpret_cast<const std::byte *>(data.data()), data.size_bytes()});
         return *this;
       }
+
+    private:
+      void _write(std::span<const std::byte> data) noexcept;
   };
 
   class UniformBuffer : public HostBuffer {
     public:
-      UniformBuffer() = default;
-
       UniformBuffer(const VulkanState &state, size_t size)
           : HostBuffer(state, size, vk::BufferUsageFlagBits::eUniformBuffer)
       {

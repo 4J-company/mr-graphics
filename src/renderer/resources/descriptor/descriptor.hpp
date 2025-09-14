@@ -44,7 +44,6 @@ namespace mr {
     public:
       DescriptorSet() noexcept = default;
 
-      // TODO(dk6): we have not unique DescriptorSet, will default move work correctly?
       DescriptorSet(DescriptorSet &&) noexcept = default;
       DescriptorSet & operator=(DescriptorSet &&) noexcept = default;
 
@@ -69,10 +68,10 @@ namespace mr {
     public:
       DescriptorAllocator(const VulkanState &state);
 
-      std::optional<mr::DescriptorSet> allocate_set(DescriptorSetLayoutHandle set_layout) noexcept;
+      std::optional<mr::DescriptorSet> allocate_set(DescriptorSetLayoutHandle set_layout) const noexcept;
 
       std::optional<std::vector<mr::DescriptorSet>> allocate_sets(
-        std::span<const DescriptorSetLayoutHandle> set_layouts) noexcept;
+        std::span<const DescriptorSetLayoutHandle> set_layouts) const noexcept;
 
       void reset() noexcept;
 

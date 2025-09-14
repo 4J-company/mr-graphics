@@ -6,37 +6,53 @@
 // mr::Application class defualt constructor (initializes vulkan instance, device ...)
 mr::Application::Application()
 {
-  while (vkfw::init() != vkfw::Result::eSuccess)
-    ;
-  // _state._init();
 }
 
 // destructor
-mr::Application::~Application()
+mr::Application::~Application() {}
+
+[[nodiscard]] std::unique_ptr<mr::RenderContext> mr::Application::create_render_context(Extent extent)
 {
-  // _state._deinit();
+  return std::make_unique<RenderContext>(&_state, extent);
 }
 
-[[nodiscard]] std::unique_ptr<mr::HostBuffer>
-mr::Application::create_host_buffer() const
+void mr::Application::start_render_loop(RenderContext &render_context, SceneHandle scene,
+                                                                       WindowHandle window) const noexcept
 {
-  return std::make_unique<HostBuffer>();
+  std::jthread render_thread {
+    [&](std::stop_token stop_token) {
+      while (not stop_token.stop_requested()) {
+        window->update_state();
+        scene->update(std::optional(std::reference_wrapper(window->input_state())));
+        render_context.render(scene, *window);
+      }
+    }
+  };
+
+  // TMP theme
+  while (not window->window().shouldClose().value) {
+    vkfw::pollEvents();
+  }
 }
 
-[[nodiscard]] std::unique_ptr<mr::DeviceBuffer>
-mr::Application::create_device_buffer() const
-{
-  return std::make_unique<DeviceBuffer>();
-}
 
-[[nodiscard]] std::unique_ptr<mr::CommandUnit>
-mr::Application::create_command_unit() const
+void mr::Application::render_frames(RenderContext &render_context,
+                                    SceneHandle scene,
+                                    FileWriterHandle file_writer,
+                                    const std::string_view filename_prefix,
+                                    uint32_t frames) const noexcept
 {
-  return std::make_unique<CommandUnit>();
-}
+  ASSERT(frames > 0);
+  ASSERT(not filename_prefix.empty());
 
-[[nodiscard]] std::unique_ptr<mr::Window>
-mr::Application::create_window(Extent extent)
-{
-  return std::make_unique<Window>(&_state, extent);
+  file_writer->filename("frame");
+  for (uint32_t i = 0; i < frames; i++) {
+    if (frames > 1) {
+      auto str = std::format("frame{}", i);
+      file_writer->filename(str);
+    }
+
+    scene->update();
+    render_context.render(scene, *file_writer);
+  }
 }

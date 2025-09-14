@@ -1,5 +1,6 @@
 #include "model/model.hpp"
 #include "renderer/renderer.hpp"
+#include "renderer/window/render_context.hpp"
 
 // for tmp singleton
 #include "manager/manager.hpp"
@@ -16,13 +17,14 @@ static std::optional<mr::TextureHandle> load_texture(const mr::VulkanState &stat
                                                      const int index) noexcept;
 static mr::MaterialHandle load_material(const mr::VulkanState &state,
                                         const mr::RenderContext &render_context,
+                                        mr::UniformBuffer &camera_uniform_buffer,
                                         const tinygltf::Model &model,
                                         const tinygltf::Material &material,
                                         mr::Matr4f transform) noexcept;
 static mr::Matr4f calculate_transform(const tinygltf::Node &node,
                                       const mr::Matr4f &parent_transform) noexcept;
 
-mr::Model::Model(const VulkanState &state, const RenderContext &render_context, std::string_view filename) noexcept
+mr::Model::Model(const Scene &mr_scene, std::string_view filename) noexcept : _scene(&mr_scene)
 {
   MR_INFO("Loading model {}", filename);
 
@@ -50,7 +52,7 @@ mr::Model::Model(const VulkanState &state, const RenderContext &render_context, 
   const auto &scene = model.scenes[0];
   for (int i = 0; i < scene.nodes.size(); i++) {
     const auto &node = model.nodes[scene.nodes[i]];
-    _process_node(state, render_context, model, mr::Matr4f::identity(), node);
+    _process_node(model, mr::Matr4f::identity(), node);
   }
 
   MR_INFO("Loading model {} finished\n", filename);
@@ -65,9 +67,7 @@ void mr::Model::draw(CommandUnit &unit) const noexcept
   }
 }
 
-void mr::Model::_process_node(const mr::VulkanState &state,
-                              const RenderContext &render_context,
-                              tinygltf::Model &model,
+void mr::Model::_process_node(tinygltf::Model &model,
                               const mr::Matr4f &parent_transform,
                               const tinygltf::Node &node) noexcept
 {
@@ -85,8 +85,10 @@ void mr::Model::_process_node(const mr::VulkanState &state,
   mr::Matr4f transform = calculate_transform(node, parent_transform);
 
   for (auto child : node.children) {
-    _process_node(state, render_context, model, transform, model.nodes[child]);
+    _process_node(model, transform, model.nodes[child]);
   }
+
+  const auto &state = _scene->render_context().vulkan_state();
 
   for (auto &primitive : mesh.primitives) {
     std::vector<VertexBuffer> vbufs;
@@ -144,7 +146,9 @@ void mr::Model::_process_node(const mr::VulkanState &state,
     tinygltf::Material material = model.materials[primitive.material];
 
     _meshes.emplace_back(std::move(vbufs), std::move(ibuf));
-    _materials.emplace_back(load_material(state, render_context, model, material, transform));
+    // TODO(dk6): pass Scene to material too
+    _materials.emplace_back(load_material(state, _scene->render_context(), _scene->camera_uniform_buffer(),
+                                          model, material, transform));
   }
 }
 
@@ -165,12 +169,10 @@ static std::optional<mr::TextureHandle> load_texture(const mr::VulkanState &stat
   return manager.create(mr::unnamed, state, image.image.data(), extent, format);
 }
 
-// TODO(dk6): workaround to pass camera data to material ubo until Scene class will be added
-extern mr::UniformBuffer *s_cam_ubo_ptr;
-
 static mr::MaterialHandle load_material(
   const mr::VulkanState &state,
   const mr::RenderContext &render_context,
+  mr::UniformBuffer &camera_uniform_buffer,
   const tinygltf::Model &model,
   const tinygltf::Material &material,
   mr::Matr4f transform) noexcept
@@ -206,7 +208,7 @@ static mr::MaterialHandle load_material(
     .add_texture(EmissiveColor, std::move(emissive_texture_optional), emissive_color_factor)
     .add_texture(OcclusionMap, std::move(occlusion_texture_optional))
     .add_texture(NormalMap, std::move(normal_texture_optional))
-    .add_camera(*s_cam_ubo_ptr)
+    .add_camera(camera_uniform_buffer)
     ;
   builders.emplace_back(std::move(builder));
   return builders.back().build();

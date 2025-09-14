@@ -9,25 +9,25 @@
 #include "renderer/material/material.hpp"
 
 namespace mr {
-  class VulkanState;
+  class Scene;
 
-  class Model {
+  class Model : public ResourceBase<Model> {
     private:
+      const Scene *_scene = nullptr;
+
       std::vector<mr::Mesh> _meshes;
       std::vector<mr::MaterialHandle> _materials;
 
       std::string _name;
 
-      void _process_node(const VulkanState &state,
-                         const RenderContext &render_context,
-                         tinygltf::Model &model,
+      void _process_node(tinygltf::Model &model,
                          const mr::Matr4f &parent_transform,
                          const tinygltf::Node &node) noexcept;
 
     public:
       Model() = default;
 
-      Model(const VulkanState &state, const RenderContext &render_context, std::string_view filename) noexcept;
+      Model(const Scene &scene, std::string_view filename) noexcept;
 
       Model(const Model &other) noexcept = default;
       Model &operator=(const Model &other) noexcept = default;
@@ -37,6 +37,8 @@ namespace mr {
 
       void draw(CommandUnit &unit) const noexcept;
   };
+
+  MR_DECLARE_HANDLE(Model);
 } // namespace mr
 
 #endif // __MR_MODEL_HPP_
