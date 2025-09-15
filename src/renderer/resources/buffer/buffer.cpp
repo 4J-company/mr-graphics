@@ -34,7 +34,7 @@ mr::Buffer::Buffer(const VulkanState &state, size_t byte_size,
     &_allocation,
     nullptr
   );
-  ASSERT(result == VK_SUCCESS);
+  ASSERT(result == VK_SUCCESS, "Failed to create vk::Buffer", result);
 }
 
 mr::Buffer::~Buffer() noexcept {
@@ -131,7 +131,7 @@ void * mr::HostBuffer::MappedData::map() noexcept
 
   auto result = vmaMapMemory(_buf->_state->allocator(), _buf->_allocation, &_data);
 
-  ASSERT(result == VK_SUCCESS);
+  ASSERT(result == VK_SUCCESS, "Failed to map memory for the vk::Buffer", result);
   ASSERT(_data != nullptr);
   return _data;
 }
