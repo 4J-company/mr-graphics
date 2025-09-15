@@ -1,18 +1,31 @@
 #include "resources/shaders/shader.hpp"
+
 #include <filesystem>
 #include <fstream>
+#include <sstream>
 
-mr::Shader::Shader(const VulkanState &state, std::string_view filename)
-    : _path(std::string("bin/shaders/") + filename.data())
+mr::graphics::Shader::Shader(const VulkanState &state, std::string_view filename, const std::unordered_map<std::string, std::string> &define_map)
+    : _path(std::filesystem::current_path())
 {
+  _path /= path::shaders_dir;
+  _include_string = std::string(" -I ") + _path.string() + " ";
+  _path /= filename;
+
+  std::stringstream ss;
+  for (auto &[name, value] : define_map) {
+    ss << "-D" << name << '=' << value << ' ';
+  }
+  _define_string = ss.str();
+
   std::array<int, max_shader_modules> shd_types;
   std::iota(shd_types.begin(), shd_types.end(), 0);
 
   std::for_each(
     std::execution::par, shd_types.begin(), shd_types.end(), [&](int shd_ind) {
       auto stage = static_cast<Stage>(shd_ind);
+      compile(stage);
       std::optional<std::vector<char>> source = load(stage);
-      assert(_validate_stage(stage, source.has_value()));
+      ASSERT(_validate_stage(stage, source.has_value()), "Necessary stage failed to compile :(", _path.string(), stage);
       if (!source) {
         // TODO: check if this stage is optional
         return;
@@ -20,39 +33,56 @@ mr::Shader::Shader(const VulkanState &state, std::string_view filename)
 
       int ind = _num_of_loaded_shaders++;
 
-      vk::StructureChain<vk::ShaderModuleCreateInfo, vk::ShaderModuleValidationCacheCreateInfoEXT>
-        create_info {
-          {
-            .codeSize = source->size(),
-            .pCode = reinterpret_cast<const uint *>(source->data())
-          },
-          {
-            .validationCache = state.validation_cache()
-          }
-        };
+      vk::ShaderModuleCreateInfo create_info {
+       .codeSize = source->size(),
+       .pCode = reinterpret_cast<const uint *>(source->data())
+      };
 
       auto [result, module] =
-        state.device().createShaderModuleUnique(create_info.get());
-      assert(result == vk::Result::eSuccess);
+        state.device().createShaderModuleUnique(create_info);
+      ASSERT(result == vk::Result::eSuccess);
       _modules[ind] = std::move(module);
+
+      vk::SpecializationInfo *specialization_info_ptr = nullptr;
+      vk::SpecializationInfo specialization_info;
+      #if 0
+        specialization_info_ptr = &specialization_info;
+        specialization_info = vk::SpecializationInfo {
+          .dataSize = specialization_data.size(),
+          .pData = specialization_data.data(),
+        };
+      #endif
 
       _stages[ind] = vk::PipelineShaderStageCreateInfo {
         .stage = get_stage_flags(stage),
         .module = _modules[ind].get(),
         .pName = "main",
+        .pSpecializationInfo = specialization_info_ptr,
       };
     });
 }
 
-void mr::Shader::compile(Shader::Stage stage) const noexcept
+// TODO: replace with Google's libshaderc
+void mr::graphics::Shader::compile(Shader::Stage stage) const noexcept
 {
+  MR_INFO("Compiling shader {}\n\t with defines {}\n", _path.string(), _define_string);
+
   std::string stage_type = get_stage_name(stage);
-  std::system(("glslc --target-env=vulkan1.2 *." + stage_type + " -o " +
-               stage_type + ".spv")
-                .c_str());
+
+  std::filesystem::path src_path = _path;
+  src_path.append("shader").replace_extension(stage_type);
+
+  if (!std::filesystem::exists(src_path)) return;
+
+  std::filesystem::path dst_path = _path;
+  dst_path.append(stage_type).replace_extension("spv");
+
+  auto argstr = ("glslc " + _define_string + _include_string + " -O " +
+                 src_path.string() + " -o " + dst_path.string());
+  std::system(argstr.c_str());
 }
 
-std::optional<std::vector<char>> mr::Shader::load(Shader::Stage stage) noexcept
+std::optional<std::vector<char>> mr::graphics::Shader::load(Shader::Stage stage) noexcept
 {
   std::filesystem::path stage_file_path = _path;
 
@@ -73,7 +103,7 @@ std::optional<std::vector<char>> mr::Shader::load(Shader::Stage stage) noexcept
   return source;
 }
 
-bool mr::Shader::_validate_stage(Stage stage, bool present) const noexcept
+bool mr::graphics::Shader::_validate_stage(Stage stage, bool present) const noexcept
 {
   // TODO: add mesh & task stages
   if (not present && (stage == Stage::Vertex || stage == Stage::Fragment)) {
@@ -98,4 +128,4 @@ bool mr::Shader::_validate_stage(Stage stage, bool present) const noexcept
   return true;
 }
 
-void mr::Shader::reload() {}
+void mr::graphics::Shader::reload() {}

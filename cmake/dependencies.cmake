@@ -1,74 +1,58 @@
 file(
   DOWNLOAD
-  https://github.com/cpm-cmake/CPM.cmake/releases/download/v0.38.3/CPM.cmake
+  https://github.com/cpm-cmake/CPM.cmake/releases/download/v0.40.2/CPM.cmake
   ${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake
-  EXPECTED_HASH SHA256=cc155ce02e7945e7b8967ddfaff0b050e958a723ef7aad3766d368940cb15494
+  EXPECTED_HASH SHA256=c8cdc32c03816538ce22781ed72964dc864b2a34a310d3b7104812a5ca2d835d
 )
 include(${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake)
 
-if (BINARY_DEPS)
-else()
+# install libraries with no binaries available
+find_package(glm REQUIRED)
+find_package(glfw3 REQUIRED)
+find_package(mr-math REQUIRED)
+find_package(mr-utils REQUIRED)
+find_package(mr-manager REQUIRED)
+find_package(mr-importer REQUIRED)
+
+CPMAddPackage("gh:Cvelth/vkfw#main")
+CPMAddPackage("gh:charles-lunarg/vk-bootstrap@1.4.321")
+CPMAddPackage("gh:bemanproject/inplace_vector#b81a3c7")
+
+if (${vkfw_ADDED})
+  add_library(libvkfw INTERFACE "")
+  target_link_libraries(libvkfw INTERFACE glfw)
+  target_include_directories(libvkfw INTERFACE ${vkfw_SOURCE_DIR}/include)
 endif()
 
-# install libraries with no binaries available
-CPMFindPackage(
-  NAME glfw3
-  GITHUB_REPOSITORY glfw/glfw
-  GIT_TAG 3.4
-  OPTIONS
-    "GLFW_BUILD_TESTS OFF"
-    "GLFW_BUILD_EXAMPLES OFF"
-    "GLFW_BULID_DOCS OFF"
-)
-
-CPMFindPackage(
-  NAME vkfw
-  GITHUB_REPOSITORY Cvelth/vkfw
-  GIT_TAG glfw-3.4
-)
-
-CPMFindPackage(
-  NAME vk-bootstrap
-  GITHUB_REPOSITORY charles-lunarg/vk-bootstrap
-  GIT_TAG v1.3.290
-)
-
-CPMFindPackage(
-  NAME assimp
-  URL "https://github.com/assimp/assimp/archive/refs/tags/v5.4.2.zip"
-  OPTIONS
-    "ASSIMP_WARNINGS_AS_ERRORS OFF"
-    "ASSIMP_BUILD_TESTS OFF"
-    "ASSIMP_NO_EXPORT ON"
-)
-
-# download a single file from stb
-file(
-  DOWNLOAD
-  https://raw.githubusercontent.com/nothings/stb/master/stb_image.h
-  ${CMAKE_CURRENT_BINARY_DIR}/_deps/stb-src/stb/stb_image.h
-  EXPECTED_HASH SHA256=594c2fe35d49488b4382dbfaec8f98366defca819d916ac95becf3e75f4200b3
-)
+if (${vk-bootstrap_ADDED})
+  add_library(vk-bootstrap-lib INTERFACE "")
+  target_link_libraries(vk-bootstrap-lib INTERFACE vk-bootstrap::vk-bootstrap)
+  target_include_directories(vk-bootstrap-lib INTERFACE ${vk-bootstrap_SOURCE_DIR}/src)
+endif()
 
 find_package(Vulkan)
 
 # set important variables
 set(DEPS_LIBRARIES
   Vulkan::Vulkan
-  assimp::assimp
-  glfw
-  vk-bootstrap::vk-bootstrap
+  libvkfw
+  vk-bootstrap-lib
+
+  beman.inplace_vector
+
+  glm::glm
+
+  mr-math::mr-math
+  mr-utils::mr-utils
+  mr-manager::mr-manager
+  mr-importer::mr-importer
 )
 
-set(DEPS_INCLUDE_DIRS
-  ${assimp_INCLUDE_DIRS}
-  ${CMAKE_CURRENT_BINARY_DIR}/_deps/stb-src
-  ${vkfw_SOURCE_DIR}/include
-  ${vk-bootstrap_SOURCE_DIR}/src
-)
-
-set(DEPS_DEFINITIONS
-)
+# TBB is required since it's dependency of PSTL on GCC and Clang
+if (NOT MSVC)
+  find_package(TBB REQUIRED tbb)
+  set(DEPS_LIBRARIES ${DEPS_LIBRARIES} tbb)
+endif()
 
 # install CMake scripts
 include(${CMAKE_SOURCE_DIR}/cmake/scripts.cmake)

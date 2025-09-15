@@ -1,8 +1,14 @@
+#include "resources/images/image.hpp"
+#include "resources/texture/sampler/sampler.hpp"
+
 #include "resources/descriptor/descriptor.hpp"
 #include "resources/shaders/shader.hpp"
 
-static vk::DescriptorType
-get_descriptor_type(const mr::Shader::Resource &attachment) noexcept
+// ============================================================================
+// Static functions
+// ============================================================================
+
+static vk::DescriptorType get_descriptor_type(const mr::graphics::Shader::Resource &attachment) noexcept
 {
   using enum vk::DescriptorType;
   static std::array types {
@@ -12,28 +18,50 @@ get_descriptor_type(const mr::Shader::Resource &attachment) noexcept
     eInputAttachment,
   };
 
-  assert(attachment.index() < types.size());
+  ASSERT(attachment.index() < types.size());
   return types[attachment.index()];
 }
 
 static std::vector<vk::DescriptorSetLayoutBinding>
-get_bindings(mr::Shader::Stage stage,
-             std::span<const mr::Shader::ResourceView> attachment_set) noexcept
+get_bindings(vk::ShaderStageFlags stage,
+             std::span<const mr::graphics::Shader::ResourceView> attachment_set) noexcept
 {
-  std::vector<vk::DescriptorSetLayoutBinding> set_bindings(
-    attachment_set.size());
-  for (int i = 0; i < attachment_set.size(); i++) {
-    set_bindings[i] = vk::DescriptorSetLayoutBinding {
-      .binding = attachment_set[i].binding,
-      .descriptorType = get_descriptor_type(attachment_set[i]),
-      .descriptorCount = 1,          // TODO: replace with reasonable value
-      .stageFlags = get_stage_flags(stage),
-      .pImmutableSamplers = nullptr, // TODO: investigate immutable samplers
+  return attachment_set | std::views::transform([stage](auto &&set) {
+    return vk::DescriptorSetLayoutBinding {
+      .binding = set.binding,
+      .descriptorType = get_descriptor_type(set),
+      .descriptorCount = 1,
+      .stageFlags = stage,
+      .pImmutableSamplers = nullptr, // TODO: replace this with corresponding sampler as it's never changed
     };
-  }
-
-  return set_bindings;
+  }) | std::ranges::to<std::vector>();
 }
+
+// ============================================================================
+// Descriptor set layout functions
+// ============================================================================
+
+mr::DescriptorSetLayout::DescriptorSetLayout(const VulkanState &state,
+                                             vk::ShaderStageFlags stage,
+                                             std::span<const Shader::ResourceView> attachments) noexcept
+{
+  auto set_bindings = get_bindings(stage, attachments);
+
+  // Create descriptor set layout
+  vk::DescriptorSetLayoutCreateInfo set_layout_create_info {
+    .bindingCount = static_cast<uint32_t>(set_bindings.size()),
+    .pBindings = set_bindings.data(),
+  };
+
+  auto [res, set_layout] =
+    state.device().createDescriptorSetLayoutUnique(set_layout_create_info);
+  ASSERT(res == vk::Result::eSuccess);
+  _set_layout = std::move(set_layout);
+}
+
+// ============================================================================
+// Descriptor set functions
+// ============================================================================
 
 void mr::DescriptorSet::update(
   const VulkanState &state,
@@ -48,12 +76,10 @@ void mr::DescriptorSet::update(
     info.range = buffer->byte_size();
     info.offset = 0;
   };
-  auto write_uniform_buffer = [&](UniformBuffer *buffer,
-                                  vk::DescriptorBufferInfo &info) {
+  auto write_uniform_buffer = [&](UniformBuffer *buffer, vk::DescriptorBufferInfo &info) {
     write_buffer(buffer, info);
   };
-  auto write_storage_buffer = [&](StorageBuffer *buffer,
-                                  vk::DescriptorBufferInfo &info) {
+  auto write_storage_buffer = [&](StorageBuffer *buffer, vk::DescriptorBufferInfo &info) {
     write_buffer(buffer, info);
   };
   auto write_texture = [&](Texture *texture, vk::DescriptorImageInfo &info) {
@@ -61,19 +87,16 @@ void mr::DescriptorSet::update(
     info.imageView = texture->image().image_view();
     info.sampler = texture->sampler().sampler();
   };
-  auto write_geometry_buffer = [&](Image *image,
-                                   vk::DescriptorImageInfo &info) {
+  auto write_geometry_buffer = [&](Image *image, vk::DescriptorImageInfo &info) {
     info.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
     info.imageView = image->image_view();
     info.sampler = nullptr;
   };
   auto write_default = [](auto, auto) { std::unreachable(); };
 
-  for (const auto &[attachment_view, write_info] :
-       std::views::zip(attachments, write_infos)) {
+  for (const auto &[attachment_view, write_info] : std::views::zip(attachments, write_infos)) {
     const Shader::Resource &attachment = attachment_view;
-    if (std::holds_alternative<Texture *>(attachment) ||
-        std::holds_alternative<Image *>(attachment)) {
+    if (std::holds_alternative<Texture *>(attachment) || std::holds_alternative<Image *>(attachment)) {
       write_info.emplace<vk::DescriptorImageInfo>();
     }
 
@@ -86,28 +109,40 @@ void mr::DescriptorSet::update(
                write_info);
   }
 
-  std::vector<vk::WriteDescriptorSet> descriptor_writes(attachments.size());
-  for (uint i = 0; i < attachments.size(); i++) {
-    descriptor_writes[i] = vk::WriteDescriptorSet {
+  static constexpr size_t max_descriptor_writes = 64;
+  ASSERT(attachments.size() < max_descriptor_writes);
+  InplaceVector<vk::WriteDescriptorSet, max_descriptor_writes> descriptor_writes;
+
+  for (const auto &[attach, write_info] : std::views::zip(attachments, write_infos)) {
+    descriptor_writes.emplace_back(vk::WriteDescriptorSet {
       .dstSet = _set,
-      .dstBinding = attachments[i].binding,
+      .dstBinding = attach.binding,
       .dstArrayElement = 0,
       .descriptorCount = 1,
-      .descriptorType = get_descriptor_type(attachments[i]),
-      .pImageInfo = std::get_if<vk::DescriptorImageInfo>(&write_infos[i]),
-      .pBufferInfo = std::get_if<vk::DescriptorBufferInfo>(&write_infos[i]),
-    };
+      .descriptorType = get_descriptor_type(attach),
+      .pImageInfo = std::get_if<vk::DescriptorImageInfo>(&write_info),
+      .pBufferInfo = std::get_if<vk::DescriptorBufferInfo>(&write_info),
+    });
   }
 
   state.device().updateDescriptorSets(descriptor_writes, {});
 }
 
+// ============================================================================
+// Descriptor allocator functions
+// ============================================================================
+
 mr::DescriptorAllocator::DescriptorAllocator(const VulkanState &state)
-    : _state(state)
+    : _state(&state)
 {
-  static std::vector<vk::DescriptorPoolSize> default_sizes = {
-    {vk::DescriptorType::eUniformBuffer, 10},
-    { vk::DescriptorType::eSampledImage,  5},
+  static constexpr std::array default_sizes {
+    vk::DescriptorPoolSize {vk::DescriptorType::eUniformBuffer, 10},
+    vk::DescriptorPoolSize {vk::DescriptorType::eStorageBuffer, 10},
+    vk::DescriptorPoolSize {vk::DescriptorType::eSampledImage, 5},
+    vk::DescriptorPoolSize {vk::DescriptorType::eInputAttachment, 10},
+    vk::DescriptorPoolSize {vk::DescriptorType::eCombinedImageSampler, 10},
+    // vk::DescriptorPoolSize {vk::DescriptorType::eUniformBufferDynamic, 5},
+    // vk::DescriptorPoolSize {vk::DescriptorType::eStorageBufferDynamic, 5},
   };
 
   if (auto pool = allocate_pool(default_sizes); pool.has_value()) {
@@ -116,7 +151,7 @@ mr::DescriptorAllocator::DescriptorAllocator(const VulkanState &state)
 }
 
 std::optional<vk::UniqueDescriptorPool> mr::DescriptorAllocator::allocate_pool(
-  std::span<vk::DescriptorPoolSize> sizes) noexcept
+  std::span<const vk::DescriptorPoolSize> sizes) noexcept
 {
   // Create descriptor pool
   vk::DescriptorPoolCreateInfo pool_create_info {
@@ -125,8 +160,7 @@ std::optional<vk::UniqueDescriptorPool> mr::DescriptorAllocator::allocate_pool(
     .pPoolSizes = sizes.data(),
   };
 
-  auto [res, pool] =
-    _state.device().createDescriptorPoolUnique(pool_create_info);
+  auto [res, pool] = _state->device().createDescriptorPoolUnique(pool_create_info);
   if (res != vk::Result::eSuccess) [[unlikely]] {
     return std::nullopt;
   }
@@ -134,55 +168,38 @@ std::optional<vk::UniqueDescriptorPool> mr::DescriptorAllocator::allocate_pool(
 }
 
 // TODO: rewrite allocate_set in a 1-dimensional manner
-std::optional<mr::DescriptorSet> mr::DescriptorAllocator::allocate_set(
-  Shader::Stage stage,
-  std::span<const Shader::ResourceView> attachments) noexcept
+std::optional<mr::DescriptorSet> mr::DescriptorAllocator::allocate_set(DescriptorSetLayoutHandle set_layout) const noexcept
 {
-  std::pair p = {stage, attachments};
-  return allocate_sets({&p, 1}).transform(
+  return allocate_sets({&set_layout, 1}).transform(
     [](std::vector<mr::DescriptorSet> &&v) -> mr::DescriptorSet {
       return std::move(v[0]);
     });
 }
 
 // TODO: handle resizing pool vector
-std::optional<std::vector<mr::DescriptorSet>>
-mr::DescriptorAllocator::allocate_sets(
-  std::span<
-    const std::pair<Shader::Stage, std::span<const Shader::ResourceView>>>
-    attachment_sets) noexcept
+std::optional<std::vector<mr::DescriptorSet>> mr::DescriptorAllocator::allocate_sets(
+  std::span<const DescriptorSetLayoutHandle> set_layouts) const noexcept
 {
-  std::vector<vk::DescriptorSetLayout> layouts;
-  std::vector<mr::DescriptorSet> sets;
+  static constexpr size_t max_descriptor_set_number = 64;
+  ASSERT(set_layouts.size() < max_descriptor_set_number);
+  InplaceVector<vk::DescriptorSetLayout, max_descriptor_set_number> layouts;
 
-  layouts.reserve(attachment_sets.size());
-  sets.reserve(attachment_sets.size());
+  std::vector<DescriptorSet> sets;
+  sets.reserve(set_layouts.size());
 
-  for (auto &attachment_set : attachment_sets) {
-    auto set_bindings =
-      get_bindings(attachment_set.first, attachment_set.second);
-
-    // Create descriptor set layout
-    vk::DescriptorSetLayoutCreateInfo set_layout_create_info {
-      .bindingCount = (uint32_t)set_bindings.size(),
-      .pBindings = set_bindings.data(),
-    };
-
-    auto [res, set_layout] =
-      _state.device().createDescriptorSetLayoutUnique(set_layout_create_info);
-    assert(res == vk::Result::eSuccess);
-
-    sets.emplace_back(vk::DescriptorSet(), std::move(set_layout), 0);
-    layouts.emplace_back(sets.back().layout());
+  for (const auto &layout : set_layouts) {
+    layouts.emplace_back(layout->layout());
+    // TODO(dk6): check this 0
+    sets.emplace_back(vk::DescriptorSet(), layout, 0);
   }
 
   vk::DescriptorSetAllocateInfo descriptor_alloc_info {
     .descriptorPool = _pools.back().get(),
-    .descriptorSetCount = (uint32_t)attachment_sets.size(),
+    .descriptorSetCount = static_cast<uint32_t>(sets.size()),
     .pSetLayouts = layouts.data(),
   };
   auto [res, val] =
-    _state.device().allocateDescriptorSets(descriptor_alloc_info);
+    _state->device().allocateDescriptorSets(descriptor_alloc_info);
   if (res != vk::Result::eSuccess) [[unlikely]] {
     return std::nullopt;
   }
@@ -190,7 +207,6 @@ mr::DescriptorAllocator::allocate_sets(
   // fill output variable with created vk::DescriptorSet's
   for (int i = 0; i < sets.size(); i++) {
     sets[i]._set = val[i];
-    sets[i].update(_state, attachment_sets[i].second);
   }
 
   return std::move(sets);
@@ -198,7 +214,7 @@ mr::DescriptorAllocator::allocate_sets(
 
 void mr::DescriptorAllocator::reset() noexcept
 {
-  for (int i = 0; i < _pools.size(); i++) {
-    _state.device().resetDescriptorPool(_pools[i].get());
+  for (auto &pool : _pools) {
+    _state->device().resetDescriptorPool(pool.get());
   }
 }

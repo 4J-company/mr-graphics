@@ -4,6 +4,7 @@
 #include "resources/pipelines/pipeline.hpp"
 
 namespace mr {
+inline namespace graphics {
   class GraphicsPipeline : public Pipeline {
     public:
       enum struct Subpass {
@@ -25,15 +26,17 @@ namespace mr {
     public:
       GraphicsPipeline() = default;
 
-      GraphicsPipeline(
-        const VulkanState &state, vk::RenderPass render_pass, Subpass subpass,
-        Shader *shader,
-        std::span<const vk::VertexInputAttributeDescription> attributes,
-        std::span<const vk::DescriptorSetLayout> descriptor_layouts);
+      GraphicsPipeline(const VulkanState &state,
+                       const RenderContext &render_context,
+                       Subpass subpass,
+                       mr::ShaderHandle shader,
+                       std::span<const vk::VertexInputAttributeDescription> attributes,
+                       std::span<const DescriptorSetLayoutHandle> descriptor_layouts);
 
       void recompile();
 
       void apply(vk::CommandBuffer cmd_buffer) const override;
   };
+}
 } // namespace mr
 #endif // __MR_GRAPHICS_PIPELINE_HPP_

@@ -3,15 +3,18 @@
 
 #include "pch.hpp"
 
+#include "manager/resource.hpp"
+
 #include "vulkan_state.hpp"
 
 namespace mr {
+inline namespace graphics {
   class UniformBuffer;
   class StorageBuffer;
   class Texture;
   class Image;
 
-  class Shader {
+  class Shader : public ResourceBase<Shader> {
     private:
       static inline const size_t max_shader_modules = 6;
 
@@ -19,11 +22,15 @@ namespace mr {
       std::array<vk::UniqueShaderModule, max_shader_modules> _modules;
       std::array<vk::PipelineShaderStageCreateInfo, max_shader_modules> _stages;
       std::atomic<uint> _num_of_loaded_shaders;
+      std::string _define_string;
+      std::string _include_string;
 
     public:
+      // TODO(dk6): think why pointers not const
       using Resource = std::variant<UniformBuffer *, StorageBuffer *, Texture *, Image *>;
 
       // TODO: consider RT shaders from extensions;
+      // TODO(dk6): remove this enum, use vk::ShaderStageFlagsBits instead
       enum struct Stage {
         Compute  = 0,
         Vertex   = 1,
@@ -43,7 +50,8 @@ namespace mr {
 
       Shader() = default;
 
-      Shader(const VulkanState &state, std::string_view filename);
+      Shader(const VulkanState &state, std::string_view filename,
+             const std::unordered_map<std::string, std::string> &define_map = {});
 
       // move semantics
       Shader(Shader &&other) noexcept
@@ -78,14 +86,16 @@ namespace mr {
       bool _validate_stage(Stage stage, bool present)  const noexcept;
 
     public:
-      const std::array<vk::PipelineShaderStageCreateInfo, max_shader_modules> &
-      get_stages() const { return _stages; }
+      const std::array<vk::PipelineShaderStageCreateInfo, max_shader_modules> & stages() const { return _stages; }
 
-      std::array<vk::PipelineShaderStageCreateInfo, max_shader_modules> &
-      get_stages() { return _stages; }
+      std::array<vk::PipelineShaderStageCreateInfo, max_shader_modules> & stages() { return _stages; }
 
       uint stage_number() const noexcept { return _num_of_loaded_shaders; }
+
+      std::string name() const noexcept { return _path.stem(); }
   };
+
+  MR_DECLARE_HANDLE(Shader)
 
   constexpr vk::ShaderStageFlagBits get_stage_flags(std::integral auto stage) noexcept
   {
@@ -97,7 +107,7 @@ namespace mr {
       vk::ShaderStageFlagBits::eGeometry,
       vk::ShaderStageFlagBits::eFragment
     };
-    assert(stage < stage_bits.size());
+    ASSERT(stage < stage_bits.size());
 
     return stage_bits[stage];
   }
@@ -117,7 +127,7 @@ namespace mr {
       "geom",
       "frag",
     };
-    assert(stage < shader_type_names.size());
+    ASSERT(stage < shader_type_names.size());
     return shader_type_names[stage];
   }
 
@@ -125,6 +135,7 @@ namespace mr {
   {
     return get_stage_name(std::to_underlying(stage));
   }
+}
 } // namespace mr
 
 #endif // __MR_SHADER_HPP_

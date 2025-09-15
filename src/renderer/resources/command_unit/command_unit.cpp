@@ -20,6 +20,7 @@ mr::CommandUnit::CommandUnit(const VulkanState &state)
 
 void mr::CommandUnit::begin()
 {
+  clear_semaphores();
   _cmd_buffer.reset();
   vk::CommandBufferBeginInfo
     begin_info {}; /// .flags = 0, .pInheritanceInfo = nullptr, };
@@ -30,3 +31,40 @@ void mr::CommandUnit::end()
 {
   _cmd_buffer.end();
 }
+
+vk::SubmitInfo mr::CommandUnit::submit_info() const noexcept {
+  auto &[wait_sems, wait_stage_flags] = _wait_sems;
+  vk::SubmitInfo submit_info {
+    .waitSemaphoreCount = static_cast<uint32_t>(wait_sems.size()),
+    .pWaitSemaphores = wait_sems.data(),
+    .pWaitDstStageMask = wait_stage_flags.data(),
+    .commandBufferCount = 1,
+    .pCommandBuffers = &_cmd_buffer,
+    .signalSemaphoreCount = static_cast<uint32_t>(_signal_sems.size()),
+    .pSignalSemaphores = _signal_sems.data(),
+  };
+  return submit_info;
+}
+
+void mr::CommandUnit::clear_semaphores() noexcept
+{
+  auto &[wait_sems, wait_stage_flags] = _wait_sems;
+  wait_sems.clear();
+  wait_stage_flags.clear();
+  _signal_sems.clear();
+}
+
+void mr::CommandUnit::add_wait_semaphore(vk::Semaphore sem, vk::PipelineStageFlags stage_flags) noexcept
+{
+  ASSERT(_wait_sems.first.size() + 1 < max_semaphores_number, "Not enough space for wait semaphores");
+  auto &[wait_sems, wait_stage_flags] = _wait_sems;
+  wait_sems.emplace_back(sem);
+  wait_stage_flags.emplace_back(stage_flags);
+}
+
+void mr::CommandUnit::add_signal_semaphore(vk::Semaphore sem) noexcept
+{
+  ASSERT(_signal_sems.size() + 1 < max_semaphores_number, "Not enough space for signal semaphores");
+  _signal_sems.emplace_back(sem);
+}
+
