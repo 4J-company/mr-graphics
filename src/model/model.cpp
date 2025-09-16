@@ -28,6 +28,7 @@ constexpr mr::MaterialParameter importer2graphics(mr::importer::TextureType type
 mr::graphics::Model::Model(
     Scene &scene,
     std::fs::path filename) noexcept
+  : _scene(&scene)
 {
   MR_INFO("Loading model {}", filename.string());
 
@@ -72,7 +73,7 @@ mr::graphics::Model::Model(
       }
 
       scene._bounds_data.emplace_back();
-      scene._visibility_data.emplace_back();
+      scene._visibility_data.emplace_back(1);
       scene._transforms_data.insert(
         scene._transforms_data.end(),
         mesh.transforms.begin(),
@@ -98,9 +99,9 @@ mr::graphics::Model::Model(
       for (const auto &texture : material.textures) {
         builder.add_texture(importer2graphics(texture.type), texture);
       }
-      builder.add_buffer(&scene._transforms);
-      builder.add_buffer(&scene._bounds);
-      builder.add_buffer(&scene._visibility);
+      builder.add_storage_buffer(&scene._transforms);
+      builder.add_storage_buffer(&scene._bounds);
+      builder.add_conditional_buffer(&scene._visibility);
 
       builders.push_back(std::move(builder));
       _materials.push_back(builders.back().build());
@@ -112,15 +113,27 @@ mr::graphics::Model::Model(
 
 void mr::graphics::Model::draw(CommandUnit &unit) const noexcept
 {
+  ASSERT(_scene != nullptr, "Parent scene of the model is lost");
   for (const auto &[material, mesh] : std::views::zip(_materials, _meshes)) {
-    uint32_t data[2] {
+    uint32_t offsets[2] {
       mesh._mesh_offset,
       mesh._instance_offset,
     };
+
+    vk::ConditionalRenderingBeginInfoEXT conditional_rendering_begin_info {
+      .buffer = _scene->_visibility.buffer(),
+      .offset = mesh._mesh_offset,
+    };
+
+    _scene->render_context().vulkan_state().disp().cmdBeginConditionalRenderingEXT(
+      unit.command_buffer(),
+      conditional_rendering_begin_info
+    );
     material->bind(unit);
-    unit->pushConstants(material->pipeline().layout(), vk::ShaderStageFlagBits::eFragment, 0, 8, data);
+    unit->pushConstants(material->pipeline().layout(), vk::ShaderStageFlagBits::eFragment, 0, 8, offsets);
     mesh.bind(unit);
     mesh.draw(unit);
+    _scene->render_context().vulkan_state().disp().cmdEndConditionalRenderingEXT(unit.command_buffer());
   }
 }
 

@@ -115,8 +115,7 @@ void mr::VulkanGlobalState::_create_phys_device()
     .set_required_features_14(features14)
     .add_required_extensions({
       VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-      VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
-      VK_EXT_CONDITIONAL_RENDERING_EXTENSION_NAME
+      VK_EXT_CONDITIONAL_RENDERING_EXTENSION_NAME,
     }).select();
 
   if (not phys_device) {
@@ -159,17 +158,15 @@ void mr::VulkanState::_create_device()
       break;
     }
   }
+
   vkb::DeviceBuilder builder{_global->_phys_device};
   auto device = builder.custom_queue_setup(queue_descrs).build();
-  if (not device) {
-    MR_ERROR("Cannot create VkDevice. {}\n", device.error().message());
-  }
+  ASSERT(device.has_value(), "Cannot create VkDevice", device.error().message());
+  _dispatch_table = device.value().make_table();
   _device.reset(device.value().device);
 
   auto queue = device.value().get_queue(vkb::QueueType::graphics);
-  if (not queue) {
-    MR_ERROR("Cannot create VkQueue {}\n ", queue.error().message());
-  }
+  ASSERT(queue.has_value(), "Cannot create VkQueue", queue.error().message());
   _queue = queue.value();
 }
 
