@@ -35,6 +35,7 @@ inline namespace graphics {
       void add_wait_semaphore(vk::Semaphore sem, vk::PipelineStageFlags stage_flags) noexcept;
       void add_signal_semaphore(vk::Semaphore sem) noexcept;
 
+      vk::CommandBuffer command_buffer() { return _cmd_buffer; }
       vk::CommandBuffer * operator->() { return &_cmd_buffer; }
   };
 }

@@ -34,7 +34,7 @@ inline namespace graphics {
     StorageBuffer _bounds;     // AABB                for each instance
     std::vector<mr::AABBf> _bounds_data;
 
-    StorageBuffer _visibility; // u32 visibility mask for each draw call
+    ConditionalBuffer _visibility; // u32 visibility mask for each draw call
     std::vector<uint32_t> _visibility_data;
 
     mutable UniformBuffer _camera_uniform_buffer;

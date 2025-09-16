@@ -119,6 +119,20 @@ inline namespace graphics {
     DeviceBuffer &write(std::span<T, Extent> src) { return write(std::as_bytes(src)); }
   };
 
+  class ConditionalBuffer : public DeviceBuffer {
+  public:
+    ConditionalBuffer() = default;
+    ConditionalBuffer(ConditionalBuffer &&) noexcept = default;
+    ConditionalBuffer & operator=(ConditionalBuffer &&) noexcept = default;
+
+    ConditionalBuffer(const VulkanState &state, size_t byte_size)
+      : DeviceBuffer(state, byte_size,
+                     vk::BufferUsageFlagBits::eTransferDst |
+                       vk::BufferUsageFlagBits::eConditionalRenderingEXT)
+    {
+    }
+  };
+
   class UniformBuffer : public HostBuffer {
   public:
     UniformBuffer(const VulkanState &state, size_t size)

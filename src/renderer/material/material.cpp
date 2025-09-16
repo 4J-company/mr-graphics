@@ -5,14 +5,15 @@ mr::graphics::Material::Material(const VulkanState &state,
                        mr::graphics::ShaderHandle shader,
                        std::span<std::byte> ubo_data,
                        std::span<std::optional<mr::TextureHandle>> textures,
-                       std::span<mr::StorageBuffer*> buffers,
+                       std::span<mr::StorageBuffer*> storage_buffers,
+                       std::span<mr::ConditionalBuffer*> conditional_buffers,
                        mr::UniformBuffer &cam_ubo) noexcept
     : _ubo(state, ubo_data)
     , _shader(shader)
     , _descriptor_allocator(state)
 {
   std::vector<Shader::ResourceView> attachments;
-  attachments.reserve(textures.size() + buffers.size() + 2);
+  attachments.reserve(textures.size() + storage_buffers.size() + conditional_buffers.size() + 2);
 
   attachments.emplace_back(0, 0, &cam_ubo);
   attachments.emplace_back(0, 1, &_ubo);
@@ -22,8 +23,15 @@ mr::graphics::Material::Material(const VulkanState &state,
     }
     attachments.emplace_back(0, static_cast<uint32_t>(i + 2), textures[i]->get());
   }
-  for (size_t i = 0; i < buffers.size(); i++) {
-    attachments.emplace_back(0, static_cast<uint32_t>(i + textures.size() + 2), buffers[i]);
+  for (size_t i = 0; i < storage_buffers.size(); i++) {
+    attachments.emplace_back(0, static_cast<uint32_t>(i + textures.size() + 2), storage_buffers[i]);
+  }
+  for (size_t i = 0; i < conditional_buffers.size(); i++) {
+    attachments.emplace_back(
+      0,
+      static_cast<uint32_t>(i + textures.size() + storage_buffers.size() + 2),
+      conditional_buffers[i]
+    );
   }
 
   auto layout_handle = ResourceManager<DescriptorSetLayout>::get().create(shader->name(),
