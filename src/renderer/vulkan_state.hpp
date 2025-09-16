@@ -30,6 +30,7 @@ inline namespace graphics {
       vk::UniqueDevice _device;
       vk::Queue _queue;
       vk::UniquePipelineCache _pipeline_cache;
+      VmaAllocator _allocator;
 
     public:
       VulkanState() = default;
@@ -44,9 +45,11 @@ inline namespace graphics {
       vk::Device device() const noexcept { return *_device; }
       vk::Queue queue() const noexcept { return _queue; }
       vk::PipelineCache pipeline_cache() const noexcept { return *_pipeline_cache; }
+      VmaAllocator allocator() const noexcept { return _allocator; }
 
     private:
       void _create_device();
+      void _create_allocator();
       void _create_pipeline_cache();
       void _destroy_pipeline_cache();
   };

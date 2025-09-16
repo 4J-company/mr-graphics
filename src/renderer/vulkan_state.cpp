@@ -131,12 +131,21 @@ mr::VulkanState::VulkanState(VulkanGlobalState *state)
   , _device({}, {nullptr})
 {
   _create_device();
+  _create_allocator();
   _create_pipeline_cache();
 }
 
 mr::VulkanState::~VulkanState()
 {
   _destroy_pipeline_cache();
+}
+
+void mr::VulkanState::_create_allocator() {
+  VmaAllocatorCreateInfo allocator_create_info {};
+  allocator_create_info.physicalDevice = phys_device();
+  allocator_create_info.device = device();
+  allocator_create_info.instance = instance();
+  vmaCreateAllocator(&allocator_create_info, &_allocator);
 }
 
 void mr::VulkanState::_create_device()

@@ -114,7 +114,7 @@ mr::SceneHandle mr::RenderContext::create_scene() const noexcept
 void mr::RenderContext::_render_lights(const SceneHandle scene, Presenter &presenter)
 {
   for (auto &gbuf : _gbuffers) {
-    gbuf.switch_layout(*_state, vk::ImageLayout::eShaderReadOnlyOptimal);
+    gbuf.switch_layout(vk::ImageLayout::eShaderReadOnlyOptimal);
   }
 
   vk::RenderingAttachmentInfoKHR swapchain_image_attachment_info = presenter.target_image_info();
@@ -126,7 +126,7 @@ void mr::RenderContext::_render_lights(const SceneHandle scene, Presenter &prese
     .pColorAttachments = &swapchain_image_attachment_info,
   };
 
-  _depthbuffer.switch_layout(*_state, vk::ImageLayout::eDepthStencilAttachmentOptimal);
+  _depthbuffer.switch_layout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
 
   _lights_command_unit->beginRendering(&attachment_info);
 
@@ -163,9 +163,9 @@ void mr::RenderContext::_render_lights(const SceneHandle scene, Presenter &prese
 void mr::RenderContext::_render_models(const SceneHandle scene)
 {
   for (auto &gbuf : _gbuffers) {
-    gbuf.switch_layout(*_state, vk::ImageLayout::eColorAttachmentOptimal);
+    gbuf.switch_layout(vk::ImageLayout::eColorAttachmentOptimal);
   }
-  _depthbuffer.switch_layout(*_state, vk::ImageLayout::eDepthStencilAttachmentOptimal);
+  _depthbuffer.switch_layout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
 
   auto gbufs_attachs = _gbuffers | std::views::transform([](const ColorAttachmentImage &gbuf) {
     return gbuf.attachment_info();

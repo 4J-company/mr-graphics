@@ -54,8 +54,7 @@ vk::RenderingAttachmentInfoKHR mr::Window::target_image_info() noexcept
                              nullptr,
                              &image_index);
 
-  _swapchain._images[image_index].switch_layout(_parent->vulkan_state(),
-                                                        vk::ImageLayout::eColorAttachmentOptimal);
+  _swapchain._images[image_index].switch_layout(vk::ImageLayout::eColorAttachmentOptimal);
 
   _current_image_available_semaphore =_image_available_semaphore[prev_image_index].get();
   _current_render_finished_semaphore = _render_finished_semaphore[image_index].get();
@@ -72,7 +71,7 @@ vk::RenderingAttachmentInfoKHR mr::Window::target_image_info() noexcept
 
 void mr::Window::present() noexcept
 {
-  _swapchain._images[image_index].switch_layout(_parent->vulkan_state(), vk::ImageLayout::ePresentSrcKHR);
+  _swapchain._images[image_index].switch_layout(vk::ImageLayout::ePresentSrcKHR);
   std::array sems = {_render_finished_semaphore[image_index].get()};
   vk::PresentInfoKHR present_info {
     .waitSemaphoreCount = sems.size(),

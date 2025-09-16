@@ -5,6 +5,7 @@
 #define STB_IMAGE_WRITE_STATIC
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image_write.h>
+#undef STB_IMAGE_WRITE_IMPLEMENTATION
 
 mr::FileWriter::FileWriter(const RenderContext &parent, Extent extent) : Presenter(parent, extent)
 {
@@ -27,7 +28,7 @@ vk::RenderingAttachmentInfoKHR mr::FileWriter::target_image_info() noexcept
   _image_index = (_image_index + 1) % images_number;
 
   auto &image = _images[_image_index];
-  image.switch_layout(_parent->vulkan_state(), vk::ImageLayout::eColorAttachmentOptimal);
+  image.switch_layout(vk::ImageLayout::eColorAttachmentOptimal);
 
   auto &[sem, first_usage] = _image_available_semaphore[_image_index];
   _current_image_available_semaphore = first_usage ? VK_NULL_HANDLE : sem.get();
@@ -51,10 +52,11 @@ void mr::FileWriter::present() noexcept
   command_unit.add_wait_semaphore(_render_finished_semaphore[_image_index].get(),
                                   vk::PipelineStageFlagBits::eColorAttachmentOutput);
 
-  auto stage_buffer = image.read_to_host_buffer(state, command_unit);
+  auto stage_buffer = image.read_to_host_buffer(command_unit);
 
-  auto data = stage_buffer.read();
+  auto data = stage_buffer.copy();
   ASSERT(data.size() % 4 == 0);
+
   // convert BGRA -> RGBA
   for (uint32_t i = 0; i < data.size(); i += 4) {
     std::swap(data[i], data[i + 2]);

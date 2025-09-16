@@ -8,64 +8,98 @@
 namespace mr {
 inline namespace graphics {
   class Image {
-    protected:
-      vk::UniqueImage _image;
-      vk::UniqueImageView _image_view;
-      vk::UniqueDeviceMemory _memory;
+  protected:
+    vk::Image _image;
+    vk::UniqueImageView _image_view;
+    VmaAllocation _allocation;
 
-      vk::Extent3D _extent;
-      size_t _size{};
-      vk::Format _format;
-      int _num_of_channels{};
-      uint _mip_level{};
-      vk::ImageLayout _layout;
-      vk::ImageUsageFlags _usage_flags;
-      vk::ImageAspectFlags _aspect_flags;
-      vk::MemoryPropertyFlags _memory_properties;
-      const VulkanState *_state = nullptr;
+    vk::Extent3D _extent;
+    size_t _size{};
+    vk::Format _format;
+    int _num_of_channels{};
+    uint _mip_level{};
+    vk::ImageLayout _layout;
+    vk::ImageUsageFlags _usage_flags;
+    vk::ImageAspectFlags _aspect_flags;
+    vk::MemoryPropertyFlags _memory_properties;
+    const VulkanState *_state = nullptr;
 
-      // Protected constructor for use by derived classes
-      Image() = default;
-      Image(const VulkanState &state, Extent extent, vk::Format format,
-            vk::ImageUsageFlags usage_flags, vk::ImageAspectFlags aspect_flags,
-            vk::MemoryPropertyFlags memory_properties, uint mip_level = 1);
+    // Protected constructor for use by derived classes
+    Image() = default;
+    Image(const VulkanState &state, Extent extent, vk::Format format,
+          vk::ImageUsageFlags usage_flags, vk::ImageAspectFlags aspect_flags,
+          vk::MemoryPropertyFlags memory_properties, uint mip_level = 1);
 
-    public:
-      Image(Image &&) = default;
-      Image& operator=(Image &&) = default;
+  public:
+    Image(Image &&other) noexcept {
+      std::swap(_state, other._state);
 
-      virtual ~Image();
+      std::swap(_image, other._image);
+      std::swap(_image_view, other._image_view);
+      std::swap(_allocation, other._allocation);
 
-      void switch_layout(const VulkanState &state, vk::ImageLayout new_layout);
+      std::swap(_extent, other._extent);
+      std::swap(_size, other._size);
+      std::swap(_format, other._format);
+      std::swap(_num_of_channels, other._num_of_channels);
+      std::swap(_mip_level, other._mip_level);
+      std::swap(_layout, other._layout);
+      std::swap(_usage_flags, other._usage_flags);
+      std::swap(_aspect_flags, other._aspect_flags);
+      std::swap(_memory_properties, other._memory_properties);
+    }
+    Image& operator=(Image &&other) noexcept {
+      std::swap(_state, other._state);
 
-      // Copy data from to host visible buffer
-      HostBuffer read_to_host_buffer(const VulkanState &state, CommandUnit &command_unit) noexcept;
+      std::swap(_image, other._image);
+      std::swap(_image_view, other._image_view);
+      std::swap(_allocation, other._allocation);
 
-      // TODO(dk6): implement this
-      // std::vector<std::byte> read() { return read_to_buffer().read(); }
-      // Vec4f get_pixel(x, y) -> get small size (16 bytes)
+      std::swap(_extent, other._extent);
+      std::swap(_size, other._size);
+      std::swap(_format, other._format);
+      std::swap(_num_of_channels, other._num_of_channels);
+      std::swap(_mip_level, other._mip_level);
+      std::swap(_layout, other._layout);
+      std::swap(_usage_flags, other._usage_flags);
+      std::swap(_aspect_flags, other._aspect_flags);
+      std::swap(_memory_properties, other._memory_properties);
 
-    public:
-      void write(const VulkanState &state, std::span<const std::byte> src);
+      return *this;
+    }
 
-      template <typename T>
-      void write(const VulkanState &state, std::span<T> src) { write(state, std::as_bytes(src)); }
+    virtual ~Image();
 
-    protected:
-      void create_image_view(const VulkanState &state);
+    void switch_layout(vk::ImageLayout new_layout);
 
-    public:
-      vk::ImageView image_view() const noexcept { return _image_view.get(); }
-      vk::Image image() const noexcept { return _image.get(); }
-      vk::Format format() const noexcept { return _format; }
-      vk::MemoryPropertyFlags memory_properties() const noexcept { return _memory_properties; }
+    // Copy data from to host visible buffer
+    HostBuffer read_to_host_buffer(CommandUnit &command_unit) noexcept;
 
-      const vk::Extent3D & extent() const noexcept { return _extent; }
-      size_t size() const noexcept { return _size; }
+    // TODO(dk6): implement this
+    // std::vector<std::byte> read() { return read_to_buffer().read(); }
+    // Vec4f get_pixel(x, y) -> get small size (16 bytes)
 
-      static vk::Format find_supported_format(
-        const VulkanState &state, const std::vector<vk::Format> &candidates,
-        vk::ImageTiling tiling, vk::FormatFeatureFlags features);
+  public:
+    void write(std::span<const std::byte> src);
+
+    template <typename T>
+    void write(std::span<T> src) { write(std::as_bytes(src)); }
+
+  protected:
+    void create_image_view();
+
+  public:
+    vk::ImageView image_view() const noexcept { return _image_view.get(); }
+    vk::Image image() const noexcept { return _image; }
+    vk::Format format() const noexcept { return _format; }
+    vk::MemoryPropertyFlags memory_properties() const noexcept { return _memory_properties; }
+
+    const vk::Extent3D & extent() const noexcept { return _extent; }
+    size_t size() const noexcept { return _size; }
+
+    static vk::Format find_supported_format(
+      const VulkanState &state, const std::vector<vk::Format> &candidates,
+      vk::ImageTiling tiling, vk::FormatFeatureFlags features);
   };
 
   // HostImage: host-visible, for staging or CPU read/write
