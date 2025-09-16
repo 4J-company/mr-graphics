@@ -24,6 +24,15 @@ layout(set = 0, binding = 0) uniform CameraUbo {
   float sens;
 } cam_ubo;
 
+layout(set = 0, binding = 7) buffer Transforms {
+  mat4 transforms[];
+};
+
+layout(push_constant) uniform Offsets {
+  int mesh_offset;
+  int instance_offset;
+};
+
 #include "pbr_params.h"
 
 void main()
@@ -35,7 +44,9 @@ void main()
   vec4 occlusion_color = get_occlusion_color(tex_coord);
   vec4 normal_color = get_normal_color(tex_coord);
 
-  position = ubo.transform * vec4(InPos.xyz, 1.0);
+  mat4 transform = transforms[instance_offset + gl_InstanceIndex];
+
+  position = transform * vec4(InPos.xyz, 1.0);
   color = base_color;
   metallic_roughness = metallic_roughness_color;
   emissive = emissive_color;
@@ -46,6 +57,6 @@ void main()
   //               (texture(NormalMap, DrawTexCoord).rgb * 2 - vec3(1, 1, 1)), TexFlags1.y)), 1);
   normal = vec4(InNorm, 0);
 
-  gl_Position = cam_ubo.vp * ubo.transform * vec4(InPos.xyz, 1.0);
+  gl_Position = cam_ubo.vp * transform * vec4(InPos.xyz, 1.0);
   gl_Position = vec4(gl_Position.x, -gl_Position.y, gl_Position.z, gl_Position.w);
 }

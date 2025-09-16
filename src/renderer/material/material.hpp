@@ -40,11 +40,15 @@ inline namespace graphics {
              mr::ShaderHandle shader,
              std::span<std::byte> ubo_data,
              std::span<std::optional<mr::TextureHandle>> textures,
+             std::span<mr::StorageBuffer*> storage_buffers,
+             std::span<mr::ConditionalBuffer*> conditional_buffers,
              mr::UniformBuffer &cam_ubo) noexcept;
 
     void bind(CommandUnit &unit) const noexcept;
 
-  protected:
+    const mr::GraphicsPipeline &pipeline() const noexcept { return _pipeline; }
+
+  private:
     mr::UniformBuffer _ubo;
     mr::ShaderHandle _shader;
 
@@ -103,6 +107,8 @@ inline namespace graphics {
     std::unordered_map<std::string, std::string> _defines;
     std::vector<std::byte> _ubo_data;
     std::array<std::optional<mr::TextureHandle>, enum_cast(MaterialParameter::EnumSize)> _textures;
+    InplaceVector<mr::StorageBuffer *, 16> _storage_buffers;
+    InplaceVector<mr::ConditionalBuffer *, 16> _conditional_buffers;
     mr::UniformBuffer *_cam_ubo;
 
     std::string_view _shader_filename;
@@ -135,6 +141,18 @@ inline namespace graphics {
 
       _textures[enum_cast(param)] = std::move(tex);
       add_value(factor);
+      return *this;
+    }
+
+    MaterialBuilder & add_storage_buffer(mr::StorageBuffer *buffer)
+    {
+      _storage_buffers.push_back(buffer);
+      return *this;
+    }
+
+    MaterialBuilder & add_conditional_buffer(mr::ConditionalBuffer *buffer)
+    {
+      _conditional_buffers.push_back(buffer);
       return *this;
     }
 
@@ -196,6 +214,8 @@ inline namespace graphics {
         shdhandle,
         std::span {_ubo_data},
         std::span {_textures},
+        std::span {_storage_buffers.data(), _storage_buffers.size()},
+        std::span {_conditional_buffers.data(), _conditional_buffers.size()},
         *_cam_ubo
       );
     }

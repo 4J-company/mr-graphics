@@ -6,31 +6,42 @@
 
 namespace mr {
 inline namespace graphics {
+  class Model;
+
   class Mesh {
+    friend class Model;
+
   private:
     std::vector<VertexBuffer> _vbufs;
-    IndexBuffer _ibuf;
+    std::vector<IndexBuffer> _ibufs;
 
     std::atomic<int> _instance_count = 0;
+
+    uint32_t _mesh_offset = 0;     // offset to the *per mesh*     data buffer in the scene
+    uint32_t _instance_offset = 0; // offset to the *per instance* data buffer in the scene
 
   public:
     Mesh() = default;
 
-    Mesh(std::vector<VertexBuffer>, IndexBuffer) noexcept;
+    Mesh(std::vector<VertexBuffer>, std::vector<IndexBuffer>, size_t, size_t, size_t) noexcept;
 
     // move semantics
     Mesh(Mesh &&other) noexcept
     {
       _vbufs = std::move(other._vbufs);
-      _ibuf = std::move(other._ibuf);
+      _ibufs = std::move(other._ibufs);
       _instance_count = std::move(other._instance_count.load());
+      _mesh_offset = std::move(other._mesh_offset);
+      _instance_offset = std::move(other._instance_offset);
     }
 
     Mesh &operator=(Mesh &&other) noexcept
     {
       _vbufs = std::move(other._vbufs);
-      _ibuf = std::move(other._ibuf);
+      _ibufs = std::move(other._ibufs);
       _instance_count = std::move(other._instance_count.load());
+      _mesh_offset = std::move(other._mesh_offset);
+      _instance_offset = std::move(other._instance_offset);
 
       return *this;
     }
@@ -48,10 +59,11 @@ inline namespace graphics {
       unit->bindVertexBuffers(0,
           std::span{vbufs.data(), _vbufs.size()},
           std::span{offsets.data(), _vbufs.size()});
-      unit->bindIndexBuffer(_ibuf.buffer(), 0, _ibuf.index_type());
+      unit->bindIndexBuffer(_ibufs[0].buffer(), 0, _ibufs[0].index_type());
     }
+
     void draw(mr::CommandUnit &unit) const noexcept {
-      unit->drawIndexed(_ibuf.element_count(), num_of_instances(), 0, 0, 0);
+      unit->drawIndexed(_ibufs[0].element_count(), num_of_instances(), 0, 0, 0);
     }
   };
 }
