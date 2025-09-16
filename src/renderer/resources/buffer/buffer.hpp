@@ -3,44 +3,57 @@
 
 #include "pch.hpp"
 
+#include <vk_mem_alloc.h>
 
-#include "resources/command_unit/command_unit.hpp"
 #include "vulkan_state.hpp"
+#include <vulkan/vulkan_core.h>
 
 namespace mr {
 inline namespace graphics {
   class Buffer {
-    public:
-      Buffer() = default;
-      Buffer(const VulkanState &state, size_t byte_size,
-             vk::BufferUsageFlags usage_flag,
-             vk::MemoryPropertyFlags memory_properties);
-      Buffer(Buffer &&) = default;
-      Buffer &operator=(Buffer &&) = default;
-      virtual ~Buffer() = default;
+  public:
+    Buffer() = default;
+    Buffer(const VulkanState &state, size_t byte_size,
+           vk::BufferUsageFlags usage_flag,
+           vk::MemoryPropertyFlags memory_properties);
+    Buffer(Buffer &&other) noexcept {
+      std::swap(_state, other._state);
+      std::swap(_size, other._size);
+      std::swap(_buffer, other._buffer);
+      std::swap(_usage_flags, other._usage_flags);
+      std::swap(_allocation, other._allocation);
+      std::swap(_memory_properties, other._memory_properties);
+    }
+    Buffer & operator=(Buffer &&other) noexcept {
+      std::swap(_state, other._state);
+      std::swap(_size, other._size);
+      std::swap(_buffer, other._buffer);
+      std::swap(_usage_flags, other._usage_flags);
+      std::swap(_allocation, other._allocation);
+      std::swap(_memory_properties, other._memory_properties);
+      return *this;
+    }
+    virtual ~Buffer() noexcept;
 
-      void resize(size_t byte_size);
+    void resize(size_t byte_size);
 
-      static uint find_memory_type(const VulkanState &state, uint filter,
-                                   vk::MemoryPropertyFlags properties) noexcept;
+    static uint find_memory_type(const VulkanState &state, uint filter,
+                                 vk::MemoryPropertyFlags properties) noexcept;
 
-      vk::Buffer buffer() const noexcept { return _buffer.get(); }
+    vk::Buffer buffer() const noexcept { return _buffer; }
 
-      size_t byte_size() const noexcept { return _size; }
+    size_t byte_size() const noexcept { return _size; }
 
-    protected:
-      const VulkanState *_state{nullptr};
+  protected:
+    const VulkanState *_state = nullptr;
 
-      size_t _size;
+    size_t _size = 0;
 
-      vk::UniqueBuffer _buffer;
-      vk::UniqueDeviceMemory _memory;
+    vk::Buffer _buffer {};
 
-      vk::BufferUsageFlags _usage_flags;
-      vk::MemoryPropertyFlags _memory_properties;
-      // VMA data
-      // VmaAllocation _allocation;
-      // VmaMemoryUsage _memory_usage;
+    vk::BufferUsageFlags _usage_flags {};
+    vk::MemoryPropertyFlags _memory_properties {};
+    VmaAllocation _allocation {};
   };
 
   class HostBuffer : public Buffer {
@@ -51,17 +64,20 @@ inline namespace graphics {
       void *_data = nullptr;
 
     public:
-      MappedData(HostBuffer &buf);
-      ~MappedData();
+
+      MappedData(HostBuffer &buf) : _buf(&buf) {}
+      ~MappedData() { if (mapped()) { unmap(); } }
 
       MappedData & operator=(MappedData &&other) noexcept;
       MappedData(MappedData &&other) noexcept;
 
-      void * map(size_t offset, size_t size) noexcept;
+      MappedData & operator=(const MappedData &other) = delete;
+      MappedData(const MappedData &other) = delete;
+
       void * map() noexcept;
       void unmap() noexcept;
-      bool mapped() const noexcept;
-      void * get() noexcept;
+      bool mapped() const noexcept { return _data != nullptr; }
+      void * get() noexcept { return _data; }
     };
 
     MappedData _mapped_data;
@@ -85,7 +101,7 @@ inline namespace graphics {
     HostBuffer &operator=(HostBuffer &&) = default;
 
     // This method just map device memory and collect it to span
-    std::span<std::byte> read() noexcept;
+    std::span<const std::byte> read() noexcept;
 
     HostBuffer &write(std::span<const std::byte> src);
 

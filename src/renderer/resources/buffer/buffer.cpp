@@ -1,3 +1,7 @@
+#include <vulkan/vulkan_core.h>
+#define VMA_IMPLEMENTATION
+#include <vk_mem_alloc.h>
+
 #include "resources/buffer/buffer.hpp"
 
 // constructor
@@ -15,17 +19,30 @@ mr::Buffer::Buffer(const VulkanState &state, size_t byte_size,
     .sharingMode = vk::SharingMode::eExclusive,
   };
 
-  _buffer = state.device().createBufferUnique(buffer_create_info).value;
+  VmaAllocationCreateInfo allocation_create_info { };
+  allocation_create_info.usage = VMA_MEMORY_USAGE_AUTO;
 
-  vk::MemoryRequirements mem_requirements =
-    state.device().getBufferMemoryRequirements(_buffer.get());
-  vk::MemoryAllocateInfo alloc_info {
-    .allocationSize = mem_requirements.size,
-    .memoryTypeIndex = find_memory_type(
-      state, mem_requirements.memoryTypeBits, _memory_properties),
-  };
-  _memory = state.device().allocateMemoryUnique(alloc_info).value;
-  state.device().bindBufferMemory(_buffer.get(), _memory.get(), 0);
+  if (_memory_properties & vk::MemoryPropertyFlagBits::eHostVisible) {
+    allocation_create_info.flags |= VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+  }
+
+  auto result = vmaCreateBuffer(
+    state.allocator(),
+    (VkBufferCreateInfo*)&buffer_create_info,
+    &allocation_create_info,
+    (VkBuffer*)&_buffer,
+    &_allocation,
+    nullptr
+  );
+  ASSERT(result == VK_SUCCESS, "Failed to create vk::Buffer", result);
+}
+
+mr::Buffer::~Buffer() noexcept {
+  if (_buffer != VK_NULL_HANDLE) {
+    ASSERT(_state != nullptr);
+    vmaDestroyBuffer(_state->allocator(), _buffer, _allocation);
+    _buffer = VK_NULL_HANDLE;
+  }
 }
 
 // resize
@@ -51,12 +68,12 @@ uint32_t mr::Buffer::find_memory_type(
   return 0;
 }
 
-std::span<std::byte> mr::HostBuffer::read() noexcept
+std::span<const std::byte> mr::HostBuffer::read() noexcept
 {
   if (not _mapped_data.mapped()) {
     _mapped_data.map();
   }
-  return std::span(reinterpret_cast<std::byte *>(_mapped_data.get()), _size);
+  return std::span(reinterpret_cast<const std::byte *>(_mapped_data.get()), _size);
 }
 
 std::vector<std::byte> mr::HostBuffer::copy() noexcept
@@ -71,20 +88,27 @@ std::vector<std::byte> mr::HostBuffer::copy() noexcept
   return data;
 }
 
+mr::HostBuffer & mr::HostBuffer::write(std::span<const std::byte> src)
+{
+  ASSERT(_state != nullptr);
+  ASSERT(src.data());
+  ASSERT(src.size() <= _size);
+
+  if (_mapped_data.mapped()) {
+    memcpy(_mapped_data.get(), src.data(), _size);
+  } else {
+    memcpy(_mapped_data.map(), src.data(), _size);
+    _mapped_data.unmap();
+  }
+
+  return *this;
+}
+
 mr::HostBuffer::~HostBuffer() {}
 
 // ----------------------------------------------------------------------------
 // Data mapper
 // ----------------------------------------------------------------------------
-
-mr::HostBuffer::MappedData::MappedData(HostBuffer &buf) : _buf(&buf) {}
-
-mr::HostBuffer::MappedData::~MappedData()
-{
-  if (_data != nullptr) {
-    _buf->_state->device().unmapMemory(_buf->_memory.get());
-  }
-}
 
 mr::HostBuffer::MappedData & mr::HostBuffer::MappedData::operator=(MappedData &&other) noexcept
 {
@@ -99,28 +123,28 @@ mr::HostBuffer::MappedData::MappedData(MappedData &&other) noexcept
   std::swap(_data, other._data);
 }
 
-void * mr::HostBuffer::MappedData::map(size_t offset, size_t size) noexcept
-{
-  ASSERT(_data == nullptr);
-  ASSERT(offset < size);
-  _buf->_state->device().mapMemory(_buf->_memory.get(), offset, size, {}, &_data);
-  return _data;
-}
-
 void * mr::HostBuffer::MappedData::map() noexcept
 {
-  return map(0, _buf->_size);
+  ASSERT(_buf != nullptr);
+  ASSERT(_buf->_state != nullptr);
+  ASSERT(_data == nullptr);
+
+  auto result = vmaMapMemory(_buf->_state->allocator(), _buf->_allocation, &_data);
+
+  ASSERT(result == VK_SUCCESS, "Failed to map memory for the vk::Buffer", result);
+  ASSERT(_data != nullptr);
+  return _data;
 }
 
 void mr::HostBuffer::MappedData::unmap() noexcept
 {
+  ASSERT(_buf != nullptr);
+  ASSERT(_buf->_state != nullptr);
   ASSERT(_data != nullptr);
-  _buf->_state->device().unmapMemory(_buf->_memory.get());
+
+  vmaUnmapMemory(_buf->_state->allocator(), _buf->_allocation);
   _data = nullptr;
 }
-
-bool mr::HostBuffer::MappedData::mapped() const noexcept { return _data != nullptr; }
-void * mr::HostBuffer::MappedData::get() noexcept { return _data; }
 
 mr::DeviceBuffer & mr::DeviceBuffer::write(std::span<const std::byte> src)
 {
@@ -135,7 +159,7 @@ mr::DeviceBuffer & mr::DeviceBuffer::write(std::span<const std::byte> src)
 
   static CommandUnit command_unit(*_state);
   command_unit.begin();
-  command_unit->copyBuffer(buf.buffer(), _buffer.get(), {buffer_copy});
+  command_unit->copyBuffer(buf.buffer(), _buffer, {buffer_copy});
   command_unit.end();
 
   vk::SubmitInfo submit_info  = command_unit.submit_info();
@@ -144,17 +168,5 @@ mr::DeviceBuffer & mr::DeviceBuffer::write(std::span<const std::byte> src)
   _state->queue().submit(submit_info, fence.get());
   _state->device().waitForFences({fence.get()}, VK_TRUE, UINT64_MAX);
 
-  return *this;
-}
-
-mr::HostBuffer & mr::HostBuffer::write(std::span<const std::byte> src)
-{
-  ASSERT(_state != nullptr);
-  ASSERT(src.data());
-  ASSERT(src.size() <= _size);
-
-  auto ptr = _state->device().mapMemory(_memory.get(), 0, src.size()).value;
-  memcpy(ptr, src.data(), src.size());
-  _state->device().unmapMemory(_memory.get());
   return *this;
 }

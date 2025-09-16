@@ -1,3 +1,5 @@
+#include <vk_mem_alloc.h>
+
 #include "resources/images/image.hpp"
 #include "resources/buffer/buffer.hpp"
 #include "vulkan_state.hpp"
@@ -35,27 +37,33 @@ mr::Image::Image(const VulkanState &state, Extent extent, vk::Format format,
     .sharingMode = vk::SharingMode::eExclusive,
     .initialLayout = _layout,
   };
-  _image = state.device().createImageUnique(image_create_info).value;
 
-  vk::MemoryRequirements mem_requirements =
-    state.device().getImageMemoryRequirements(_image.get());
-  vk::MemoryAllocateInfo alloc_info {
-    .allocationSize = mem_requirements.size,
-    .memoryTypeIndex =
-      Buffer::find_memory_type(state,
-                               mem_requirements.memoryTypeBits,
-                               _memory_properties),
+  VmaAllocationCreateInfo allocation_create_info {
+    .usage = VMA_MEMORY_USAGE_GPU_ONLY
   };
 
-  _memory = state.device().allocateMemoryUnique(alloc_info, nullptr).value;
-  state.device().bindImageMemory(_image.get(), _memory.get(), 0);
+  auto result = vmaCreateImage(
+    state.allocator(),
+    (VkImageCreateInfo*)&image_create_info,
+    &allocation_create_info,
+    (VkImage*)&_image,
+    &_allocation,
+    nullptr
+  );
+  ASSERT(result == VK_SUCCESS, "Failed to create a vk::Image", result);
 
-  create_image_view(state);
+  create_image_view();
 }
 
-mr::Image::~Image() {}
+mr::Image::~Image() {
+  if (_image != VK_NULL_HANDLE) {
+    ASSERT(_state != nullptr);
+    vmaDestroyImage(_state->allocator(), _image, _allocation);
+    _image = VK_NULL_HANDLE;
+  }
+}
 
-void mr::Image::switch_layout(const VulkanState &state, vk::ImageLayout new_layout) {
+void mr::Image::switch_layout(vk::ImageLayout new_layout) {
   if (new_layout == _layout) {
     return;
   }
@@ -73,7 +81,7 @@ void mr::Image::switch_layout(const VulkanState &state, vk::ImageLayout new_layo
     .newLayout = new_layout,
     .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
     .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-    .image = _image.get(),
+    .image = _image,
     .subresourceRange = range
   };
 
@@ -137,25 +145,26 @@ void mr::Image::switch_layout(const VulkanState &state, vk::ImageLayout new_layo
     break;
   }
 
-  static CommandUnit command_unit(state);
+  static CommandUnit command_unit(*_state);
   command_unit.begin();
   command_unit->pipelineBarrier(
     source_stage, destination_stage, {}, {}, {}, {barrier});
   command_unit.end();
   vk::SubmitInfo submit_info = command_unit.submit_info();
 
-  auto fence = state.device().createFenceUnique({}).value;
-  state.queue().submit(submit_info, fence.get());
-  state.device().waitForFences({fence.get()}, VK_TRUE, UINT64_MAX);
+  auto fence = _state->device().createFenceUnique({}).value;
+  _state->queue().submit(submit_info, fence.get());
+  _state->device().waitForFences({fence.get()}, VK_TRUE, UINT64_MAX);
 
   _layout = new_layout;
 }
 
-void mr::Image::write(const VulkanState &state, std::span<const std::byte> src) {
+void mr::Image::write(std::span<const std::byte> src) {
+  ASSERT(_state != nullptr);
   ASSERT(src.data());
   ASSERT(src.size() <= _size);
 
-  auto stage_buffer = HostBuffer(state, _size, vk::BufferUsageFlagBits::eTransferSrc);
+  auto stage_buffer = HostBuffer(*_state, _size, vk::BufferUsageFlagBits::eTransferSrc);
   stage_buffer.write(std::span {src});
 
   vk::ImageSubresourceLayers range {
@@ -174,20 +183,19 @@ void mr::Image::write(const VulkanState &state, std::span<const std::byte> src) 
   };
 
   // TODO: delete static
-  static CommandUnit command_unit(state);
+  static CommandUnit command_unit(*_state);
   command_unit.begin();
-  command_unit->copyBufferToImage(
-      stage_buffer.buffer(), _image.get(), _layout, {region});
+  command_unit->copyBufferToImage(stage_buffer.buffer(), _image, _layout, {region});
   command_unit.end();
 
   vk::SubmitInfo submit_info = command_unit.submit_info();
 
-  auto fence = state.device().createFenceUnique({}).value;
-  state.queue().submit(submit_info, fence.get());
-  state.device().waitForFences({fence.get()}, VK_TRUE, UINT64_MAX);
+  auto fence = _state->device().createFenceUnique({}).value;
+  _state->queue().submit(submit_info, fence.get());
+  _state->device().waitForFences({fence.get()}, VK_TRUE, UINT64_MAX);
 }
 
-void mr::Image::create_image_view(const VulkanState &state) {
+void mr::Image::create_image_view() {
   vk::ImageSubresourceRange range {
     .aspectMask = _aspect_flags,
     .baseMipLevel = 0,
@@ -197,7 +205,7 @@ void mr::Image::create_image_view(const VulkanState &state) {
   };
 
   vk::ImageViewCreateInfo create_info {
-    .image = _image.get(),
+    .image = _image,
     .viewType = vk::ImageViewType::e2D,
     .format = _format,
     .components = {vk::ComponentSwizzle::eIdentity,
@@ -207,7 +215,7 @@ void mr::Image::create_image_view(const VulkanState &state) {
     .subresourceRange = range
   };
 
-  _image_view = state.device().createImageViewUnique(create_info).value;
+  _image_view = _state->device().createImageViewUnique(create_info).value;
 }
 
 vk::Format mr::Image::find_supported_format(
@@ -231,11 +239,11 @@ vk::Format mr::Image::find_supported_format(
   return {};
 }
 
-mr::HostBuffer mr::Image::read_to_host_buffer(const VulkanState &state, CommandUnit &command_unit) noexcept
+mr::HostBuffer mr::Image::read_to_host_buffer(CommandUnit &command_unit) noexcept
 {
-  switch_layout(state, vk::ImageLayout::eTransferSrcOptimal);
+  switch_layout(vk::ImageLayout::eTransferSrcOptimal);
 
-  auto stage_buffer = HostBuffer(state, _size, vk::BufferUsageFlagBits::eTransferDst);
+  auto stage_buffer = HostBuffer(*_state, _size, vk::BufferUsageFlagBits::eTransferDst);
 
   vk::ImageSubresourceLayers range {
     .aspectMask = _aspect_flags,
@@ -253,13 +261,13 @@ mr::HostBuffer mr::Image::read_to_host_buffer(const VulkanState &state, CommandU
   };
 
   command_unit.begin();
-  command_unit->copyImageToBuffer(_image.get(), _layout, stage_buffer.buffer(), {region});
+  command_unit->copyImageToBuffer(_image, _layout, stage_buffer.buffer(), {region});
   command_unit.end();
   auto submit_info = command_unit.submit_info();
 
-  auto fence = state.device().createFenceUnique({}).value;
-  state.queue().submit(submit_info, fence.get());
-  state.device().waitForFences({fence.get()}, VK_TRUE, UINT64_MAX);
+  auto fence = _state->device().createFenceUnique({}).value;
+  _state->queue().submit(submit_info, fence.get());
+  _state->device().waitForFences({fence.get()}, VK_TRUE, UINT64_MAX);
 
   return stage_buffer;
 }
@@ -283,19 +291,26 @@ mr::DeviceImage::DeviceImage(const VulkanState &state, Extent extent, vk::Format
 // ---- SwapchainImage ----
 mr::SwapchainImage::SwapchainImage(const VulkanState &state, Extent extent, vk::Format format, vk::Image image)
 {
-  _image.reset(image); // Wrap, do not own
+  _state = &state;
+  _image = image;
   _extent = vk::Extent3D{.width = extent.width, .height= extent.height, .depth = 1};
   _size = calculate_image_size(extent, format);
   _format = format;
   _mip_level = 1;
   _aspect_flags = vk::ImageAspectFlagBits::eColor;
   _layout = vk::ImageLayout::eUndefined;
-  create_image_view(state);
+  create_image_view();
 }
 
-mr::SwapchainImage::SwapchainImage(const VulkanState &state, Extent extent, vk::Format format, vk::Image image, vk::ImageView view)
+mr::SwapchainImage::SwapchainImage(
+  const VulkanState &state,
+  Extent extent,
+  vk::Format format,
+  vk::Image image,
+  vk::ImageView view)
 {
-  _image.reset(image); // Wrap, do not own
+  _state = &state;
+  _image = image; // Wrap, do not own
   _extent = vk::Extent3D{.width = extent.width, .height= extent.height, .depth = 1};
   _size = calculate_image_size(extent, format);
   _format = format;
@@ -306,8 +321,8 @@ mr::SwapchainImage::SwapchainImage(const VulkanState &state, Extent extent, vk::
 }
 
 mr::SwapchainImage::~SwapchainImage() {
-  // Do not destroy swapchain image, just release wrapper
-  _image.release();
+  // We do not need to destroy swapchain image so we nullify it so that ~Image doesn't destroy it
+  _image = VK_NULL_HANDLE;
 }
 
 // ---- TextureImage ----
@@ -330,7 +345,7 @@ mr::DepthImage::DepthImage(const VulkanState &state, Extent extent, uint mip_lev
       mip_level
     )
 {
-  switch_layout(state, vk::ImageLayout::eDepthStencilAttachmentOptimal);
+  switch_layout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
 }
 
 vk::RenderingAttachmentInfoKHR mr::DepthImage::attachment_info() const
