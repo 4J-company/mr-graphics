@@ -8,6 +8,9 @@
 mr::Scene::Scene(const RenderContext &render_context)
   : _parent(&render_context)
   , _camera_uniform_buffer(_parent->vulkan_state(), sizeof(ShaderCameraData))
+  , _transforms(_parent->vulkan_state(), 1024 * sizeof(mr::Matr4f))
+  , _bounds(_parent->vulkan_state(),     1024 * sizeof(mr::AABBf))
+  , _visibility(_parent->vulkan_state(), 1024 * sizeof(uint32_t))
 {
   ASSERT(_parent != nullptr);
 }
@@ -26,6 +29,7 @@ mr::ModelHandle mr::Scene::create_model(std::string_view filename) noexcept
   ASSERT(_parent != nullptr);
 
   auto model_handle = ResourceManager<Model>::get().create(mr::unnamed, *this, filename);
+
   _models.push_back(model_handle);
   return model_handle;
 }
@@ -36,6 +40,10 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
 
   if (input_state_ref) {
     const auto &input_state = input_state_ref->get();
+
+    _transforms.write(std::span(_transforms_data));
+    _bounds.write(std::span(_bounds_data));
+    _visibility.write(std::span(_visibility_data));
 
     _camera.turn({input_state.mouse_pos_delta().x() / _parent->extent().width,
                   input_state.mouse_pos_delta().y() / _parent->extent().height,

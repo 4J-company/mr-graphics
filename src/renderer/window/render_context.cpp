@@ -246,7 +246,9 @@ void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
   }
   _lights_command_unit.add_signal_semaphore(presenter.render_finished_semaphore());
   _lights_command_unit.end();
+
   vk::SubmitInfo light_submit_info = _lights_command_unit.submit_info();
+
   _state->queue().submit(light_submit_info, _image_fence.get());
 
   presenter.present();

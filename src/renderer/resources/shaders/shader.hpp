@@ -27,7 +27,7 @@ inline namespace graphics {
 
     public:
       // TODO(dk6): think why pointers not const
-      using Resource = std::variant<UniformBuffer *, StorageBuffer *, Texture *, Image *>;
+      using Resource = std::variant<UniformBuffer *, StorageBuffer *, Texture *, Image *, ConditionalBuffer*>;
 
       // TODO: consider RT shaders from extensions;
       // TODO(dk6): remove this enum, use vk::ShaderStageFlagsBits instead

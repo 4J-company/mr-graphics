@@ -8,6 +8,13 @@
 namespace mr {
 inline namespace graphics {
   class Pipeline {
+    private:
+    static inline constexpr vk::PushConstantRange _push_constant_range {
+      .stageFlags = vk::ShaderStageFlagBits::eVertex,
+      .offset = 0,
+      .size = sizeof(uint32_t) * 2
+    };
+
     protected:
       vk::UniquePipeline _pipeline;
       vk::UniquePipelineLayout _layout;

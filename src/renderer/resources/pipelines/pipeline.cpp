@@ -1,5 +1,4 @@
 #include "pch.hpp"
-#include "resources/attachment/attachment.hpp"
 #include "resources/pipelines/pipeline.hpp"
 
 void mr::Pipeline::apply(vk::CommandBuffer cmd_buffer) const {}
@@ -25,6 +24,8 @@ mr::Pipeline::Pipeline(const VulkanState &state,
   vk::PipelineLayoutCreateInfo pipeline_layout_create_info {
     .setLayoutCount = static_cast<uint32_t>(vk_descriptor_layouts.size()),
     .pSetLayouts = vk_descriptor_layouts.data(),
+    .pushConstantRangeCount = 1,
+    .pPushConstantRanges = &_push_constant_range,
   };
 
   auto [res, layout] = state.device().createPipelineLayoutUnique(pipeline_layout_create_info);

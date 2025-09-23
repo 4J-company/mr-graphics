@@ -28,14 +28,14 @@ class MrGraphicsRecipe(ConanFile):
         self.requires("glfw/3.4")
         self.requires("meshoptimizer/0.23")
 
-        self.requires("stb/cci.20240531")
-
         self.requires("glm/1.0.1")
 
         self.requires("mr-math/1.1.3")
         self.requires("mr-utils/1.0.4")
         self.requires("mr-manager/1.0.1")
         self.requires("mr-importer/1.3.0")
+
+        self.requires("stb/cci.20240531")
 
         self.requires("onetbb/2022.2.0")
 
@@ -66,6 +66,9 @@ class MrGraphicsRecipe(ConanFile):
 
         deps = CMakeDeps(self)
         deps.generate()
+        tc = CMakeToolchain(self)
+        tc.generator = "Ninja"
+        tc.generate()
 
     def build(self):
         cmake = CMake(self)
