@@ -118,19 +118,33 @@ inline namespace graphics {
     DeviceBuffer(DeviceBuffer &&) = default;
     DeviceBuffer &operator=(DeviceBuffer &&) = default;
 
-      DeviceBuffer(
-        const VulkanState &state, std::size_t size,
-        vk::BufferUsageFlags usage_flags,
-        vk::MemoryPropertyFlags memory_properties = vk::MemoryPropertyFlags(0))
-          : Buffer(state, size, usage_flags,
-                   memory_properties | vk::MemoryPropertyFlagBits::eDeviceLocal)
-      {
-      }
+    DeviceBuffer(
+      const VulkanState &state, std::size_t size,
+      vk::BufferUsageFlags usage_flags,
+      vk::MemoryPropertyFlags memory_properties = vk::MemoryPropertyFlags(0))
+        : Buffer(state, size, usage_flags,
+                 memory_properties | vk::MemoryPropertyFlagBits::eDeviceLocal)
+    {
+    }
 
     DeviceBuffer &write(std::span<const std::byte> src);
 
     template <typename T, size_t Extent>
     DeviceBuffer &write(std::span<T, Extent> src) { return write(std::as_bytes(src)); }
+  };
+
+  class ConditionalBuffer : public DeviceBuffer {
+  public:
+    ConditionalBuffer() = default;
+    ConditionalBuffer(ConditionalBuffer &&) noexcept = default;
+    ConditionalBuffer & operator=(ConditionalBuffer &&) noexcept = default;
+
+    ConditionalBuffer(const VulkanState &state, size_t byte_size)
+      : DeviceBuffer(state, byte_size,
+                     vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer |
+                       vk::BufferUsageFlagBits::eConditionalRenderingEXT)
+    {
+    }
   };
 
   class UniformBuffer : public HostBuffer {
@@ -152,6 +166,21 @@ inline namespace graphics {
   class StorageBuffer : public DeviceBuffer {
     public:
       using DeviceBuffer::DeviceBuffer;
+
+      StorageBuffer(const VulkanState &state, size_t byte_size)
+          : DeviceBuffer(state, byte_size,
+                         vk::BufferUsageFlagBits::eStorageBuffer |
+                           vk::BufferUsageFlagBits::eTransferDst)
+      {
+      }
+
+      template <typename T, size_t Extent>
+      StorageBuffer(const VulkanState &state, std::span<T, Extent> src)
+          : StorageBuffer(state, src.size() * sizeof(T))
+      {
+        assert(src.data());
+        write(src);
+      }
   };
 
   class VertexBuffer : public DeviceBuffer {

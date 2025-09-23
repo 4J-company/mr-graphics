@@ -10,6 +10,8 @@ inline namespace graphics {
   class VulkanState;
 
   class Model : public ResourceBase<Model> {
+    friend class Scene;
+
     private:
       const Scene *_scene = nullptr;
 
@@ -21,7 +23,7 @@ inline namespace graphics {
     public:
       Model() = default;
 
-      Model(const Scene &scene, std::fs::path filename) noexcept;
+      Model(Scene &scene, std::fs::path filename) noexcept;
 
       Model(const Model &other) noexcept = default;
       Model &operator=(const Model &other) noexcept = default;

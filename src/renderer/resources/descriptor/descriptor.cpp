@@ -12,10 +12,11 @@ static vk::DescriptorType get_descriptor_type(const mr::graphics::Shader::Resour
 {
   using enum vk::DescriptorType;
   static std::array types {
-    eUniformBuffer,
-    eStorageBuffer,
-    eCombinedImageSampler,
-    eInputAttachment,
+    eUniformBuffer,        // for UniformBuffer
+    eStorageBuffer,        // for StorageBuffer
+    eCombinedImageSampler, // for Sampler
+    eInputAttachment,      // for TextureImage
+    eStorageBuffer,        // for ConditionalBuffer
   };
 
   ASSERT(attachment.index() < types.size());
@@ -76,6 +77,9 @@ void mr::DescriptorSet::update(
     info.range = buffer->byte_size();
     info.offset = 0;
   };
+  auto write_conditional_buffer = [&](ConditionalBuffer *buffer, vk::DescriptorBufferInfo &info) {
+    write_buffer(buffer, info);
+  };
   auto write_uniform_buffer = [&](UniformBuffer *buffer, vk::DescriptorBufferInfo &info) {
     write_buffer(buffer, info);
   };
@@ -92,7 +96,7 @@ void mr::DescriptorSet::update(
     info.imageView = image->image_view();
     info.sampler = nullptr;
   };
-  auto write_default = [](auto, auto) { std::unreachable(); };
+  auto write_default = [](auto, auto) { ASSERT(false, "Unhandled attachment type"); std::unreachable(); };
 
   for (const auto &[attachment_view, write_info] : std::views::zip(attachments, write_infos)) {
     const Shader::Resource &attachment = attachment_view;
@@ -102,6 +106,7 @@ void mr::DescriptorSet::update(
 
     std::visit(Overloads {write_uniform_buffer,
                           write_storage_buffer,
+                          write_conditional_buffer,
                           write_texture,
                           write_geometry_buffer,
                           write_default},
