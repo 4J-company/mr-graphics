@@ -2,6 +2,7 @@
 #define __MR_INPUT_STATE_HPP_
 
 #include "pch.hpp"
+#include "vkfw/vkfw.hpp"
 
 namespace mr {
 inline namespace graphics {
@@ -38,23 +39,6 @@ inline namespace graphics {
 
   public:
     InputState();
-    InputState(InputState&& other) noexcept
-      : _key_pressed(std::move(other._key_pressed))
-      , _prev_key_pressed(std::move(other._prev_key_pressed))
-      , _key_tapped(std::move(other._key_tapped))
-      , _mouse_pos(std::move(other._mouse_pos))
-      , _prev_mouse_pos(std::move(other._prev_mouse_pos))
-      , _mouse_pos_delta(std::move(other._mouse_pos_delta))
-    {
-    }
-    InputState& operator=(InputState&& other) noexcept {
-      _key_pressed = std::move(other._key_pressed);
-      _prev_key_pressed = std::move(other._prev_key_pressed);
-      _key_tapped = std::move(other._key_tapped);
-      _mouse_pos = std::move(other._mouse_pos);
-      _prev_mouse_pos = std::move(other._prev_mouse_pos);
-      _mouse_pos_delta = std::move(other._mouse_pos_delta);
-    }
 
     void update() noexcept;
 
@@ -63,6 +47,9 @@ inline namespace graphics {
 
     const Vec2d & mouse_pos() const noexcept { return _prev_mouse_pos; }
     const Vec2d & mouse_pos_delta() const noexcept { return _mouse_pos_delta; }
+
+    InputState(InputState &&other) noexcept;
+    InputState & operator=(InputState &&other) noexcept;
 
   private: // for Window only
     friend class Window;

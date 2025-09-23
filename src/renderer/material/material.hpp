@@ -46,7 +46,7 @@ inline namespace graphics {
 
     void bind(CommandUnit &unit) const noexcept;
 
-    const mr::GraphicsPipeline &pipeline() const noexcept { return _pipeline; }
+    const mr::GraphicsPipeline & pipeline() const noexcept { return _pipeline; }
 
   private:
     mr::UniformBuffer _ubo;
@@ -100,6 +100,8 @@ inline namespace graphics {
 
   class MaterialBuilder {
   private:
+    static inline constexpr int max_attached_buffers = 16;
+
     const mr::VulkanState *_state {};
     const mr::RenderContext *_context {};
 
@@ -107,8 +109,8 @@ inline namespace graphics {
     std::unordered_map<std::string, std::string> _defines;
     std::vector<std::byte> _ubo_data;
     std::array<std::optional<mr::TextureHandle>, enum_cast(MaterialParameter::EnumSize)> _textures;
-    InplaceVector<mr::StorageBuffer *, 16> _storage_buffers;
-    InplaceVector<mr::ConditionalBuffer *, 16> _conditional_buffers;
+    InplaceVector<mr::StorageBuffer *, max_attached_buffers / 2> _storage_buffers;
+    InplaceVector<mr::ConditionalBuffer *, max_attached_buffers / 2> _conditional_buffers;
     mr::UniformBuffer *_cam_ubo;
 
     std::string_view _shader_filename;

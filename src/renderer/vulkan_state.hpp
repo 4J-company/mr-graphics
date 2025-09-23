@@ -44,7 +44,7 @@ inline namespace graphics {
       vk::Instance instance() const noexcept { return _global->_instance.instance; }
       vk::PhysicalDevice phys_device() const noexcept { return _global->_phys_device.physical_device; }
       vk::Device device() const noexcept { return *_device; }
-      vkb::DispatchTable disp() const noexcept { return _dispatch_table; }
+      vkb::DispatchTable dispatch_table() const noexcept { return _dispatch_table; }
       vk::Queue queue() const noexcept { return _queue; }
       vk::PipelineCache pipeline_cache() const noexcept { return *_pipeline_cache; }
       VmaAllocator allocator() const noexcept { return _allocator; }

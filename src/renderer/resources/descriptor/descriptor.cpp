@@ -12,11 +12,11 @@ static vk::DescriptorType get_descriptor_type(const mr::graphics::Shader::Resour
 {
   using enum vk::DescriptorType;
   static std::array types {
-    eUniformBuffer,
-    eStorageBuffer,
-    eCombinedImageSampler,
-    eInputAttachment,
-    eStorageBuffer,
+    eUniformBuffer,        // for UniformBuffer
+    eStorageBuffer,        // for StorageBuffer
+    eCombinedImageSampler, // for Sampler
+    eInputAttachment,      // for TextureImage
+    eStorageBuffer,        // for ConditionalBuffer
   };
 
   ASSERT(attachment.index() < types.size());

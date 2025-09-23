@@ -125,7 +125,7 @@ void mr::graphics::Model::draw(CommandUnit &unit) const noexcept
       .offset = mesh._mesh_offset * 4,
     };
 
-    _scene->render_context().vulkan_state().disp().cmdBeginConditionalRenderingEXT(
+    _scene->render_context().vulkan_state().dispatch_table().cmdBeginConditionalRenderingEXT(
       unit.command_buffer(),
       conditional_rendering_begin_info
     );
@@ -133,7 +133,7 @@ void mr::graphics::Model::draw(CommandUnit &unit) const noexcept
     unit->pushConstants(material->pipeline().layout(), vk::ShaderStageFlagBits::eVertex, 0, 8, offsets);
     mesh.bind(unit);
     mesh.draw(unit);
-    _scene->render_context().vulkan_state().disp().cmdEndConditionalRenderingEXT(unit.command_buffer());
+    _scene->render_context().vulkan_state().dispatch_table().cmdEndConditionalRenderingEXT(unit.command_buffer());
   }
 }
 

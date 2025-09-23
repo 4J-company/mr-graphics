@@ -12,6 +12,9 @@ mr::InputState::InputState()
 void mr::InputState::update() noexcept
 {
   Vec2d mouse_pos_copy;
+  std::ranges::fill(_reader_key_pressed, 0);
+  std::ranges::fill(_reader_key_tapped, 0);
+
   /* scope for mutex lock */ {
     std::lock_guard lock(update_mutex);
     std::swap(_reader_key_pressed, _writer_key_pressed);
@@ -55,4 +58,33 @@ mr::InputState::MouseCallbackT mr::InputState::get_mouse_callback() noexcept
     std::lock_guard lock(update_mutex);
     _mouse_pos = {x, y};
   };
+}
+
+mr::InputState::InputState(InputState &&other) noexcept
+{
+  *this = std::move(other);
+}
+
+mr::InputState & mr::InputState::operator=(InputState &&other) noexcept
+{
+  _key_pressed = std::move(other._key_pressed);
+  _prev_key_pressed = std::move(other._prev_key_pressed);
+  _key_tapped = std::move(other._key_tapped);
+  _prev_key_pressed = std::move(other._prev_key_pressed);
+
+  _writer_key_pressed = std::span(_key_pressed.data(), _key_pressed.size());
+  _reader_key_pressed = std::span(_prev_key_pressed.data(), _prev_key_pressed.size());
+  _writer_key_tapped = std::span(_key_tapped.data(), _key_tapped.size());
+  _reader_key_tapped = std::span(_prev_key_tapped.data(), _prev_key_tapped.size());
+  // if reader refers on _key_pressed, writer refers to _prev_key_pressed - in new instance after move must be same state
+  if (other._reader_key_pressed.data() == other._key_pressed.data()) {
+    std::swap(_writer_key_pressed, _reader_key_pressed);
+    std::swap(_writer_key_tapped, _reader_key_tapped);
+  }
+
+  _mouse_pos = other._mouse_pos;
+  _prev_mouse_pos = other._prev_mouse_pos;
+  _mouse_pos_delta = other._mouse_pos_delta;
+
+  return *this;
 }
