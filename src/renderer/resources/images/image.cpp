@@ -244,7 +244,6 @@ mr::HostBuffer mr::Image::read_to_host_buffer(CommandUnit &command_unit) noexcep
   switch_layout(vk::ImageLayout::eTransferSrcOptimal);
 
   auto stage_buffer = HostBuffer(*_state, _size, vk::BufferUsageFlagBits::eTransferDst);
-
   vk::ImageSubresourceLayers range {
     .aspectMask = _aspect_flags,
     .mipLevel = _mip_level - 1,
