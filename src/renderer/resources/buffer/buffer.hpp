@@ -141,7 +141,7 @@ inline namespace graphics {
 
     ConditionalBuffer(const VulkanState &state, size_t byte_size)
       : DeviceBuffer(state, byte_size,
-                     vk::BufferUsageFlagBits::eTransferDst |
+                     vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer |
                        vk::BufferUsageFlagBits::eConditionalRenderingEXT)
     {
     }

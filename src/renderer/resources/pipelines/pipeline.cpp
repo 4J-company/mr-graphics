@@ -23,6 +23,7 @@ mr::Pipeline::Pipeline(const VulkanState &state,
   }
 
   vk::PushConstantRange range {
+    .stageFlags = vk::ShaderStageFlagBits::eVertex,
     .offset = 0,
     .size = sizeof(uint32_t) * 2
   };
