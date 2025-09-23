@@ -38,7 +38,12 @@ inline namespace graphics {
       std::shared_ptr<VulkanState> _state;
       Extent _extent;
 
+      // Should be std::atomic_flag but using atomic here forces a hand-written move semantics
+      bool _models_command_unit_dirty = true;
       CommandUnit _models_command_unit;
+
+      // Should be std::atomic_flag but using atomic here forces a hand-written move semantics
+      bool _lights_command_unit_dirty = true;
       CommandUnit _lights_command_unit;
 
       // RenderContext doesn't use transfer command unit, only gives it for buffers

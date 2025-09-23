@@ -221,11 +221,19 @@ void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
 
   _update_camera_buffer(scene->_camera_uniform_buffer);
 
-  _models_command_unit.begin();
-  _render_models(scene);
+  if (_models_command_unit_dirty) {
+    _models_command_unit.begin();
+    _render_models(scene);
+    _models_command_unit.end();
+    _models_command_unit_dirty = false;
+    MR_INFO("Actually recorded lights shit");
+  }
+  else {
+    _models_command_unit.clear_semaphores();
+    MR_INFO("Didn't record no lights shit");
+  }
 
   _models_command_unit.add_signal_semaphore(_models_render_finished_semaphore.get());
-  _models_command_unit.end();
 
   vk::SubmitInfo models_submit_info = _models_command_unit.submit_info();
 
@@ -235,8 +243,17 @@ void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
   // Lights shading pass
   // --------------------------------------------------------------------------
 
-  _lights_command_unit.begin();
-  _render_lights(scene, presenter);
+  if (_lights_command_unit_dirty) {
+    _lights_command_unit.begin();
+    _render_lights(scene, presenter);
+    _lights_command_unit.end();
+    _lights_command_unit_dirty = false;
+    MR_INFO("Actually recorded lights shit");
+  }
+  else {
+    _lights_command_unit.clear_semaphores();
+    MR_INFO("Didn't record no lights shit");
+  }
 
   _lights_command_unit.add_wait_semaphore(_models_render_finished_semaphore.get(),
                                    vk::PipelineStageFlagBits::eColorAttachmentOutput);
@@ -246,7 +263,6 @@ void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
                                      vk::PipelineStageFlagBits::eColorAttachmentOutput);
   }
   _lights_command_unit.add_signal_semaphore(presenter.render_finished_semaphore());
-  _lights_command_unit.end();
 
   vk::SubmitInfo light_submit_info = _lights_command_unit.submit_info();
   _state->queue().submit(light_submit_info, _image_fence.get());
