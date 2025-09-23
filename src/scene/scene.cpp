@@ -41,9 +41,13 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
     _bounds.write(std::span(_bounds_data));
     _visibility.write(std::span(_visibility_data));
 
-    _camera.turn({input_state.mouse_pos_delta().x() / _parent->extent().width,
-                  input_state.mouse_pos_delta().y() / _parent->extent().height,
-                  0});
+    mr::Vec3f angular_delta {
+      input_state.mouse_pos_delta().x() / _parent->extent().width,
+      -input_state.mouse_pos_delta().y() / _parent->extent().height, // "-" to adjust for screen-space y coordinate being inverted
+      0
+    };
+
+    _camera.turn(angular_delta);
 
     // camera controls
     if (input_state.key_pressed(vkfw::Key::eW)) {
@@ -59,11 +63,14 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
       _camera.move(_camera.cam().right());
     }
     if (input_state.key_pressed(vkfw::Key::eSpace)) {
-      // TODO(mt6): remove here -
-      _camera.move(-_camera.cam().up());
+      _camera.move(_camera.cam().up());
     }
     if (input_state.key_pressed(vkfw::Key::eLeftShift)) {
       _camera.move(_camera.cam().up());
+    }
+    if (input_state.key_tapped(vkfw::Key::e1)) {
+      _camera.cam() = mr::math::Camera<float>({1}, {-1}, {0, 1, 0});
+      _camera.cam().projection() = mr::math::Camera<float>::Projection(45_deg);
     }
   }
 
@@ -72,8 +79,8 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
 
 void mr::Scene::_update_camera_buffer() noexcept
 {
-  _camera.cam() = mr::math::Camera<float>({1}, {-1}, {0, 1, 0});
-  _camera.cam().projection() = mr::math::Camera<float>::Projection(45_deg);
+  // _camera.cam() = mr::math::Camera<float>({1}, {-1}, {0, 1, 0});
+  // _camera.cam().projection() = mr::math::Camera<float>::Projection(45_deg);
 
   mr::ShaderCameraData cam_data {
     .vp = _camera.viewproj(),
