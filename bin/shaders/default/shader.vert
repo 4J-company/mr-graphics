@@ -15,7 +15,7 @@ layout(location = 3) out vec4 metallic_roughness;
 layout(location = 4) out vec4 emissive;
 layout(location = 5) out vec4 occlusion;
 
-layout(set = 0, binding = 0) uniform CameraUbo {
+layout(set = 0, binding = 0) readonly uniform CameraUbo {
   mat4 vp;
   vec4 pos;
   float fov;
@@ -24,7 +24,7 @@ layout(set = 0, binding = 0) uniform CameraUbo {
   float sens;
 } cam_ubo;
 
-layout(set = 0, binding = 7) buffer Transforms {
+layout(set = 0, binding = 7) readonly buffer Transforms {
   mat4 transforms[];
 };
 
