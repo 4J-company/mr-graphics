@@ -48,6 +48,9 @@ inline namespace graphics {
       vk::Queue queue() const noexcept { return _queue; }
       vk::PipelineCache pipeline_cache() const noexcept { return *_pipeline_cache; }
       VmaAllocator allocator() const noexcept { return _allocator; }
+#ifndef NDEBUG
+      const VmaBudget * memory_budgets() const noexcept;
+#endif
 
     private:
       void _create_device();

@@ -126,6 +126,14 @@ void mr::VulkanGlobalState::_create_phys_device()
   _phys_device.enable_extensions_if_present({VK_EXT_VALIDATION_CACHE_EXTENSION_NAME});
 }
 
+#ifndef NDEBUG
+const VmaBudget * mr::VulkanState::memory_budgets() const noexcept {
+  static VmaBudget budgets[VK_MAX_MEMORY_HEAPS] {};
+  vmaGetHeapBudgets(_allocator, budgets);
+  return budgets;
+}
+#endif
+
 mr::VulkanState::VulkanState(VulkanGlobalState *state)
   : _global(state)
   , _device({}, {nullptr})

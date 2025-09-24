@@ -48,7 +48,26 @@ mr::Image::Image(const VulkanState &state, Extent extent, vk::Format format,
     &_allocation,
     nullptr
   );
-  ASSERT(result == VK_SUCCESS, "Failed to create a vk::Image", result, extent.width, extent.height, (int)format);
+
+  if (result != VK_SUCCESS) {
+#ifndef NDEBUG
+    auto budgets = state.memory_budgets();
+    for (uint32_t heapIndex = 0; heapIndex < VK_MAX_MEMORY_HEAPS; heapIndex++) {
+      if (budgets[heapIndex].statistics.allocationCount == 0) continue;
+      MR_DEBUG("My heap currently has {} allocations taking {} B,",
+          budgets[heapIndex].statistics.allocationCount,
+          budgets[heapIndex].statistics.allocationBytes);
+      MR_DEBUG("allocated out of {} Vulkan device memory blocks taking {} B,",
+          budgets[heapIndex].statistics.blockCount,
+          budgets[heapIndex].statistics.blockBytes);
+      MR_DEBUG("Vulkan reports total usage {} B with budget {} B ({}%).",
+          budgets[heapIndex].usage,
+          budgets[heapIndex].budget,
+          budgets[heapIndex].usage / (float)budgets[heapIndex].budget);
+    }
+#endif
+    ASSERT(result == VK_SUCCESS, "Failed to create a vk::Image", result, extent.width, extent.height, (int)format);
+  }
 
   create_image_view();
 }
