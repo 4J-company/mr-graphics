@@ -26,7 +26,9 @@ inline namespace graphics {
 
     Swapchain(const VulkanState &state, vk::SurfaceKHR surface, Extent extent);
 
-    void recreate(vk::SurfaceKHR surface);
+    operator vk::SwapchainKHR() noexcept {
+      return _swapchain.swapchain;
+    }
 
     vk::Format format() const noexcept;
   };

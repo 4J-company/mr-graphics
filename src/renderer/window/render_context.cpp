@@ -227,6 +227,7 @@ void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
   _state->device().resetFences(_image_fence.get());
 
   resize(presenter.extent());
+  // NOTE: Camera UBO is already updated and this resize will only affect next frame
   scene->_camera.cam().projection().resize((float)_extent.width / _extent.height);
 
   // --------------------------------------------------------------------------

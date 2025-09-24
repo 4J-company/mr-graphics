@@ -26,11 +26,4 @@ mr::Swapchain::Swapchain(const VulkanState &state, vk::SurfaceKHR surface, Exten
   }
 }
 
-void mr::Swapchain::recreate(vk::SurfaceKHR surface)
-{
-  vkb::SwapchainBuilder builder{ _state->phys_device(), _state->device(), surface };
-  auto swap_ret = builder.set_old_swapchain(_swapchain).build().value();
-  _swapchain = swap_ret;
-}
-
 vk::Format mr::Swapchain::format() const noexcept { return _format; }

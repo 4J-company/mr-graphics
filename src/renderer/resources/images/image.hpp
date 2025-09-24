@@ -9,8 +9,8 @@ namespace mr {
 inline namespace graphics {
   class Image {
   protected:
-    vk::Image _image;
-    vk::ImageView _image_view;
+    vk::Image _image;          // this is not Unique because it's handled by VMA
+    vk::ImageView _image_view; // this is not Unique to be destroyed before _image
     VmaAllocation _allocation;
 
     vk::Extent3D _extent;

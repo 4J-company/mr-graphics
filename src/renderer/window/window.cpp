@@ -81,12 +81,12 @@ std::optional<vk::RenderingAttachmentInfoKHR> mr::Window::target_image_info_impl
 
   prev_image_index = image_index;
   auto device = _parent->vulkan_state().device();
-  auto result = device.acquireNextImageKHR(_swapchain._swapchain.swapchain,
+  auto result = device.acquireNextImageKHR(_swapchain,
                              UINT64_MAX,
                              _image_available_semaphore[prev_image_index].get(),
                              nullptr,
                              &image_index);
-  while (result == vk::Result::eErrorOutOfDateKHR) {
+  if (result == vk::Result::eErrorOutOfDateKHR) {
     _should_update_swapchain = true;
     return std::nullopt;
   }
