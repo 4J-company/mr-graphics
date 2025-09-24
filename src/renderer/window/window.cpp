@@ -2,6 +2,29 @@
 #include "render_context.hpp"
 #include "camera/camera.hpp"
 
+void mr::Window::update_swapchain() noexcept
+{
+  // Don't touch this loop.
+  // If errors occur during resize - it's this bastard right under here
+  while (_should_update_swapchain) {
+    _should_update_swapchain = false;
+
+    _parent->vulkan_state().device().waitIdle();
+
+    vkb::destroy_swapchain(_swapchain._swapchain);
+    vkb::destroy_surface(_parent->vulkan_state().instance(), _surface.release());
+
+    _surface = vkfw::createWindowSurfaceUnique(_parent->vulkan_state().instance(), _window.get());
+
+    auto [res, value] = _window->getSize();
+    auto [w, h] = value;
+    _extent.width = w;
+    _extent.height = h;
+
+    _swapchain = mr::Swapchain(_parent->vulkan_state(), _surface.get(), _extent);
+  }
+}
+
 vkfw::UniqueWindow mr::Window::_create_window(const Extent &extent) noexcept
 {
   std::call_once(_init_vkfw_flag, [] {
@@ -42,17 +65,31 @@ mr::Window::Window(const RenderContext &parent, Extent extent)
 
   _window->callbacks()->on_cursor_move = _input_state.get_mouse_callback();
   _window->callbacks()->on_key = _input_state.get_key_callback();
+  _window->callbacks()->on_window_resize = [this](const vkfw::Window&, uint32_t, uint32_t) { _should_update_swapchain = true; };
 }
 
 vk::RenderingAttachmentInfoKHR mr::Window::target_image_info() noexcept
 {
+  std::optional<vk::RenderingAttachmentInfoKHR> res = target_image_info_impl();
+  while (!res) { res = target_image_info_impl(); }
+  return res.value();
+}
+
+std::optional<vk::RenderingAttachmentInfoKHR> mr::Window::target_image_info_impl() noexcept
+{
+  while (_should_update_swapchain) update_swapchain();
+
   prev_image_index = image_index;
   auto device = _parent->vulkan_state().device();
-  device.acquireNextImageKHR(_swapchain._swapchain.get(),
+  auto result = device.acquireNextImageKHR(_swapchain._swapchain.swapchain,
                              UINT64_MAX,
                              _image_available_semaphore[prev_image_index].get(),
                              nullptr,
                              &image_index);
+  while (result == vk::Result::eErrorOutOfDateKHR) {
+    _should_update_swapchain = true;
+    return std::nullopt;
+  }
 
   _swapchain._images[image_index].switch_layout(vk::ImageLayout::eColorAttachmentOptimal);
 
@@ -77,10 +114,15 @@ void mr::Window::present() noexcept
     .waitSemaphoreCount = sems.size(),
     .pWaitSemaphores = sems.data(),
     .swapchainCount = 1,
-    .pSwapchains = &_swapchain._swapchain.get(),
+    .pSwapchains = (vk::SwapchainKHR*)&_swapchain._swapchain.swapchain,
     .pImageIndices = &image_index,
   };
-  _parent->vulkan_state().queue().presentKHR(present_info);
+  auto result = _parent->vulkan_state().queue().presentKHR(present_info);
+  if (result == vk::Result::eErrorOutOfDateKHR) {
+    _should_update_swapchain = true;
+    return;
+  }
+  ASSERT(result == vk::Result::eSuccess || result == vk::Result::eSuboptimalKHR, "Failed to present onto a window", result);
 }
 
 void mr::Window::update_state() noexcept

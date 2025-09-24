@@ -98,7 +98,12 @@ mr::RenderContext::~RenderContext() {
 
 mr::WindowHandle mr::RenderContext::create_window() const noexcept
 {
-  return ResourceManager<Window>::get().create(mr::unnamed, *this, _extent);
+  return create_window(_extent);
+}
+
+mr::WindowHandle mr::RenderContext::create_window(const mr::Extent &extent) const noexcept
+{
+  return ResourceManager<Window>::get().create(mr::unnamed, *this, extent);
 }
 
 mr::FileWriterHandle mr::RenderContext::create_file_writer() const noexcept
@@ -120,7 +125,7 @@ void mr::RenderContext::_render_lights(const SceneHandle scene, Presenter &prese
   vk::RenderingAttachmentInfoKHR swapchain_image_attachment_info = presenter.target_image_info();
 
   vk::RenderingInfoKHR attachment_info {
-    .renderArea = { 0, 0, _extent.width, _extent.height },
+    .renderArea = { 0, 0, presenter.extent().width, presenter.extent().height },
     .layerCount = 1,
     .colorAttachmentCount = 1,
     .pColorAttachments = &swapchain_image_attachment_info,
@@ -132,8 +137,8 @@ void mr::RenderContext::_render_lights(const SceneHandle scene, Presenter &prese
 
   vk::Viewport viewport {
     .x = 0, .y = 0,
-    .width = static_cast<float>(_extent.width),
-    .height = static_cast<float>(_extent.height),
+    .width = static_cast<float>(presenter.extent().width),
+    .height = static_cast<float>(presenter.extent().height),
     .minDepth = 0, .maxDepth = 1,
   };
   _lights_command_unit->setViewport(0, viewport);
@@ -141,8 +146,8 @@ void mr::RenderContext::_render_lights(const SceneHandle scene, Presenter &prese
   vk::Rect2D scissors {
     .offset = {0, 0},
     .extent = {
-      static_cast<uint32_t>(_extent.width),
-      static_cast<uint32_t>(_extent.height),
+      static_cast<uint32_t>(presenter.extent().width),
+      static_cast<uint32_t>(presenter.extent().height),
     },
   };
   _lights_command_unit->setScissor(0, scissors);
@@ -207,6 +212,12 @@ void mr::RenderContext::_render_models(const SceneHandle scene)
   _models_command_unit->endRendering();
 }
 
+
+void mr::RenderContext::resize(const mr::Extent &extent)
+{
+  _extent = extent;
+}
+
 void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
 {
   ASSERT(this == &scene->render_context());
@@ -214,6 +225,9 @@ void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
 
   _state->device().waitForFences(_image_fence.get(), VK_TRUE, UINT64_MAX);
   _state->device().resetFences(_image_fence.get());
+
+  resize(presenter.extent());
+  scene->_camera.cam().projection().resize((float)_extent.width / _extent.height);
 
   // --------------------------------------------------------------------------
   // Model rendering pass

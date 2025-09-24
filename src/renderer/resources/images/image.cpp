@@ -82,6 +82,7 @@ mr::Image::Image(const VulkanState &state, const mr::importer::ImageData &image,
 mr::Image::~Image() {
   if (_image != VK_NULL_HANDLE) {
     ASSERT(_state != nullptr);
+    _state->device().destroyImageView(_image_view);
     vmaDestroyImage(_state->allocator(), _image, _allocation);
     _image = VK_NULL_HANDLE;
   }
@@ -239,7 +240,7 @@ void mr::Image::create_image_view() {
     .subresourceRange = range
   };
 
-  _image_view = _state->device().createImageViewUnique(create_info).value;
+  _image_view = _state->device().createImageView(create_info).value;
 }
 
 vk::Format mr::Image::find_supported_format(
@@ -345,7 +346,7 @@ mr::SwapchainImage::SwapchainImage(
   _mip_level = 1;
   _aspect_flags = vk::ImageAspectFlagBits::eColor;
   _layout = vk::ImageLayout::eUndefined;
-  _image_view.reset(view);
+  _image_view = view;
 }
 
 mr::SwapchainImage::~SwapchainImage() {
@@ -384,7 +385,7 @@ mr::DepthImage::DepthImage(const VulkanState &state, Extent extent, uint mip_lev
 vk::RenderingAttachmentInfoKHR mr::DepthImage::attachment_info() const
 {
   return vk::RenderingAttachmentInfoKHR {
-    .imageView = _image_view.get(),
+    .imageView = _image_view,
     .imageLayout = _layout,
     .loadOp = vk::AttachmentLoadOp::eClear,
     .storeOp = vk::AttachmentStoreOp::eStore,
@@ -402,7 +403,7 @@ mr::ColorAttachmentImage::ColorAttachmentImage(const VulkanState &state, Extent 
 vk::RenderingAttachmentInfoKHR mr::ColorAttachmentImage::attachment_info() const
 {
   return vk::RenderingAttachmentInfoKHR {
-    .imageView = _image_view.get(),
+    .imageView = _image_view,
     .imageLayout = _layout,
     .loadOp = vk::AttachmentLoadOp::eClear,
     .storeOp = vk::AttachmentStoreOp::eStore,
