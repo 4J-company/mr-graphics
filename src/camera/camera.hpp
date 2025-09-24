@@ -24,7 +24,7 @@ inline namespace graphics {
       delta *= _sensetivity;
       _cam += mr::Yaw(mr::Radiansf(delta.x()));
       _cam += mr::Pitch(mr::Radiansf(delta.y()));
-      _cam += mr::Roll(mr::Radiansf(std::acos(_cam.right() & mr::axis::y)) - mr::pi / 2 + mr::Radiansf(delta.z()));
+      _cam += mr::Roll(-mr::Radiansf(std::acos(_cam.right() & mr::axis::y)) + mr::pi / 2 + mr::Radiansf(delta.z()));
       return *this;
     }
 
