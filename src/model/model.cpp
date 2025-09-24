@@ -61,6 +61,9 @@ mr::graphics::Model::Model(
       vbufs.reserve(2);
       vbufs.emplace_back(scene.render_context().vulkan_state(),
           std::span(mesh.positions.data(), mesh.positions.size()));
+
+      // TODO: This is done to avoid alignment-related issues.
+      //       Should really be removed in favor of plain mr::importer::VertexAttributes
       struct Attr { float r, g, b, a; float nx, ny, nz; float tx, ty, tz; float bx, by, bz; float xx, xy; };
       std::vector<Attr> attributes;
       for (auto &a : mesh.attributes) {
