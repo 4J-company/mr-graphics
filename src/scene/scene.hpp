@@ -29,7 +29,7 @@ inline namespace graphics {
     std::vector<ModelHandle> _models;
 
     StorageBuffer _transforms; // transform matrix    for each instance
-    std::vector<glm::mat4x4> _transforms_data;
+    std::vector<mr::Matr4f> _transforms_data;
 
     StorageBuffer _bounds;     // AABB                for each instance
     std::vector<mr::AABBf> _bounds_data;

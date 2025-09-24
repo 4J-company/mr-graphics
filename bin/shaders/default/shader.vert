@@ -44,7 +44,7 @@ void main()
   vec4 occlusion_color = get_occlusion_color(tex_coord);
   vec4 normal_color = get_normal_color(tex_coord);
 
-  mat4 transform = transforms[instance_offset + gl_InstanceIndex];
+  mat4 transform = transpose(transforms[instance_offset + gl_InstanceIndex]);
 
   position = transform * vec4(InPos.xyz, 1.0);
   color = base_color;
