@@ -47,7 +47,7 @@ mr::graphics::Model::Model(
   static std::vector<mr::MaterialBuilder> builders;
   static auto &manager = ResourceManager<Texture>::get();
   std::for_each(std::execution::seq, model_value.meshes.begin(), model_value.meshes.end(),
-    [&, this] (const auto &mesh) {
+    [&, this] (auto &mesh) {
       ASSERT(mesh.material < model_value.materials.size(), "Failed to load material from GLTF file");
 
       const auto &material = model_value.materials[mesh.material];
@@ -61,8 +61,20 @@ mr::graphics::Model::Model(
       vbufs.reserve(2);
       vbufs.emplace_back(scene.render_context().vulkan_state(),
           std::span(mesh.positions.data(), mesh.positions.size()));
+
+      // TODO: This is done to avoid alignment-related issues.
+      //       Should really be removed in favor of plain mr::importer::VertexAttributes
+      struct Attr { float r, g, b, a; float nx, ny, nz; float tx, ty, tz; float bx, by, bz; float xx, xy; };
+      std::vector<Attr> attributes;
+      for (auto &a : mesh.attributes) {
+        attributes.emplace_back(a.color.r(), a.color.g(), a.color.b(), a.color.a(),
+                                a.normal[0], a.normal[1], a.normal[2],
+                                a.tangent[0], a.tangent[1], a.tangent[2],
+                                a.bitangent[0], a.bitangent[1], a.bitangent[2],
+                                a.texcoord.x(), a.texcoord.y());
+      }
       vbufs.emplace_back(scene.render_context().vulkan_state(),
-          std::span(mesh.attributes.data(), mesh.attributes.size()));
+          std::span(attributes.data(), attributes.size()));
 
       std::vector<IndexBuffer> ibufs;
       vbufs.reserve(mesh.lods.size());

@@ -7,7 +7,6 @@ file(
 include(${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake)
 
 # install libraries with no binaries available
-find_package(glm REQUIRED)
 find_package(glfw3 REQUIRED)
 find_package(mr-math REQUIRED)
 find_package(mr-utils REQUIRED)
@@ -41,8 +40,6 @@ set(DEPS_LIBRARIES
   vk-bootstrap-lib
 
   beman.inplace_vector
-
-  glm::glm
 
   mr-math::mr-math
   mr-utils::mr-utils
