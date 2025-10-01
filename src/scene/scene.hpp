@@ -20,7 +20,8 @@ inline namespace graphics {
   private:
     static inline constexpr int max_scene_instances = 64000;
 
-    const RenderContext *_parent = nullptr;
+  private:
+    RenderContext *_parent = nullptr;
 
     // One array for each light type
     // TODO(mt6): Maybe use https://github.com/rollbear/columnist or https://github.com/skypjack/entt here
@@ -32,6 +33,7 @@ inline namespace graphics {
 
     StorageBuffer _transforms; // transform matrix    for each instance
     std::vector<mr::Matr4f> _transforms_data;
+    uint32_t _transforms_buffer_id;  // id in bindless descriptor set
 
     StorageBuffer _bounds;     // AABB                for each instance
     std::vector<mr::AABBf> _bounds_data;
@@ -41,6 +43,7 @@ inline namespace graphics {
 
     mutable UniformBuffer _camera_uniform_buffer;
     mr::FPSCamera _camera;
+    uint32_t _camera_buffer_id;  // id in bindless descriptor set
 
     template <std::derived_from<Light> L>
     constexpr std::vector<Handle<L>> & lights() noexcept { return std::get<get_light_type<L>()>(_lights); }
@@ -71,16 +74,21 @@ inline namespace graphics {
     Scene(Scene &&) = default;
     Scene & operator=(Scene &&) = default;
 
-    Scene(const RenderContext &render_context);
+    Scene(RenderContext &render_context);
+    ~Scene();
 
+    RenderContext & render_context() noexcept { return *_parent; }
     const RenderContext & render_context() const noexcept { return *_parent; }
     UniformBuffer & camera_uniform_buffer() const noexcept { return _camera_uniform_buffer; }
 
     using OptionalInputStateReference = std::optional<std::reference_wrapper<const InputState>>;
     void update(OptionalInputStateReference input_state = std::nullopt) noexcept;
 
+    uint32_t transforms_buffer_id() const noexcept { return _transforms_buffer_id; }
+    uint32_t camera_buffer_id() const noexcept { return _camera_buffer_id; }
+
   private:
-    void _update_camera_buffer() noexcept;
+    void update_camera_buffer() noexcept;
   };
 
   MR_DECLARE_HANDLE(Scene);

@@ -36,30 +36,14 @@ inline namespace graphics {
       "light", // LightType::Directional
     };
 
-    static constexpr uint32_t max_resource_number = 2;
-    using ShaderResourceDescriptionT = InplaceVector<Shader::ResourceView, max_resource_number>;
-    static inline std::array<ShaderResourceDescriptionT, light_type_number> shader_resources_descriptions {
-      ShaderResourceDescriptionT { // LightType::Directional
-        // We want just describe layout of descriptor sets, data isn't required here
-        Shader::ResourceView(1, 0, static_cast<UniformBuffer *>(nullptr)),
-      },
-    };
-
     VertexBuffer screen_vbuf {};
     IndexBuffer screen_ibuf {};
 
-    std::optional<DescriptorAllocator> set0_descriptor_allocator;
-    DescriptorSetLayoutHandle set0_layout;
-    DescriptorSet set0_set;
-
-    // Here will be light UBO and shadow map
-    InplaceVector<DescriptorAllocator, light_type_number> set1_descriptor_allocators {};
-    InplaceVector<DescriptorSetLayoutHandle, light_type_number> set1_layouts {};
+    DescriptorSetLayoutHandle lights_set_layout;
+    DescriptorSet lights_descriptor_set;
 
     InplaceVector<ShaderHandle, light_type_number> shaders {};
     InplaceVector<GraphicsPipeline, light_type_number> pipelines {};
-
-    // TODO(dk6): maybe use bindless rendering and add here descriptor set and SSBO for each types
 
     LightsRenderData() = default;
 
