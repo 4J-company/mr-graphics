@@ -4,9 +4,9 @@
 mr::Scene::Scene(const RenderContext &render_context)
   : _parent(&render_context)
   , _camera_uniform_buffer(_parent->vulkan_state(), sizeof(ShaderCameraData))
-  , _transforms(_parent->vulkan_state(), 1024 * sizeof(mr::Matr4f))
-  , _bounds(_parent->vulkan_state(),     1024 * sizeof(mr::AABBf))
-  , _visibility(_parent->vulkan_state(), 1024 * sizeof(uint32_t))
+  , _transforms(_parent->vulkan_state(), 64000 * sizeof(mr::Matr4f))
+  , _bounds(_parent->vulkan_state(),     64000 * sizeof(mr::AABBf))
+  , _visibility(_parent->vulkan_state(), 64000 * sizeof(uint32_t))
 {
   ASSERT(_parent != nullptr);
 }

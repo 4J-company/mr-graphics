@@ -95,9 +95,9 @@ mr::HostBuffer & mr::HostBuffer::write(std::span<const std::byte> src)
   ASSERT(src.size() <= _size);
 
   if (_mapped_data.mapped()) {
-    memcpy(_mapped_data.get(), src.data(), _size);
+    memcpy(_mapped_data.get(), src.data(), src.size());
   } else {
-    memcpy(_mapped_data.map(), src.data(), _size);
+    std::memcpy(_mapped_data.map(), src.data(), src.size());
     _mapped_data.unmap();
   }
 

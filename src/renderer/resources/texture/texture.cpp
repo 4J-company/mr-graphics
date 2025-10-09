@@ -8,3 +8,12 @@ mr::Texture::Texture(const VulkanState &state, const std::byte *data, Extent ext
   _image.write<const std::byte>(std::span{data, _image.size()});
   _image.switch_layout(vk::ImageLayout::eShaderReadOnlyOptimal);
 }
+
+mr::Texture::Texture(const VulkanState &state, const mr::importer::ImageData &image) noexcept
+  : _image (state, image)
+  , _sampler (state, vk::Filter::eLinear, vk::SamplerAddressMode::eRepeat)
+{
+  _image.switch_layout(vk::ImageLayout::eTransferDstOptimal);
+  _image.write<const std::byte>(std::span{image.pixels.get(), image.byte_size()});
+  _image.switch_layout(vk::ImageLayout::eShaderReadOnlyOptimal);
+}

@@ -55,45 +55,6 @@ inline namespace graphics {
     mr::DescriptorAllocator _descriptor_allocator;
     mr::DescriptorSet _descriptor_set;
     mr::GraphicsPipeline _pipeline;
-
-    std::array<vk::VertexInputAttributeDescription, 6> _descrs {
-      vk::VertexInputAttributeDescription {
-        .location = 0,
-        .binding = 0,
-        .format = vk::Format::eR32G32B32Sfloat,
-        .offset = 0
-      },
-      vk::VertexInputAttributeDescription {
-        .location = 1,
-        .binding = 1,
-        .format = vk::Format::eR32G32B32A32Sfloat,
-        .offset = 0
-      },
-      vk::VertexInputAttributeDescription {
-        .location = 2,
-        .binding = 1,
-        .format = vk::Format::eR32G32B32Sfloat,
-        .offset = 16
-      },
-      vk::VertexInputAttributeDescription {
-        .location = 3,
-        .binding = 1,
-        .format = vk::Format::eR32G32B32Sfloat,
-        .offset = 28
-      },
-      vk::VertexInputAttributeDescription {
-        .location = 4,
-        .binding = 1,
-        .format = vk::Format::eR32G32B32Sfloat,
-        .offset = 40
-      },
-      vk::VertexInputAttributeDescription {
-        .location = 5,
-        .binding = 1,
-        .format = vk::Format::eR32G32Sfloat,
-        .offset = 52
-      },
-    };
   };
 
   MR_DECLARE_HANDLE(Material)
@@ -136,9 +97,7 @@ inline namespace graphics {
       ASSERT(tex_data.image.pixels.get() != nullptr, "Image should be valid");
       mr::TextureHandle tex = ResourceManager<Texture>::get().create(mr::unnamed,
         *_state,
-        (const std::byte*)tex_data.image.pixels.get(),
-        mr::Extent{ tex_data.image.width, tex_data.image.height },
-        vk::Format::eR32G32B32A32Sfloat
+        tex_data.image
       );
 
       _textures[enum_cast(param)] = std::move(tex);

@@ -26,12 +26,11 @@ class MrGraphicsRecipe(ConanFile):
         self.requires("libdwarf/0.9.1", override=True)
 
         self.requires("glfw/3.4")
-        self.requires("meshoptimizer/0.23")
 
         self.requires("mr-math/1.1.4")
         self.requires("mr-utils/1.0.4")
         self.requires("mr-manager/1.0.1")
-        self.requires("mr-importer/2.0.0")
+        self.requires("mr-importer/2.2.4")
 
         self.requires("stb/cci.20240531")
 

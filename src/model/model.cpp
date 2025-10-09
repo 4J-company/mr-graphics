@@ -61,27 +61,13 @@ mr::graphics::Model::Model(
       vbufs.reserve(2);
       vbufs.emplace_back(scene.render_context().vulkan_state(),
           std::span(mesh.positions.data(), mesh.positions.size()));
-
-      // TODO: This is done to avoid alignment-related issues.
-      //       Should really be removed in favor of plain mr::importer::VertexAttributes
-      struct Attr { float r, g, b, a; float nx, ny, nz; float tx, ty, tz; float bx, by, bz; float xx, xy; };
-      std::vector<Attr> attributes;
-      for (auto &a : mesh.attributes) {
-        attributes.emplace_back(a.color.r(), a.color.g(), a.color.b(), a.color.a(),
-                                a.normal[0], a.normal[1], a.normal[2],
-                                a.tangent[0], a.tangent[1], a.tangent[2],
-                                a.bitangent[0], a.bitangent[1], a.bitangent[2],
-                                a.texcoord.x(), a.texcoord.y());
-      }
       vbufs.emplace_back(scene.render_context().vulkan_state(),
-          std::span(attributes.data(), attributes.size()));
+          std::span(mesh.attributes.data(), mesh.attributes.size()));
 
       std::vector<IndexBuffer> ibufs;
-      vbufs.reserve(mesh.lods.size());
+      ibufs.reserve(mesh.lods.size());
       for (size_t j = 0; j < mesh.lods.size(); j++) {
-        ibufs.emplace_back(scene.render_context().vulkan_state(),
-          std::span(mesh.lods[j].indices.data(), mesh.lods[j].indices.size())
-        );
+        ibufs.emplace_back(scene.render_context().vulkan_state(), mesh.lods[j].indices);
       }
 
       scene._bounds_data.emplace_back();
