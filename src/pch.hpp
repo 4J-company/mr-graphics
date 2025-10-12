@@ -49,11 +49,6 @@
 #define VKFW_NO_STRUCT_CONSTRUCTORS
 #include <vkfw/vkfw.hpp>
 
-#include <beman/inplace_vector/inplace_vector.hpp>
-namespace mr {
-  template <typename T, size_t N> using InplaceVector = beman::inplace_vector<T, N>;
-}
-
 // WinAPI macros undefined :(
 #undef max
 #undef min

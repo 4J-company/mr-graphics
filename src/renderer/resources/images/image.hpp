@@ -103,6 +103,32 @@ inline namespace graphics {
     static vk::Format find_supported_format(
       const VulkanState &state, const std::vector<vk::Format> &candidates,
       vk::ImageTiling tiling, vk::FormatFeatureFlags features);
+
+    static bool is_image_format_supported(
+        const VulkanState &state,
+        vk::Format format,
+        vk::ImageType imageType,
+        vk::ImageTiling tiling,
+        vk::ImageUsageFlags usage)
+    {
+      vk::PhysicalDeviceImageFormatInfo2 formatInfo {
+        .format = format,
+        .type = imageType,
+        .tiling = tiling,
+        .usage = usage,
+        .flags = vk::ImageCreateFlagBits(0),
+      };
+
+      vk::ImageFormatProperties2 formatProperties { };
+
+      vk::Result result = (vk::Result)vkGetPhysicalDeviceImageFormatProperties2(
+        state.phys_device(),
+        (VkPhysicalDeviceImageFormatInfo2*)&formatInfo,
+        (VkImageFormatProperties2*)&formatProperties
+      );
+
+      return result == vk::Result::eSuccess;
+    }
   };
 
   // HostImage: host-visible, for staging or CPU read/write
@@ -147,6 +173,16 @@ inline namespace graphics {
       TextureImage & operator=(TextureImage&&) noexcept = default;
       ~TextureImage() override = default;
       // Add mipmap generation, upload helpers as needed
+
+      static bool is_texture_format_supported(const VulkanState &state, vk::Format format) {
+        return is_image_format_supported(
+          state,
+          format,
+          vk::ImageType::e2D,
+          vk::ImageTiling::eOptimal,
+          vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled
+        );
+      }
   };
 
   // DepthImage: for depth/stencil attachments

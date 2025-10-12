@@ -11,7 +11,7 @@ mr::Sampler::Sampler(const VulkanState &state, vk::Filter filter,
   vk::SamplerCreateInfo sampler_create_info {
     .magFilter = _filter,
     .minFilter = _filter,
-    .mipmapMode = vk::SamplerMipmapMode::eLinear,
+    .mipmapMode = vk::SamplerMipmapMode::eNearest,
     .addressModeU = _address,
     .addressModeV = _address,
     .addressModeW = _address,

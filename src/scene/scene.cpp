@@ -72,6 +72,14 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
       _camera.cam() = mr::math::Camera<float>({1}, {-1}, {0, 1, 0});
       _camera.cam().projection() = mr::math::Camera<float>::Projection(45_deg);
     }
+    if (input_state.key_tapped(vkfw::Key::e2)) {
+      _camera.cam() = mr::math::Camera<float>({10}, {-1}, {0, 1, 0});
+      _camera.cam().projection() = mr::math::Camera<float>::Projection(45_deg);
+    }
+    if (input_state.key_tapped(vkfw::Key::e3)) {
+      _camera.cam() = mr::math::Camera<float>({100}, {-1}, {0, 1, 0});
+      _camera.cam().projection() = mr::math::Camera<float>::Projection(45_deg);
+    }
   }
 
   _update_camera_buffer();

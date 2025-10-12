@@ -36,7 +36,23 @@ mr::graphics::Model::Model(
 
   std::filesystem::path model_path = path::models_dir / filename;
 
-  auto model = mr::import(model_path);
+  bool is_1component_supported = mr::TextureImage::is_texture_format_supported(state, vk::Format::eR8Uint);
+  bool is_2component_supported = mr::TextureImage::is_texture_format_supported(state, vk::Format::eR8G8Uint);
+  bool is_3component_supported = mr::TextureImage::is_texture_format_supported(state, vk::Format::eR8G8B8Uint);
+  bool is_4component_supported = mr::TextureImage::is_texture_format_supported(state, vk::Format::eR8G8B8A8Uint);
+
+  using enum mr::importer::Options;
+
+  Options options {
+    Options::All
+    & (is_1component_supported ? Options::All : ~Options::Allow1ComponentImages)
+    & (is_2component_supported ? Options::All : ~Options::Allow2ComponentImages)
+    & (is_3component_supported ? Options::All : ~Options::Allow3ComponentImages)
+    & (is_4component_supported ? Options::All : ~Options::Allow4ComponentImages)
+    & ~Options::PreferUncompressed
+  };
+
+  auto model = mr::import(model_path, options);
   if (!model) {
     MR_ERROR("Loading model {} failed", model_path.string());
     return;
