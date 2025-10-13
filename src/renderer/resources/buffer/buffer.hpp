@@ -14,23 +14,19 @@ inline namespace graphics {
   public:
     Buffer() = default;
     Buffer(const VulkanState &state, size_t byte_size,
-           vk::BufferUsageFlags usage_flag,
+           vk::BufferUsageFlags usage_flags,
            vk::MemoryPropertyFlags memory_properties);
     Buffer(Buffer &&other) noexcept {
       std::swap(_state, other._state);
       std::swap(_size, other._size);
       std::swap(_buffer, other._buffer);
-      std::swap(_usage_flags, other._usage_flags);
       std::swap(_allocation, other._allocation);
-      std::swap(_memory_properties, other._memory_properties);
     }
     Buffer & operator=(Buffer &&other) noexcept {
       std::swap(_state, other._state);
       std::swap(_size, other._size);
       std::swap(_buffer, other._buffer);
-      std::swap(_usage_flags, other._usage_flags);
       std::swap(_allocation, other._allocation);
-      std::swap(_memory_properties, other._memory_properties);
       return *this;
     }
     virtual ~Buffer() noexcept;
@@ -51,8 +47,6 @@ inline namespace graphics {
 
     vk::Buffer _buffer {};
 
-    vk::BufferUsageFlags _usage_flags {};
-    vk::MemoryPropertyFlags _memory_properties {};
     VmaAllocation _allocation {};
   };
 
