@@ -96,23 +96,6 @@ inline namespace graphics {
     {
       ASSERT(tex_data.image.pixels.get() != nullptr, "Image should be valid");
 
-      switch (tex_data.image.format) {
-        case vk::Format::eR8Uint:
-          const_cast<vk::Format&>(tex_data.image.format) = vk::Format::eR8Srgb;
-          break;
-        case vk::Format::eR8G8Uint:
-          const_cast<vk::Format&>(tex_data.image.format) = vk::Format::eR8G8Srgb;
-          break;
-        case vk::Format::eR8G8B8Uint:
-          const_cast<vk::Format&>(tex_data.image.format) = vk::Format::eR8G8B8Srgb;
-          break;
-        case vk::Format::eR8G8B8A8Uint:
-          const_cast<vk::Format&>(tex_data.image.format) = vk::Format::eR8G8B8A8Srgb;
-          break;
-        default:
-          break;
-      }
-
       mr::TextureHandle tex = ResourceManager<Texture>::get().create(mr::unnamed,
         *_state,
         tex_data.image
