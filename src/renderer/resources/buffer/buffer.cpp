@@ -6,23 +6,21 @@
 
 // constructor
 mr::Buffer::Buffer(const VulkanState &state, size_t byte_size,
-                   vk::BufferUsageFlags usage_flag,
+                   vk::BufferUsageFlags usage_flags,
                    vk::MemoryPropertyFlags memory_properties)
   : _state(&state)
   , _size(byte_size)
-  , _usage_flags(usage_flag)
-  , _memory_properties(memory_properties)
 {
   vk::BufferCreateInfo buffer_create_info {
     .size = _size,
-    .usage = _usage_flags,
+    .usage = usage_flags,
     .sharingMode = vk::SharingMode::eExclusive,
   };
 
   VmaAllocationCreateInfo allocation_create_info { };
   allocation_create_info.usage = VMA_MEMORY_USAGE_AUTO;
 
-  if (_memory_properties & vk::MemoryPropertyFlagBits::eHostVisible) {
+  if (memory_properties & vk::MemoryPropertyFlagBits::eHostVisible) {
     allocation_create_info.flags |= VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
   }
 
