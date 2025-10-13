@@ -29,6 +29,9 @@ inline namespace graphics {
     Image(const VulkanState &state, Extent extent, vk::Format format,
           vk::ImageUsageFlags usage_flags, vk::ImageAspectFlags aspect_flags,
           vk::MemoryPropertyFlags memory_properties, uint mip_level = 1);
+    Image(const VulkanState &state, const mr::importer::ImageData &image,
+          vk::ImageUsageFlags usage_flags, vk::ImageAspectFlags aspect_flags,
+          vk::MemoryPropertyFlags memory_properties);
 
   public:
     Image(Image &&other) noexcept {
@@ -100,6 +103,32 @@ inline namespace graphics {
     static vk::Format find_supported_format(
       const VulkanState &state, const std::vector<vk::Format> &candidates,
       vk::ImageTiling tiling, vk::FormatFeatureFlags features);
+
+    static bool is_image_format_supported(
+        const VulkanState &state,
+        vk::Format format,
+        vk::ImageType imageType,
+        vk::ImageTiling tiling,
+        vk::ImageUsageFlags usage)
+    {
+      vk::PhysicalDeviceImageFormatInfo2 formatInfo {
+        .format = format,
+        .type = imageType,
+        .tiling = tiling,
+        .usage = usage,
+        .flags = vk::ImageCreateFlagBits(0),
+      };
+
+      vk::ImageFormatProperties2 formatProperties { };
+
+      vk::Result result = (vk::Result)vkGetPhysicalDeviceImageFormatProperties2(
+        state.phys_device(),
+        (VkPhysicalDeviceImageFormatInfo2*)&formatInfo,
+        (VkImageFormatProperties2*)&formatProperties
+      );
+
+      return result == vk::Result::eSuccess;
+    }
   };
 
   // HostImage: host-visible, for staging or CPU read/write
@@ -119,6 +148,7 @@ inline namespace graphics {
       DeviceImage(const VulkanState &state, Extent extent, vk::Format format,
                   vk::ImageUsageFlags usage_flags, vk::ImageAspectFlags aspect_flags,
                   uint mip_level = 1);
+      DeviceImage(const VulkanState &state, const mr::importer::ImageData &image, vk::ImageUsageFlags usage_flags, vk::ImageAspectFlags aspect_flags);
       DeviceImage(DeviceImage&&) noexcept = default;
       DeviceImage & operator=(DeviceImage&&) noexcept = default;
       ~DeviceImage() override = default;
@@ -138,10 +168,21 @@ inline namespace graphics {
   class TextureImage : public DeviceImage {
     public:
       TextureImage(const VulkanState &state, Extent extent, vk::Format format, vk::ImageUsageFlags usage_flags = {}, uint mip_level = 1);
+      TextureImage(const VulkanState &state, const mr::importer::ImageData &image, vk::ImageUsageFlags usage_flags = {});
       TextureImage(TextureImage&&) noexcept = default;
       TextureImage & operator=(TextureImage&&) noexcept = default;
       ~TextureImage() override = default;
       // Add mipmap generation, upload helpers as needed
+
+      static bool is_texture_format_supported(const VulkanState &state, vk::Format format) {
+        return is_image_format_supported(
+          state,
+          format,
+          vk::ImageType::e2D,
+          vk::ImageTiling::eOptimal,
+          vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled
+        );
+      }
   };
 
   // DepthImage: for depth/stencil attachments
@@ -187,40 +228,6 @@ inline namespace graphics {
         vk::FormatFeatureFlagBits::eDepthStencilAttachment
       );
     return format;
-  }
-
-  inline constexpr size_t format_byte_size(vk::Format format) noexcept
-  {
-    size_t texel_size = format == vk::Format::eR8G8B8A8Srgb       ? 4
-                      : format == vk::Format::eR8G8B8Srgb         ? 3
-                      : format == vk::Format::eR8G8Srgb           ? 2
-                      : format == vk::Format::eR8Srgb             ? 1
-
-                      : format == vk::Format::eB8G8R8A8Srgb       ? 4
-                      : format == vk::Format::eB8G8R8Srgb         ? 3
-
-                      : format == vk::Format::eR8G8B8A8Unorm      ? 4
-                      : format == vk::Format::eR8G8B8Unorm        ? 3
-                      : format == vk::Format::eR8G8Unorm          ? 2
-                      : format == vk::Format::eR8Unorm            ? 1
-
-                      : format == vk::Format::eB8G8R8A8Unorm      ? 4
-                      : format == vk::Format::eB8G8R8Unorm        ? 3
-
-                      : format == vk::Format::eR32G32B32A32Sfloat ? 16
-                      : format == vk::Format::eR32G32B32Sfloat    ? 12
-                      : format == vk::Format::eR32G32Sfloat       ? 8
-                      : format == vk::Format::eR32Sfloat          ? 4
-
-                      : format == vk::Format::eD32Sfloat          ? 4
-                      : format == vk::Format::eD32SfloatS8Uint    ? 0
-                      : format == vk::Format::eD24UnormS8Uint     ? 0
-
-                                                                  : 0;
-
-    ASSERT(texel_size != 0, "Unsupported image format. Needs investigation", format);
-
-    return texel_size;
   }
 }
 } // namespace mr

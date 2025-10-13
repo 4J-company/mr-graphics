@@ -4,9 +4,9 @@
 mr::Scene::Scene(const RenderContext &render_context)
   : _parent(&render_context)
   , _camera_uniform_buffer(_parent->vulkan_state(), sizeof(ShaderCameraData))
-  , _transforms(_parent->vulkan_state(), 1024 * sizeof(mr::Matr4f))
-  , _bounds(_parent->vulkan_state(),     1024 * sizeof(mr::AABBf))
-  , _visibility(_parent->vulkan_state(), 1024 * sizeof(uint32_t))
+  , _transforms(_parent->vulkan_state(), max_scene_instances * sizeof(mr::Matr4f))
+  , _bounds(_parent->vulkan_state(),     max_scene_instances * sizeof(mr::AABBf))
+  , _visibility(_parent->vulkan_state(), max_scene_instances * sizeof(uint32_t))
 {
   ASSERT(_parent != nullptr);
 }
@@ -70,6 +70,14 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
     }
     if (input_state.key_tapped(vkfw::Key::e1)) {
       _camera.cam() = mr::math::Camera<float>({1}, {-1}, {0, 1, 0});
+      _camera.cam().projection() = mr::math::Camera<float>::Projection(45_deg);
+    }
+    if (input_state.key_tapped(vkfw::Key::e2)) {
+      _camera.cam() = mr::math::Camera<float>({10}, {-1}, {0, 1, 0});
+      _camera.cam().projection() = mr::math::Camera<float>::Projection(45_deg);
+    }
+    if (input_state.key_tapped(vkfw::Key::e3)) {
+      _camera.cam() = mr::math::Camera<float>({100}, {-1}, {0, 1, 0});
       _camera.cam().projection() = mr::math::Camera<float>::Projection(45_deg);
     }
   }

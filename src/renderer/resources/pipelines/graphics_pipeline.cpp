@@ -17,11 +17,7 @@ mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state,
     .dynamicStateCount = static_cast<uint>(_dynamic_states.size()),
     .pDynamicStates = _dynamic_states.data()};
 
-  std::array<vk::VertexInputBindingDescription, 16> binding_descriptions {};
-  uint32_t sum = 0;
-  for (int i = 1; i < attributes.size(); i++) {
-    sum += format_byte_size(attributes[i].format);
-  }
+  std::array<vk::VertexInputBindingDescription, 2> binding_descriptions {};
   binding_descriptions[0] = vk::VertexInputBindingDescription {
     .binding = attributes[0].binding,
     .stride = (uint32_t)format_byte_size(attributes[0].format),
@@ -30,7 +26,7 @@ mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state,
   if (attributes.size() > 1) {
     binding_descriptions[1] = vk::VertexInputBindingDescription {
       .binding = attributes[1].binding,
-      .stride = sum,
+      .stride = attributes.back().offset + format_byte_size(attributes.back().format),
       .inputRate = vk::VertexInputRate::eVertex,
     };
   }

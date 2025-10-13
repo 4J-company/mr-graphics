@@ -50,9 +50,16 @@ mr::Image::Image(const VulkanState &state, Extent extent, vk::Format format,
     &_allocation,
     nullptr
   );
-  ASSERT(result == VK_SUCCESS, "Failed to create a vk::Image", result);
+  ASSERT(result == VK_SUCCESS, "Failed to create a vk::Image", result, extent.width, extent.height, (int)format);
 
   create_image_view();
+}
+
+mr::Image::Image(const VulkanState &state, const mr::importer::ImageData &image,
+          vk::ImageUsageFlags usage_flags, vk::ImageAspectFlags aspect_flags,
+          vk::MemoryPropertyFlags memory_properties)
+  : Image(state, image.extent(), image.format, usage_flags, aspect_flags, memory_properties, 1)
+{
 }
 
 mr::Image::~Image() {
@@ -287,6 +294,11 @@ mr::DeviceImage::DeviceImage(const VulkanState &state, Extent extent, vk::Format
           vk::MemoryPropertyFlagBits::eDeviceLocal, mip_level)
 {}
 
+mr::DeviceImage::DeviceImage(const VulkanState &state, const mr::importer::ImageData &image, vk::ImageUsageFlags usage_flags, vk::ImageAspectFlags aspect_flags)
+  : Image(state, image, usage_flags, aspect_flags, vk::MemoryPropertyFlagBits::eDeviceLocal)
+{
+}
+
 // ---- SwapchainImage ----
 mr::SwapchainImage::SwapchainImage(const VulkanState &state, Extent extent, vk::Format format, vk::Image image)
 {
@@ -332,6 +344,11 @@ mr::TextureImage::TextureImage(const VulkanState &state, Extent extent, vk::Form
                 usage_flags | vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
                 vk::ImageAspectFlagBits::eColor, mip_level)
 {}
+
+mr::TextureImage::TextureImage(const VulkanState &state, const mr::importer::ImageData &image, vk::ImageUsageFlags usage_flags)
+  : DeviceImage(state, image, usage_flags | vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled, vk::ImageAspectFlagBits::eColor)
+{
+}
 
 // ---- DepthImage ----
 mr::DepthImage::DepthImage(const VulkanState &state, Extent extent, uint mip_level)

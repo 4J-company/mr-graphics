@@ -31,6 +31,11 @@
 #include <variant>
 #include <vector>
 
+#define VULKAN_HPP_NO_EXCEPTIONS
+#define VULKAN_HPP_NO_NODISCARD_WARNINGS
+#define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
+#include <vulkan/vulkan.hpp>
+
 #include <mr-math/math.hpp>
 #include <mr-utils/assert.hpp>
 #include <mr-utils/misc.hpp>
@@ -39,22 +44,10 @@
 // #include <mr-manager/manager.hpp>
 #include <mr-importer/importer.hpp>
 
-// user includes
-#define VULKAN_HPP_ASSERT DEBUG_ASSERT
-#define VULKAN_HPP_NO_EXCEPTIONS
-#define VULKAN_HPP_NO_NODISCARD_WARNINGS
-#define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
-#include <vulkan/vulkan.hpp>
-
 #define VKFW_NO_EXCEPTIONS
 #define VKFW_NO_NODISCARD_WARNINGS
 #define VKFW_NO_STRUCT_CONSTRUCTORS
 #include <vkfw/vkfw.hpp>
-
-#include <beman/inplace_vector/inplace_vector.hpp>
-namespace mr {
-  template <typename T, size_t N> using InplaceVector = beman::inplace_vector<T, N>;
-}
 
 // WinAPI macros undefined :(
 #undef max
