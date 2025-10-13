@@ -18,6 +18,8 @@ inline namespace graphics {
     friend class Model;
 
   private:
+    static inline constexpr int max_scene_instances = 64000;
+
     const RenderContext *_parent = nullptr;
 
     // One array for each light type

@@ -47,7 +47,7 @@ mr::graphics::Material::Material(const VulkanState &state,
                                    render_context,
                                    mr::GraphicsPipeline::Subpass::OpaqueGeometry,
                                    _shader,
-                                   std::span {_descrs},
+                                   std::span {mr::importer::Mesh::vertex_input_attribute_descriptions},
                                    std::span {layouts});
 }
 
