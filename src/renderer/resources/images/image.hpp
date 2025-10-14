@@ -9,8 +9,8 @@ namespace mr {
 inline namespace graphics {
   class Image {
   protected:
-    vk::Image _image;
-    vk::UniqueImageView _image_view;
+    vk::Image _image;          // this is not Unique because it's handled by VMA
+    vk::ImageView _image_view; // this is not Unique to be destroyed before _image
     VmaAllocation _allocation;
 
     vk::Extent3D _extent;
@@ -86,7 +86,7 @@ inline namespace graphics {
     void create_image_view();
 
   public:
-    vk::ImageView image_view() const noexcept { return _image_view.get(); }
+    vk::ImageView image_view() const noexcept { return _image_view; }
     vk::Image image() const noexcept { return _image; }
     vk::Format format() const noexcept { return _format; }
 

@@ -15,7 +15,7 @@ mr::Swapchain::Swapchain(const VulkanState &state, vk::SurfaceKHR surface, Exten
     MR_ERROR("Cannot create VkSwapchainKHR. {}\n", swapchain.error().message());
     std::exit(1);
   }
-  _swapchain.reset(swapchain.value().swapchain);
+  _swapchain = swapchain.value();
 
   std::vector<VkImage> images = swapchain.value().get_images().value();
   std::vector<VkImageView> image_views = swapchain.value().get_image_views().value();
@@ -24,13 +24,6 @@ mr::Swapchain::Swapchain(const VulkanState &state, vk::SurfaceKHR surface, Exten
   for (int i = 0; i < images.size(); i++) {
     _images.emplace_back(state, extent, _format, images[i], image_views[i]);
   }
-}
-
-void mr::Swapchain::recreate(vk::SurfaceKHR surface)
-{
-  vkb::SwapchainBuilder builder{ _state->phys_device(), _state->device(), surface };
-  auto swap_ret = builder.set_old_swapchain(_swapchain.get()).build().value();
-  _swapchain.reset(swap_ret.swapchain);
 }
 
 vk::Format mr::Swapchain::format() const noexcept { return _format; }

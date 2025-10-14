@@ -17,7 +17,7 @@ inline namespace graphics {
 
     const VulkanState *_state;
     vk::Format _format = default_format;
-    vk::UniqueSwapchainKHR _swapchain;
+    vkb::Swapchain _swapchain;
     std::vector<SwapchainImage> _images;
 
   public:
@@ -26,7 +26,9 @@ inline namespace graphics {
 
     Swapchain(const VulkanState &state, vk::SurfaceKHR surface, Extent extent);
 
-    void recreate(vk::SurfaceKHR surface);
+    operator vk::SwapchainKHR() noexcept {
+      return _swapchain.swapchain;
+    }
 
     vk::Format format() const noexcept;
   };

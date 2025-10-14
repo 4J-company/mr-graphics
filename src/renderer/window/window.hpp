@@ -13,6 +13,7 @@ inline namespace graphics {
     static inline std::once_flag _init_vkfw_flag;
     vkfw::UniqueWindow _window;
 
+    std::atomic_bool _should_update_swapchain = false;
     vk::UniqueSurfaceKHR _surface;
     Swapchain _swapchain;
 
@@ -44,6 +45,10 @@ inline namespace graphics {
 
   private:
     static vkfw::UniqueWindow _create_window(const Extent &extent) noexcept;
+
+    std::optional<vk::RenderingAttachmentInfoKHR> target_image_info_impl() noexcept;
+
+    void update_swapchain() noexcept;
   };
 
   MR_DECLARE_HANDLE(Window);
