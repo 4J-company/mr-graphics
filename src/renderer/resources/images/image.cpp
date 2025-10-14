@@ -21,9 +21,7 @@ mr::Image::Image(const VulkanState &state, Extent extent, vk::Format format,
   , _size{calculate_image_size(extent, format)}
   , _format(format)
   , _layout(vk::ImageLayout::eUndefined)
-  , _usage_flags(usage_flags)
   , _aspect_flags(aspect_flags)
-  , _memory_properties(memory_properties)
 {
   vk::ImageCreateInfo image_create_info {
     .imageType = vk::ImageType::e2D,
@@ -33,7 +31,7 @@ mr::Image::Image(const VulkanState &state, Extent extent, vk::Format format,
     .arrayLayers = 1,
     .samples = vk::SampleCountFlagBits::e1,
     .tiling = vk::ImageTiling::eOptimal,
-    .usage = _usage_flags,
+    .usage = usage_flags,
     .sharingMode = vk::SharingMode::eExclusive,
     .initialLayout = _layout,
   };
