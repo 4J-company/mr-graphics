@@ -19,9 +19,7 @@ inline namespace graphics {
     int _num_of_channels{};
     uint _mip_level{};
     vk::ImageLayout _layout;
-    vk::ImageUsageFlags _usage_flags;
     vk::ImageAspectFlags _aspect_flags;
-    vk::MemoryPropertyFlags _memory_properties;
     const VulkanState *_state = nullptr;
 
     // Protected constructor for use by derived classes
@@ -47,9 +45,7 @@ inline namespace graphics {
       std::swap(_num_of_channels, other._num_of_channels);
       std::swap(_mip_level, other._mip_level);
       std::swap(_layout, other._layout);
-      std::swap(_usage_flags, other._usage_flags);
       std::swap(_aspect_flags, other._aspect_flags);
-      std::swap(_memory_properties, other._memory_properties);
     }
     Image& operator=(Image &&other) noexcept {
       std::swap(_state, other._state);
@@ -64,9 +60,7 @@ inline namespace graphics {
       std::swap(_num_of_channels, other._num_of_channels);
       std::swap(_mip_level, other._mip_level);
       std::swap(_layout, other._layout);
-      std::swap(_usage_flags, other._usage_flags);
       std::swap(_aspect_flags, other._aspect_flags);
-      std::swap(_memory_properties, other._memory_properties);
 
       return *this;
     }
@@ -95,7 +89,6 @@ inline namespace graphics {
     vk::ImageView image_view() const noexcept { return _image_view.get(); }
     vk::Image image() const noexcept { return _image; }
     vk::Format format() const noexcept { return _format; }
-    vk::MemoryPropertyFlags memory_properties() const noexcept { return _memory_properties; }
 
     const vk::Extent3D & extent() const noexcept { return _extent; }
     size_t size() const noexcept { return _size; }
