@@ -126,9 +126,16 @@ void mr::VulkanGlobalState::_create_phys_device()
   _phys_device.enable_extensions_if_present({VK_EXT_VALIDATION_CACHE_EXTENSION_NAME});
 }
 
+#ifndef NDEBUG
+const VmaBudget * mr::VulkanState::memory_budgets() const noexcept {
+  static VmaBudget budgets[VK_MAX_MEMORY_HEAPS] {};
+  vmaGetHeapBudgets(_allocator, budgets);
+  return budgets;
+}
+#endif
+
 mr::VulkanState::VulkanState(VulkanGlobalState *state)
   : _global(state)
-  , _device({}, {nullptr})
 {
   _create_device();
   _create_allocator();
@@ -138,6 +145,7 @@ mr::VulkanState::VulkanState(VulkanGlobalState *state)
 mr::VulkanState::~VulkanState()
 {
   _destroy_pipeline_cache();
+  vkb::destroy_device(_device);
 }
 
 void mr::VulkanState::_create_allocator() {
@@ -163,7 +171,7 @@ void mr::VulkanState::_create_device()
   auto device = builder.custom_queue_setup(queue_descrs).build();
   ASSERT(device.has_value(), "Cannot create VkDevice", device.error().message());
   _dispatch_table = device.value().make_table();
-  _device.reset(device.value().device);
+  _device = device.value();
 
   auto queue = device.value().get_queue(vkb::QueueType::graphics);
   ASSERT(queue.has_value(), "Cannot create VkQueue", queue.error().message());
