@@ -48,7 +48,26 @@ mr::Image::Image(const VulkanState &state, Extent extent, vk::Format format,
     &_allocation,
     nullptr
   );
-  ASSERT(result == VK_SUCCESS, "Failed to create a vk::Image", result, extent.width, extent.height, (int)format);
+
+  if (result != VK_SUCCESS) {
+#ifndef NDEBUG
+    auto budgets = state.memory_budgets();
+    for (uint32_t heapIndex = 0; heapIndex < VK_MAX_MEMORY_HEAPS; heapIndex++) {
+      if (budgets[heapIndex].statistics.allocationCount == 0) continue;
+      MR_DEBUG("My heap currently has {} allocations taking {} B,",
+          budgets[heapIndex].statistics.allocationCount,
+          budgets[heapIndex].statistics.allocationBytes);
+      MR_DEBUG("allocated out of {} Vulkan device memory blocks taking {} B,",
+          budgets[heapIndex].statistics.blockCount,
+          budgets[heapIndex].statistics.blockBytes);
+      MR_DEBUG("Vulkan reports total usage {} B with budget {} B ({}%).",
+          budgets[heapIndex].usage,
+          budgets[heapIndex].budget,
+          budgets[heapIndex].usage / (float)budgets[heapIndex].budget);
+    }
+#endif
+    ASSERT(result == VK_SUCCESS, "Failed to create a vk::Image", result, extent.width, extent.height, (int)format);
+  }
 
   create_image_view();
 }
@@ -63,6 +82,7 @@ mr::Image::Image(const VulkanState &state, const mr::importer::ImageData &image,
 mr::Image::~Image() {
   if (_image != VK_NULL_HANDLE) {
     ASSERT(_state != nullptr);
+    _state->device().destroyImageView(_image_view);
     vmaDestroyImage(_state->allocator(), _image, _allocation);
     _image = VK_NULL_HANDLE;
   }
@@ -220,7 +240,7 @@ void mr::Image::create_image_view() {
     .subresourceRange = range
   };
 
-  _image_view = _state->device().createImageViewUnique(create_info).value;
+  _image_view = _state->device().createImageView(create_info).value;
 }
 
 vk::Format mr::Image::find_supported_format(
@@ -326,7 +346,7 @@ mr::SwapchainImage::SwapchainImage(
   _mip_level = 1;
   _aspect_flags = vk::ImageAspectFlagBits::eColor;
   _layout = vk::ImageLayout::eUndefined;
-  _image_view.reset(view);
+  _image_view = view;
 }
 
 mr::SwapchainImage::~SwapchainImage() {
@@ -365,7 +385,7 @@ mr::DepthImage::DepthImage(const VulkanState &state, Extent extent, uint mip_lev
 vk::RenderingAttachmentInfoKHR mr::DepthImage::attachment_info() const
 {
   return vk::RenderingAttachmentInfoKHR {
-    .imageView = _image_view.get(),
+    .imageView = _image_view,
     .imageLayout = _layout,
     .loadOp = vk::AttachmentLoadOp::eClear,
     .storeOp = vk::AttachmentStoreOp::eStore,
@@ -383,7 +403,7 @@ mr::ColorAttachmentImage::ColorAttachmentImage(const VulkanState &state, Extent 
 vk::RenderingAttachmentInfoKHR mr::ColorAttachmentImage::attachment_info() const
 {
   return vk::RenderingAttachmentInfoKHR {
-    .imageView = _image_view.get(),
+    .imageView = _image_view,
     .imageLayout = _layout,
     .loadOp = vk::AttachmentLoadOp::eClear,
     .storeOp = vk::AttachmentStoreOp::eStore,

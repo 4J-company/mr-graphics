@@ -72,7 +72,7 @@ inline namespace graphics {
 
       ~RenderContext();
 
-      void resize(Extent extent);
+      void resize(const Extent &extent);
 
       void render(const SceneHandle scene, Presenter &presenter);
 
@@ -81,6 +81,7 @@ inline namespace graphics {
       const Extent & extent() const noexcept { return _extent; }
       CommandUnit & transfer_command_unit() const noexcept { return _transfer_command_unit; }
 
+      WindowHandle create_window(const mr::Extent &extent) const noexcept;
       WindowHandle create_window() const noexcept;
       FileWriterHandle create_file_writer() const noexcept;
 
