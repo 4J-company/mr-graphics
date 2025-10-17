@@ -174,7 +174,7 @@ mr::DeviceBuffer & mr::DeviceBuffer::write(std::span<const std::byte> src)
 
   vk::BufferCopy buffer_copy {.size = src.size()};
 
-  static CommandUnit command_unit(*_state);
+  CommandUnit command_unit(*_state);
   command_unit.begin();
   command_unit->copyBuffer(buf.buffer(), _buffer, {buffer_copy});
   command_unit.end();

@@ -144,7 +144,16 @@ mr::VulkanState::VulkanState(VulkanGlobalState *state)
 
 mr::VulkanState::~VulkanState()
 {
-  _destroy_pipeline_cache();
+  if (_pipeline_cache) {
+    _destroy_pipeline_cache();
+    _pipeline_cache.reset();
+  }
+
+  if (_allocator) {
+    vmaDestroyAllocator(_allocator);
+    _allocator = VK_NULL_HANDLE;
+  }
+
   vkb::destroy_device(_device);
 }
 

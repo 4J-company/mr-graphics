@@ -15,21 +15,22 @@ mr::CommandUnit::CommandUnit(const VulkanState &state)
     .level = vk::CommandBufferLevel::ePrimary,
     .commandBufferCount = 1,
   };
-  state.device().allocateCommandBuffers(&cmd_buffer_alloc_info, &_cmd_buffer);
+  auto cmd_buffers = state.device().allocateCommandBuffersUnique(cmd_buffer_alloc_info).value;
+  _cmd_buffer = std::move(cmd_buffers[0]);
 }
 
 void mr::CommandUnit::begin()
 {
   clear_semaphores();
-  _cmd_buffer.reset();
+  _cmd_buffer->reset();
   vk::CommandBufferBeginInfo
     begin_info {}; /// .flags = 0, .pInheritanceInfo = nullptr, };
-  _cmd_buffer.begin(begin_info);
+  _cmd_buffer->begin(begin_info);
 }
 
 void mr::CommandUnit::end()
 {
-  _cmd_buffer.end();
+  _cmd_buffer->end();
 }
 
 vk::SubmitInfo mr::CommandUnit::submit_info() const noexcept {
@@ -39,7 +40,7 @@ vk::SubmitInfo mr::CommandUnit::submit_info() const noexcept {
     .pWaitSemaphores = wait_sems.data(),
     .pWaitDstStageMask = wait_stage_flags.data(),
     .commandBufferCount = 1,
-    .pCommandBuffers = &_cmd_buffer,
+    .pCommandBuffers = &_cmd_buffer.get(),
     .signalSemaphoreCount = static_cast<uint32_t>(_signal_sems.size()),
     .pSignalSemaphores = _signal_sems.data(),
   };
