@@ -2,18 +2,16 @@
 #include "scene/scene.hpp"
 #include "renderer/window/render_context.hpp"
 
-mr::graphics::DirectionalLight::DirectionalLight(const Scene &scene, const Norm3f &direction, const Vec3f &color)
+mr::graphics::DirectionalLight::DirectionalLight(Scene &scene, const Norm3f &direction, const Vec3f &color)
   : Light(scene, color, sizeof(ShaderUniformBuffer))
   , _direction(direction)
 {
-  auto set1_optional = descriptor_allocator().allocate_set(set_layout());
-  ASSERT(set1_optional.has_value());
-  _set1 = std::move(set1_optional.value());
+  _uniform_buffer_id = scene.render_context().bindless_set().register_resource(&_uniform_buffer);
+}
 
-  std::array light_shader_resources {
-    Shader::ResourceView(1, 0, &_uniform_buffer)
-  };
-  _set1.update(_scene->render_context().vulkan_state(), light_shader_resources);
+mr::graphics::DirectionalLight::~DirectionalLight() noexcept
+{
+  _scene->render_context().bindless_set().unregister_resource(&_uniform_buffer);
 }
 
 void mr::graphics::DirectionalLight::shade(CommandUnit &unit) const noexcept
@@ -21,22 +19,29 @@ void mr::graphics::DirectionalLight::shade(CommandUnit &unit) const noexcept
   if (not _enabled) {
     return;
   }
+  _update_ubo();
+
+  uint32_t push_data[] {
+    _scene->camera_buffer_id(),
+    _uniform_buffer_id,
+  };
+  unit->pushConstants(pipeline().layout(), vk::ShaderStageFlagBits::eAllGraphics,
+                      0, sizeof(push_data), push_data);
+
+  // ---------------------------------------------------------------------------------
+  // TODO(dk6): all code above can be called once for all directional lights per frame
+  // ---------------------------------------------------------------------------------
 
   // TODO(dk6): use pipeline.apply()
   unit->bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline().pipeline());
   // TODO(dk6): use set.bind()
   unit->bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
                            pipeline().layout(),
-                           0, {set0()}, {});
+                           0, {lights_descriptor_set()}, {});
 
-  // ---------------------------------------------------------------------------------
-  // TODO(dk6): all code above can be called once for all directional lights per frame
-  // ---------------------------------------------------------------------------------
-
-  _update_ubo();
   unit->bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
                            pipeline().layout(),
-                           1, {_set1}, {});
+                           1, {_scene->render_context().bindless_set()}, {});
 
   // TODO(dk6): use instansing here
   unit->drawIndexed(index_buffer().element_count(), 1, 0, 0, 0);

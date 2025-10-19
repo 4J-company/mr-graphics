@@ -1,6 +1,9 @@
 /**/
 #version 460
 
+// For uniforms array
+#extension GL_EXT_nonuniform_qualifier : enable
+
 layout(location = 0) out vec4 OutColor;
 
 layout(input_attachment_index = 0, set = 0, binding = 0) uniform subpassInput InPos;
@@ -9,20 +12,28 @@ layout(input_attachment_index = 2, set = 0, binding = 2) uniform subpassInput In
 layout(input_attachment_index = 3, set = 0, binding = 3) uniform subpassInput InEmissive;
 layout(input_attachment_index = 5, set = 0, binding = 5) uniform subpassInput InColorTrans;
 
-layout(set = 0, binding = 6) uniform CameraUbo {
+layout(push_constant) uniform Offsets {
+  uint camera_ubo_id;
+  uint light_ubo_id;
+};
+
+#define BINDLESS_SET 1
+
+layout(set = BINDLESS_SET, binding = UNIFORM_BUFFERS_BINDING) readonly uniform CameraUbo {
   mat4 vp;
   vec4 pos;
   float fov;
   float gamma;
   float speed;
   float sens;
-} cam_uniform_buffer;
+} CameraUboArray[];
+#define cam_uniform_buffer CameraUboArray[camera_ubo_id]
 
-layout(set = 1, binding = 0) uniform LightUbo {
+layout(set = BINDLESS_SET, binding = UNIFORM_BUFFERS_BINDING) readonly uniform LightUbo {
   vec4 direction;
   vec4 color;
-} light_uniform_buffer;
-
+} DirectionLightsUboArray[];
+#define light_uniform_buffer DirectionLightsUboArray[light_ubo_id]
 
 #include "gamma_correction.h"
 #include "tone_mapping.h"

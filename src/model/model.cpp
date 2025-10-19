@@ -129,9 +129,12 @@ void mr::graphics::Model::draw(CommandUnit &unit) const noexcept
 {
   ASSERT(_scene != nullptr, "Parent scene of the model is lost");
   for (const auto &[material, mesh] : std::views::zip(_materials, _meshes)) {
-    uint32_t offsets[2] {
+    uint32_t offsets[] {
       mesh._mesh_offset,
       mesh._instance_offset,
+      material->material_ubo_id(),
+      _scene->camera_buffer_id(),
+      _scene->transforms_buffer_id(),
     };
 
     vk::ConditionalRenderingBeginInfoEXT conditional_rendering_begin_info {
@@ -144,7 +147,8 @@ void mr::graphics::Model::draw(CommandUnit &unit) const noexcept
       conditional_rendering_begin_info
     );
     material->bind(unit);
-    unit->pushConstants(material->pipeline().layout(), vk::ShaderStageFlagBits::eVertex, 0, 8, offsets);
+    unit->pushConstants(material->pipeline().layout(), vk::ShaderStageFlagBits::eAllGraphics,
+                        0, sizeof(offsets), offsets);
     mesh.bind(unit);
     mesh.draw(unit);
     _scene->render_context().vulkan_state().dispatch_table().cmdEndConditionalRenderingEXT(unit.command_buffer());
