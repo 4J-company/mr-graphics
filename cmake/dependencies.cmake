@@ -8,6 +8,7 @@ include(${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake)
 
 # install libraries with no binaries available
 find_package(glfw3 REQUIRED)
+find_package(stb REQUIRED)
 find_package(mr-math REQUIRED)
 find_package(mr-utils REQUIRED)
 find_package(mr-manager REQUIRED)
@@ -38,7 +39,7 @@ set(DEPS_LIBRARIES
   GPUOpen::VulkanMemoryAllocator
   libvkfw
   vk-bootstrap-lib
-
+  stb::stb
   beman.inplace_vector
 
   mr-math::mr-math
