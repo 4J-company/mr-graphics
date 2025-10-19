@@ -106,9 +106,16 @@ void mr::RenderContext::init_bindless_rendering()
 }
 
 mr::RenderContext::~RenderContext() {
-  if (_state) {
-    _state->queue().waitIdle();
-  }
+  ASSERT(_state != nullptr);
+
+  _state->queue().waitIdle();
+
+  _image_available_semaphore.clear();
+  _render_finished_semaphore.clear();
+  _models_render_finished_semaphore.reset();
+  _image_fence.reset();
+
+  _gbuffers.clear();
 }
 
 mr::WindowHandle mr::RenderContext::create_window() const noexcept
