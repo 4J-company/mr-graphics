@@ -64,6 +64,7 @@ inline namespace graphics {
 
     LightsRenderData _lights_render_data;
 
+    // TODO(dk6): Maybe move to class scene
     // Bindless rednering data
     DescriptorAllocator _default_descriptor_allocator;
     BindlessDescriptorSetLayoutHandle _bindless_set_layout;
@@ -102,6 +103,8 @@ inline namespace graphics {
     DescriptorSetLayoutHandle bindless_set_layout() const noexcept { return _bindless_set_layout; }
     BindlessDescriptorSet & bindless_set() noexcept { return _bindless_set; }
     const BindlessDescriptorSet & bindless_set() const noexcept { return _bindless_set; }
+
+    const DescriptorAllocator & desciptor_allocator() const noexcept { return _default_descriptor_allocator; }
 
   private:
     void init_lights_render_data();

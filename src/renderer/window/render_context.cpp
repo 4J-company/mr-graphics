@@ -230,13 +230,23 @@ void mr::RenderContext::render_models(const SceneHandle scene)
   for (auto &[material, draw] : scene->_draws) {
     const GraphicsPipeline &pipeline = material->pipeline();
     _models_command_unit->bindPipeline(vk::PipelineBindPoint::eGraphics,  pipeline.pipeline());
+
+    std::array sets {_bindless_set.set(), draw.descriptor_set.set()};
     _models_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
                                              {pipeline.layout()},
                                              0, // TODO(dk6): give name for this magic number
-                                             {_bindless_set.set()},
+                                             sets,
                                              {});
 
-    for (const Mesh *mesh : draw.meshes) {
+    draw.commands_buffer.update();
+    // TODO(dk6): write to buffer only if it was updated in current frame
+    draw.meshes_render_info.write(std::span(draw.meshes_render_info_data));
+
+    for (auto [draw_number, mesh] : std::views::enumerate(draw.meshes)) {
+      // TODO(dk6): Make one big vertex buffer - if so, we can delete binding from cycle and only add draw command.
+      //            And cmdDraw will be called after cycle, once per pipelines (now material)
+      mesh->bind(_models_command_unit);
+
       vk::ConditionalRenderingBeginInfoEXT conditional_rendering_begin_info {
         .buffer = scene->_visibility.buffer(),
         .offset = mesh->_mesh_offset * sizeof(uint32_t),
@@ -247,34 +257,8 @@ void mr::RenderContext::render_models(const SceneHandle scene)
         conditional_rendering_begin_info
       );
 
-      uint32_t offsets[] {
-        mesh->_mesh_offset,
-        mesh->_instance_offset,
-        material->material_ubo_id(),
-        scene->camera_buffer_id(),
-        scene->transforms_buffer_id(),
-      };
-
-      // TODO(dk6): Think what we can do with push constants
-      _models_command_unit->pushConstants(material->pipeline().layout(), vk::ShaderStageFlagBits::eAllGraphics,
-                                          0, sizeof(offsets), offsets);
-
-      // TODO(dk6): Make one big vertex buffer - if so, we can delete binding from cycle and only add draw command.
-      //            And cmdDraw will be called after cycle, once per pipelines (now material)
-      mesh->bind(_models_command_unit);
-
-      draw.commands_buffer.clear();
-      draw.commands_buffer.add_command(vk::DrawIndexedIndirectCommand {
-        .indexCount = mesh->element_count(),
-        .instanceCount = mesh->num_of_instances(),
-        .firstIndex = 0,
-        .vertexOffset = 0,
-        .firstInstance = 0,
-      });
-      draw.commands_buffer.update();
       uint32_t stride = sizeof(vk::DrawIndexedIndirectCommand);
-      // maybe 3rd arg (drawCount) is not 1
-      _models_command_unit->drawIndexedIndirect(draw.commands_buffer.buffer(), 0, 1, stride);
+      _models_command_unit->drawIndexedIndirect(draw.commands_buffer.buffer(), draw_number, 1, stride);
 
       _state->dispatch_table().cmdEndConditionalRenderingEXT(_models_command_unit.command_buffer());
     }

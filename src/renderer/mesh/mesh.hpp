@@ -8,10 +8,21 @@ namespace mr {
 inline namespace graphics {
   class Model;
   class RenderContext;
+  class Scene;
 
   class Mesh {
     friend class Model;
     friend class RenderContext;
+    friend class Scene;
+
+  public:
+    struct RenderInfo {
+      uint32_t mesh_offset;
+      uint32_t instance_offset;
+      uint32_t material_ubo_id;
+      uint32_t camera_buffer_id;
+      uint32_t transforms_buffer_id;
+    };
 
   private:
     std::vector<VertexBuffer> _vbufs;

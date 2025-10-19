@@ -21,6 +21,15 @@ inline namespace graphics {
     struct MeshesWithSamePipeline {
       std::vector<const Mesh *> meshes;
       DrawIndirectBuffer commands_buffer;
+
+      // Instead have meshes data and descriptor set for each Pipeline we can use one set per Scene and one big
+      // buffer with render data and passed offset to meshes_render_info by push constants.
+      // But if so it will be difficult to update scene - for insert data we must move data in memory.
+      StorageBuffer meshes_render_info; // render data for each mesh
+      std::vector<Mesh::RenderInfo> meshes_render_info_data;
+      // It can be replaced on 'meshes_info_id' - register buffer with infos in bindless set and pass it to shader
+      // using push constants. But now i don't now which variant will be better.
+      DescriptorSet descriptor_set;
     };
 
   private:
@@ -49,6 +58,8 @@ inline namespace graphics {
 
     ConditionalBuffer _visibility; // u32 visibility mask for each draw call
     std::vector<uint32_t> _visibility_data;
+
+    DescriptorSetLayoutHandle _scene_descriptor_set_layout;
 
     mutable UniformBuffer _camera_uniform_buffer;
     mr::FPSCamera _camera;
@@ -96,6 +107,8 @@ inline namespace graphics {
 
     uint32_t transforms_buffer_id() const noexcept { return _transforms_buffer_id; }
     uint32_t camera_buffer_id() const noexcept { return _camera_buffer_id; }
+
+    DescriptorSetLayoutHandle scene_set_layout() const noexcept { return _scene_descriptor_set_layout; }
 
   private:
     void update_camera_buffer() noexcept;

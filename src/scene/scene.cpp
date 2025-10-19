@@ -1,5 +1,6 @@
 #include "scene/scene.hpp"
 #include "renderer/window/render_context.hpp"
+#include "manager/manager.hpp"
 
 mr::Scene::Scene(RenderContext &render_context)
   : _parent(&render_context)
@@ -15,6 +16,13 @@ mr::Scene::Scene(RenderContext &render_context)
 
   _camera_buffer_id = render_context.bindless_set().register_resource(&_camera_uniform_buffer);
   _transforms_buffer_id = render_context.bindless_set().register_resource(&_transforms);
+
+  using BindingDescription = DescriptorSetLayout::BindingDescription;
+  std::array bindings {
+    BindingDescription {0, vk::DescriptorType::eStorageBuffer},
+  };
+  _scene_descriptor_set_layout = ResourceManager<DescriptorSetLayout>::get().create("Scene descriptor set layout",
+    _parent->vulkan_state(), vk::ShaderStageFlagBits::eAllGraphics, bindings);
 }
 
 mr::Scene::~Scene()
@@ -51,9 +59,30 @@ mr::ModelHandle mr::Scene::create_model(std::string_view filename) noexcept
       auto &draw = _draws[material.get()];
       // TODO(dk6): Maybe max_scene_instances is too big number here
       draw.commands_buffer = DrawIndirectBuffer(_parent->vulkan_state(), max_scene_instances, true);
+      draw.meshes_render_info = StorageBuffer(_parent->vulkan_state(), sizeof(Mesh::RenderInfo) * max_scene_instances);
+      draw.descriptor_set = *ASSERT_VAL(_parent->desciptor_allocator().allocate_set(_scene_descriptor_set_layout));
+      std::array resources {
+        Shader::ResourceView(0, &draw.meshes_render_info),
+      };
+      draw.descriptor_set.update(_parent->vulkan_state(), resources);
     }
+
     auto &draw = _draws[material.get()];
     draw.meshes.emplace_back(&mesh);
+    draw.commands_buffer.add_command(vk::DrawIndexedIndirectCommand {
+      .indexCount = mesh.element_count(),
+      .instanceCount = mesh.num_of_instances(),
+      .firstIndex = 0,
+      .vertexOffset = 0,
+      .firstInstance = 0,
+    });
+    draw.meshes_render_info_data.emplace_back(Mesh::RenderInfo {
+      .mesh_offset = mesh._mesh_offset,
+      .instance_offset = mesh._instance_offset,
+      .material_ubo_id = material->material_ubo_id(),
+      .camera_buffer_id = _camera_buffer_id,
+      .transforms_buffer_id = _transforms_buffer_id,
+    });
   }
 
   return model_handle;
@@ -66,6 +95,9 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
   _transforms.write(std::span(_transforms_data));
   _bounds.write(std::span(_bounds_data));
   _visibility.write(std::span(_visibility_data));
+
+  for (auto &[material, draw] : _draws) {
+  }
 
   if (input_state_ref) {
     const auto &input_state = input_state_ref->get();

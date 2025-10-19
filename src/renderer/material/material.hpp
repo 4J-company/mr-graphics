@@ -40,7 +40,7 @@ inline namespace graphics {
 
     mr::GraphicsPipeline _pipeline;
 
-    RenderContext *_context = nullptr;
+    Scene *_scene = nullptr;
 
     // requires for deinitialization
     std::array<std::optional<mr::TextureHandle>, enum_cast(MaterialParameter::EnumSize)> _textures;
@@ -49,7 +49,7 @@ inline namespace graphics {
     uint32_t _uniform_buffer_id = -1;
 
   public:
-    Material(RenderContext &render_context,
+    Material(Scene &scene,
              mr::ShaderHandle shader,
              std::span<std::byte> ubo_data,
              std::span<std::optional<mr::TextureHandle>> textures,
@@ -69,8 +69,7 @@ inline namespace graphics {
   private:
     static inline constexpr int max_attached_buffers = 16;
 
-    const mr::VulkanState *_state {};
-    mr::RenderContext *_context {};
+    Scene *_scene {};
 
     std::vector<std::byte> _specialization_data;
     boost::unordered_map<std::string, std::string> _defines;
@@ -83,9 +82,7 @@ inline namespace graphics {
     std::string_view _shader_filename;
 
   public:
-    MaterialBuilder(const mr::VulkanState &state,
-                    mr::RenderContext &context,
-                    std::string_view filename);
+    MaterialBuilder(Scene &scene, std::string_view filename);
 
     MaterialBuilder(MaterialBuilder &&) noexcept = default;
     MaterialBuilder & operator=(MaterialBuilder &&) noexcept = default;

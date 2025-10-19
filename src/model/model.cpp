@@ -101,11 +101,7 @@ mr::graphics::Model::Model(
         instance_offset
       );
 
-      mr::MaterialBuilder builder {
-        scene.render_context().vulkan_state(),
-        scene.render_context(),
-        "default"
-      };
+      mr::MaterialBuilder builder(scene, "default");
 
       builder.add_camera(scene.camera_uniform_buffer());
       builder.add_value(&material.constants);
