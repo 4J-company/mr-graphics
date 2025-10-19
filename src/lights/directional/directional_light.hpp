@@ -17,10 +17,12 @@ inline namespace graphics {
   private:
     Norm3f _direction = Norm3f(1, 1, 1);
 
+    uint32_t _uniform_buffer_id = -1;
+
   public:
-    DirectionalLight(const Scene &scene,
+    DirectionalLight(Scene &scene,
                      const Norm3f &direction = Norm3f(1, 1, 1), const Vec3f &color = Vec3f(1.0));
-    ~DirectionalLight() = default;
+    ~DirectionalLight() noexcept;
 
     DirectionalLight & operator=(DirectionalLight &&) noexcept = default;
     DirectionalLight(DirectionalLight &&) noexcept = default;

@@ -26,8 +26,7 @@ inline namespace graphics {
     public:
       GraphicsPipeline() = default;
 
-      GraphicsPipeline(const VulkanState &state,
-                       const RenderContext &render_context,
+      GraphicsPipeline(const RenderContext &render_context,
                        Subpass subpass,
                        mr::ShaderHandle shader,
                        std::span<const vk::VertexInputAttributeDescription> attributes,

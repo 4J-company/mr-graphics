@@ -4,6 +4,8 @@
 
 #include "resources/buffer/buffer.hpp"
 
+#include "window/render_context.hpp"
+
 // constructor
 mr::Buffer::Buffer(const VulkanState &state, size_t byte_size,
                    vk::BufferUsageFlags usage_flags,
@@ -186,4 +188,23 @@ mr::DeviceBuffer & mr::DeviceBuffer::write(std::span<const std::byte> src)
   _state->device().waitForFences({fence.get()}, VK_TRUE, UINT64_MAX);
 
   return *this;
+}
+
+// ----------------------------------------------------------------------------
+// Uniform buffer
+// ----------------------------------------------------------------------------
+
+mr::UniformBuffer::UniformBuffer(const VulkanState &state, size_t size)
+  : HostBuffer(state, size, vk::BufferUsageFlagBits::eUniformBuffer)
+{
+}
+
+// ----------------------------------------------------------------------------
+// Storage buffer
+// ----------------------------------------------------------------------------
+
+mr::StorageBuffer::StorageBuffer(const VulkanState &state, size_t byte_size)
+  : DeviceBuffer(state, byte_size,
+                 vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst)
+{
 }

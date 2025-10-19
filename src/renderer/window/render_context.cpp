@@ -19,17 +19,19 @@ mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent)
   , _extent(extent)
   , _depthbuffer(*_state, _extent)
   , _image_fence (_state->device().createFenceUnique({.flags = vk::FenceCreateFlagBits::eSignaled}).value)
+  , _default_descriptor_allocator(*_state)
 {
   for (auto _ : std::views::iota(0, gbuffers_number)) {
     _gbuffers.emplace_back(*_state, _extent, vk::Format::eR32G32B32A32Sfloat);
   }
   _models_render_finished_semaphore = _state->device().createSemaphoreUnique({}).value;
 
-  _init_lights_render_data();
+  init_bindless_rendering();
+  init_lights_render_data();
 }
 
 // TODO(dk6): maybe create lights_render_data.cpp file and move this function?
-void mr::RenderContext::_init_lights_render_data() {
+void mr::RenderContext::init_lights_render_data() {
   const std::vector<float> light_vertexes {-1, -1, 1, -1, 1, 1, -1, 1};
   const std::vector light_indexes {0, 1, 2, 2, 3, 0};
 
@@ -43,51 +45,64 @@ void mr::RenderContext::_init_lights_render_data() {
     .offset = 0
   };
 
-  // Set 0 is shared for all lights type
-  std::array<Shader::ResourceView, gbuffers_number + 1> shader_resources;
-  for (int i = 0; i < gbuffers_number; i++) {
-    shader_resources[i] = Shader::ResourceView(0, i, &_gbuffers[i]);
+  std::array<DescriptorSetLayout::BindingDescription, gbuffers_number> bindings;
+  for (uint32_t i = 0; i < gbuffers_number; i++) {
+    bindings[i] = {i, vk::DescriptorType::eInputAttachment};
   }
-  // just for pipeline layout
-  shader_resources.back() = Shader::ResourceView(0, 6, static_cast<UniformBuffer *>(nullptr));
 
-  _lights_render_data.set0_layout = ResourceManager<DescriptorSetLayout>::get().create(mr::unnamed,
-    *_state, vk::ShaderStageFlagBits::eFragment, shader_resources);
-  _lights_render_data.set0_descriptor_allocator = DescriptorAllocator(*_state);
+  _lights_render_data.lights_set_layout = ResourceManager<DescriptorSetLayout>::get().create(mr::unnamed,
+    *_state, vk::ShaderStageFlagBits::eFragment, bindings);
 
-  auto set0_optional = _lights_render_data.set0_descriptor_allocator.value()
-    .allocate_set(_lights_render_data.set0_layout);
-  ASSERT(set0_optional.has_value());
-  _lights_render_data.set0_set = std::move(set0_optional.value());
+  auto light_set = _default_descriptor_allocator.allocate_set(_lights_render_data.lights_set_layout);
+  ASSERT(light_set.has_value());
+  _lights_render_data.lights_descriptor_set = std::move(light_set.value());
 
-  _lights_render_data.set0_set.update(*_state, std::span(shader_resources.data(), gbuffers_number));
+  // Set 0 is shared for all lights type
+  std::array<Shader::ResourceView, gbuffers_number> shader_resources;
+  for (int i = 0; i < gbuffers_number; i++) {
+    shader_resources[i] = Shader::ResourceView(i, &_gbuffers[i]);
+  }
 
-  auto light_type_data = std::views::zip(LightsRenderData::shader_names,
-                                         LightsRenderData::shader_resources_descriptions);
-  for (const auto &[shader_name, light_shader_resources] : light_type_data) {
+  _lights_render_data.lights_descriptor_set.update(*_state, std::span(shader_resources.data(), gbuffers_number));
+
+  std::unordered_map<std::string, std::string> defines {
+    {"TEXTURES_BINDING",        std::to_string(textures_binding)},
+    {"UNIFORM_BUFFERS_BINDING", std::to_string(uniform_buffer_binding)},
+    {"STORAGE_BUFFERS_BINDING", std::to_string(storage_buffer_binding)},
+  };
+
+  for (const auto &shader_name : LightsRenderData::shader_names) {
     std::string shader_name_str = {shader_name.begin(), shader_name.end()};
-    auto shader = ResourceManager<Shader>::get().create(shader_name_str, *_state, shader_name);
+    auto shader = ResourceManager<Shader>::get().create(shader_name_str, *_state, shader_name, defines);
     _lights_render_data.shaders.emplace_back(shader);
 
-    auto layout_handle = ResourceManager<DescriptorSetLayout>::get().create(mr::unnamed,
-      *_state, vk::ShaderStageFlagBits::eFragment, light_shader_resources);
-    _lights_render_data.set1_layouts.emplace_back(layout_handle);
-
-    std::array set_layouts { _lights_render_data.set0_layout, layout_handle };
+    std::array set_layouts {
+      _lights_render_data.lights_set_layout,
+      DescriptorSetLayoutHandle(_bindless_set_layout),
+    };
 
     // TODO(dk6): here move instead inplace contruct, because without move this doesn't compile
-    _lights_render_data.pipelines.emplace_back(GraphicsPipeline(*_state, *this,
+    _lights_render_data.pipelines.emplace_back(GraphicsPipeline(*this,
       GraphicsPipeline::Subpass::OpaqueLighting, shader,
       {&light_descr, 1}, set_layouts));
-
-    _lights_render_data.set1_descriptor_allocators.emplace_back(*_state);
   }
 }
 
-void mr::RenderContext::_update_camera_buffer(UniformBuffer &uniform_buffer)
+void mr::RenderContext::init_bindless_rendering()
 {
-  std::array camera_buffer_resource {Shader::ResourceView(0, 6, &uniform_buffer)};
-  _lights_render_data.set0_set.update(*_state, camera_buffer_resource);
+  using BindingT = DescriptorSetLayout::BindingDescription;
+  std::array bindings {
+    BindingT {0, vk::DescriptorType::eCombinedImageSampler},
+    BindingT {1, vk::DescriptorType::eUniformBuffer},
+    BindingT {2, vk::DescriptorType::eStorageBuffer},
+  };
+
+  _bindless_set_layout = ResourceManager<BindlessDescriptorSetLayout>::get().create("BindlessSetLayout",
+    *_state, vk::ShaderStageFlagBits::eAllGraphics, bindings);
+
+  auto set = _default_descriptor_allocator.allocate_bindless_set(_bindless_set_layout);
+  ASSERT(set.has_value(), "Failed to allocate bindless descriptor set");
+  _bindless_set = std::move(set.value());
 }
 
 mr::RenderContext::~RenderContext() {
@@ -111,12 +126,12 @@ mr::FileWriterHandle mr::RenderContext::create_file_writer() const noexcept
   return ResourceManager<FileWriter>::get().create(mr::unnamed, *this, _extent);
 }
 
-mr::SceneHandle mr::RenderContext::create_scene() const noexcept
+mr::SceneHandle mr::RenderContext::create_scene() noexcept
 {
   return ResourceManager<Scene>::get().create(mr::unnamed, *this);
 }
 
-void mr::RenderContext::_render_lights(const SceneHandle scene, Presenter &presenter)
+void mr::RenderContext::render_lights(const SceneHandle scene, Presenter &presenter)
 {
   for (auto &gbuf : _gbuffers) {
     gbuf.switch_layout(vk::ImageLayout::eShaderReadOnlyOptimal);
@@ -165,7 +180,7 @@ void mr::RenderContext::_render_lights(const SceneHandle scene, Presenter &prese
   _lights_command_unit->endRendering();
 }
 
-void mr::RenderContext::_render_models(const SceneHandle scene)
+void mr::RenderContext::render_models(const SceneHandle scene)
 {
   for (auto &gbuf : _gbuffers) {
     gbuf.switch_layout(vk::ImageLayout::eColorAttachmentOptimal);
@@ -212,7 +227,6 @@ void mr::RenderContext::_render_models(const SceneHandle scene)
   _models_command_unit->endRendering();
 }
 
-
 void mr::RenderContext::resize(const mr::Extent &extent)
 {
   _extent = extent;
@@ -234,10 +248,8 @@ void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
   // Model rendering pass
   // --------------------------------------------------------------------------
 
-  _update_camera_buffer(scene->_camera_uniform_buffer);
-
   _models_command_unit.begin();
-  _render_models(scene);
+  render_models(scene);
 
   _models_command_unit.add_signal_semaphore(_models_render_finished_semaphore.get());
   _models_command_unit.end();
@@ -250,7 +262,7 @@ void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
   // --------------------------------------------------------------------------
 
   _lights_command_unit.begin();
-  _render_lights(scene, presenter);
+  render_lights(scene, presenter);
 
   _lights_command_unit.add_wait_semaphore(_models_render_finished_semaphore.get(),
                                    vk::PipelineStageFlagBits::eColorAttachmentOutput);

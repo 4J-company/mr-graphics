@@ -15,34 +15,41 @@ layout(location = 3) out vec4 metallic_roughness;
 layout(location = 4) out vec4 emissive;
 layout(location = 5) out vec4 occlusion;
 
-layout(set = 0, binding = 0) readonly uniform CameraUbo {
+#include "pbr_params.h"
+
+layout(push_constant) uniform Offsets {
+  int mesh_offset;
+  int instance_offset;
+  uint material_ubo_id;
+  uint camera_ubo_id;
+  uint transform_ssbo_id;
+};
+
+layout(set = BINDLESS_SET, binding = UNIFORM_BUFFERS_BINDING) readonly uniform CameraUbo {
   mat4 vp;
   vec4 pos;
   float fov;
   float gamma;
   float speed;
   float sens;
-} cam_ubo;
+} CameraUboArray[];
+#define cam_ubo CameraUboArray[camera_ubo_id]
 
-layout(set = 0, binding = 7) readonly buffer Transforms {
+layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer Transforms {
   mat4 transforms[];
-};
-
-layout(push_constant) uniform Offsets {
-  int mesh_offset;
-  int instance_offset;
-};
-
-#include "pbr_params.h"
+} SSBOArray[];
+#define transforms SSBOArray[transform_ssbo_id].transforms
 
 void main()
 {
+  // TODO(dk6): move readings from texture to fragment shader, because these readings can be useless if fragment isn't on screen
   vec2 tex_coord = InTexCoord.xy;
-  vec4 base_color = get_base_color(tex_coord);
-  vec4 metallic_roughness_color = get_metallic_roughness_color(tex_coord);
-  vec4 emissive_color = get_emissive_color(tex_coord);
-  vec4 occlusion_color = get_occlusion_color(tex_coord);
-  vec4 normal_color = get_normal_color(tex_coord);
+  uint mat_id = material_ubo_id;
+  vec4 base_color = get_base_color(mat_id, tex_coord);
+  vec4 metallic_roughness_color = get_metallic_roughness_color(mat_id, tex_coord);
+  vec4 emissive_color = get_emissive_color(mat_id, tex_coord);
+  vec4 occlusion_color = get_occlusion_color(mat_id, tex_coord);
+  vec4 normal_color = get_normal_color(mat_id, tex_coord);
 
   mat4 transform = transpose(transforms[instance_offset + gl_InstanceIndex]);
 

@@ -10,9 +10,9 @@ inline namespace graphics {
   class Pipeline {
     private:
     static inline constexpr vk::PushConstantRange _push_constant_range {
-      .stageFlags = vk::ShaderStageFlagBits::eVertex,
+      .stageFlags = vk::ShaderStageFlagBits::eAllGraphics,
       .offset = 0,
-      .size = sizeof(uint32_t) * 2
+      .size = sizeof(uint32_t) * 5
     };
 
     protected:

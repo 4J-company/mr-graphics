@@ -41,7 +41,6 @@ inline namespace graphics {
       };
 
       struct ResourceView {
-        uint32_t set;
         uint32_t binding;
         Resource res;
 

@@ -142,15 +142,12 @@ inline namespace graphics {
   };
 
   class UniformBuffer : public HostBuffer {
-    public:
-      UniformBuffer(const VulkanState &state, size_t size)
-          : HostBuffer(state, size, vk::BufferUsageFlagBits::eUniformBuffer)
-      {
-      }
+  public:
+    UniformBuffer(const VulkanState &state, size_t size);
 
     template <typename T, size_t Extent>
     UniformBuffer(const VulkanState &state, std::span<T, Extent> src)
-        : UniformBuffer(state, src.size() * sizeof(T))
+      : UniformBuffer(state, src.size() * sizeof(T))
     {
       ASSERT(src.data());
       write(src);
@@ -158,23 +155,18 @@ inline namespace graphics {
   };
 
   class StorageBuffer : public DeviceBuffer {
-    public:
-      using DeviceBuffer::DeviceBuffer;
+  public:
+    using DeviceBuffer::DeviceBuffer;
 
-      StorageBuffer(const VulkanState &state, size_t byte_size)
-          : DeviceBuffer(state, byte_size,
-                         vk::BufferUsageFlagBits::eStorageBuffer |
-                           vk::BufferUsageFlagBits::eTransferDst)
-      {
-      }
+    StorageBuffer(const VulkanState &state, size_t byte_size);
 
-      template <typename T, size_t Extent>
-      StorageBuffer(const VulkanState &state, std::span<T, Extent> src)
-          : StorageBuffer(state, src.size() * sizeof(T))
-      {
-        assert(src.data());
-        write(src);
-      }
+    template <typename T, size_t Extent>
+    StorageBuffer(const VulkanState &state, std::span<T, Extent> src)
+        : StorageBuffer(state, src.size() * sizeof(T))
+    {
+      assert(src.data());
+      write(src);
+    }
   };
 
   class VertexBuffer : public DeviceBuffer {

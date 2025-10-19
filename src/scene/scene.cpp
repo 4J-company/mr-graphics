@@ -1,7 +1,7 @@
 #include "scene/scene.hpp"
 #include "renderer/window/render_context.hpp"
 
-mr::Scene::Scene(const RenderContext &render_context)
+mr::Scene::Scene(RenderContext &render_context)
   : _parent(&render_context)
   , _camera_uniform_buffer(_parent->vulkan_state(), sizeof(ShaderCameraData))
   , _transforms(_parent->vulkan_state(), max_scene_instances * sizeof(mr::Matr4f))
@@ -9,6 +9,25 @@ mr::Scene::Scene(const RenderContext &render_context)
   , _visibility(_parent->vulkan_state(), max_scene_instances * sizeof(uint32_t))
 {
   ASSERT(_parent != nullptr);
+
+  _camera.cam() = mr::math::Camera<float>({1}, {-1}, {0, 1, 0});
+  _camera.cam().projection() = mr::math::Camera<float>::Projection(45_deg);
+
+  _camera_buffer_id = render_context.bindless_set().register_resource(&_camera_uniform_buffer);
+  _transforms_buffer_id = render_context.bindless_set().register_resource(&_transforms);
+}
+
+mr::Scene::~Scene()
+{
+  // TODO(dk6): Now this is segfault - RenderContext here has already destoryed - Scene class creating by RenderContext
+  //            using Managers, RenderContext creating as std::shared_ptr by Application.
+  //            So in end of main function RenderContext instance will be deleted, but Scene instances will be deleted
+  //            only after main in end of c++ program when static resources destructors calls.
+  //            For fix it RenderContext must store all Scene instances and in destructor delete it from Manager,
+  //            but now Manager doesn't support it. Maybe we can add as tmp solution Scene
+  //            method 'notify_render_context_deleted` and use it as destuctor and move Scene in "disabeld" state
+  _parent->bindless_set().unregister_resource(&_camera_uniform_buffer);
+  _parent->bindless_set().unregister_resource(&_transforms);
 }
 
 mr::DirectionalLightHandle mr::Scene::create_directional_light(const Norm3f &direction, const Vec3f &color) noexcept
@@ -34,12 +53,12 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
 {
   ASSERT(_parent != nullptr);
 
+  _transforms.write(std::span(_transforms_data));
+  _bounds.write(std::span(_bounds_data));
+  _visibility.write(std::span(_visibility_data));
+
   if (input_state_ref) {
     const auto &input_state = input_state_ref->get();
-
-    _transforms.write(std::span(_transforms_data));
-    _bounds.write(std::span(_bounds_data));
-    _visibility.write(std::span(_visibility_data));
 
     mr::Vec3f angular_delta {
       input_state.mouse_pos_delta().x() / _parent->extent().width,
@@ -82,14 +101,11 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
     }
   }
 
-  _update_camera_buffer();
+  update_camera_buffer();
 }
 
-void mr::Scene::_update_camera_buffer() noexcept
+void mr::Scene::update_camera_buffer() noexcept
 {
-  // _camera.cam() = mr::math::Camera<float>({1}, {-1}, {0, 1, 0});
-  // _camera.cam().projection() = mr::math::Camera<float>::Projection(45_deg);
-
   mr::ShaderCameraData cam_data {
     .vp = _camera.viewproj(),
     .campos = _camera.cam().position(),
@@ -100,5 +116,4 @@ void mr::Scene::_update_camera_buffer() noexcept
   };
 
   _camera_uniform_buffer.write(std::span<mr::ShaderCameraData> {&cam_data, 1});
-
 }

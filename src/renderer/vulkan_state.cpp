@@ -93,6 +93,11 @@ void mr::VulkanGlobalState::_create_phys_device()
 
   vk::PhysicalDeviceVulkan12Features features12{
     .descriptorIndexing = true,
+    .descriptorBindingUniformBufferUpdateAfterBind = true,
+    .descriptorBindingSampledImageUpdateAfterBind = true,
+    .descriptorBindingStorageBufferUpdateAfterBind = true,
+    .descriptorBindingPartiallyBound = true,
+    .runtimeDescriptorArray = true,
     .bufferDeviceAddress = true,
   };
 
