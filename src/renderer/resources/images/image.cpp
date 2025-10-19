@@ -82,10 +82,11 @@ mr::Image::Image(const VulkanState &state, const mr::importer::ImageData &image,
 mr::Image::~Image() {
   if (_image != VK_NULL_HANDLE) {
     ASSERT(_state != nullptr);
-    _state->device().destroyImageView(_image_view);
     vmaDestroyImage(_state->allocator(), _image, _allocation);
     _image = VK_NULL_HANDLE;
   }
+  ASSERT(_state != nullptr);
+  _state->device().destroyImageView(_image_view);
 }
 
 void mr::Image::switch_layout(vk::ImageLayout new_layout) {
@@ -170,7 +171,7 @@ void mr::Image::switch_layout(vk::ImageLayout new_layout) {
     break;
   }
 
-  static CommandUnit command_unit(*_state);
+  CommandUnit command_unit(*_state);
   command_unit.begin();
   command_unit->pipelineBarrier(
     source_stage, destination_stage, {}, {}, {}, {barrier});
@@ -208,7 +209,7 @@ void mr::Image::write(std::span<const std::byte> src) {
   };
 
   // TODO: delete static
-  static CommandUnit command_unit(*_state);
+  CommandUnit command_unit(*_state);
   command_unit.begin();
   command_unit->copyBufferToImage(stage_buffer.buffer(), _image, _layout, {region});
   command_unit.end();

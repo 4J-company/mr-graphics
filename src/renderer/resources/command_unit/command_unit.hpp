@@ -12,7 +12,7 @@ inline namespace graphics {
       constexpr static size_t max_semaphores_number = 10;
 
       vk::UniqueCommandPool _cmd_pool;
-      vk::CommandBuffer _cmd_buffer;
+      vk::UniqueCommandBuffer _cmd_buffer;
 
       std::pair<
         InplaceVector<vk::Semaphore, max_semaphores_number>,
@@ -35,8 +35,8 @@ inline namespace graphics {
       void add_wait_semaphore(vk::Semaphore sem, vk::PipelineStageFlags stage_flags) noexcept;
       void add_signal_semaphore(vk::Semaphore sem) noexcept;
 
-      vk::CommandBuffer command_buffer() { return _cmd_buffer; }
-      vk::CommandBuffer * operator->() { return &_cmd_buffer; }
+      vk::CommandBuffer command_buffer() { return _cmd_buffer.get(); }
+      vk::CommandBuffer * operator->() { return &_cmd_buffer.get(); }
   };
 }
 } // namespace mr
