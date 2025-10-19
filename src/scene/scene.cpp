@@ -46,6 +46,16 @@ mr::ModelHandle mr::Scene::create_model(std::string_view filename) noexcept
   auto model_handle = ResourceManager<Model>::get().create(mr::unnamed, *this, filename);
 
   _models.push_back(model_handle);
+  for (const auto &[material, mesh] : model_handle->draws()) {
+    if (not _draws.contains(material.get())) {
+      auto &draw = _draws[material.get()];
+      // TODO(dk6): Maybe max_scene_instances is too big number here
+      draw.commands_buffer = DrawIndirectBuffer(_parent->vulkan_state(), max_scene_instances, true);
+    }
+    auto &draw = _draws[material.get()];
+    draw.meshes.emplace_back(&mesh);
+  }
+
   return model_handle;
 }
 

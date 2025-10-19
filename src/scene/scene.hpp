@@ -18,6 +18,12 @@ inline namespace graphics {
     friend class Model;
 
   private:
+    struct MeshesWithSamePipeline {
+      std::vector<const Mesh *> meshes;
+      DrawIndirectBuffer commands_buffer;
+    };
+
+  private:
     static inline constexpr int max_scene_instances = 64000;
 
   private:
@@ -30,6 +36,9 @@ inline namespace graphics {
     > _lights;
 
     SmallVector<ModelHandle> _models;
+    // TODO(dk6): Move of Material change pointer, but now we use materials only from Manager so it is not a problem
+    // TODO(dk6): Maybe changes key type from Material to GraphicsPipelines - but now between these class 1:1 relation
+    std::unordered_map<const Material *, MeshesWithSamePipeline> _draws;
 
     StorageBuffer _transforms; // transform matrix    for each instance
     std::vector<mr::Matr4f> _transforms_data;
@@ -63,6 +72,7 @@ inline namespace graphics {
 
     void remove(ModelHandle model)
     {
+      // TODO(dk6): Also we must delete from _draws array...
       _models.erase(std::ranges::find(_models, model));
       MR_WARNING(
         "mr::Scene::remove(ModelHandle) wastes 84 bytes on CPU."

@@ -208,3 +208,45 @@ mr::StorageBuffer::StorageBuffer(const VulkanState &state, size_t byte_size)
                  vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst)
 {
 }
+
+// ----------------------------------------------------------------------------
+// Draw inderect buffer
+// ----------------------------------------------------------------------------
+
+mr::DrawIndirectBuffer::DrawIndirectBuffer(const VulkanState &state, uint32_t max_draws_count, bool fill_from_cpu)
+  : DeviceBuffer(state, sizeof(vk::DrawIndexedIndirectCommand) * max_draws_count,
+                 vk::BufferUsageFlagBits::eStorageBuffer |
+                 vk::BufferUsageFlagBits::eTransferDst |
+                 vk::BufferUsageFlagBits::eIndirectBuffer)
+  , _max_draws_count(max_draws_count)
+  , _fill_from_cpu(fill_from_cpu)
+{
+  if (_fill_from_cpu) {
+    _draws.reserve(max_draws_count);
+  }
+}
+
+void mr::DrawIndirectBuffer::add_command(const vk::DrawIndexedIndirectCommand &command) noexcept
+{
+  ASSERT(_fill_from_cpu, "add_commmand method is only for indirect buffer which can be filled from cpu");
+  ASSERT(_draws.size() <= _max_draws_count,
+         "not enough space for indirect command storing, increase size of indirect buffer");
+  _draws.emplace_back(command);
+  _updated = false;
+}
+
+void mr::DrawIndirectBuffer::clear() noexcept
+{
+  ASSERT(_fill_from_cpu, "clear method is only for indirect buffer which can be filled from cpu");
+  _draws.clear();
+  _updated = false;
+}
+
+void mr::DrawIndirectBuffer::update() noexcept
+{
+  ASSERT(_fill_from_cpu, "update method is only for indirect buffer which can be filled from cpu");
+  if (not _updated) {
+    write(std::span(_draws));
+    _updated = true;
+  }
+}

@@ -239,6 +239,30 @@ inline namespace graphics {
     std::size_t   element_count() const noexcept { return _element_count; }
     vk::IndexType index_type() const noexcept { return _index_type; }
   };
+
+  class DrawIndirectBuffer : public DeviceBuffer {
+  private:
+    uint32_t _max_draws_count;
+
+    // TODO(dk6): Maybe it can be unneccessary in future
+    bool _fill_from_cpu = false;
+    // TODO(dk6): make it threadsafe
+    bool _updated = true;
+    std::vector<vk::DrawIndexedIndirectCommand> _draws;
+
+  public:
+    DrawIndirectBuffer() = default;
+
+    DrawIndirectBuffer(const VulkanState &state, uint32_t max_draws_count, bool fill_from_cpu = true);
+
+    DrawIndirectBuffer(DrawIndirectBuffer &&) noexcept = default;
+    DrawIndirectBuffer & operator=(DrawIndirectBuffer &&) noexcept = default;
+
+    void add_command(const vk::DrawIndexedIndirectCommand &command) noexcept;
+    void clear() noexcept;
+    void update() noexcept;
+  };
+
 }
 } // namespace mr
 

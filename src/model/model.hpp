@@ -33,7 +33,10 @@ inline namespace graphics {
       Model(Model &&other) noexcept = default;
       Model &operator=(Model &&other) noexcept = default;
 
-      void draw(CommandUnit &unit) const noexcept;
+      const std::vector<mr::graphics::Mesh> & meshes() const noexcept { return _meshes; }
+      const std::vector<mr::graphics::MaterialHandle> & materials() const noexcept { return _materials; }
+      // First material handle, second mesh reference
+      auto draws() const noexcept { return std::views::zip(_materials, _meshes); }
   };
 
   MR_DECLARE_HANDLE(Model);

@@ -70,16 +70,6 @@ mr::graphics::Material::~Material()
   _context->bindless_set().unregister_resource(&_ubo);
 }
 
-void mr::Material::bind(CommandUnit &unit) const noexcept
-{
-  unit->bindPipeline(vk::PipelineBindPoint::eGraphics, _pipeline.pipeline());
-  unit->bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                           {_pipeline.layout()},
-                           0,
-                           {_context->bindless_set().set()}, // here must be descriptor set
-                           {});
-}
-
 // ----------------------------------------------------------------------------
 // Material Builder
 // ----------------------------------------------------------------------------

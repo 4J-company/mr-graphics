@@ -13,3 +13,18 @@ mr::graphics::Mesh::Mesh(
   , _instance_offset(instance_offset)
 {
 }
+
+void mr::graphics::Mesh::bind(mr::CommandUnit &unit) const noexcept
+{
+  static std::array<vk::Buffer, 16> vbufs {};
+  static std::array<vk::DeviceSize, 16> offsets {};
+
+  for (int i = 0; i < _vbufs.size(); i++) {
+    vbufs[i] = _vbufs[i].buffer();
+  }
+
+  unit->bindVertexBuffers(0,
+      std::span{vbufs.data(), _vbufs.size()},
+      std::span{offsets.data(), _vbufs.size()});
+  unit->bindIndexBuffer(_ibufs[0].buffer(), 0, _ibufs[0].index_type());
+}
