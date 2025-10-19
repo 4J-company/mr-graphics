@@ -240,9 +240,9 @@ std::optional<vk::UniqueDescriptorPool> mr::DescriptorAllocator::allocate_pool(
 {
   // Create descriptor pool
   vk::DescriptorPoolCreateInfo pool_create_info {
-    .flags = bindless
-      ? vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind
-      : vk::DescriptorPoolCreateFlags {},
+    .flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet
+           | (bindless ? vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind
+                       : vk::DescriptorPoolCreateFlags {}),
     .maxSets = 100, // TODO(dk6): This is must bw reworked
     .poolSizeCount = (uint32_t)sizes.size(),
     .pPoolSizes = sizes.data(),
