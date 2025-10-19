@@ -2,13 +2,12 @@
 #include "resources/pipelines/graphics_pipeline.hpp"
 #include "renderer/window/render_context.hpp"
 
-mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state,
-                                       const RenderContext &render_context,
+mr::GraphicsPipeline::GraphicsPipeline(const RenderContext &render_context,
                                        Subpass subpass,
                                        mr::ShaderHandle shader,
                                        std::span<const vk::VertexInputAttributeDescription> attributes,
                                        std::span<const DescriptorSetLayoutHandle> descriptor_layouts)
-  : Pipeline(state, shader, descriptor_layouts), _subpass(subpass)
+  : Pipeline(render_context.vulkan_state(), shader, descriptor_layouts), _subpass(subpass)
 {
   // dynamic states of pipeline (viewport)
   _dynamic_states.push_back(vk::DynamicState::eViewport);
@@ -84,6 +83,7 @@ mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state,
   std::array<vk::Format, RenderContext::gbuffers_number> color_attachments_formats;
   uint32_t color_attacmhents_cnt = 0;
 
+  auto &state = render_context.vulkan_state();
   switch (subpass) {
     case Subpass::OpaqueGeometry:
       color_attacmhents_cnt = RenderContext::gbuffers_number;
@@ -162,9 +162,7 @@ mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state,
     pipiline_rendering_create_info,
   };
 
-  _pipeline = std::move(state.device()
-                          .createGraphicsPipelinesUnique(state.pipeline_cache(), chain.get())
-                          .value[0]);
+  _pipeline = std::move(state.device().createGraphicsPipelinesUnique(state.pipeline_cache(), chain.get()).value.front());
 }
 
 void mr::GraphicsPipeline::apply(vk::CommandBuffer cmd_buffer) const

@@ -34,27 +34,34 @@ inline namespace graphics {
   }
 
   class Material : public ResourceBase<Material> {
-  public:
-    Material(const VulkanState &state,
-             const RenderContext &render_context,
-             mr::ShaderHandle shader,
-             std::span<std::byte> ubo_data,
-             std::span<std::optional<mr::TextureHandle>> textures,
-             std::span<mr::StorageBuffer*> storage_buffers,
-             std::span<mr::ConditionalBuffer*> conditional_buffers,
-             mr::UniformBuffer &cam_ubo) noexcept;
-
-    void bind(CommandUnit &unit) const noexcept;
-
-    const mr::GraphicsPipeline & pipeline() const noexcept { return _pipeline; }
-
   private:
     mr::UniformBuffer _ubo;
     mr::ShaderHandle _shader;
 
-    mr::DescriptorAllocator _descriptor_allocator;
-    mr::DescriptorSet _descriptor_set;
     mr::GraphicsPipeline _pipeline;
+
+    RenderContext *_context = nullptr;
+
+    // requires for deinitialization
+    std::array<std::optional<mr::TextureHandle>, enum_cast(MaterialParameter::EnumSize)> _textures;
+
+    std::array<uint32_t, enum_cast(MaterialParameter::EnumSize)> _textures_ids;
+    uint32_t _uniform_buffer_id = -1;
+
+  public:
+    Material(RenderContext &render_context,
+             mr::ShaderHandle shader,
+             std::span<std::byte> ubo_data,
+             std::span<std::optional<mr::TextureHandle>> textures,
+             std::span<mr::StorageBuffer *> storage_buffers,
+             std::span<mr::ConditionalBuffer *> conditional_buffers) noexcept;
+
+    ~Material();
+
+    void bind(CommandUnit &unit) const noexcept;
+    uint32_t material_ubo_id() noexcept { return _uniform_buffer_id; }
+
+    const mr::GraphicsPipeline & pipeline() const noexcept { return _pipeline; }
   };
 
   MR_DECLARE_HANDLE(Material)
@@ -64,7 +71,7 @@ inline namespace graphics {
     static inline constexpr int max_attached_buffers = 16;
 
     const mr::VulkanState *_state {};
-    const mr::RenderContext *_context {};
+    mr::RenderContext *_context {};
 
     std::vector<std::byte> _specialization_data;
     std::unordered_map<std::string, std::string> _defines;
@@ -77,34 +84,16 @@ inline namespace graphics {
     std::string_view _shader_filename;
 
   public:
-    MaterialBuilder(
-        const mr::VulkanState &state,
-        const mr::RenderContext &context,
-        std::string_view filename)
-      : _state(&state)
-      , _context(&context)
-      , _shader_filename(filename)
-    {
-    }
+    MaterialBuilder(const mr::VulkanState &state,
+                    mr::RenderContext &context,
+                    std::string_view filename);
 
     MaterialBuilder(MaterialBuilder &&) noexcept = default;
     MaterialBuilder & operator=(MaterialBuilder &&) noexcept = default;
 
-    MaterialBuilder &add_texture(MaterialParameter param,
+    MaterialBuilder & add_texture(MaterialParameter param,
                                  const mr::importer::TextureData &tex_data,
-                                 math::Color factor = {1.0, 1.0, 1.0, 1.0})
-    {
-      ASSERT(tex_data.image.pixels.get() != nullptr, "Image should be valid");
-
-      mr::TextureHandle tex = ResourceManager<Texture>::get().create(mr::unnamed,
-        *_state,
-        tex_data.image
-      );
-
-      _textures[enum_cast(param)] = std::move(tex);
-      add_value(factor);
-      return *this;
-    }
+                                 math::Color factor = {1.0, 1.0, 1.0, 1.0});
 
     MaterialBuilder & add_storage_buffer(mr::StorageBuffer *buffer)
     {
@@ -157,35 +146,12 @@ inline namespace graphics {
       return *this;
     }
 
-    MaterialHandle build() noexcept
-    {
-      auto &mtlmanager = ResourceManager<Material>::get();
-      auto &shdmanager = ResourceManager<Shader>::get();
-
-      auto definestr = _generate_shader_defines_str();
-      auto shdname = std::string(_shader_filename) + ":" + definestr;
-      auto shdfindres = shdmanager.find(shdname);
-      auto shdhandle = shdfindres ? shdfindres : shdmanager.create(shdname, *_state, _shader_filename, _generate_shader_defines());
-
-      ASSERT(_state != nullptr);
-      ASSERT(_context != nullptr);
-
-      return mtlmanager.create(unnamed,
-        *_state,
-        *_context,
-        shdhandle,
-        std::span {_ubo_data},
-        std::span {_textures},
-        std::span {_storage_buffers.data(), _storage_buffers.size()},
-        std::span {_conditional_buffers.data(), _conditional_buffers.size()},
-        *_cam_ubo
-      );
-    }
+    MaterialHandle build() noexcept;
 
   private:
-    std::string _generate_shader_defines_str() const noexcept
+    std::string generate_shader_defines_str() const noexcept
     {
-      std::unordered_map<std::string, std::string> defines = _generate_shader_defines();
+      std::unordered_map<std::string, std::string> defines = generate_shader_defines();
       std::stringstream ss;
       for (auto &[name, value] : defines) {
         ss << "-D" << name << '=' << value << ' ';
@@ -193,16 +159,7 @@ inline namespace graphics {
       return ss.str();
     }
 
-    std::unordered_map<std::string, std::string> _generate_shader_defines() const noexcept
-    {
-      std::unordered_map<std::string, std::string> defines;
-      for (size_t i = 0; i < enum_cast(MaterialParameter::EnumSize); i++) {
-        if (_textures[i].has_value()) {
-          defines[get_material_parameter_define(enum_cast<MaterialParameter>(i))] = std::to_string(i + 2);
-        }
-      }
-      return defines;
-    }
+    std::unordered_map<std::string, std::string> generate_shader_defines() const noexcept;
   };
 }
 } // namespace mr
