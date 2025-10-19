@@ -60,7 +60,6 @@ mr::graphics::Model::Model(
   auto& model_value = model.value();
 
   using enum mr::MaterialParameter;
-  static std::vector<mr::MaterialBuilder> builders;
   static auto &manager = ResourceManager<Texture>::get();
   std::for_each(std::execution::seq, model_value.meshes.begin(), model_value.meshes.end(),
     [&, this] (auto &mesh) {
@@ -117,8 +116,8 @@ mr::graphics::Model::Model(
       builder.add_storage_buffer(&scene._bounds);
       builder.add_conditional_buffer(&scene._visibility);
 
-      builders.push_back(std::move(builder));
-      _materials.push_back(builders.back().build());
+      _builders.push_back(std::move(builder));
+      _materials.push_back(_builders.back().build());
     }
   );
 

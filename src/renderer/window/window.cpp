@@ -68,6 +68,18 @@ mr::Window::Window(const RenderContext &parent, Extent extent)
   _window->callbacks()->on_window_resize = [this](const vkfw::Window&, uint32_t, uint32_t) { _should_update_swapchain = true; };
 }
 
+mr::Window::~Window() {
+  if (_parent) {
+    _parent->vulkan_state().queue().waitIdle();
+
+    _image_available_semaphore.clear();
+    _render_finished_semaphore.clear();
+
+    vkb::destroy_swapchain(_swapchain._swapchain);
+    vkb::destroy_surface(_parent->vulkan_state().instance(), _surface.release());
+  }
+}
+
 vk::RenderingAttachmentInfoKHR mr::Window::target_image_info() noexcept
 {
   std::optional<vk::RenderingAttachmentInfoKHR> res = target_image_info_impl();

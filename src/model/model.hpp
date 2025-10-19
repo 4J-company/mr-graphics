@@ -15,6 +15,8 @@ inline namespace graphics {
     private:
       const Scene *_scene = nullptr;
 
+      std::vector<mr::MaterialBuilder> _builders;
+
       std::vector<mr::graphics::Mesh> _meshes;
       std::vector<mr::MaterialHandle> _materials;
 

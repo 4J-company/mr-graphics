@@ -32,7 +32,7 @@ inline namespace graphics {
 
     Window(Window &&other) noexcept = default;
     Window &operator=(Window &&other) noexcept = default;
-    ~Window() = default;
+    ~Window();
 
     vkfw::Window window() { return _window.get(); }
 
