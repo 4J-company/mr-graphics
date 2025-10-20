@@ -26,7 +26,10 @@ inline namespace graphics {
 
   private:
     std::vector<VertexBuffer> _vbufs;
-    std::vector<IndexBuffer> _ibufs;
+    // std::vector<IndexBuffer> _ibufs;
+
+    // std::vector<uint32_t> _vbufs;
+    std::vector<std::pair<uint32_t, uint32_t>> _ibufs;
 
     std::atomic<uint32_t> _instance_count = 0;
 
@@ -36,7 +39,14 @@ inline namespace graphics {
   public:
     Mesh() = default;
 
-    Mesh(std::vector<VertexBuffer>, std::vector<IndexBuffer>, size_t, size_t, size_t) noexcept;
+    // Mesh(std::vector<VertexBuffer>, std::vector<IndexBuffer>, size_t, size_t, size_t) noexcept;
+    Mesh(
+      // std::vector<uint32_t> vertex_buffers_offsets,
+	    std::vector<VertexBuffer> vertex_buffers_offsets,
+         std::vector<std::pair<uint32_t, uint32_t>> index_buffers_offsets_sizes,
+         size_t instance_count,
+         size_t mesh_offset,
+         size_t instance_offset) noexcept;
 
     // move semantics
     Mesh(Mesh &&other) noexcept
@@ -61,7 +71,8 @@ inline namespace graphics {
 
     std::atomic<uint32_t> & num_of_instances() noexcept { return _instance_count; }
     uint32_t num_of_instances() const noexcept { return _instance_count.load(); }
-    uint32_t element_count() const noexcept { return _ibufs[0].element_count(); }
+    // uint32_t element_count() const noexcept { return _ibufs[0].element_count(); }
+    uint32_t element_count() const noexcept { return _ibufs[0].second; }
 
     // TODO(dk6): After union all in one big vertex buffer and we can delete this funciton
     void bind(mr::CommandUnit &unit) const noexcept;

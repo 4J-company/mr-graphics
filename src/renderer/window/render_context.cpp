@@ -20,6 +20,9 @@ mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent)
   , _depthbuffer(*_state, _extent)
   , _image_fence (_state->device().createFenceUnique({.flags = vk::FenceCreateFlagBits::eSignaled}).value)
   , _default_descriptor_allocator(*_state)
+  , _positions_vertex_buffer(*_state)
+  , _attributes_vertex_buffer(*_state)
+  , _index_buffer(*_state)
 {
   for (auto _ : std::views::iota(0, gbuffers_number)) {
     _gbuffers.emplace_back(*_state, _extent, vk::Format::eR32G32B32A32Sfloat);
@@ -226,6 +229,14 @@ void mr::RenderContext::render_models(const SceneHandle scene)
     },
   };
   _models_command_unit->setScissor(0, scissors);
+
+  // std::array vertex_buffers {
+  //   _positions_vertex_buffer.buffer(),
+  //   _attributes_vertex_buffer.buffer(),
+  // };
+  // std::array vertex_buffers_offsets {0ul, 0ul};
+  // _models_command_unit->bindVertexBuffers(0, vertex_buffers, vertex_buffers_offsets);
+  _models_command_unit->bindIndexBuffer(_index_buffer.buffer(), 0, vk::IndexType::eUint32);
 
   for (auto &[material, draw] : scene->_draws) {
     const GraphicsPipeline &pipeline = material->pipeline();

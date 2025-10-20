@@ -13,8 +13,26 @@ mr::Buffer::Buffer(const VulkanState &state, size_t byte_size,
   : _state(&state)
   , _size(byte_size)
 {
+  auto res = create_buffer(state, usage_flags, memory_properties, byte_size);
+  _buffer = std::move(res.first);
+  _allocation = std::move(res.second);
+}
+
+mr::Buffer::~Buffer() noexcept {
+  if (_buffer != VK_NULL_HANDLE) {
+    ASSERT(_state != nullptr);
+    vmaDestroyBuffer(_state->allocator(), _buffer, _allocation);
+    _buffer = VK_NULL_HANDLE;
+  }
+}
+
+std::pair<vk::Buffer, VmaAllocation> mr::Buffer::create_buffer(const VulkanState &state,
+                                                               vk::BufferUsageFlags usage_flags,
+                                                               vk::MemoryPropertyFlags memory_properties,
+                                                               size_t byte_size)
+{
   vk::BufferCreateInfo buffer_create_info {
-    .size = _size,
+    .size = byte_size,
     .usage = usage_flags,
     .sharingMode = vk::SharingMode::eExclusive,
   };
@@ -26,12 +44,15 @@ mr::Buffer::Buffer(const VulkanState &state, size_t byte_size,
     allocation_create_info.flags |= VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
   }
 
+  vk::Buffer buffer;
+  VmaAllocation allocation;
+
   auto result = vmaCreateBuffer(
     state.allocator(),
-    (VkBufferCreateInfo*)&buffer_create_info,
+    (VkBufferCreateInfo *)&buffer_create_info,
     &allocation_create_info,
-    (VkBuffer*)&_buffer,
-    &_allocation,
+    (VkBuffer *)&buffer,
+    &allocation,
     nullptr
   );
 
@@ -54,14 +75,8 @@ mr::Buffer::Buffer(const VulkanState &state, size_t byte_size,
 #endif
     ASSERT(false, "Failed to create vk::Buffer", result);
   }
-}
 
-mr::Buffer::~Buffer() noexcept {
-  if (_buffer != VK_NULL_HANDLE) {
-    ASSERT(_state != nullptr);
-    vmaDestroyBuffer(_state->allocator(), _buffer, _allocation);
-    _buffer = VK_NULL_HANDLE;
-  }
+  return {buffer, allocation};
 }
 
 // resize
@@ -165,16 +180,19 @@ void mr::HostBuffer::MappedData::unmap() noexcept
   _data = nullptr;
 }
 
-mr::DeviceBuffer & mr::DeviceBuffer::write(std::span<const std::byte> src)
+mr::DeviceBuffer & mr::DeviceBuffer::write(std::span<const std::byte> src, uint32_t offset)
 {
   ASSERT(_state != nullptr);
   ASSERT(src.data());
-  ASSERT(src.size() <= _size);
+  ASSERT(offset + src.size() <= _size);
 
   auto buf = HostBuffer(*_state, _size, vk::BufferUsageFlagBits::eTransferSrc);
   buf.write(src);
 
-  vk::BufferCopy buffer_copy {.size = src.size()};
+  vk::BufferCopy buffer_copy {
+    .dstOffset = offset,
+    .size = src.size()
+  };
 
   CommandUnit command_unit(*_state);
   command_unit.begin();
@@ -249,4 +267,152 @@ void mr::DrawIndirectBuffer::update() noexcept
     write(std::span(_draws));
     _updated = true;
   }
+}
+
+// ----------------------------------------------------------------------------
+// Dynamic buffer
+// ----------------------------------------------------------------------------
+
+mr::DynamicBuffer::DynamicBuffer(const VulkanState &state,
+                                 vk::BufferUsageFlags usage_flags,
+                                 size_t start_byte_size,
+                                 uint32_t alignment)
+  :
+  DeviceBuffer(state, start_byte_size, usage_flags | vk::BufferUsageFlagBits::eTransferSrc)
+  , _aligment(alignment)
+  , _usage_flags(usage_flags | vk::BufferUsageFlagBits::eTransferSrc)
+{
+  VmaVirtualBlockCreateInfo virtual_block_create_info {
+    .size = start_byte_size,
+  };
+  vmaCreateVirtualBlock(&virtual_block_create_info, &_virtual_block);
+}
+
+uint32_t mr::DynamicBuffer::add_data(std::span<const std::byte> src) noexcept
+{
+  VmaVirtualAllocationCreateInfo alloc_info {
+    .size = src.size_bytes(),
+    .alignment = _aligment,
+  };
+
+  Allocation allocation;
+  for (int retry = 0; retry < 2; retry++) {
+    if (vmaVirtualAllocate(_virtual_block, &alloc_info, &allocation.allocation, &allocation.offset) == VK_SUCCESS) {
+      break;
+    }
+    ASSERT(retry == 0, "Can not allocate enough space for vertex buffer");
+    size_t new_size = (_size + src.size_bytes()) * 2;
+    recreate_buffer(new_size);
+  }
+  allocation.byte_size = src.size_bytes();
+  write(src, allocation.offset);
+
+  // TODO(dk6): make it thread safe critical section
+  _allocations.push_back(allocation);
+  return static_cast<uint32_t>(allocation.offset);
+}
+
+void mr::DynamicBuffer::free_data(uint32_t offset) noexcept
+{
+  // Linear search in allocations? Or std::map?
+  ASSERT(false, "Not implemented yet");
+}
+
+void mr::DynamicBuffer::recreate_buffer(size_t new_size) noexcept
+{
+  VmaVirtualBlock new_block;
+  VmaVirtualBlockCreateInfo virtual_block_create_info {
+    .size = new_size,
+  };
+  vmaCreateVirtualBlock(&virtual_block_create_info, &new_block);
+  auto &&[new_buffer, new_allocation] = create_buffer(*_state, _usage_flags, vk::MemoryPropertyFlags(0), new_size);
+
+  for (auto &virtual_allocation : _allocations) {
+    auto old_allocation = std::move(virtual_allocation.allocation);
+    auto old_offset = virtual_allocation.offset;
+
+    VmaVirtualAllocationCreateInfo allocation_info {
+      .size = virtual_allocation.byte_size,
+      .alignment = _aligment,
+    };
+
+    std::println("tried to allocate {} bytes, old size is {}", new_size, _size);
+    auto result = vmaVirtualAllocate(new_block, &allocation_info,
+                              &virtual_allocation.allocation, &virtual_allocation.offset);;
+
+  if (result != VK_SUCCESS) {
+#ifndef NDEBUG
+    auto budgets = _state->memory_budgets();
+    for (uint32_t heapIndex = 0; heapIndex < VK_MAX_MEMORY_HEAPS; heapIndex++) {
+      if (budgets[heapIndex].statistics.allocationCount == 0) continue;
+      MR_DEBUG("My heap currently has {} allocations taking {} B,",
+          budgets[heapIndex].statistics.allocationCount,
+          budgets[heapIndex].statistics.allocationBytes);
+      MR_DEBUG("allocated out of {} Vulkan device memory blocks taking {} B,",
+          budgets[heapIndex].statistics.blockCount,
+          budgets[heapIndex].statistics.blockBytes);
+      MR_DEBUG("Vulkan reports total usage {} B with budget {} B ({}%).",
+          budgets[heapIndex].usage,
+          budgets[heapIndex].budget,
+          budgets[heapIndex].usage / (float)budgets[heapIndex].budget);
+    }
+#endif
+    ASSERT(false, "Failed to create vk::Buffer", result);
+  }
+
+    vk::BufferCopy copy_info {
+      .srcOffset = old_offset,
+      .dstOffset = virtual_allocation.offset,
+      .size = virtual_allocation.byte_size,
+    };
+    // TODO(dk6): pass RenderContext to buffer and get from it
+    static CommandUnit command_unit(*_state);
+    command_unit.begin();
+    command_unit->copyBuffer(_buffer, new_buffer, {copy_info});
+    command_unit.end();
+
+    vk::SubmitInfo submit_info  = command_unit.submit_info();
+
+    auto fence = _state->device().createFenceUnique({}).value;
+    _state->queue().submit(submit_info, fence.get());
+    _state->device().waitForFences({fence.get()}, VK_TRUE, UINT64_MAX);
+
+    vmaVirtualFree(_virtual_block, old_allocation);
+  }
+
+  vmaDestroyVirtualBlock(_virtual_block);
+  vmaDestroyBuffer(_state->allocator(), _buffer, _allocation);
+
+  _size = new_size;
+  _buffer = std::move(new_buffer);
+  _allocation = std::move(new_allocation);
+  _virtual_block = std::move(new_block);
+}
+
+
+// ----------------------------------------------------------------------------
+// Dynamic vertex buffer
+// ----------------------------------------------------------------------------
+
+mr::DynamicVertexBuffer::DynamicVertexBuffer(const VulkanState &state, size_t start_byte_size)
+  : DynamicBuffer(state,
+                  vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
+                  start_byte_size,
+                  18 * 4 /* TODO(dk6): now this is magic number from shader */)
+{
+}
+
+// ----------------------------------------------------------------------------
+// Dynamic index buffer
+// ----------------------------------------------------------------------------
+
+mr::DynamicIndexBuffer::DynamicIndexBuffer(const VulkanState &state, size_t start_byte_size)
+  : DynamicBuffer(state,
+                  vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst,
+                  // start_byte_size,
+                  20'000'000,
+                  // sizeof(uint32_t) /* TODO(dk6): now this is magic number from shader */
+                  0
+                )
+{
 }

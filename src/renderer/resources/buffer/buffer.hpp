@@ -11,6 +11,13 @@
 namespace mr {
 inline namespace graphics {
   class Buffer {
+  protected:
+    const VulkanState *_state = nullptr;
+
+    size_t _size = 0;
+    vk::Buffer _buffer {};
+    VmaAllocation _allocation {};
+
   public:
     Buffer() = default;
     Buffer(const VulkanState &state, size_t byte_size,
@@ -41,13 +48,10 @@ inline namespace graphics {
     size_t byte_size() const noexcept { return _size; }
 
   protected:
-    const VulkanState *_state = nullptr;
-
-    size_t _size = 0;
-
-    vk::Buffer _buffer {};
-
-    VmaAllocation _allocation {};
+    static std::pair<vk::Buffer, VmaAllocation> create_buffer(const VulkanState &state,
+                                                              vk::BufferUsageFlags usage_flags,
+                                                              vk::MemoryPropertyFlags memory_properties,
+                                                              size_t byte_size);
   };
 
   class HostBuffer : public Buffer {
@@ -121,13 +125,13 @@ inline namespace graphics {
     {
     }
 
-    DeviceBuffer &write(std::span<const std::byte> src);
+    DeviceBuffer & write(std::span<const std::byte> src, uint32_t offset = 0);
 
     template <size_t Extent>
     DeviceBuffer &write(std::span<const std::byte, Extent> src) { return write(std::span<const std::byte>(src.data(), src.size())); }
 
     template <typename T, size_t Extent>
-    DeviceBuffer &write(std::span<T, Extent> src) { return write(std::as_bytes(src)); }
+    DeviceBuffer & write(std::span<T, Extent> src, uint32_t offset = 0) { return write(std::as_bytes(src), offset); }
   };
 
   class ConditionalBuffer : public DeviceBuffer {
@@ -261,6 +265,66 @@ inline namespace graphics {
     void add_command(const vk::DrawIndexedIndirectCommand &command) noexcept;
     void clear() noexcept;
     void update() noexcept;
+  };
+
+  class DynamicBuffer : public DeviceBuffer {
+  private:
+    struct Allocation {
+      VmaVirtualAllocation allocation;
+      VkDeviceSize offset;
+      VkDeviceSize byte_size;
+    };
+
+  private:
+    VmaAllocationInfo _allocation_info; // Maybe it will be unused
+    VmaVirtualBlock _virtual_block;
+    uint32_t _current_size = 0; // Maybe it will be unused
+
+    // for resizing
+    uint32_t _aligment {};
+    vk::BufferUsageFlags _usage_flags {};
+    std::vector<Allocation> _allocations;
+
+  public:
+    DynamicBuffer() = default;
+
+    DynamicBuffer(const VulkanState &state, vk::BufferUsageFlags usage_flags,
+                  size_t start_byte_size = 1'000'000, uint32_t alignment = 16);
+
+    DynamicBuffer(DynamicBuffer &&) noexcept = default;
+    DynamicBuffer & operator=(DynamicBuffer &&) noexcept = default;
+
+    template <typename T, size_t Extent>
+    const uint32_t add_data(std::span<T, Extent> src) noexcept
+    {
+      ASSERT(src.data());
+      return add_data(std::as_bytes(src));
+    }
+    uint32_t add_data(std::span<const std::byte> src) noexcept;
+    void free_data(uint32_t offset) noexcept;
+
+  private:
+    void recreate_buffer(size_t new_size) noexcept;
+  };
+
+  class DynamicVertexBuffer : public DynamicBuffer {
+  public:
+    DynamicVertexBuffer() = default;
+
+    DynamicVertexBuffer(const VulkanState &state, size_t start_byte_size = 1'000'000);
+
+    DynamicVertexBuffer(DynamicVertexBuffer &&) noexcept = default;
+    DynamicVertexBuffer &operator=(DynamicVertexBuffer &&) noexcept = default;
+  };
+
+  class DynamicIndexBuffer : public DynamicBuffer {
+  public:
+    DynamicIndexBuffer() = default;
+
+    DynamicIndexBuffer(const VulkanState &state, size_t start_byte_size = 1'000'000);
+
+    DynamicIndexBuffer(DynamicIndexBuffer &&) noexcept = default;
+    DynamicIndexBuffer &operator=(DynamicIndexBuffer &&) noexcept = default;
   };
 
 }

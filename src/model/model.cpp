@@ -72,6 +72,20 @@ mr::graphics::Model::Model(
       const size_t instance_offset = scene._transforms_data.size();
       const size_t mesh_offset = scene._bounds_data.size();
 
+      // std::vector<uint32_t> offsets_in_vbufs {
+      //   scene.render_context().positions_vertex_buffer().add_data(std::span(mesh.positions)),
+      //   scene.render_context().attributes_vertex_buffer().add_data(std::span(mesh.attributes)),
+      // };
+
+      std::vector<std::pair<uint32_t, uint32_t>> offest_in_ibuf;
+      offest_in_ibuf.reserve(mesh.lods.size());
+      for (size_t j = 0; j < mesh.lods.size(); j++) {
+        offest_in_ibuf.emplace_back(std::make_pair(
+          scene.render_context().index_buffer().add_data(std::span(mesh.lods[j].indices)),
+          static_cast<uint32_t>(mesh.lods[j].indices.size())
+        ));
+      }
+
       std::vector<VertexBuffer> vbufs;
       vbufs.reserve(2);
       vbufs.emplace_back(scene.render_context().vulkan_state(),
@@ -79,11 +93,11 @@ mr::graphics::Model::Model(
       vbufs.emplace_back(scene.render_context().vulkan_state(),
           std::span(mesh.attributes.data(), mesh.attributes.size()));
 
-      std::vector<IndexBuffer> ibufs;
-      ibufs.reserve(mesh.lods.size());
-      for (size_t j = 0; j < mesh.lods.size(); j++) {
-        ibufs.emplace_back(scene.render_context().vulkan_state(), mesh.lods[j].indices);
-      }
+      // std::vector<IndexBuffer> ibufs;
+      // ibufs.reserve(mesh.lods.size());
+      // for (size_t j = 0; j < mesh.lods.size(); j++) {
+      //   ibufs.emplace_back(scene.render_context().vulkan_state(), mesh.lods[j].indices);
+      // }
 
       scene._bounds_data.emplace_back();
       scene._visibility_data.emplace_back(1);
@@ -94,8 +108,9 @@ mr::graphics::Model::Model(
       );
 
       _meshes.emplace_back(
+        // std::move(offsets_in_vbufs),
         std::move(vbufs),
-        std::move(ibufs),
+        std::move(offest_in_ibuf),
         instance_count,
         mesh_offset,
         instance_offset
