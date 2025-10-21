@@ -78,7 +78,8 @@ mr::ModelHandle mr::Scene::create_model(std::string_view filename) noexcept
       .firstIndex = 0,
 #endif // USE_MERGED_INDEX_BUFFER
 #if USE_MERGED_VERTEX_BUFFER
-      .vertexOffset = static_cast<int32_t>(mesh._vbufs[0]),
+      // .vertexOffset = static_cast<int32_t>(mesh._vbufs[0]) / (18 * 4),
+      .vertexOffset = static_cast<int32_t>(mesh._vbufs[0]) / (12),
 #else // USE_MERGED_VERTEX_BUFFER
       .vertexOffset = 0,
 #endif // USE_MERGED_VERTEX_BUFFER

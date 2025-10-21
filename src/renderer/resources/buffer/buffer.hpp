@@ -313,7 +313,7 @@ inline namespace graphics {
   public:
     DynamicVertexBuffer() = default;
 
-    DynamicVertexBuffer(const VulkanState &state, size_t start_byte_size = 1'000'000);
+    DynamicVertexBuffer(const VulkanState &state, size_t start_byte_size = 1'000'000, uint32_t alignment = 16);
 
     DynamicVertexBuffer(DynamicVertexBuffer &&) noexcept = default;
     DynamicVertexBuffer &operator=(DynamicVertexBuffer &&) noexcept = default;
@@ -323,7 +323,7 @@ inline namespace graphics {
   public:
     DynamicIndexBuffer() = default;
 
-    DynamicIndexBuffer(const VulkanState &state, size_t start_byte_size = 1'000'000);
+    DynamicIndexBuffer(const VulkanState &state, size_t start_byte_size = 1'000'000, uint32_t alignment = 16);
 
     DynamicIndexBuffer(DynamicIndexBuffer &&) noexcept = default;
     DynamicIndexBuffer &operator=(DynamicIndexBuffer &&) noexcept = default;

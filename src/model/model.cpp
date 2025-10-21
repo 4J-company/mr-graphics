@@ -78,6 +78,11 @@ mr::graphics::Model::Model(
         scene.render_context().positions_vertex_buffer().add_data(std::span(mesh.positions)),
         scene.render_context().attributes_vertex_buffer().add_data(std::span(mesh.attributes)),
       };
+      ASSERT(std::as_bytes(std::span(mesh.positions)).size() / 12.f ==
+             std::as_bytes(std::span(mesh.attributes)).size() / 64.f);
+      // ASSERT(vbufs[0] / 12.f == vbufs[1] / 64.f);
+      std::println("vbufs[0] / 12.f = {}, vbufs[1] / 64.f = {}", vbufs[0] / 12.f, vbufs[1] / 64.f );
+
 #else // USE_MERGED_VERTEX_BUFFER
       std::vector<VertexBuffer> vbufs;
       vbufs.reserve(2);

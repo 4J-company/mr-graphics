@@ -20,9 +20,9 @@ mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent)
   , _depthbuffer(*_state, _extent)
   , _image_fence (_state->device().createFenceUnique({.flags = vk::FenceCreateFlagBits::eSignaled}).value)
   , _default_descriptor_allocator(*_state)
-  , _positions_vertex_buffer(*_state)
-  , _attributes_vertex_buffer(*_state)
-  , _index_buffer(*_state)
+  , _positions_vertex_buffer(*_state, 10'000'000 * 12, 12)
+  , _attributes_vertex_buffer(*_state, 10'000'000 * 64, 64)
+  , _index_buffer(*_state, 20'000, 4)
 {
   for (auto _ : std::views::iota(0, gbuffers_number)) {
     _gbuffers.emplace_back(*_state, _extent, vk::Format::eR32G32B32A32Sfloat);
