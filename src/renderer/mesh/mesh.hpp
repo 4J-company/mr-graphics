@@ -36,7 +36,6 @@ inline namespace graphics {
     std::vector<IndexBuffer> _ibufs;
 #endif
 
-
     std::atomic<uint32_t> _instance_count = 0;
 
     uint32_t _mesh_offset = 0;     // offset to the *per mesh*     data buffer in the scene
@@ -61,22 +60,16 @@ inline namespace graphics {
       size_t instance_offset) noexcept;
 
     // move semantics
-    Mesh(Mesh &&other) noexcept
-    {
-      _vbufs = std::move(other._vbufs);
-      _ibufs = std::move(other._ibufs);
-      _instance_count = std::move(other._instance_count.load());
-      _mesh_offset = std::move(other._mesh_offset);
-      _instance_offset = std::move(other._instance_offset);
-    }
+    Mesh(Mesh &&other) noexcept { *this = std::move(other); }
 
-    Mesh &operator=(Mesh &&other) noexcept
+    Mesh & operator=(Mesh &&other) noexcept
     {
       _vbufs = std::move(other._vbufs);
       _ibufs = std::move(other._ibufs);
       _instance_count = std::move(other._instance_count.load());
       _mesh_offset = std::move(other._mesh_offset);
       _instance_offset = std::move(other._instance_offset);
+      _idx_data = std::move(other._idx_data);
 
       return *this;
     }
@@ -95,6 +88,13 @@ inline namespace graphics {
 
     // TODO(dk6): After union all in one big vertex buffer and we can delete this funciton
     void bind(mr::CommandUnit &unit) const noexcept;
+
+public:
+    std::vector<uint32_t> _idx_data;
+    void set_data(std::span<const uint32_t> data) {
+      _idx_data.resize(data.size());
+      std::memcpy(_idx_data.data(), data.data(), data.size() * sizeof(uint32_t));
+    }
   };
 }
 }     // namespace mr

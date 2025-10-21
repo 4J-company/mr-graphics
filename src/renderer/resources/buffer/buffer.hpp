@@ -303,6 +303,8 @@ inline namespace graphics {
     uint32_t add_data(std::span<const std::byte> src) noexcept;
     void free_data(uint32_t offset) noexcept;
 
+    HostBuffer read() const noexcept;
+
   private:
     void recreate_buffer(size_t new_size) noexcept;
   };

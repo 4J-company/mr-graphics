@@ -390,6 +390,28 @@ void mr::DynamicBuffer::recreate_buffer(size_t new_size) noexcept
   _virtual_block = std::move(new_block);
 }
 
+mr::HostBuffer mr::DynamicBuffer::read() const noexcept
+{
+  auto buf = HostBuffer(*_state, _size, vk::BufferUsageFlagBits::eTransferDst);
+  vk::BufferCopy copy_info {
+    .srcOffset = 0,
+    .dstOffset = 0,
+    .size = _size
+  };
+  // TODO(dk6): pass RenderContext to buffer and get from it
+  static CommandUnit command_unit(*_state);
+  command_unit.begin();
+  command_unit->copyBuffer(_buffer, buf.buffer(), {copy_info});
+  command_unit.end();
+
+  vk::SubmitInfo submit_info  = command_unit.submit_info();
+
+  auto fence = _state->device().createFenceUnique({}).value;
+  _state->queue().submit(submit_info, fence.get());
+  _state->device().waitForFences({fence.get()}, VK_TRUE, UINT64_MAX);
+
+  return buf;
+}
 
 // ----------------------------------------------------------------------------
 // Dynamic vertex buffer

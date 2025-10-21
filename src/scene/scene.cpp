@@ -73,7 +73,7 @@ mr::ModelHandle mr::Scene::create_model(std::string_view filename) noexcept
       .indexCount = mesh.element_count(),
       .instanceCount = mesh.num_of_instances(),
 #if USE_MERGED_INDEX_BUFFER
-      .firstIndex = mesh._ibufs[0].first,
+      .firstIndex = mesh._ibufs[0].first / static_cast<uint32_t>(sizeof(uint32_t)),
 #else // USE_MERGED_INDEX_BUFFER
       .firstIndex = 0,
 #endif // USE_MERGED_INDEX_BUFFER
@@ -104,8 +104,15 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
   _bounds.write(std::span(_bounds_data));
   _visibility.write(std::span(_visibility_data));
 
-  for (auto &[material, draw] : _draws) {
+  auto index_data = _parent->index_buffer().read().copy();
+  auto data32 = std::span(reinterpret_cast<uint32_t *>(index_data.data()), index_data.size() / sizeof(uint32_t));
+  for (auto model : _models) {
+    for (auto &mesh : model->_meshes) {
+      auto [offset, size] = mesh._ibufs[0];
+      ASSERT(memcmp(mesh._idx_data.data(), index_data.data() + offset, size) == 0);
+    }
   }
+  // for (auto &[material, draw] : _draws) {}
 
   if (input_state_ref) {
     const auto &input_state = input_state_ref->get();

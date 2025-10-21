@@ -94,13 +94,13 @@ mr::graphics::Model::Model(
         scene.render_context().index_buffer().add_data(std::span(mesh.lods[0].indices)),
         static_cast<uint32_t>(mesh.lods[0].indices.size())
       ));
-      ibufs.reserve(mesh.lods.size());
-      for (size_t j = 0; j < mesh.lods.size(); j++) {
-        ibufs.emplace_back(std::make_pair(
-          scene.render_context().index_buffer().add_data(std::span(mesh.lods[j].indices)),
-          static_cast<uint32_t>(mesh.lods[j].indices.size())
-        ));
-      }
+      // ibufs.reserve(mesh.lods.size());
+      // for (size_t j = 0; j < mesh.lods.size(); j++) {
+      //   ibufs.emplace_back(std::make_pair(
+      //     scene.render_context().index_buffer().add_data(std::span(mesh.lods[j].indices)),
+      //     static_cast<uint32_t>(mesh.lods[j].indices.size())
+      //   ));
+      // }
 #else // USE_MERGED_INDEX_BUFFER
       std::vector<IndexBuffer> ibufs;
       ibufs.reserve(mesh.lods.size());
@@ -124,6 +124,7 @@ mr::graphics::Model::Model(
         mesh_offset,
         instance_offset
       );
+      _meshes.back().set_data(mesh.lods[0].indices);
 
       mr::MaterialBuilder builder(scene, "default");
 
