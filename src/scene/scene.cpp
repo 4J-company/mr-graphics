@@ -72,9 +72,16 @@ mr::ModelHandle mr::Scene::create_model(std::string_view filename) noexcept
     draw.commands_buffer.add_command(vk::DrawIndexedIndirectCommand {
       .indexCount = mesh.element_count(),
       .instanceCount = mesh.num_of_instances(),
+#if USE_MERGED_INDEX_BUFFER
       .firstIndex = mesh._ibufs[0].first,
-      // .vertexOffset = static_cast<int32_t>(mesh._vbufs[0]),
+#else // USE_MERGED_INDEX_BUFFER
+      .firstIndex = 0,
+#endif // USE_MERGED_INDEX_BUFFER
+#if USE_MERGED_VERTEX_BUFFER
+      .vertexOffset = static_cast<int32_t>(mesh._vbufs[0]),
+#else // USE_MERGED_VERTEX_BUFFER
       .vertexOffset = 0,
+#endif // USE_MERGED_VERTEX_BUFFER
       .firstInstance = 0,
     });
     draw.meshes_render_info_data.emplace_back(Mesh::RenderInfo {

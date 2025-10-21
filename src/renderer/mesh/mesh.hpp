@@ -25,11 +25,17 @@ inline namespace graphics {
     };
 
   private:
+#if USE_MERGED_VERTEX_BUFFER
+    std::vector<uint32_t> _vbufs;
+#else // USE_MERGED_VERTEX_BUFFER
     std::vector<VertexBuffer> _vbufs;
-    // std::vector<IndexBuffer> _ibufs;
-
-    // std::vector<uint32_t> _vbufs;
+#endif // USE_MERGED_VERTEX_BUFFER
+#if USE_MERGED_INDEX_BUFFER
     std::vector<std::pair<uint32_t, uint32_t>> _ibufs;
+#else // USE_MERGED_INDEX_BUFFER
+    std::vector<IndexBuffer> _ibufs;
+#endif
+
 
     std::atomic<uint32_t> _instance_count = 0;
 
@@ -39,14 +45,20 @@ inline namespace graphics {
   public:
     Mesh() = default;
 
-    // Mesh(std::vector<VertexBuffer>, std::vector<IndexBuffer>, size_t, size_t, size_t) noexcept;
     Mesh(
-      // std::vector<uint32_t> vertex_buffers_offsets,
-	    std::vector<VertexBuffer> vertex_buffers_offsets,
-         std::vector<std::pair<uint32_t, uint32_t>> index_buffers_offsets_sizes,
-         size_t instance_count,
-         size_t mesh_offset,
-         size_t instance_offset) noexcept;
+#if USE_MERGED_VERTEX_BUFFER
+      std::vector<uint32_t> vertex_buffers_offsets,
+#else // USE_MERGED_VERTEX_BUFFER
+	    std::vector<VertexBuffer> vbufs,
+#endif // USE_MERGED_VERTEX_BUFFER
+#if USE_MERGED_INDEX_BUFFER
+      std::vector<std::pair<uint32_t, uint32_t>> ibufs,
+#else // USE_MERGED_INDEX_BUFFER
+      std::vector<IndexBuffer> ibufs,
+#endif // USE_MERGED_INDEX_BUFFER
+      size_t instance_count,
+      size_t mesh_offset,
+      size_t instance_offset) noexcept;
 
     // move semantics
     Mesh(Mesh &&other) noexcept
@@ -72,7 +84,14 @@ inline namespace graphics {
     std::atomic<uint32_t> & num_of_instances() noexcept { return _instance_count; }
     uint32_t num_of_instances() const noexcept { return _instance_count.load(); }
     // uint32_t element_count() const noexcept { return _ibufs[0].element_count(); }
-    uint32_t element_count() const noexcept { return _ibufs[0].second; }
+    uint32_t element_count() const noexcept
+    {
+#if USE_MERGED_INDEX_BUFFER
+      return _ibufs[0].second;
+#else // USE_MERGED_INDEX_BUFFER
+      return _ibufs[0].element_count();
+#endif // USE_MERGED_INDEX_BUFFER
+    }
 
     // TODO(dk6): After union all in one big vertex buffer and we can delete this funciton
     void bind(mr::CommandUnit &unit) const noexcept;

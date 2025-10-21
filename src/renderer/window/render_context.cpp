@@ -230,13 +230,18 @@ void mr::RenderContext::render_models(const SceneHandle scene)
   };
   _models_command_unit->setScissor(0, scissors);
 
-  // std::array vertex_buffers {
-  //   _positions_vertex_buffer.buffer(),
-  //   _attributes_vertex_buffer.buffer(),
-  // };
-  // std::array vertex_buffers_offsets {0ul, 0ul};
-  // _models_command_unit->bindVertexBuffers(0, vertex_buffers, vertex_buffers_offsets);
+#if USE_MERGED_VERTEX_BUFFER
+  std::array vertex_buffers {
+    _positions_vertex_buffer.buffer(),
+    _attributes_vertex_buffer.buffer(),
+  };
+  std::array vertex_buffers_offsets {0ul, 0ul};
+  _models_command_unit->bindVertexBuffers(0, vertex_buffers, vertex_buffers_offsets);
+#endif // USE_MERGED_VERTEX_BUFFER
+
+#if USE_MERGED_INDEX_BUFFER
   _models_command_unit->bindIndexBuffer(_index_buffer.buffer(), 0, vk::IndexType::eUint32);
+#endif // USE_MERGED_INDEX_BUFFER
 
   for (auto &[material, draw] : scene->_draws) {
     const GraphicsPipeline &pipeline = material->pipeline();

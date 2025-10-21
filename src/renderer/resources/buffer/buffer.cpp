@@ -320,6 +320,7 @@ void mr::DynamicBuffer::free_data(uint32_t offset) noexcept
 
 void mr::DynamicBuffer::recreate_buffer(size_t new_size) noexcept
 {
+  ASSERT(false, "bebra");
   VmaVirtualBlock new_block;
   VmaVirtualBlockCreateInfo virtual_block_create_info {
     .size = new_size,
@@ -412,7 +413,7 @@ mr::DynamicIndexBuffer::DynamicIndexBuffer(const VulkanState &state, size_t star
                   // start_byte_size,
                   20'000'000,
                   // sizeof(uint32_t) /* TODO(dk6): now this is magic number from shader */
-                  0
+                  4
                 )
 {
 }
