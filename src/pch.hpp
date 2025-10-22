@@ -42,7 +42,6 @@
 #include <mr-utils/misc.hpp>
 #include <mr-utils/path.hpp>
 #include <mr-utils/log.hpp>
-// #include <mr-manager/manager.hpp>
 #include <mr-importer/importer.hpp>
 
 #define VKFW_NO_EXCEPTIONS

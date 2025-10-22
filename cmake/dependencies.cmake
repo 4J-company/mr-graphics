@@ -11,7 +11,6 @@ find_package(glfw3 REQUIRED)
 find_package(stb REQUIRED)
 find_package(mr-math REQUIRED)
 find_package(mr-utils REQUIRED)
-find_package(mr-manager REQUIRED)
 find_package(mr-importer REQUIRED)
 
 CPMAddPackage("gh:Cvelth/vkfw#main")
@@ -44,7 +43,6 @@ set(DEPS_LIBRARIES
 
   mr-math::mr-math
   mr-utils::mr-utils
-  mr-manager::mr-manager
   mr-importer::mr-importer
 )
 
