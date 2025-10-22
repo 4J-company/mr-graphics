@@ -25,6 +25,8 @@ class MrGraphicsRecipe(ConanFile):
         self.requires("spdlog/1.14.1", override=True)
         self.requires("libdwarf/0.9.1", override=True)
 
+        self.requires("boost/1.88.0")
+
         self.requires("glfw/3.4")
 
         self.requires("mr-math/1.1.4")
