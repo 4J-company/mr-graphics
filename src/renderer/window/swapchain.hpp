@@ -18,7 +18,7 @@ inline namespace graphics {
     const VulkanState *_state;
     vk::Format _format = default_format;
     vkb::Swapchain _swapchain;
-    std::vector<SwapchainImage> _images;
+    SmallVector<SwapchainImage, 4> _images;
 
   public:
     Swapchain(Swapchain &&) noexcept = default;

@@ -7,11 +7,11 @@ file(
 include(${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake)
 
 # install libraries with no binaries available
+find_package(Boost REQUIRED)
 find_package(glfw3 REQUIRED)
 find_package(stb REQUIRED)
 find_package(mr-math REQUIRED)
 find_package(mr-utils REQUIRED)
-find_package(mr-manager REQUIRED)
 find_package(mr-importer REQUIRED)
 
 CPMAddPackage("gh:Cvelth/vkfw#main")
@@ -41,10 +41,10 @@ set(DEPS_LIBRARIES
   vk-bootstrap-lib
   stb::stb
   beman.inplace_vector
+  boost::boost
 
   mr-math::mr-math
   mr-utils::mr-utils
-  mr-manager::mr-manager
   mr-importer::mr-importer
 )
 

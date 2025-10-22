@@ -132,9 +132,9 @@ mr::MaterialHandle mr::MaterialBuilder::build() noexcept
   );
 }
 
-std::unordered_map<std::string, std::string> mr::MaterialBuilder::generate_shader_defines() const noexcept
+boost::unordered_map<std::string, std::string> mr::MaterialBuilder::generate_shader_defines() const noexcept
 {
-  std::unordered_map<std::string, std::string> defines;
+  boost::unordered_map<std::string, std::string> defines;
   for (size_t i = 0; i < enum_cast(MaterialParameter::EnumSize); i++) {
     if (_textures[i].has_value()) {
       defines[get_material_parameter_define(enum_cast<MaterialParameter>(i))] = std::to_string(i + 2);

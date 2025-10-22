@@ -4,7 +4,7 @@
 #include <fstream>
 #include <sstream>
 
-mr::graphics::Shader::Shader(const VulkanState &state, std::string_view filename, const std::unordered_map<std::string, std::string> &define_map)
+mr::graphics::Shader::Shader(const VulkanState &state, std::string_view filename, const boost::unordered_map<std::string, std::string> &define_map)
     : _path(std::filesystem::current_path())
 {
   _path /= path::shaders_dir;

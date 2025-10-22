@@ -123,6 +123,9 @@ inline namespace graphics {
 
     DeviceBuffer &write(std::span<const std::byte> src);
 
+    template <size_t Extent>
+    DeviceBuffer &write(std::span<const std::byte, Extent> src) { return write(std::span<const std::byte>(src.data(), src.size())); }
+
     template <typename T, size_t Extent>
     DeviceBuffer &write(std::span<T, Extent> src) { return write(std::as_bytes(src)); }
   };

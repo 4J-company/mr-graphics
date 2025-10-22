@@ -74,7 +74,7 @@ inline namespace graphics {
     mr::RenderContext *_context {};
 
     std::vector<std::byte> _specialization_data;
-    std::unordered_map<std::string, std::string> _defines;
+    boost::unordered_map<std::string, std::string> _defines;
     std::vector<std::byte> _ubo_data;
     std::array<std::optional<mr::TextureHandle>, enum_cast(MaterialParameter::EnumSize)> _textures;
     InplaceVector<mr::StorageBuffer *, max_attached_buffers / 2> _storage_buffers;
@@ -151,7 +151,7 @@ inline namespace graphics {
   private:
     std::string generate_shader_defines_str() const noexcept
     {
-      std::unordered_map<std::string, std::string> defines = generate_shader_defines();
+      boost::unordered_map<std::string, std::string> defines = generate_shader_defines();
       std::stringstream ss;
       for (auto &[name, value] : defines) {
         ss << "-D" << name << '=' << value << ' ';
@@ -159,7 +159,7 @@ inline namespace graphics {
       return ss.str();
     }
 
-    std::unordered_map<std::string, std::string> generate_shader_defines() const noexcept;
+    boost::unordered_map<std::string, std::string> generate_shader_defines() const noexcept;
   };
 }
 } // namespace mr

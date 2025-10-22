@@ -245,7 +245,7 @@ void mr::Image::create_image_view() {
 }
 
 vk::Format mr::Image::find_supported_format(
-  const VulkanState &state, const std::vector<vk::Format> &candidates,
+  const VulkanState &state, const SmallVector<vk::Format> &candidates,
   vk::ImageTiling tiling, vk::FormatFeatureFlags features)
 {
   for (auto format : candidates) {
