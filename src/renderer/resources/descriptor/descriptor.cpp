@@ -130,26 +130,26 @@ void mr::DescriptorSet::update(
     std::variant<vk::DescriptorBufferInfo, vk::DescriptorImageInfo>;
   InplaceVector<WriteInfo, desciptor_set_max_bindings> write_infos(attachments.size());
 
-  auto write_buffer = [&](Buffer *buffer, vk::DescriptorBufferInfo &info) {
+  auto write_buffer = [&](const Buffer *buffer, vk::DescriptorBufferInfo &info) {
     info.buffer = buffer->buffer();
     info.range = buffer->byte_size();
     info.offset = 0;
   };
-  auto write_conditional_buffer = [&](ConditionalBuffer *buffer, vk::DescriptorBufferInfo &info) {
+  auto write_conditional_buffer = [&](const ConditionalBuffer *buffer, vk::DescriptorBufferInfo &info) {
     write_buffer(buffer, info);
   };
-  auto write_uniform_buffer = [&](UniformBuffer *buffer, vk::DescriptorBufferInfo &info) {
+  auto write_uniform_buffer = [&](const UniformBuffer *buffer, vk::DescriptorBufferInfo &info) {
     write_buffer(buffer, info);
   };
-  auto write_storage_buffer = [&](StorageBuffer *buffer, vk::DescriptorBufferInfo &info) {
+  auto write_storage_buffer = [&](const StorageBuffer *buffer, vk::DescriptorBufferInfo &info) {
     write_buffer(buffer, info);
   };
-  auto write_texture = [&](Texture *texture, vk::DescriptorImageInfo &info) {
+  auto write_texture = [&](const Texture *texture, vk::DescriptorImageInfo &info) {
     info.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
     info.imageView = texture->image().image_view();
     info.sampler = texture->sampler().sampler();
   };
-  auto write_geometry_buffer = [&](Image *image, vk::DescriptorImageInfo &info) {
+  auto write_geometry_buffer = [&](const Image *image, vk::DescriptorImageInfo &info) {
     info.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
     info.imageView = image->image_view();
     info.sampler = nullptr;
@@ -160,7 +160,7 @@ void mr::DescriptorSet::update(
 
   for (const auto &[attachment_view, write_info] : std::views::zip(attachments, write_infos)) {
     const Shader::Resource &attachment = attachment_view;
-    if (std::holds_alternative<Texture *>(attachment) || std::holds_alternative<Image *>(attachment)) {
+    if (std::holds_alternative<const Texture *>(attachment) || std::holds_alternative<const Image *>(attachment)) {
       write_info.emplace<vk::DescriptorImageInfo>();
     }
 
@@ -418,16 +418,16 @@ static std::uintptr_t get_resource_id(const T *res)
 
 void mr::BindlessDescriptorSet::unregister_resource(const Shader::Resource &resource) noexcept
 {
-  auto tex = [&](Texture *tex) -> uint32_t {
+  auto tex = [&](const Texture *tex) -> uint32_t {
     return get_resource_id(tex);
   };
-  auto ubuf = [&](UniformBuffer *buf) -> uint32_t {
+  auto ubuf = [&](const UniformBuffer *buf) -> uint32_t {
     return get_resource_id(buf);
   };
-  auto sbuf = [&](StorageBuffer *buf) -> uint32_t {
+  auto sbuf = [&](const StorageBuffer *buf) -> uint32_t {
     return get_resource_id(buf);
   };
-  auto other = [](auto *unknown_res) -> uint32_t {
+  auto other = [](auto &&unknown_res) -> uint32_t {
     ASSERT(false, "Unsupported in BindlessSet resource type", unknown_res);
     return 0;
   };
@@ -441,19 +441,19 @@ uint32_t mr::BindlessDescriptorSet::fill_resource(const Shader::ResourceView &re
                                                   ResourceInfo &resource_info,
                                                   vk::WriteDescriptorSet &write_info) noexcept
 {
-  auto tex = [&](Texture *tex) -> std::uintptr_t {
+  auto tex = [&](const Texture *tex) -> std::uintptr_t {
     fill_texture(tex, resource_info.emplace<vk::DescriptorImageInfo>());
     return get_resource_id(tex);
   };
-  auto ubuf = [&](UniformBuffer *buf) -> std::uintptr_t {
+  auto ubuf = [&](const UniformBuffer *buf) -> std::uintptr_t {
     fill_uniform_buffer(buf, resource_info.emplace<vk::DescriptorBufferInfo>());
     return get_resource_id(buf);
   };
-  auto sbuf = [&](StorageBuffer *buf) -> std::uintptr_t {
+  auto sbuf = [&](const StorageBuffer *buf) -> std::uintptr_t {
     fill_storage_buffer(buf, resource_info.emplace<vk::DescriptorBufferInfo>());
     return get_resource_id(buf);
   };
-  auto other = [](auto *unknown_res) -> std::uintptr_t {
+  auto other = [](auto &&unknown_res) -> std::uintptr_t {
     ASSERT(false, "Unsupported in BindlessSet resource type", unknown_res);
     return {};
   };
