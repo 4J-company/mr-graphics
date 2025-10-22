@@ -26,10 +26,10 @@ inline namespace graphics {
     // One array for each light type
     // TODO(mt6): Maybe use https://github.com/rollbear/columnist or https://github.com/skypjack/entt here
     std::tuple<
-      std::vector<DirectionalLightHandle>
+      SmallVector<DirectionalLightHandle>
     > _lights;
 
-    std::vector<ModelHandle> _models;
+    SmallVector<ModelHandle> _models;
 
     StorageBuffer _transforms; // transform matrix    for each instance
     std::vector<mr::Matr4f> _transforms_data;
@@ -46,7 +46,7 @@ inline namespace graphics {
     uint32_t _camera_buffer_id;  // id in bindless descriptor set
 
     template <std::derived_from<Light> L>
-    constexpr std::vector<Handle<L>> & lights() noexcept { return std::get<get_light_type<L>()>(_lights); }
+    constexpr SmallVector<Handle<L>> & lights() noexcept { return std::get<get_light_type<L>()>(_lights); }
 
   public:
     // TODO(dk6): maybe change state & light_render_data in light ctr to render_context?

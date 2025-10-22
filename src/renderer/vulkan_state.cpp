@@ -172,6 +172,7 @@ void mr::VulkanState::_create_allocator() {
 
 void mr::VulkanState::_create_device()
 {
+  // there can only theoretically be 2^3 queue families
   std::vector<vkb::CustomQueueDescription> queue_descrs;
   auto queue_families = _global->_phys_device.get_queue_families ();
   for (size_t i = 0; i < queue_families.size(); i++) {
