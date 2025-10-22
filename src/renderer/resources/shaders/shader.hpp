@@ -50,7 +50,7 @@ inline namespace graphics {
       Shader() = default;
 
       Shader(const VulkanState &state, std::string_view filename,
-             const std::unordered_map<std::string, std::string> &define_map = {});
+             const boost::unordered_map<std::string, std::string> &define_map = {});
 
       // move semantics
       Shader(Shader &&other) noexcept

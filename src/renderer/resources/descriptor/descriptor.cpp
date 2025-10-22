@@ -336,7 +336,7 @@ mr::BindlessDescriptorSet::BindlessDescriptorSet(const VulkanState &state,
     uint32_t count = 0;
     uint32_t last_binding = -1;
   };
-  std::unordered_map<vk::DescriptorType, StatInfo> stats;
+  boost::unordered_map<vk::DescriptorType, StatInfo> stats;
   for (auto [binding, type] : std::views::enumerate(_set_layout->bindings())) {
     if (type.has_value()) {
       auto &stat = stats[type.value()];

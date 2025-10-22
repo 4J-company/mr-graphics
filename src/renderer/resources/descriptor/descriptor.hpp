@@ -112,7 +112,7 @@ inline namespace graphics {
     private:
       std::atomic_uint32_t current_id = 0;
       InplaceVector<uint32_t, resource_max_number_per_binding> free_ids;
-      std::unordered_map<std::uintptr_t, ResourceStat> usage;
+      boost::unordered_map<std::uintptr_t, ResourceStat> usage;
       // Mutex may be bottle neck, it require profiling. Now it used for simple hanlde consistency
       // of two data sctuctures (vector and map)
       std::mutex mutex;
@@ -148,7 +148,7 @@ inline namespace graphics {
     // It is necessary for deletion. We can delete this if change interface of 'unregister_resource`: change parameter
     // from Resource to ResourceView, with data of binding. But it loops like dirty interface, I think deletion of
     // resource must be easy
-    std::unordered_map<std::uintptr_t, uint32_t> _bindings_of_resources;
+    boost::unordered_map<std::uintptr_t, uint32_t> _bindings_of_resources;
 
   public:
     BindlessDescriptorSet() = default;

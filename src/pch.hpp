@@ -31,6 +31,8 @@
 #include <variant>
 #include <vector>
 
+#include <boost/unordered_map.hpp>
+
 #define VULKAN_HPP_ASSERT_ON_RESULT
 #define VULKAN_HPP_NO_EXCEPTIONS
 #define VULKAN_HPP_NO_NODISCARD_WARNINGS
