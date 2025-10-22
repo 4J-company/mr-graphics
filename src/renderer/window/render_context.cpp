@@ -32,8 +32,8 @@ mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent)
 
 // TODO(dk6): maybe create lights_render_data.cpp file and move this function?
 void mr::RenderContext::init_lights_render_data() {
-  const std::vector<float> light_vertexes {-1, -1, 1, -1, 1, 1, -1, 1};
-  const std::vector light_indexes {0, 1, 2, 2, 3, 0};
+  const std::array light_vertexes {-1.f, -1.f, 1.f, -1.f, 1.f, 1.f, -1.f, 1.f};
+  const std::array light_indexes {0, 1, 2, 2, 3, 0};
 
   _lights_render_data.screen_vbuf = VertexBuffer(*_state, std::span {light_vertexes});
   _lights_render_data.screen_ibuf = IndexBuffer(*_state, std::span {light_indexes});
