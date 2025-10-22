@@ -32,6 +32,7 @@
 #include <vector>
 
 #include <boost/unordered_map.hpp>
+#include <boost/container/small_vector.hpp>
 
 #define VULKAN_HPP_ASSERT_ON_RESULT
 #define VULKAN_HPP_NO_EXCEPTIONS
@@ -60,6 +61,9 @@ namespace std { namespace fs = filesystem; }
 namespace mr {
   using uint = unsigned int;
   using byte = unsigned char;
+
+  template <typename T, size_t N = 16>
+  using SmallVector = boost::container::small_vector<T, N>;
 } // namespace mr
 
 using namespace std::literals;

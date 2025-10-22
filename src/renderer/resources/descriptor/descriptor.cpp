@@ -260,21 +260,20 @@ std::optional<mr::DescriptorSet> mr::DescriptorAllocator::allocate_set(
   DescriptorSetLayoutHandle set_layout) const noexcept
 {
   return allocate_sets({&set_layout, 1}).transform(
-    [](std::vector<mr::DescriptorSet> &&v) -> mr::DescriptorSet {
+    [](auto &&v) -> mr::DescriptorSet {
       return std::move(v[0]);
     });
 }
 
 // TODO: handle resizing pool vector
-// TODO: use boost::small_vector instead
-std::optional<std::vector<mr::DescriptorSet>> mr::DescriptorAllocator::allocate_sets(
+std::optional<mr::SmallVector<mr::DescriptorSet>> mr::DescriptorAllocator::allocate_sets(
   std::span<const DescriptorSetLayoutHandle> set_layouts) const noexcept
 {
   static constexpr size_t max_descriptor_set_number = 64;
   ASSERT(set_layouts.size() < max_descriptor_set_number);
   InplaceVector<vk::DescriptorSetLayout, max_descriptor_set_number> layouts;
 
-  std::vector<DescriptorSet> sets;
+  SmallVector<DescriptorSet> sets;
   sets.reserve(set_layouts.size());
 
   for (const auto &layout : set_layouts) {

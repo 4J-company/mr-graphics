@@ -199,7 +199,7 @@ inline namespace graphics {
 
     std::optional<mr::DescriptorSet> allocate_set(DescriptorSetLayoutHandle set_layout) const noexcept;
 
-    std::optional<std::vector<mr::DescriptorSet>> allocate_sets(
+    std::optional<SmallVector<mr::DescriptorSet>> allocate_sets(
       std::span<const DescriptorSetLayoutHandle> set_layouts) const noexcept;
 
     std::optional<BindlessDescriptorSet> allocate_bindless_set(
