@@ -26,8 +26,7 @@ inline namespace graphics {
       std::string _include_string;
 
     public:
-      // TODO(dk6): think why pointers not const
-      using Resource = std::variant<UniformBuffer *, StorageBuffer *, Texture *, Image *, ConditionalBuffer*>;
+      using Resource = std::variant<const UniformBuffer *, const StorageBuffer *, const Texture *, const Image *, const ConditionalBuffer*>;
 
       // TODO: consider RT shaders from extensions;
       // TODO(dk6): remove this enum, use vk::ShaderStageFlagsBits instead
@@ -50,7 +49,7 @@ inline namespace graphics {
       Shader() = default;
 
       Shader(const VulkanState &state, std::string_view filename,
-             const std::unordered_map<std::string, std::string> &define_map = {});
+             const boost::unordered_map<std::string, std::string> &define_map = {});
 
       // move semantics
       Shader(Shader &&other) noexcept

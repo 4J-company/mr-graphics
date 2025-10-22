@@ -94,7 +94,7 @@ inline namespace graphics {
     size_t size() const noexcept { return _size; }
 
     static vk::Format find_supported_format(
-      const VulkanState &state, const std::vector<vk::Format> &candidates,
+      const VulkanState &state, const SmallVector<vk::Format> &candidates,
       vk::ImageTiling tiling, vk::FormatFeatureFlags features);
 
     static bool is_image_format_supported(
