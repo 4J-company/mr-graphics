@@ -241,41 +241,39 @@ void mr::RenderContext::render_models(const SceneHandle scene)
 
   _models_command_unit->bindIndexBuffer(_index_buffer.buffer(), 0, vk::IndexType::eUint32);
 
-  for (auto &[material, draw] : scene->_draws) {
-    const GraphicsPipeline &pipeline = material->pipeline();
-    _models_command_unit->bindPipeline(vk::PipelineBindPoint::eGraphics,  pipeline.pipeline());
+  for (auto &[pipeline, draw] : scene->_draws) {
+    _models_command_unit->bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline->pipeline());
 
     std::array sets {_bindless_set.set(), draw.descriptor_set.set()};
     _models_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                                             {pipeline.layout()},
+                                             {pipeline->layout()},
                                              0, // TODO(dk6): give name for this magic number
                                              sets,
                                              {});
 
+    // TODO(dk6): Update only if scene updates on this frame
     draw.commands_buffer.update();
-    // TODO(dk6): write to buffer only if it was updated in current frame
     draw.meshes_render_info.write(std::span(draw.meshes_render_info_data));
 
-    for (auto [draw_number, mesh] : std::views::enumerate(draw.meshes)) {
-      // TODO(dk6): Make one big vertex buffer - if so, we can delete binding from cycle and only add draw command.
-      //            And cmdDraw will be called after cycle, once per pipelines (now material)
-      // mesh->bind(_models_command_unit);
+    uint32_t stride = sizeof(vk::DrawIndexedIndirectCommand);
+    _models_command_unit->drawIndexedIndirect(draw.commands_buffer.buffer(), 0, draw.meshes.size(), stride);
 
-      vk::ConditionalRenderingBeginInfoEXT conditional_rendering_begin_info {
-        .buffer = scene->_visibility.buffer(),
-        .offset = mesh->_mesh_offset * sizeof(uint32_t),
-      };
+    // for (auto [draw_number, mesh] : std::views::enumerate(draw.meshes)) {
+    //   vk::ConditionalRenderingBeginInfoEXT conditional_rendering_begin_info {
+    //     .buffer = scene->_visibility.buffer(),
+    //     .offset = mesh->_mesh_offset * sizeof(uint32_t),
+    //   };
 
-      _state->dispatch_table().cmdBeginConditionalRenderingEXT(
-        _models_command_unit.command_buffer(),
-        conditional_rendering_begin_info
-      );
+    //   _state->dispatch_table().cmdBeginConditionalRenderingEXT(
+    //     _models_command_unit.command_buffer(),
+    //     conditional_rendering_begin_info
+    //   );
 
-      uint32_t stride = sizeof(vk::DrawIndexedIndirectCommand);
-      _models_command_unit->drawIndexedIndirect(draw.commands_buffer.buffer(), draw_number, 1, stride);
+    //   uint32_t stride = sizeof(vk::DrawIndexedIndirectCommand);
+    //   _models_command_unit->drawIndexedIndirect(draw.commands_buffer.buffer(), draw_number, 1, stride);
 
-      _state->dispatch_table().cmdEndConditionalRenderingEXT(_models_command_unit.command_buffer());
-    }
+    //   _state->dispatch_table().cmdEndConditionalRenderingEXT(_models_command_unit.command_buffer());
+    // }
   }
 
   _models_command_unit->endRendering();

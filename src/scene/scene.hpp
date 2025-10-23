@@ -47,7 +47,7 @@ inline namespace graphics {
     SmallVector<ModelHandle> _models;
     // TODO(dk6): Move of Material change pointer, but now we use materials only from Manager so it is not a problem
     // TODO(dk6): Maybe changes key type from Material to GraphicsPipelines - but now between these class 1:1 relation
-    std::unordered_map<const Material *, MeshesWithSamePipeline> _draws;
+    std::unordered_map<const GraphicsPipeline *, MeshesWithSamePipeline> _draws;
 
     StorageBuffer _transforms; // transform matrix    for each instance
     std::vector<mr::Matr4f> _transforms_data;

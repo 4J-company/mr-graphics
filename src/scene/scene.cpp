@@ -55,8 +55,9 @@ mr::ModelHandle mr::Scene::create_model(std::string_view filename) noexcept
 
   _models.push_back(model_handle);
   for (const auto &[material, mesh] : model_handle->draws()) {
-    if (not _draws.contains(material.get())) {
-      auto &draw = _draws[material.get()];
+    auto *pipeline = &material->pipeline();
+    if (not _draws.contains(pipeline)) {
+      auto &draw = _draws[pipeline];
       // TODO(dk6): Maybe max_scene_instances is too big number here
       draw.commands_buffer = DrawIndirectBuffer(_parent->vulkan_state(), max_scene_instances, true);
       draw.meshes_render_info = StorageBuffer(_parent->vulkan_state(), sizeof(Mesh::RenderInfo) * max_scene_instances);
@@ -66,8 +67,8 @@ mr::ModelHandle mr::Scene::create_model(std::string_view filename) noexcept
       };
       draw.descriptor_set.update(_parent->vulkan_state(), resources);
     }
+    auto &draw = _draws[pipeline];
 
-    auto &draw = _draws[material.get()];
     draw.meshes.emplace_back(&mesh);
 
     // TODO(dk6): make this number not magic numbers

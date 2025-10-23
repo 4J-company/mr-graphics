@@ -25,11 +25,17 @@ mr::graphics::Material::Material(Scene &scene,
   std::ranges::copy(textures, _textures.begin());
 
   std::array layouts { scene.render_context().bindless_set_layout(), scene.scene_set_layout() };
-  _pipeline = mr::GraphicsPipeline(scene.render_context(),
-                                   mr::GraphicsPipeline::Subpass::OpaqueGeometry,
-                                   _shader,
-                                   std::span {mr::importer::Mesh::vertex_input_attribute_descriptions},
-                                   std::span {layouts});
+  auto &pipelines_manager = mr::ResourceManager<GraphicsPipeline>::get();
+  auto pipeline_name = std::format("{}_{}", materials_pipeline_name, shader->name());
+  _pipeline = pipelines_manager.find(pipeline_name);
+  if (not _pipeline) {
+    _pipeline = pipelines_manager.create(pipeline_name,
+                                         scene.render_context(),
+                                         mr::GraphicsPipeline::Subpass::OpaqueGeometry,
+                                         _shader,
+                                         std::span {mr::importer::Mesh::vertex_input_attribute_descriptions},
+                                         std::span {layouts});
+  }
 
   // TODO: also register storage and conditional buffers
   constexpr size_t max_textures_size = enum_cast(MaterialParameter::EnumSize);

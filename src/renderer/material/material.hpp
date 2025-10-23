@@ -35,10 +35,14 @@ inline namespace graphics {
 
   class Material : public ResourceBase<Material> {
   private:
+    constexpr static inline auto materials_pipeline_name = "Default material pipeline";
+
+  private:
     mr::UniformBuffer _ubo;
     mr::ShaderHandle _shader;
 
-    mr::GraphicsPipeline _pipeline;
+    // mr::GraphicsPipeline _pipeline;
+    mr::GraphicsPipelineHandle _pipeline;
 
     Scene *_scene = nullptr;
 
@@ -60,7 +64,7 @@ inline namespace graphics {
 
     uint32_t material_ubo_id() const noexcept { return _uniform_buffer_id; }
 
-    const mr::GraphicsPipeline & pipeline() const noexcept { return _pipeline; }
+    const mr::GraphicsPipeline & pipeline() const noexcept { return *_pipeline; }
   };
 
   MR_DECLARE_HANDLE(Material)
