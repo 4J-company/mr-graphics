@@ -70,9 +70,9 @@ inline namespace graphics {
     BindlessDescriptorSetLayoutHandle _bindless_set_layout;
     BindlessDescriptorSet _bindless_set;
 
-    DynamicVertexBuffer _positions_vertex_buffer;
-    DynamicVertexBuffer _attributes_vertex_buffer;
-    DynamicIndexBuffer _index_buffer;
+    VertexStackBuffer _positions_vertex_buffer;
+    VertexStackBuffer _attributes_vertex_buffer;
+    IndexHeapBuffer _index_buffer;
 
   public:
     RenderContext(RenderContext &&other) noexcept = default;
@@ -96,9 +96,9 @@ inline namespace graphics {
     const Extent & extent() const noexcept { return _extent; }
     CommandUnit & transfer_command_unit() const noexcept { return _transfer_command_unit; }
 
-    DynamicVertexBuffer & positions_vertex_buffer() noexcept { return _positions_vertex_buffer; }
-    DynamicVertexBuffer & attributes_vertex_buffer() noexcept { return _attributes_vertex_buffer; }
-    DynamicIndexBuffer & index_buffer() noexcept { return _index_buffer; }
+    VertexStackBuffer & positions_vertex_buffer() noexcept { return _positions_vertex_buffer; }
+    VertexStackBuffer & attributes_vertex_buffer() noexcept { return _attributes_vertex_buffer; }
+    IndexHeapBuffer & index_buffer() noexcept { return _index_buffer; }
 
     // ===== Resources creation =====
     WindowHandle create_window() const noexcept;

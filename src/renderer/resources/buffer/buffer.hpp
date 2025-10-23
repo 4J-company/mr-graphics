@@ -267,7 +267,7 @@ inline namespace graphics {
     void update() noexcept;
   };
 
-  class DynamicBuffer : public DeviceBuffer {
+  class HeapBuffer : public DeviceBuffer {
   private:
     struct Allocation {
       VmaVirtualAllocation allocation;
@@ -286,13 +286,14 @@ inline namespace graphics {
     std::vector<Allocation> _allocations;
 
   public:
-    DynamicBuffer() = default;
+    HeapBuffer() = default;
+    // TODO(dk6): add destuctor
 
-    DynamicBuffer(const VulkanState &state, vk::BufferUsageFlags usage_flags,
-                  size_t start_byte_size = 1'000'000, uint32_t alignment = 16);
+    HeapBuffer(const VulkanState &state, vk::BufferUsageFlags usage_flags,
+               size_t start_byte_size = 1'000'000, uint32_t alignment = 16);
 
-    DynamicBuffer(DynamicBuffer &&) noexcept = default;
-    DynamicBuffer & operator=(DynamicBuffer &&) noexcept = default;
+    HeapBuffer(HeapBuffer &&) noexcept = default;
+    HeapBuffer & operator=(HeapBuffer &&) noexcept = default;
 
     template <typename T, size_t Extent>
     const uint32_t add_data(std::span<T, Extent> src) noexcept
@@ -309,24 +310,61 @@ inline namespace graphics {
     void recreate_buffer(size_t new_size) noexcept;
   };
 
-  class DynamicVertexBuffer : public DynamicBuffer {
+  class VertexHeapBuffer : public HeapBuffer {
   public:
-    DynamicVertexBuffer() = default;
+    VertexHeapBuffer() = default;
 
-    DynamicVertexBuffer(const VulkanState &state, size_t start_byte_size = 1'000'000, uint32_t alignment = 16);
+    VertexHeapBuffer(const VulkanState &state, size_t start_byte_size = 1'000'000, uint32_t alignment = 16);
 
-    DynamicVertexBuffer(DynamicVertexBuffer &&) noexcept = default;
-    DynamicVertexBuffer &operator=(DynamicVertexBuffer &&) noexcept = default;
+    VertexHeapBuffer(VertexHeapBuffer &&) noexcept = default;
+    VertexHeapBuffer & operator=(VertexHeapBuffer &&) noexcept = default;
   };
 
-  class DynamicIndexBuffer : public DynamicBuffer {
+  class IndexHeapBuffer : public HeapBuffer {
   public:
-    DynamicIndexBuffer() = default;
+    IndexHeapBuffer() = default;
 
-    DynamicIndexBuffer(const VulkanState &state, size_t start_byte_size = 1'000'000, uint32_t alignment = 16);
+    IndexHeapBuffer(const VulkanState &state, size_t start_byte_size = 1'000'000, uint32_t alignment = 16);
 
-    DynamicIndexBuffer(DynamicIndexBuffer &&) noexcept = default;
-    DynamicIndexBuffer &operator=(DynamicIndexBuffer &&) noexcept = default;
+    IndexHeapBuffer(IndexHeapBuffer &&) noexcept = default;
+    IndexHeapBuffer & operator=(IndexHeapBuffer &&) noexcept = default;
+  };
+
+  class StackBuffer : public DeviceBuffer {
+  private:
+    vk::BufferUsageFlags _usage_flags {};
+    uint32_t _current_size;
+
+  public:
+    StackBuffer() = default;
+
+    StackBuffer(const VulkanState &state, vk::BufferUsageFlags usage_flags, size_t start_byte_size = 1'000'000);
+
+    StackBuffer(StackBuffer &&) noexcept = default;
+    StackBuffer & operator=(StackBuffer &&) noexcept = default;
+
+    template <typename T, size_t Extent>
+    const uint32_t add_data(std::span<T, Extent> src) noexcept
+    {
+      ASSERT(src.data());
+      return add_data(std::as_bytes(src));
+    }
+    uint32_t add_data(std::span<const std::byte> src) noexcept;
+
+    void free_data(uint32_t offset) noexcept { ASSERT(false, "not implemented"); }
+
+  private:
+    void recreate_buffer(size_t new_size) noexcept;
+  };
+
+  class VertexStackBuffer : public StackBuffer {
+  public:
+    VertexStackBuffer() = default;
+
+    VertexStackBuffer(const VulkanState &state, size_t start_byte_size = 1'000'000);
+
+    VertexStackBuffer(VertexStackBuffer &&) noexcept = default;
+    VertexStackBuffer & operator=(VertexStackBuffer &&) noexcept = default;
   };
 
 }

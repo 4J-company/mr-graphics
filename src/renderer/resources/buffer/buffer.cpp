@@ -270,13 +270,13 @@ void mr::DrawIndirectBuffer::update() noexcept
 }
 
 // ----------------------------------------------------------------------------
-// Dynamic buffer
+// Heap buffer
 // ----------------------------------------------------------------------------
 
-mr::DynamicBuffer::DynamicBuffer(const VulkanState &state,
-                                 vk::BufferUsageFlags usage_flags,
-                                 size_t start_byte_size,
-                                 uint32_t alignment)
+mr::HeapBuffer::HeapBuffer(const VulkanState &state,
+                           vk::BufferUsageFlags usage_flags,
+                           size_t start_byte_size,
+                           uint32_t alignment)
   :
   DeviceBuffer(state, start_byte_size, usage_flags | vk::BufferUsageFlagBits::eTransferSrc)
   , _aligment(alignment)
@@ -288,7 +288,7 @@ mr::DynamicBuffer::DynamicBuffer(const VulkanState &state,
   vmaCreateVirtualBlock(&virtual_block_create_info, &_virtual_block);
 }
 
-uint32_t mr::DynamicBuffer::add_data(std::span<const std::byte> src) noexcept
+uint32_t mr::HeapBuffer::add_data(std::span<const std::byte> src) noexcept
 {
   VmaVirtualAllocationCreateInfo alloc_info {
     .size = src.size_bytes(),
@@ -316,13 +316,13 @@ uint32_t mr::DynamicBuffer::add_data(std::span<const std::byte> src) noexcept
   return static_cast<uint32_t>(allocation.offset);
 }
 
-void mr::DynamicBuffer::free_data(uint32_t offset) noexcept
+void mr::HeapBuffer::free_data(uint32_t offset) noexcept
 {
   // Linear search in allocations? Or std::map?
   ASSERT(false, "Not implemented yet");
 }
 
-void mr::DynamicBuffer::recreate_buffer(size_t new_size) noexcept
+void mr::HeapBuffer::recreate_buffer(size_t new_size) noexcept
 {
   MR_INFO("Recreating buffer");
   VmaVirtualBlock new_block;
@@ -341,7 +341,6 @@ void mr::DynamicBuffer::recreate_buffer(size_t new_size) noexcept
       .alignment = _aligment,
     };
 
-    std::println("tried to allocate {} bytes, old size is {}", new_size, _size);
     auto result = vmaVirtualAllocate(new_block, &allocation_info,
                               &virtual_allocation.allocation, &virtual_allocation.offset);
     ASSERT(result == VK_SUCCESS);
@@ -375,7 +374,7 @@ void mr::DynamicBuffer::recreate_buffer(size_t new_size) noexcept
   _virtual_block = std::move(new_block);
 }
 
-mr::HostBuffer mr::DynamicBuffer::read() const noexcept
+mr::HostBuffer mr::HeapBuffer::read() const noexcept
 {
   auto buf = HostBuffer(*_state, _size, vk::BufferUsageFlagBits::eTransferDst);
   vk::BufferCopy copy_info {
@@ -399,25 +398,87 @@ mr::HostBuffer mr::DynamicBuffer::read() const noexcept
 }
 
 // ----------------------------------------------------------------------------
-// Dynamic vertex buffer
+// Heap vertex buffer
 // ----------------------------------------------------------------------------
 
-mr::DynamicVertexBuffer::DynamicVertexBuffer(const VulkanState &state, size_t start_byte_size, uint32_t alignment)
-  : DynamicBuffer(state,
-                  vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
-                  start_byte_size,
-                  alignment)
+mr::VertexHeapBuffer::VertexHeapBuffer(const VulkanState &state, size_t start_byte_size, uint32_t alignment)
+  : HeapBuffer(state,
+               vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
+               start_byte_size,
+               alignment)
 {
 }
 
 // ----------------------------------------------------------------------------
-// Dynamic index buffer
+// Heap index buffer
 // ----------------------------------------------------------------------------
 
-mr::DynamicIndexBuffer::DynamicIndexBuffer(const VulkanState &state, size_t start_byte_size, uint32_t alignment)
-  : DynamicBuffer(state,
-                  vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst,
-                  start_byte_size,
-                  alignment)
+mr::IndexHeapBuffer::IndexHeapBuffer(const VulkanState &state, size_t start_byte_size, uint32_t alignment)
+  : HeapBuffer(state,
+               vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst,
+               start_byte_size,
+               alignment)
+{
+}
+
+// ----------------------------------------------------------------------------
+// Stack buffer
+// ----------------------------------------------------------------------------
+
+mr::StackBuffer::StackBuffer(const VulkanState &state,
+                             vk::BufferUsageFlags usage_flags,
+                             size_t start_byte_size)
+  : DeviceBuffer(state, start_byte_size, usage_flags | vk::BufferUsageFlagBits::eTransferSrc)
+  , _usage_flags(usage_flags)
+  , _current_size(0)
+{
+}
+
+uint32_t mr::StackBuffer::add_data(std::span<const std::byte> src) noexcept
+{
+  uint32_t offset = _current_size;
+  _current_size += src.size();
+  if (_current_size > _size) {
+    recreate_buffer(_current_size * 2);
+  }
+  write(src, offset);
+  return offset;
+}
+
+void mr::StackBuffer::recreate_buffer(size_t new_size) noexcept
+{
+  auto &&[buffer, allocation] = create_buffer(*_state, _usage_flags, {}, new_size);
+  vk::BufferCopy buffer_copy {
+    .srcOffset = 0,
+    .dstOffset = 0,
+    .size = _size, // TODO(dk6): copy only used data, not all previously allocated
+  };
+  // TODO(dk6): pass RenderContext to buffer and get from it
+  static CommandUnit command_unit(*_state);
+  command_unit.begin();
+  command_unit->copyBuffer(_buffer, buffer, {buffer_copy});
+  command_unit.end();
+
+  vk::SubmitInfo submit_info  = command_unit.submit_info();
+
+  auto fence = _state->device().createFenceUnique({}).value;
+  _state->queue().submit(submit_info, fence.get());
+  _state->device().waitForFences({fence.get()}, VK_TRUE, UINT64_MAX);
+
+  vmaDestroyBuffer(_state->allocator(), _buffer, _allocation);
+
+  _size = new_size;
+  _buffer = std::move(buffer);
+  _allocation = std::move(allocation);
+}
+
+// ----------------------------------------------------------------------------
+// Stack vertex buffer
+// ----------------------------------------------------------------------------
+
+mr::VertexStackBuffer::VertexStackBuffer(const VulkanState &state, size_t start_byte_size)
+  : StackBuffer(state,
+                vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
+                start_byte_size)
 {
 }

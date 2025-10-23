@@ -70,6 +70,3 @@ using namespace std::literals;
 using namespace mr::literals;
 
 #endif // __MR_PCH_HPP_
-
-#define USE_MERGED_INDEX_BUFFER true
-#define USE_MERGED_VERTEX_BUFFER false

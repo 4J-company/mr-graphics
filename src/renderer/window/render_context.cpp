@@ -20,8 +20,8 @@ mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent)
   , _depthbuffer(*_state, _extent)
   , _image_fence (_state->device().createFenceUnique({.flags = vk::FenceCreateFlagBits::eSignaled}).value)
   , _default_descriptor_allocator(*_state)
-  , _positions_vertex_buffer(*_state, 10'000'000 * 12, 12)
-  , _attributes_vertex_buffer(*_state, 10'000'000 * 64, 64)
+  , _positions_vertex_buffer(*_state, 10'000'000 * 12)
+  , _attributes_vertex_buffer(*_state, 10'000'000 * 64)
   , _index_buffer(*_state, 20'000, 4)
 {
   for (auto _ : std::views::iota(0, gbuffers_number)) {
@@ -230,18 +230,16 @@ void mr::RenderContext::render_models(const SceneHandle scene)
   };
   _models_command_unit->setScissor(0, scissors);
 
-#if USE_MERGED_VERTEX_BUFFER
+  // ===== Rendering geometry ======
+
   std::array vertex_buffers {
     _positions_vertex_buffer.buffer(),
     _attributes_vertex_buffer.buffer(),
   };
   std::array vertex_buffers_offsets {0ul, 0ul};
   _models_command_unit->bindVertexBuffers(0, vertex_buffers, vertex_buffers_offsets);
-#endif // USE_MERGED_VERTEX_BUFFER
 
-#if USE_MERGED_INDEX_BUFFER
   _models_command_unit->bindIndexBuffer(_index_buffer.buffer(), 0, vk::IndexType::eUint32);
-#endif // USE_MERGED_INDEX_BUFFER
 
   for (auto &[material, draw] : scene->_draws) {
     const GraphicsPipeline &pipeline = material->pipeline();
@@ -261,7 +259,7 @@ void mr::RenderContext::render_models(const SceneHandle scene)
     for (auto [draw_number, mesh] : std::views::enumerate(draw.meshes)) {
       // TODO(dk6): Make one big vertex buffer - if so, we can delete binding from cycle and only add draw command.
       //            And cmdDraw will be called after cycle, once per pipelines (now material)
-      mesh->bind(_models_command_unit);
+      // mesh->bind(_models_command_unit);
 
       vk::ConditionalRenderingBeginInfoEXT conditional_rendering_begin_info {
         .buffer = scene->_visibility.buffer(),

@@ -73,32 +73,19 @@ mr::graphics::Model::Model(
       const size_t instance_offset = scene._transforms_data.size();
       const size_t mesh_offset = scene._bounds_data.size();
 
-#if USE_MERGED_VERTEX_BUFFER
+      ASSERT(std::as_bytes(std::span(mesh.positions)).size() / 12.f ==
+             std::as_bytes(std::span(mesh.attributes)).size() / 64.f);
       std::vector<uint32_t> vbufs {
         scene.render_context().positions_vertex_buffer().add_data(std::span(mesh.positions)),
         scene.render_context().attributes_vertex_buffer().add_data(std::span(mesh.attributes)),
       };
-      ASSERT(std::as_bytes(std::span(mesh.positions)).size() / 12.f ==
-             std::as_bytes(std::span(mesh.attributes)).size() / 64.f);
-      // ASSERT(vbufs[0] / 12.f == vbufs[1] / 64.f);
-      std::println("vbufs[0] / 12.f = {}, vbufs[1] / 64.f = {}", vbufs[0] / 12.f, vbufs[1] / 64.f );
 
-#else // USE_MERGED_VERTEX_BUFFER
-      std::vector<VertexBuffer> vbufs;
-      vbufs.reserve(2);
-      vbufs.emplace_back(scene.render_context().vulkan_state(),
-          std::span(mesh.positions.data(), mesh.positions.size()));
-      vbufs.emplace_back(scene.render_context().vulkan_state(),
-          std::span(mesh.attributes.data(), mesh.attributes.size()));
-#endif // USE_MERGED_VERTEX_BUFFER
-
-#if USE_MERGED_INDEX_BUFFER
-      std::vector<std::pair<uint32_t, uint32_t>> ibufs;
-      // ASSERT(mesh.lods.size() == 1);
-      ibufs.emplace_back(std::make_pair(
-        scene.render_context().index_buffer().add_data(std::span(mesh.lods[0].indices)),
-        static_cast<uint32_t>(mesh.lods[0].indices.size())
-      ));
+      using IndexBufferDescription = Mesh::IndexBufferDescription;
+      std::vector<IndexBufferDescription> ibufs;
+      ibufs.emplace_back(IndexBufferDescription {
+        .offset = scene.render_context().index_buffer().add_data(std::span(mesh.lods[0].indices)),
+        .elements_count = static_cast<uint32_t>(mesh.lods[0].indices.size())
+      });
       // ibufs.reserve(mesh.lods.size());
       // for (size_t j = 0; j < mesh.lods.size(); j++) {
       //   ibufs.emplace_back(std::make_pair(
@@ -106,13 +93,6 @@ mr::graphics::Model::Model(
       //     static_cast<uint32_t>(mesh.lods[j].indices.size())
       //   ));
       // }
-#else // USE_MERGED_INDEX_BUFFER
-      std::vector<IndexBuffer> ibufs;
-      ibufs.reserve(mesh.lods.size());
-      for (size_t j = 0; j < mesh.lods.size(); j++) {
-        ibufs.emplace_back(scene.render_context().vulkan_state(), mesh.lods[j].indices);
-      }
-#endif // USE_MERGED_INDEX_BUFFER
 
       scene._bounds_data.emplace_back();
       scene._visibility_data.emplace_back(1);
@@ -129,7 +109,6 @@ mr::graphics::Model::Model(
         mesh_offset,
         instance_offset
       );
-      _meshes.back().set_data(mesh.lods[0].indices);
 
       mr::MaterialBuilder builder(scene, "default");
 

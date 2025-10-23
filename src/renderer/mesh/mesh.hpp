@@ -24,17 +24,14 @@ inline namespace graphics {
       uint32_t transforms_buffer_id;
     };
 
+    struct IndexBufferDescription {
+      uint32_t offset;
+      uint32_t elements_count;
+    };
+
   private:
-#if USE_MERGED_VERTEX_BUFFER
     std::vector<uint32_t> _vbufs;
-#else // USE_MERGED_VERTEX_BUFFER
-    std::vector<VertexBuffer> _vbufs;
-#endif // USE_MERGED_VERTEX_BUFFER
-#if USE_MERGED_INDEX_BUFFER
-    std::vector<std::pair<uint32_t, uint32_t>> _ibufs;
-#else // USE_MERGED_INDEX_BUFFER
-    std::vector<IndexBuffer> _ibufs;
-#endif
+    std::vector<IndexBufferDescription> _ibufs;
 
     std::atomic<uint32_t> _instance_count = 0;
 
@@ -44,20 +41,11 @@ inline namespace graphics {
   public:
     Mesh() = default;
 
-    Mesh(
-#if USE_MERGED_VERTEX_BUFFER
-      std::vector<uint32_t> vertex_buffers_offsets,
-#else // USE_MERGED_VERTEX_BUFFER
-	    std::vector<VertexBuffer> vbufs,
-#endif // USE_MERGED_VERTEX_BUFFER
-#if USE_MERGED_INDEX_BUFFER
-      std::vector<std::pair<uint32_t, uint32_t>> ibufs,
-#else // USE_MERGED_INDEX_BUFFER
-      std::vector<IndexBuffer> ibufs,
-#endif // USE_MERGED_INDEX_BUFFER
-      size_t instance_count,
-      size_t mesh_offset,
-      size_t instance_offset) noexcept;
+    Mesh(std::vector<uint32_t> vbufs,
+         std::vector<IndexBufferDescription> ibufs,
+         size_t instance_count,
+         size_t mesh_offset,
+         size_t instance_offset) noexcept;
 
     // move semantics
     Mesh(Mesh &&other) noexcept { *this = std::move(other); }
@@ -69,7 +57,6 @@ inline namespace graphics {
       _instance_count = std::move(other._instance_count.load());
       _mesh_offset = std::move(other._mesh_offset);
       _instance_offset = std::move(other._instance_offset);
-      _idx_data = std::move(other._idx_data);
 
       return *this;
     }
@@ -77,24 +64,7 @@ inline namespace graphics {
     std::atomic<uint32_t> & num_of_instances() noexcept { return _instance_count; }
     uint32_t num_of_instances() const noexcept { return _instance_count.load(); }
     // uint32_t element_count() const noexcept { return _ibufs[0].element_count(); }
-    uint32_t element_count() const noexcept
-    {
-#if USE_MERGED_INDEX_BUFFER
-      return _ibufs[0].second;
-#else // USE_MERGED_INDEX_BUFFER
-      return _ibufs[0].element_count();
-#endif // USE_MERGED_INDEX_BUFFER
-    }
-
-    // TODO(dk6): After union all in one big vertex buffer and we can delete this funciton
-    void bind(mr::CommandUnit &unit) const noexcept;
-
-public:
-    std::vector<uint32_t> _idx_data;
-    void set_data(std::span<const uint32_t> data) {
-      _idx_data.resize(data.size());
-      std::memcpy(_idx_data.data(), data.data(), data.size() * sizeof(uint32_t));
-    }
+    uint32_t element_count() const noexcept { return _ibufs[0].elements_count; }
   };
 }
 }     // namespace mr

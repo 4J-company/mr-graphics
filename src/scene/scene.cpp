@@ -69,20 +69,21 @@ mr::ModelHandle mr::Scene::create_model(std::string_view filename) noexcept
 
     auto &draw = _draws[material.get()];
     draw.meshes.emplace_back(&mesh);
+
+    // TODO(dk6): make this number not magic numbers
+    std::array attributes_byte_size {12, 64};
+    ASSERT(!mesh._vbufs.empty());
+    uint32_t vertex_offset = mesh._vbufs.front() / attributes_byte_size.front();
+    for (auto [vbuf_offset, size] : std::views::zip(mesh._vbufs, attributes_byte_size)) {
+      ASSERT(vbuf_offset % size == 0);
+      ASSERT(vbuf_offset / size == vertex_offset);
+    }
+
     draw.commands_buffer.add_command(vk::DrawIndexedIndirectCommand {
       .indexCount = mesh.element_count(),
       .instanceCount = mesh.num_of_instances(),
-#if USE_MERGED_INDEX_BUFFER
-      .firstIndex = mesh._ibufs[0].first / static_cast<uint32_t>(sizeof(uint32_t)),
-#else // USE_MERGED_INDEX_BUFFER
-      .firstIndex = 0,
-#endif // USE_MERGED_INDEX_BUFFER
-#if USE_MERGED_VERTEX_BUFFER
-      // .vertexOffset = static_cast<int32_t>(mesh._vbufs[0]) / (18 * 4),
-      .vertexOffset = static_cast<int32_t>(mesh._vbufs[0]) / (12),
-#else // USE_MERGED_VERTEX_BUFFER
-      .vertexOffset = 0,
-#endif // USE_MERGED_VERTEX_BUFFER
+      .firstIndex = mesh._ibufs[0].offset / static_cast<uint32_t>(sizeof(uint32_t)),
+      .vertexOffset = static_cast<int32_t>(mesh._vbufs[0]) / attributes_byte_size[0],
       .firstInstance = 0,
     });
     draw.meshes_render_info_data.emplace_back(Mesh::RenderInfo {
@@ -104,16 +105,6 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
   _transforms.write(std::span(_transforms_data));
   _bounds.write(std::span(_bounds_data));
   _visibility.write(std::span(_visibility_data));
-
-  auto index_data = _parent->index_buffer().read().copy();
-  auto data32 = std::span(reinterpret_cast<uint32_t *>(index_data.data()), index_data.size() / sizeof(uint32_t));
-  for (auto model : _models) {
-    for (auto &mesh : model->_meshes) {
-      auto [offset, size] = mesh._ibufs[0];
-      ASSERT(memcmp(mesh._idx_data.data(), index_data.data() + offset, size) == 0);
-    }
-  }
-  // for (auto &[material, draw] : _draws) {}
 
   if (input_state_ref) {
     const auto &input_state = input_state_ref->get();
