@@ -296,8 +296,9 @@ uint32_t mr::HeapBuffer::add_data(std::span<const std::byte> src) noexcept
   };
 
   Allocation allocation;
+  VkDeviceSize offset;
   for (int retry = 0; retry < 2; retry++) {
-    if (vmaVirtualAllocate(_virtual_block, &alloc_info, &allocation.allocation, &allocation.offset) == VK_SUCCESS) {
+    if (vmaVirtualAllocate(_virtual_block, &alloc_info, &allocation.allocation, &offset) == VK_SUCCESS) {
       break;
     }
     ASSERT(retry == 0, "Can not allocate enough space for vertex buffer");
@@ -309,17 +310,18 @@ uint32_t mr::HeapBuffer::add_data(std::span<const std::byte> src) noexcept
   // ASSERT(allocation.offset % _aligment == 0);
 
   allocation.byte_size = src.size_bytes();
-  write(src, allocation.offset);
+  write(src, offset);
 
   // TODO(dk6): make it thread safe critical section
-  _allocations.push_back(allocation);
-  return static_cast<uint32_t>(allocation.offset);
+  _allocations.insert({offset, allocation});
+  return static_cast<uint32_t>(offset);
 }
 
 void mr::HeapBuffer::free_data(uint32_t offset) noexcept
 {
-  // Linear search in allocations? Or std::map?
-  ASSERT(false, "Not implemented yet");
+  auto &allocation = _allocations[offset];
+  vmaVirtualFree(_virtual_block, allocation.allocation);
+  _allocations.erase(offset);
 }
 
 void mr::HeapBuffer::recreate_buffer(size_t new_size) noexcept
@@ -332,39 +334,56 @@ void mr::HeapBuffer::recreate_buffer(size_t new_size) noexcept
   vmaCreateVirtualBlock(&virtual_block_create_info, &new_block);
   auto &&[new_buffer, new_allocation] = create_buffer(*_state, _usage_flags, vk::MemoryPropertyFlags(0), new_size);
 
-  for (auto &virtual_allocation : _allocations) {
-    auto old_allocation = std::move(virtual_allocation.allocation);
-    auto old_offset = virtual_allocation.offset;
+  // TODO(dk6): We can do it without dealocation for each write. For this:
+  // Recreate buffer, but don't tell it to allocations, just copy data
+  // Have array of virtual allocations + real offset:
+  //   (size, 0)
+  //   (size * 2, size)
+  // Append new allocation virtual block to end: (size * 4, size + size * 2 = size * 3)
+  // We have the log itteration for find block with enough space, but cheaper recreation - i don't know what is better
+
+  uint32_t previous_offset = 0;
+  for (auto &[offset, virtual_allocation] : _allocations) {
+    ASSERT(previous_offset <= offset);
+    previous_offset = offset;
 
     VmaVirtualAllocationCreateInfo allocation_info {
       .size = virtual_allocation.byte_size,
       .alignment = _aligment,
+      .flags = VMA_VIRTUAL_ALLOCATION_CREATE_STRATEGY_MIN_OFFSET_BIT
     };
 
+    VkDeviceSize new_offset;
+    VmaVirtualAllocation new_allocation;
     auto result = vmaVirtualAllocate(new_block, &allocation_info,
-                              &virtual_allocation.allocation, &virtual_allocation.offset);
+                                     &new_allocation,
+                                     &new_offset);
     ASSERT(result == VK_SUCCESS);
+    ASSERT(offset == new_offset);
 
-    vk::BufferCopy copy_info {
-      .srcOffset = old_offset,
-      .dstOffset = virtual_allocation.offset,
-      .size = virtual_allocation.byte_size,
-    };
-    // TODO(dk6): pass RenderContext to buffer and get from it
-    static CommandUnit command_unit(*_state);
-    command_unit.begin();
-    command_unit->copyBuffer(_buffer, new_buffer, {copy_info});
-    command_unit.end();
-
-    vk::SubmitInfo submit_info  = command_unit.submit_info();
-
-    auto fence = _state->device().createFenceUnique({}).value;
-    _state->queue().submit(submit_info, fence.get());
-    _state->device().waitForFences({fence.get()}, VK_TRUE, UINT64_MAX);
-
-    vmaVirtualFree(_virtual_block, old_allocation);
+    virtual_allocation.allocation = new_allocation;
   }
 
+  // copy data
+  vk::BufferCopy copy_info {
+    .srcOffset = 0,
+    .dstOffset = 0,
+    .size = _size,
+  };
+  // TODO(dk6): pass RenderContext to buffer and get from it
+  static CommandUnit command_unit(*_state);
+  command_unit.begin();
+  command_unit->copyBuffer(_buffer, new_buffer, {copy_info});
+  command_unit.end();
+
+  vk::SubmitInfo submit_info  = command_unit.submit_info();
+
+  auto fence = _state->device().createFenceUnique({}).value;
+  _state->queue().submit(submit_info, fence.get());
+  _state->device().waitForFences({fence.get()}, VK_TRUE, UINT64_MAX);
+
+  // finilize buffer recreating
+  vmaClearVirtualBlock(_virtual_block);
   vmaDestroyVirtualBlock(_virtual_block);
   vmaDestroyBuffer(_state->allocator(), _buffer, _allocation);
 

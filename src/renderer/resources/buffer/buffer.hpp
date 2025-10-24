@@ -271,7 +271,6 @@ inline namespace graphics {
   private:
     struct Allocation {
       VmaVirtualAllocation allocation;
-      VkDeviceSize offset;
       VkDeviceSize byte_size;
     };
 
@@ -283,7 +282,8 @@ inline namespace graphics {
     // for resizing
     uint32_t _aligment {};
     vk::BufferUsageFlags _usage_flags {};
-    std::vector<Allocation> _allocations;
+    // Not hashtable - very important decreasing order of keys
+    std::map<VkDeviceSize, Allocation> _allocations;
 
   public:
     HeapBuffer() = default;
