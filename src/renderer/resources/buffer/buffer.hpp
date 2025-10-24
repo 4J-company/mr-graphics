@@ -38,7 +38,7 @@ inline namespace graphics {
     }
     virtual ~Buffer() noexcept;
 
-    void resize(size_t byte_size);
+    // void resize(size_t byte_size);
 
     static uint find_memory_type(const VulkanState &state, uint filter,
                                  vk::MemoryPropertyFlags properties) noexcept;
@@ -128,7 +128,10 @@ inline namespace graphics {
     DeviceBuffer & write(std::span<const std::byte> src, uint32_t offset = 0);
 
     template <size_t Extent>
-    DeviceBuffer &write(std::span<const std::byte, Extent> src) { return write(std::span<const std::byte>(src.data(), src.size())); }
+    DeviceBuffer & write(std::span<const std::byte, Extent> src, uint32_t offset = 0)
+    {
+      return write(std::span<const std::byte>(src.data(), src.size()));
+    }
 
     template <typename T, size_t Extent>
     DeviceBuffer & write(std::span<T, Extent> src, uint32_t offset = 0) { return write(std::as_bytes(src), offset); }
@@ -295,6 +298,7 @@ inline namespace graphics {
     HeapBuffer(HeapBuffer &&) noexcept = default;
     HeapBuffer & operator=(HeapBuffer &&) noexcept = default;
 
+    // return offset in buffer
     template <typename T, size_t Extent>
     const uint32_t add_data(std::span<T, Extent> src) noexcept
     {
@@ -303,6 +307,9 @@ inline namespace graphics {
     }
     uint32_t add_data(std::span<const std::byte> src) noexcept;
     void free_data(uint32_t offset) noexcept;
+
+    // Maybe temporary solution for work with our positions vertex buffers with alignment = 12
+    std::pair<uint32_t, bool> add_data_recreate_notification(std::span<const std::byte> src) noexcept;
 
     HostBuffer read() const noexcept;
 
@@ -330,41 +337,41 @@ inline namespace graphics {
     IndexHeapBuffer & operator=(IndexHeapBuffer &&) noexcept = default;
   };
 
-  class StackBuffer : public DeviceBuffer {
+  class VectorBuffer : public DeviceBuffer {
   private:
     vk::BufferUsageFlags _usage_flags {};
     uint32_t _current_size;
 
   public:
-    StackBuffer() = default;
+    VectorBuffer() = default;
 
-    StackBuffer(const VulkanState &state, vk::BufferUsageFlags usage_flags, size_t start_byte_size = 1'000'000);
+    VectorBuffer(const VulkanState &state, vk::BufferUsageFlags usage_flags, size_t start_byte_size = 1'000'000);
 
-    StackBuffer(StackBuffer &&) noexcept = default;
-    StackBuffer & operator=(StackBuffer &&) noexcept = default;
+    VectorBuffer(VectorBuffer &&) noexcept = default;
+    VectorBuffer & operator=(VectorBuffer &&) noexcept = default;
 
     template <typename T, size_t Extent>
-    const uint32_t add_data(std::span<T, Extent> src) noexcept
+    const uint32_t push_data_back(std::span<T, Extent> src) noexcept
     {
       ASSERT(src.data());
-      return add_data(std::as_bytes(src));
+      return push_data_back(std::as_bytes(src));
     }
-    uint32_t add_data(std::span<const std::byte> src) noexcept;
+    uint32_t push_data_back(std::span<const std::byte> src) noexcept;
 
-    void free_data(uint32_t offset) noexcept { ASSERT(false, "not implemented"); }
+    void resize(uint32_t new_size) noexcept;
 
   private:
     void recreate_buffer(size_t new_size) noexcept;
   };
 
-  class VertexStackBuffer : public StackBuffer {
+  class VertexVectorBuffer : public VectorBuffer {
   public:
-    VertexStackBuffer() = default;
+    VertexVectorBuffer() = default;
 
-    VertexStackBuffer(const VulkanState &state, size_t start_byte_size = 1'000'000);
+    VertexVectorBuffer(const VulkanState &state, size_t start_byte_size = 1'000'000);
 
-    VertexStackBuffer(VertexStackBuffer &&) noexcept = default;
-    VertexStackBuffer & operator=(VertexStackBuffer &&) noexcept = default;
+    VertexVectorBuffer(VertexVectorBuffer &&) noexcept = default;
+    VertexVectorBuffer & operator=(VertexVectorBuffer &&) noexcept = default;
   };
 
 }

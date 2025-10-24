@@ -79,9 +79,6 @@ std::pair<vk::Buffer, VmaAllocation> mr::Buffer::create_buffer(const VulkanState
   return {buffer, allocation};
 }
 
-// resize
-void resize(size_t size) {}
-
 // find memory type
 uint32_t mr::Buffer::find_memory_type(
     const VulkanState &state,
@@ -288,7 +285,7 @@ mr::HeapBuffer::HeapBuffer(const VulkanState &state,
   vmaCreateVirtualBlock(&virtual_block_create_info, &_virtual_block);
 }
 
-uint32_t mr::HeapBuffer::add_data(std::span<const std::byte> src) noexcept
+std::pair<uint32_t, bool> mr::HeapBuffer::add_data_recreate_notification(std::span<const std::byte> src) noexcept
 {
   VmaVirtualAllocationCreateInfo alloc_info {
     .size = src.size_bytes(),
@@ -297,6 +294,7 @@ uint32_t mr::HeapBuffer::add_data(std::span<const std::byte> src) noexcept
 
   Allocation allocation;
   VkDeviceSize offset;
+  bool was_recreated = false;
   for (int retry = 0; retry < 2; retry++) {
     if (vmaVirtualAllocate(_virtual_block, &alloc_info, &allocation.allocation, &offset) == VK_SUCCESS) {
       break;
@@ -304,6 +302,7 @@ uint32_t mr::HeapBuffer::add_data(std::span<const std::byte> src) noexcept
     ASSERT(retry == 0, "Can not allocate enough space for vertex buffer");
     size_t new_size = (_size + src.size_bytes()) * 2;
     recreate_buffer(new_size);
+    was_recreated = true;
   }
 
   ASSERT(src.size() % _aligment == 0);
@@ -314,7 +313,13 @@ uint32_t mr::HeapBuffer::add_data(std::span<const std::byte> src) noexcept
 
   // TODO(dk6): make it thread safe critical section
   _allocations.insert({offset, allocation});
-  return static_cast<uint32_t>(offset);
+  return std::make_pair(static_cast<uint32_t>(offset), was_recreated);
+
+}
+
+uint32_t mr::HeapBuffer::add_data(std::span<const std::byte> src) noexcept
+{
+  return add_data_recreate_notification(src).first;
 }
 
 void mr::HeapBuffer::free_data(uint32_t offset) noexcept
@@ -441,10 +446,10 @@ mr::IndexHeapBuffer::IndexHeapBuffer(const VulkanState &state, size_t start_byte
 }
 
 // ----------------------------------------------------------------------------
-// Stack buffer
+// Vector buffer
 // ----------------------------------------------------------------------------
 
-mr::StackBuffer::StackBuffer(const VulkanState &state,
+mr::VectorBuffer::VectorBuffer(const VulkanState &state,
                              vk::BufferUsageFlags usage_flags,
                              size_t start_byte_size)
   : DeviceBuffer(state, start_byte_size, usage_flags | vk::BufferUsageFlagBits::eTransferSrc)
@@ -453,7 +458,7 @@ mr::StackBuffer::StackBuffer(const VulkanState &state,
 {
 }
 
-uint32_t mr::StackBuffer::add_data(std::span<const std::byte> src) noexcept
+uint32_t mr::VectorBuffer::push_data_back(std::span<const std::byte> src) noexcept
 {
   uint32_t offset = _current_size;
   _current_size += src.size();
@@ -464,7 +469,15 @@ uint32_t mr::StackBuffer::add_data(std::span<const std::byte> src) noexcept
   return offset;
 }
 
-void mr::StackBuffer::recreate_buffer(size_t new_size) noexcept
+void mr::VectorBuffer::resize(uint32_t new_size) noexcept
+{
+  if (new_size > _size) {
+    recreate_buffer(new_size);
+  }
+  _current_size = new_size;
+}
+
+void mr::VectorBuffer::recreate_buffer(size_t new_size) noexcept
 {
   auto &&[buffer, allocation] = create_buffer(*_state, _usage_flags, {}, new_size);
   vk::BufferCopy buffer_copy {
@@ -495,8 +508,8 @@ void mr::StackBuffer::recreate_buffer(size_t new_size) noexcept
 // Stack vertex buffer
 // ----------------------------------------------------------------------------
 
-mr::VertexStackBuffer::VertexStackBuffer(const VulkanState &state, size_t start_byte_size)
-  : StackBuffer(state,
+mr::VertexVectorBuffer::VertexVectorBuffer(const VulkanState &state, size_t start_byte_size)
+  : VectorBuffer(state,
                 vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
                 start_byte_size)
 {

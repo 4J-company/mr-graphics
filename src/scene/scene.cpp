@@ -62,11 +62,6 @@ mr::ModelHandle mr::Scene::create_model(std::string_view filename) noexcept
       draw.commands_buffer = DrawIndirectBuffer(_parent->vulkan_state(), max_scene_instances, true);
       draw.meshes_render_info = StorageBuffer(_parent->vulkan_state(), sizeof(Mesh::RenderInfo) * max_scene_instances);
       draw.meshes_render_info_id = _parent->bindless_set().register_resource(&draw.meshes_render_info);
-      // draw.descriptor_set = *ASSERT_VAL(_parent->desciptor_allocator().allocate_set(_scene_descriptor_set_layout));
-      // std::array resources {
-      //   Shader::ResourceView(0, &draw.meshes_render_info),
-      // };
-      // draw.descriptor_set.update(_parent->vulkan_state(), resources);
     }
     auto &draw = _draws[pipeline];
 

@@ -39,6 +39,10 @@ inline namespace graphics {
     constexpr static uint32_t uniform_buffer_binding = 1;
     constexpr static uint32_t storage_buffer_binding = 2;
 
+    // TODO(dk6): make this number not magic numbers
+    constexpr static inline uint32_t position_bytes_size = 12;
+    constexpr static inline uint32_t attributes_bytes_size = 64;
+
   private:
     std::shared_ptr<VulkanState> _state;
     Extent _extent;
@@ -70,8 +74,8 @@ inline namespace graphics {
     BindlessDescriptorSetLayoutHandle _bindless_set_layout;
     BindlessDescriptorSet _bindless_set;
 
-    VertexStackBuffer _positions_vertex_buffer;
-    VertexStackBuffer _attributes_vertex_buffer;
+    VertexVectorBuffer _positions_vertex_buffer;
+    VertexHeapBuffer _attributes_vertex_buffer;
     IndexHeapBuffer _index_buffer;
 
   public:
@@ -96,9 +100,9 @@ inline namespace graphics {
     const Extent & extent() const noexcept { return _extent; }
     CommandUnit & transfer_command_unit() const noexcept { return _transfer_command_unit; }
 
-    VertexStackBuffer & positions_vertex_buffer() noexcept { return _positions_vertex_buffer; }
-    VertexStackBuffer & attributes_vertex_buffer() noexcept { return _attributes_vertex_buffer; }
     IndexHeapBuffer & index_buffer() noexcept { return _index_buffer; }
+    std::vector<uint32_t> add_vertex_buffers(const std::vector<std::span<const std::byte>> &vbufs_data) noexcept;
+    void delete_vertex_buffers(const std::vector<uint32_t> &vbufs) noexcept;
 
     // ===== Resources creation =====
     WindowHandle create_window() const noexcept;

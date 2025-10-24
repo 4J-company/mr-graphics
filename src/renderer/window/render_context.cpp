@@ -20,8 +20,8 @@ mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent)
   , _depthbuffer(*_state, _extent)
   , _image_fence (_state->device().createFenceUnique({.flags = vk::FenceCreateFlagBits::eSignaled}).value)
   , _default_descriptor_allocator(*_state)
-  , _positions_vertex_buffer(*_state, 10'000'000 * 12)
-  , _attributes_vertex_buffer(*_state, 10'000'000 * 64)
+  , _positions_vertex_buffer(*_state, 10'000'000 * position_bytes_size)
+  , _attributes_vertex_buffer(*_state, 10'000'000 * attributes_bytes_size, attributes_bytes_size)
   , _index_buffer(*_state, 20'000, 4)
 {
   for (auto _ : std::views::iota(0, gbuffers_number)) {
@@ -108,7 +108,8 @@ void mr::RenderContext::init_bindless_rendering()
   _bindless_set = std::move(set.value());
 }
 
-mr::RenderContext::~RenderContext() {
+mr::RenderContext::~RenderContext()
+{
   ASSERT(_state != nullptr);
 
   _state->queue().waitIdle();
@@ -119,6 +120,41 @@ mr::RenderContext::~RenderContext() {
   _image_fence.reset();
 
   _gbuffers.clear();
+}
+
+std::vector<uint32_t> mr::RenderContext::add_vertex_buffers(
+  const std::vector<std::span<const std::byte>> &vbufs_data) noexcept
+{
+  // Tmp theme - fixed attributes layout
+  ASSERT(vbufs_data.size() == 2);
+
+  auto &positions_data = vbufs_data[0];
+  auto &attributes_data = vbufs_data[1];
+
+  ASSERT(positions_data.size() % position_bytes_size == 0);
+  ASSERT(attributes_data.size() % attributes_bytes_size == 0);
+
+  auto [attributes_offset, was_recreated] = _attributes_vertex_buffer.add_data_recreate_notification(attributes_data);
+  if (was_recreated) {
+    uint32_t attributes_buffer_size = _attributes_vertex_buffer.byte_size();
+    ASSERT(attributes_buffer_size % attributes_bytes_size == 0);
+    uint32_t positions_buffer_size = (attributes_buffer_size / attributes_bytes_size) * position_bytes_size;
+    _positions_vertex_buffer.resize(positions_buffer_size);
+  }
+
+  ASSERT(attributes_offset % attributes_bytes_size == 0);
+  uint32_t positions_offset = (attributes_offset / attributes_bytes_size) * position_bytes_size;
+  _positions_vertex_buffer.write(positions_data, positions_offset);
+
+  return std::vector {positions_offset, attributes_offset};
+}
+
+void mr::RenderContext::delete_vertex_buffers(const std::vector<uint32_t> &vbufs) noexcept
+{
+  // Tmp theme - fixed attributes layout
+  ASSERT(vbufs.size() == 2);
+  uint32_t attributes_offset = vbufs[1];
+  _attributes_vertex_buffer.free_data(attributes_offset);
 }
 
 mr::WindowHandle mr::RenderContext::create_window() const noexcept
