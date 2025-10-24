@@ -25,10 +25,14 @@ struct DrawInfo {
   uint transforms_buffer_id;
 };
 
-#define SCENE_SET 1
-layout(set = SCENE_SET, binding = 0) readonly buffer DrawsInfoBuffer {
-  DrawInfo draws[];
+layout(push_constant) uniform DrawsIndosBufferId {
+  uint draw_infos_buffer;
 };
+
+layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer DrawIndoBuffers {
+  DrawInfo draws[];
+} DrawInfosArray[];
+#define draws DrawInfosArray[draw_infos_buffer].draws
 #define draw draws[gl_DrawID]
 
 layout(set = BINDLESS_SET, binding = UNIFORM_BUFFERS_BINDING) readonly uniform CameraUbo {

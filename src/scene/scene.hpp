@@ -22,14 +22,12 @@ inline namespace graphics {
       std::vector<const Mesh *> meshes;
       DrawIndirectBuffer commands_buffer;
 
-      // Instead have meshes data and descriptor set for each Pipeline we can use one set per Scene and one big
-      // buffer with render data and passed offset to meshes_render_info by push constants.
+      // Instead have meshes data buffer for each Pipeline we can use one per Scene and passed offset to
+      // meshes_render_info by push constants.
       // But if so it will be difficult to update scene - for insert data we must move data in memory.
       StorageBuffer meshes_render_info; // render data for each mesh
       std::vector<Mesh::RenderInfo> meshes_render_info_data;
-      // It can be replaced on 'meshes_info_id' - register buffer with infos in bindless set and pass it to shader
-      // using push constants. But now i don't now which variant will be better.
-      DescriptorSet descriptor_set;
+      uint32_t meshes_render_info_id = -1;
     };
 
   private:

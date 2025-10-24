@@ -244,12 +244,15 @@ void mr::RenderContext::render_models(const SceneHandle scene)
   for (auto &[pipeline, draw] : scene->_draws) {
     _models_command_unit->bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline->pipeline());
 
-    std::array sets {_bindless_set.set(), draw.descriptor_set.set()};
+    std::array sets {_bindless_set.set()};
     _models_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
                                              {pipeline->layout()},
                                              0, // TODO(dk6): give name for this magic number
                                              sets,
                                              {});
+
+    _models_command_unit->pushConstants(pipeline->layout(), vk::ShaderStageFlagBits::eAllGraphics,
+                                        0, sizeof(uint32_t), &draw.meshes_render_info_id);
 
     // TODO(dk6): Update only if scene updates on this frame
     draw.commands_buffer.update();
