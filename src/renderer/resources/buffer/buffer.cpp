@@ -376,6 +376,7 @@ void mr::GpuHeap::resize(VkDeviceSize new_size) noexcept
   };
   vmaCreateVirtualBlock(&virtual_block_create_info, &new_block);
 
+  std::vector<VmaVirtualAllocation> fake_allocations;
   VkDeviceSize previous_offset = 0;
   for (auto &[offset, virtual_allocation] : _allocations) {
     ASSERT(previous_offset <= offset);
@@ -393,13 +394,43 @@ void mr::GpuHeap::resize(VkDeviceSize new_size) noexcept
                                      &new_allocation,
                                      &new_offset);
     ASSERT(result == VK_SUCCESS);
-    ASSERT(offset == new_offset);
+
+    // TODO(dk6): this real shit we must rewrite it
+    //            1) Use idea in start of function
+    //            2) Write custom allocator or use some another from library
+    // Now I can just itterate over current and next offset to avoid wrong allocation with next deallocation,
+    // check what offset + size == next_offset - if not create fake allocation
+    if (offset != new_offset) {
+      vmaVirtualFree(new_block, new_allocation);
+
+      VmaVirtualAllocation fake_allocation;
+      VkDeviceSize tmp_offset;
+      VmaVirtualAllocationCreateInfo allocation_info {
+        .size = new_offset - virtual_allocation.byte_size,
+        .alignment = _alignment,
+        .flags = VMA_VIRTUAL_ALLOCATION_CREATE_STRATEGY_MIN_OFFSET_BIT
+      };
+      result = vmaVirtualAllocate(new_block, &allocation_info, &fake_allocation, &tmp_offset);
+      ASSERT(result == VK_SUCCESS);
+      ASSERT(tmp_offset == new_offset);
+      fake_allocations.push_back(fake_allocation);
+
+      result = vmaVirtualAllocate(new_block, &allocation_info,
+                                       &new_allocation,
+                                       &new_offset);
+      ASSERT(result == VK_SUCCESS);
+      ASSERT(offset == new_offset);
+    }
 
     virtual_allocation.allocation = new_allocation;
   }
 
   vmaClearVirtualBlock(_virtual_block);
   vmaDestroyVirtualBlock(_virtual_block);
+
+  for (auto alloc : fake_allocations) {
+    vmaVirtualFree(new_block, alloc);
+  }
 
   _virtual_block = new_block;
   _size = new_size;
@@ -410,7 +441,6 @@ mr::GpuHeap::AllocInfo mr::GpuHeap::allocate(VkDeviceSize allocation_size) noexc
   VmaVirtualAllocationCreateInfo alloc_info {
     .size = allocation_size,
     .alignment = _alignment,
-    .flags = VMA_VIRTUAL_ALLOCATION_CREATE_STRATEGY_MIN_OFFSET_BIT,
   };
 
   ASSERT(allocation_size % _alignment == 0);
