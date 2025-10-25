@@ -78,7 +78,7 @@ mr::graphics::Model::Model(
         std::as_bytes(std::span(mesh.positions)),
         std::as_bytes(std::span(mesh.attributes))
       };
-      std::vector<uint32_t> vbufs = scene.render_context().add_vertex_buffers(vbufs_data);
+      auto vbufs = scene.render_context().add_vertex_buffers(vbufs_data);
 
       using IndexBufferDescription = Mesh::IndexBufferDescription;
       std::vector<IndexBufferDescription> ibufs;

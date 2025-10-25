@@ -14,6 +14,7 @@
 #include "resources/command_unit/command_unit.hpp"
 
 #include <VkBootstrap.h>
+#include <vulkan/vulkan_core.h>
 
 namespace mr {
 inline namespace graphics {
@@ -42,6 +43,7 @@ inline namespace graphics {
     // TODO(dk6): make this number not magic numbers
     constexpr static inline uint32_t position_bytes_size = 12;
     constexpr static inline uint32_t attributes_bytes_size = 64;
+    constexpr static inline uint32_t default_vertex_number = 10'000'000;
 
   private:
     std::shared_ptr<VulkanState> _state;
@@ -74,8 +76,9 @@ inline namespace graphics {
     BindlessDescriptorSetLayoutHandle _bindless_set_layout;
     BindlessDescriptorSet _bindless_set;
 
+    GpuHeap _vertex_buffers_heap;
     VertexVectorBuffer _positions_vertex_buffer;
-    VertexHeapBuffer _attributes_vertex_buffer;
+    VertexVectorBuffer _attributes_vertex_buffer;
     IndexHeapBuffer _index_buffer;
 
   public:
@@ -101,8 +104,8 @@ inline namespace graphics {
     CommandUnit & transfer_command_unit() const noexcept { return _transfer_command_unit; }
 
     IndexHeapBuffer & index_buffer() noexcept { return _index_buffer; }
-    std::vector<uint32_t> add_vertex_buffers(const std::vector<std::span<const std::byte>> &vbufs_data) noexcept;
-    void delete_vertex_buffers(const std::vector<uint32_t> &vbufs) noexcept;
+    std::vector<VkDeviceSize> add_vertex_buffers(const std::vector<std::span<const std::byte>> &vbufs_data) noexcept;
+    void delete_vertex_buffers(const std::vector<VkDeviceSize> &vbufs) noexcept;
 
     // ===== Resources creation =====
     WindowHandle create_window() const noexcept;

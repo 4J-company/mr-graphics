@@ -177,11 +177,11 @@ void mr::HostBuffer::MappedData::unmap() noexcept
   _data = nullptr;
 }
 
-mr::DeviceBuffer & mr::DeviceBuffer::write(std::span<const std::byte> src, uint32_t offset)
+mr::DeviceBuffer & mr::DeviceBuffer::write(std::span<const std::byte> src, VkDeviceSize offset)
 {
   ASSERT(_state != nullptr);
   ASSERT(src.data());
-  ASSERT(offset + src.size() <= _size);
+  ASSERT(offset + src.size() <= _size, "offset, src.size()", offset, src.size());
 
   auto buf = HostBuffer(*_state, _size, vk::BufferUsageFlagBits::eTransferSrc);
   buf.write(src);
@@ -267,200 +267,21 @@ void mr::DrawIndirectBuffer::update() noexcept
 }
 
 // ----------------------------------------------------------------------------
-// Heap buffer
-// ----------------------------------------------------------------------------
-
-mr::HeapBuffer::HeapBuffer(const VulkanState &state,
-                           vk::BufferUsageFlags usage_flags,
-                           size_t start_byte_size,
-                           uint32_t alignment)
-  :
-  DeviceBuffer(state, start_byte_size, usage_flags | vk::BufferUsageFlagBits::eTransferSrc)
-  , _aligment(alignment)
-  , _usage_flags(usage_flags | vk::BufferUsageFlagBits::eTransferSrc)
-{
-  VmaVirtualBlockCreateInfo virtual_block_create_info {
-    .size = start_byte_size,
-  };
-  vmaCreateVirtualBlock(&virtual_block_create_info, &_virtual_block);
-}
-
-std::pair<uint32_t, bool> mr::HeapBuffer::add_data_recreate_notification(std::span<const std::byte> src) noexcept
-{
-  VmaVirtualAllocationCreateInfo alloc_info {
-    .size = src.size_bytes(),
-    .alignment = _aligment,
-  };
-
-  Allocation allocation;
-  VkDeviceSize offset;
-  bool was_recreated = false;
-  for (int retry = 0; retry < 2; retry++) {
-    if (vmaVirtualAllocate(_virtual_block, &alloc_info, &allocation.allocation, &offset) == VK_SUCCESS) {
-      break;
-    }
-    ASSERT(retry == 0, "Can not allocate enough space for vertex buffer");
-    size_t new_size = (_size + src.size_bytes()) * 2;
-    recreate_buffer(new_size);
-    was_recreated = true;
-  }
-
-  ASSERT(src.size() % _aligment == 0);
-  // ASSERT(allocation.offset % _aligment == 0);
-
-  allocation.byte_size = src.size_bytes();
-  write(src, offset);
-
-  // TODO(dk6): make it thread safe critical section
-  _allocations.insert({offset, allocation});
-  return std::make_pair(static_cast<uint32_t>(offset), was_recreated);
-
-}
-
-uint32_t mr::HeapBuffer::add_data(std::span<const std::byte> src) noexcept
-{
-  return add_data_recreate_notification(src).first;
-}
-
-void mr::HeapBuffer::free_data(uint32_t offset) noexcept
-{
-  auto &allocation = _allocations[offset];
-  vmaVirtualFree(_virtual_block, allocation.allocation);
-  _allocations.erase(offset);
-}
-
-void mr::HeapBuffer::recreate_buffer(size_t new_size) noexcept
-{
-  MR_INFO("Recreating buffer");
-  VmaVirtualBlock new_block;
-  VmaVirtualBlockCreateInfo virtual_block_create_info {
-    .size = new_size,
-  };
-  vmaCreateVirtualBlock(&virtual_block_create_info, &new_block);
-  auto &&[new_buffer, new_allocation] = create_buffer(*_state, _usage_flags, vk::MemoryPropertyFlags(0), new_size);
-
-  // TODO(dk6): We can do it without dealocation for each write. For this:
-  // Recreate buffer, but don't tell it to allocations, just copy data
-  // Have array of virtual allocations + real offset:
-  //   (size, 0)
-  //   (size * 2, size)
-  // Append new allocation virtual block to end: (size * 4, size + size * 2 = size * 3)
-  // We have the log itteration for find block with enough space, but cheaper recreation - i don't know what is better
-
-  uint32_t previous_offset = 0;
-  for (auto &[offset, virtual_allocation] : _allocations) {
-    ASSERT(previous_offset <= offset);
-    previous_offset = offset;
-
-    VmaVirtualAllocationCreateInfo allocation_info {
-      .size = virtual_allocation.byte_size,
-      .alignment = _aligment,
-      .flags = VMA_VIRTUAL_ALLOCATION_CREATE_STRATEGY_MIN_OFFSET_BIT
-    };
-
-    VkDeviceSize new_offset;
-    VmaVirtualAllocation new_allocation;
-    auto result = vmaVirtualAllocate(new_block, &allocation_info,
-                                     &new_allocation,
-                                     &new_offset);
-    ASSERT(result == VK_SUCCESS);
-    ASSERT(offset == new_offset);
-
-    virtual_allocation.allocation = new_allocation;
-  }
-
-  // copy data
-  vk::BufferCopy copy_info {
-    .srcOffset = 0,
-    .dstOffset = 0,
-    .size = _size,
-  };
-  // TODO(dk6): pass RenderContext to buffer and get from it
-  static CommandUnit command_unit(*_state);
-  command_unit.begin();
-  command_unit->copyBuffer(_buffer, new_buffer, {copy_info});
-  command_unit.end();
-
-  vk::SubmitInfo submit_info  = command_unit.submit_info();
-
-  auto fence = _state->device().createFenceUnique({}).value;
-  _state->queue().submit(submit_info, fence.get());
-  _state->device().waitForFences({fence.get()}, VK_TRUE, UINT64_MAX);
-
-  // finilize buffer recreating
-  vmaClearVirtualBlock(_virtual_block);
-  vmaDestroyVirtualBlock(_virtual_block);
-  vmaDestroyBuffer(_state->allocator(), _buffer, _allocation);
-
-  _size = new_size;
-  _buffer = std::move(new_buffer);
-  _allocation = std::move(new_allocation);
-  _virtual_block = std::move(new_block);
-}
-
-mr::HostBuffer mr::HeapBuffer::read() const noexcept
-{
-  auto buf = HostBuffer(*_state, _size, vk::BufferUsageFlagBits::eTransferDst);
-  vk::BufferCopy copy_info {
-    .srcOffset = 0,
-    .dstOffset = 0,
-    .size = _size
-  };
-  // TODO(dk6): pass RenderContext to buffer and get from it
-  static CommandUnit command_unit(*_state);
-  command_unit.begin();
-  command_unit->copyBuffer(_buffer, buf.buffer(), {copy_info});
-  command_unit.end();
-
-  vk::SubmitInfo submit_info  = command_unit.submit_info();
-
-  auto fence = _state->device().createFenceUnique({}).value;
-  _state->queue().submit(submit_info, fence.get());
-  _state->device().waitForFences({fence.get()}, VK_TRUE, UINT64_MAX);
-
-  return buf;
-}
-
-// ----------------------------------------------------------------------------
-// Heap vertex buffer
-// ----------------------------------------------------------------------------
-
-mr::VertexHeapBuffer::VertexHeapBuffer(const VulkanState &state, size_t start_byte_size, uint32_t alignment)
-  : HeapBuffer(state,
-               vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
-               start_byte_size,
-               alignment)
-{
-}
-
-// ----------------------------------------------------------------------------
-// Heap index buffer
-// ----------------------------------------------------------------------------
-
-mr::IndexHeapBuffer::IndexHeapBuffer(const VulkanState &state, size_t start_byte_size, uint32_t alignment)
-  : HeapBuffer(state,
-               vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst,
-               start_byte_size,
-               alignment)
-{
-}
-
-// ----------------------------------------------------------------------------
 // Vector buffer
 // ----------------------------------------------------------------------------
 
 mr::VectorBuffer::VectorBuffer(const VulkanState &state,
                              vk::BufferUsageFlags usage_flags,
-                             size_t start_byte_size)
+                             VkDeviceSize start_byte_size)
   : DeviceBuffer(state, start_byte_size, usage_flags | vk::BufferUsageFlagBits::eTransferSrc)
   , _usage_flags(usage_flags)
   , _current_size(0)
 {
 }
 
-uint32_t mr::VectorBuffer::push_data_back(std::span<const std::byte> src) noexcept
+VkDeviceSize mr::VectorBuffer::push_data_back(std::span<const std::byte> src) noexcept
 {
-  uint32_t offset = _current_size;
+  VkDeviceSize offset = _current_size;
   _current_size += src.size();
   if (_current_size > _size) {
     recreate_buffer(_current_size * 2);
@@ -469,7 +290,7 @@ uint32_t mr::VectorBuffer::push_data_back(std::span<const std::byte> src) noexce
   return offset;
 }
 
-void mr::VectorBuffer::resize(uint32_t new_size) noexcept
+void mr::VectorBuffer::resize(VkDeviceSize new_size) noexcept
 {
   if (new_size > _size) {
     recreate_buffer(new_size);
@@ -477,9 +298,9 @@ void mr::VectorBuffer::resize(uint32_t new_size) noexcept
   _current_size = new_size;
 }
 
-void mr::VectorBuffer::recreate_buffer(size_t new_size) noexcept
+void mr::VectorBuffer::recreate_buffer(VkDeviceSize new_size) noexcept
 {
-  auto &&[buffer, allocation] = create_buffer(*_state, _usage_flags, {}, new_size);
+  auto &&[buffer, allocation] = create_buffer(*_state, _usage_flags | vk::BufferUsageFlagBits::eTransferSrc, {}, new_size);
   vk::BufferCopy buffer_copy {
     .srcOffset = 0,
     .dstOffset = 0,
@@ -505,7 +326,7 @@ void mr::VectorBuffer::recreate_buffer(size_t new_size) noexcept
 }
 
 // ----------------------------------------------------------------------------
-// Stack vertex buffer
+// Vector vertex buffer
 // ----------------------------------------------------------------------------
 
 mr::VertexVectorBuffer::VertexVectorBuffer(const VulkanState &state, size_t start_byte_size)
@@ -514,3 +335,164 @@ mr::VertexVectorBuffer::VertexVectorBuffer(const VulkanState &state, size_t star
                 start_byte_size)
 {
 }
+
+// ----------------------------------------------------------------------------
+// GPU Heap
+// ----------------------------------------------------------------------------
+
+mr::GpuHeap::GpuHeap(VkDeviceSize start_byte_size, VkDeviceSize alignment)
+  : _size(start_byte_size)
+  , _alignment(alignment)
+{
+  VmaVirtualBlockCreateInfo virtual_block_create_info {
+    .size = start_byte_size,
+  };
+  vmaCreateVirtualBlock(&virtual_block_create_info, &_virtual_block);
+}
+
+mr::GpuHeap::~GpuHeap() noexcept
+{
+  return; // TODO(dk6): use unique ptr for _virtual_block
+  if (_virtual_block != nullptr) {
+    vmaClearVirtualBlock(_virtual_block);
+    vmaDestroyVirtualBlock(_virtual_block);
+  }
+}
+
+void mr::GpuHeap::resize(VkDeviceSize new_size) noexcept
+{
+  // TODO(dk6): We can do it without dealocation for each write. For this:
+  // Recreate buffer, but don't tell it to allocations, just copy data
+  // Have array of virtual allocations + real offset:
+  //   (size, 0)
+  //   (size * 2, size)
+  // Append new allocation virtual block to end: (size * 4, size + size * 2 = size * 3)
+  // We have the log itteration for find block with enough space, but cheaper recreation - i don't know what is better
+
+  MR_DEBUG("Recreating heap");
+  VmaVirtualBlock new_block;
+  VmaVirtualBlockCreateInfo virtual_block_create_info {
+    .size = new_size,
+  };
+  vmaCreateVirtualBlock(&virtual_block_create_info, &new_block);
+
+  VkDeviceSize previous_offset = 0;
+  for (auto &[offset, virtual_allocation] : _allocations) {
+    ASSERT(previous_offset <= offset);
+    previous_offset = offset;
+
+    VmaVirtualAllocationCreateInfo allocation_info {
+      .size = virtual_allocation.byte_size,
+      .alignment = _alignment,
+      .flags = VMA_VIRTUAL_ALLOCATION_CREATE_STRATEGY_MIN_OFFSET_BIT
+    };
+
+    VkDeviceSize new_offset;
+    VmaVirtualAllocation new_allocation;
+    auto result = vmaVirtualAllocate(new_block, &allocation_info,
+                                     &new_allocation,
+                                     &new_offset);
+    ASSERT(result == VK_SUCCESS);
+    ASSERT(offset == new_offset);
+
+    virtual_allocation.allocation = new_allocation;
+  }
+
+  vmaClearVirtualBlock(_virtual_block);
+  vmaDestroyVirtualBlock(_virtual_block);
+
+  _virtual_block = new_block;
+  _size = new_size;
+}
+
+mr::GpuHeap::AllocInfo mr::GpuHeap::allocate(VkDeviceSize allocation_size) noexcept
+{
+  VmaVirtualAllocationCreateInfo alloc_info {
+    .size = allocation_size,
+    .alignment = _alignment,
+    .flags = VMA_VIRTUAL_ALLOCATION_CREATE_STRATEGY_MIN_OFFSET_BIT,
+  };
+
+  ASSERT(allocation_size % _alignment == 0);
+
+  Allocation allocation;
+  VkDeviceSize offset;
+  bool was_recreated = false;
+  for (int retry = 0; retry < 2; retry++) {
+    if (vmaVirtualAllocate(_virtual_block, &alloc_info, &allocation.allocation, &offset) == VK_SUCCESS) {
+      break;
+    }
+    ASSERT(retry == 0, "Can not allocate enough space for vertex buffer");
+    VkDeviceSize new_size = (_size + allocation_size) * 2;
+    resize(new_size);
+    was_recreated = true;
+  }
+
+  ASSERT(offset % _alignment == 0);
+  allocation.byte_size = allocation_size;
+
+  // TODO(dk6): make it thread safe critical section
+  _allocations.insert({offset, allocation});
+  return AllocInfo {offset, was_recreated};
+}
+
+void mr::GpuHeap::deallocate(VkDeviceSize offset) noexcept
+{
+  auto &allocation = _allocations[offset];
+  vmaVirtualFree(_virtual_block, allocation.allocation);
+  _allocations.erase(offset);
+}
+
+// ----------------------------------------------------------------------------
+// Heap buffer
+// ----------------------------------------------------------------------------
+
+mr::HeapBuffer::HeapBuffer(const VulkanState &state,
+                           vk::BufferUsageFlags usage_flags,
+                           VkDeviceSize start_byte_size,
+                           VkDeviceSize alignment)
+  : _buffer(state, usage_flags, start_byte_size)
+  , _heap(start_byte_size, alignment)
+{
+}
+
+VkDeviceSize mr::HeapBuffer::add_data(std::span<const std::byte> src) noexcept
+{
+  auto alloc = _heap.allocate(src.size());
+  if (alloc.resized) {
+    _buffer.resize(_heap.size());
+  }
+  _buffer.write(src, alloc.offset);
+  return alloc.offset;
+}
+
+void mr::HeapBuffer::free_data(VkDeviceSize offset) noexcept
+{
+  _heap.deallocate(offset);
+}
+
+// ----------------------------------------------------------------------------
+// Heap vertex buffer
+// ----------------------------------------------------------------------------
+
+mr::VertexHeapBuffer::VertexHeapBuffer(const VulkanState &state, VkDeviceSize start_byte_size, VkDeviceSize alignment)
+  : HeapBuffer(state,
+               vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
+               start_byte_size,
+               alignment)
+{
+}
+
+// ----------------------------------------------------------------------------
+// Heap index buffer
+// ----------------------------------------------------------------------------
+
+mr::IndexHeapBuffer::IndexHeapBuffer(const VulkanState &state, VkDeviceSize start_byte_size, VkDeviceSize alignment)
+  : HeapBuffer(state,
+               vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst,
+               start_byte_size,
+               alignment)
+{
+}
+
+

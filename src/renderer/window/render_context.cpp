@@ -20,8 +20,9 @@ mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent)
   , _depthbuffer(*_state, _extent)
   , _image_fence (_state->device().createFenceUnique({.flags = vk::FenceCreateFlagBits::eSignaled}).value)
   , _default_descriptor_allocator(*_state)
-  , _positions_vertex_buffer(*_state, 10'000'000 * position_bytes_size)
-  , _attributes_vertex_buffer(*_state, 10'000'000 * attributes_bytes_size, attributes_bytes_size)
+  , _vertex_buffers_heap(default_vertex_number, 1)
+  , _positions_vertex_buffer(*_state, default_vertex_number * position_bytes_size)
+  , _attributes_vertex_buffer(*_state, default_vertex_number * attributes_bytes_size)
   , _index_buffer(*_state, 20'000, 4)
 {
   for (auto _ : std::views::iota(0, gbuffers_number)) {
@@ -122,9 +123,25 @@ mr::RenderContext::~RenderContext()
   _gbuffers.clear();
 }
 
-std::vector<uint32_t> mr::RenderContext::add_vertex_buffers(
+std::vector<VkDeviceSize> mr::RenderContext::add_vertex_buffers(
   const std::vector<std::span<const std::byte>> &vbufs_data) noexcept
 {
+  // std::println("test heap");
+  // GpuHeap heap(4, 1);
+  // for (int i = 0; i < 4; i++) {
+  //   std::println("test heap i = {}", i);
+  //   auto alloc = heap.allocate(1);
+  //   ASSERT(alloc.offset == i);
+  //   ASSERT(!alloc.resized, "i = {}", i);
+  //   std::println("test heap i = {} done", i);
+  // }
+  // std::println("test heap last");
+  // auto alloc = heap.allocate(1);
+  // ASSERT(alloc.offset == 4);
+  // ASSERT(alloc.resized, "last");
+  // std::println("test heap last done");
+  // std::println("test heap done");
+
   // Tmp theme - fixed attributes layout
   ASSERT(vbufs_data.size() == 2);
 
@@ -134,27 +151,30 @@ std::vector<uint32_t> mr::RenderContext::add_vertex_buffers(
   ASSERT(positions_data.size() % position_bytes_size == 0);
   ASSERT(attributes_data.size() % attributes_bytes_size == 0);
 
-  auto [attributes_offset, was_recreated] = _attributes_vertex_buffer.add_data_recreate_notification(attributes_data);
-  if (was_recreated) {
-    uint32_t attributes_buffer_size = _attributes_vertex_buffer.byte_size();
-    ASSERT(attributes_buffer_size % attributes_bytes_size == 0);
-    uint32_t positions_buffer_size = (attributes_buffer_size / attributes_bytes_size) * position_bytes_size;
-    _positions_vertex_buffer.resize(positions_buffer_size);
+  ASSERT(positions_data.size() / position_bytes_size == attributes_data.size() / attributes_bytes_size);
+  VkDeviceSize vertexes_number = positions_data.size() / position_bytes_size;
+
+  auto alloc_info = _vertex_buffers_heap.allocate(vertexes_number);
+  if (alloc_info.resized) {
+    _positions_vertex_buffer.resize(_vertex_buffers_heap.size() * position_bytes_size);
+    _attributes_vertex_buffer.resize(_vertex_buffers_heap.size() * attributes_bytes_size);
   }
 
-  ASSERT(attributes_offset % attributes_bytes_size == 0);
-  uint32_t positions_offset = (attributes_offset / attributes_bytes_size) * position_bytes_size;
+  VkDeviceSize positions_offset = alloc_info.offset * position_bytes_size;
+  VkDeviceSize attributes_offset = alloc_info.offset * attributes_bytes_size;
+
   _positions_vertex_buffer.write(positions_data, positions_offset);
+  _attributes_vertex_buffer.write(attributes_data, attributes_offset);
 
   return std::vector {positions_offset, attributes_offset};
 }
 
-void mr::RenderContext::delete_vertex_buffers(const std::vector<uint32_t> &vbufs) noexcept
+void mr::RenderContext::delete_vertex_buffers(const std::vector<VkDeviceSize> &vbufs) noexcept
 {
   // Tmp theme - fixed attributes layout
   ASSERT(vbufs.size() == 2);
-  uint32_t attributes_offset = vbufs[1];
-  _attributes_vertex_buffer.free_data(attributes_offset);
+  uint32_t heap_offset = vbufs[0] / position_bytes_size;
+  _vertex_buffers_heap.deallocate(heap_offset);
 }
 
 mr::WindowHandle mr::RenderContext::create_window() const noexcept

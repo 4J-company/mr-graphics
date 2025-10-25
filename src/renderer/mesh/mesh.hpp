@@ -3,6 +3,7 @@
 
 #include "pch.hpp"
 #include "resources/resources.hpp"
+#include <vulkan/vulkan_core.h>
 
 namespace mr {
 inline namespace graphics {
@@ -25,12 +26,12 @@ inline namespace graphics {
     };
 
     struct IndexBufferDescription {
-      uint32_t offset;
+      VkDeviceSize offset;
       uint32_t elements_count;
     };
 
   private:
-    std::vector<uint32_t> _vbufs;
+    std::vector<VkDeviceSize> _vbufs;
     std::vector<IndexBufferDescription> _ibufs;
 
     std::atomic<uint32_t> _instance_count = 0;
@@ -41,7 +42,7 @@ inline namespace graphics {
   public:
     Mesh() = default;
 
-    Mesh(std::vector<uint32_t> vbufs,
+    Mesh(std::vector<VkDeviceSize> vbufs,
          std::vector<IndexBufferDescription> ibufs,
          size_t instance_count,
          size_t mesh_offset,

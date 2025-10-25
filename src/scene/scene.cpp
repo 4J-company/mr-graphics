@@ -79,8 +79,8 @@ mr::ModelHandle mr::Scene::create_model(std::string_view filename) noexcept
     draw.commands_buffer.add_command(vk::DrawIndexedIndirectCommand {
       .indexCount = mesh.element_count(),
       .instanceCount = mesh.num_of_instances(),
-      .firstIndex = mesh._ibufs[0].offset / static_cast<uint32_t>(sizeof(uint32_t)),
-      .vertexOffset = static_cast<int32_t>(mesh._vbufs[0]) / attributes_byte_size[0],
+      .firstIndex = static_cast<uint32_t>(mesh._ibufs[0].offset / sizeof(uint32_t)),
+      .vertexOffset = static_cast<int32_t>(mesh._vbufs[0] / attributes_byte_size[0]),
       .firstInstance = 0,
     });
     draw.meshes_render_info_data.emplace_back(Mesh::RenderInfo {

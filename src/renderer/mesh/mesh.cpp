@@ -1,6 +1,7 @@
 #include "mesh/mesh.hpp"
+#include <vulkan/vulkan_core.h>
 
-mr::graphics::Mesh::Mesh(std::vector<uint32_t> vbufs,
+mr::graphics::Mesh::Mesh(std::vector<VkDeviceSize> vbufs,
                          std::vector<IndexBufferDescription> ibufs,
                          size_t instance_count,
                          size_t mesh_offset,
