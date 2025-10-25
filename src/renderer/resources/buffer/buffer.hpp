@@ -313,7 +313,28 @@ inline namespace graphics {
     struct Allocation {
       VmaVirtualAllocation allocation;
       VkDeviceSize byte_size;
+      uint32_t block_number;
     };
+
+    struct AllocationBlock {
+      VmaVirtualBlock virtual_block = nullptr;
+      VkDeviceSize size = 0;
+      VkDeviceSize offset = 0;
+      uint32_t allocation_number = 0;
+      // TODO(dk6): if uncomment code we will have `illegal instruction` error with segfault
+      // std::atomic_uint32_t allocation_number = 0;
+
+      AllocationBlock(VkDeviceSize size = 0, VkDeviceSize offset = 0) : size(size), offset(offset) {}
+
+      // AllocationBlock & operator=(AllocationBlock &&other) noexcept
+      // {
+      //   virtual_block = other.virtual_block;
+      //   size = other.size;
+      //   allocation_number.store(other.allocation_number.load());
+      // }
+      // AllocationBlock(AllocationBlock &&other) noexcept { *this = std::move(other); }
+    };
+
   public:
     struct AllocInfo {
       VkDeviceSize offset;
@@ -321,25 +342,31 @@ inline namespace graphics {
     };
 
   private:
-    VmaVirtualBlock _virtual_block = nullptr;
     VkDeviceSize _size = 0;
-   
-    // for resizing
     uint32_t _alignment = 16;
+
     // Not hashtable - very important decreasing order of keys
     std::map<VkDeviceSize, Allocation> _allocations;
+    std::vector<AllocationBlock> _blocks;
 
   public:
+    // alignment must be pow of 2
     GpuHeap(VkDeviceSize start_byte_size = 1'000'000, VkDeviceSize alignment = 16);
     ~GpuHeap() noexcept;
-    
+
     GpuHeap(GpuHeap &&) noexcept = default;
     GpuHeap & operator=(GpuHeap &&) noexcept = default;
 
-    void resize(VkDeviceSize size) noexcept;
+    // size must be aligned by alignment parameter
     AllocInfo allocate(VkDeviceSize size) noexcept;
+    // offset if offset to allocation returned by allocate
     void deallocate(VkDeviceSize offset) noexcept;
+
     VkDeviceSize size() const noexcept { return _size; }
+    uint32_t alignment() const noexcept { return _alignment; }
+
+  private:
+    AllocationBlock & add_block(VkDeviceSize block_size, VkDeviceSize offset) noexcept;
   };
 
   class HeapBuffer {

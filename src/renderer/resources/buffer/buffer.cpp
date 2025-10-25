@@ -340,136 +340,89 @@ mr::VertexVectorBuffer::VertexVectorBuffer(const VulkanState &state, size_t star
 // GPU Heap
 // ----------------------------------------------------------------------------
 
+static bool is_pow2(uint32_t n) {
+  if (n == 1) {
+    return true;
+  }
+  auto log2_of_n = std::log2(double(n));
+  return std::abs(log2_of_n - double(int(log2_of_n))) <= 0.0001;
+}
+
 mr::GpuHeap::GpuHeap(VkDeviceSize start_byte_size, VkDeviceSize alignment)
-  : _size(start_byte_size)
+  : _size(0)
   , _alignment(alignment)
 {
-  VmaVirtualBlockCreateInfo virtual_block_create_info {
-    .size = start_byte_size,
-  };
-  vmaCreateVirtualBlock(&virtual_block_create_info, &_virtual_block);
+  ASSERT(is_pow2(alignment));
+  add_block(start_byte_size, 0);
 }
 
 mr::GpuHeap::~GpuHeap() noexcept
 {
-  return; // TODO(dk6): use unique ptr for _virtual_block
-  if (_virtual_block != nullptr) {
-    vmaClearVirtualBlock(_virtual_block);
-    vmaDestroyVirtualBlock(_virtual_block);
+  for (auto &block : _blocks) {
+    vmaClearVirtualBlock(block.virtual_block);
+    vmaDestroyVirtualBlock(block.virtual_block);
   }
 }
 
-void mr::GpuHeap::resize(VkDeviceSize new_size) noexcept
+mr::GpuHeap::AllocationBlock & mr::GpuHeap::add_block(VkDeviceSize block_size, VkDeviceSize offset) noexcept
 {
-  // TODO(dk6): We can do it without dealocation for each write. For this:
-  // Recreate buffer, but don't tell it to allocations, just copy data
-  // Have array of virtual allocations + real offset:
-  //   (size, 0)
-  //   (size * 2, size)
-  // Append new allocation virtual block to end: (size * 4, size + size * 2 = size * 3)
-  // We have the log itteration for find block with enough space, but cheaper recreation - i don't know what is better
-
-  MR_DEBUG("Recreating heap");
-  VmaVirtualBlock new_block;
+  AllocationBlock block(block_size, offset);
   VmaVirtualBlockCreateInfo virtual_block_create_info {
-    .size = new_size,
+    .size = block_size,
   };
-  vmaCreateVirtualBlock(&virtual_block_create_info, &new_block);
-
-  std::vector<VmaVirtualAllocation> fake_allocations;
-  VkDeviceSize previous_offset = 0;
-  for (auto &[offset, virtual_allocation] : _allocations) {
-    ASSERT(previous_offset <= offset);
-    previous_offset = offset;
-
-    VmaVirtualAllocationCreateInfo allocation_info {
-      .size = virtual_allocation.byte_size,
-      .alignment = _alignment,
-      .flags = VMA_VIRTUAL_ALLOCATION_CREATE_STRATEGY_MIN_OFFSET_BIT
-    };
-
-    VkDeviceSize new_offset;
-    VmaVirtualAllocation new_allocation;
-    auto result = vmaVirtualAllocate(new_block, &allocation_info,
-                                     &new_allocation,
-                                     &new_offset);
-    ASSERT(result == VK_SUCCESS);
-
-    // TODO(dk6): this real shit we must rewrite it
-    //            1) Use idea in start of function
-    //            2) Write custom allocator or use some another from library
-    // Now I can just itterate over current and next offset to avoid wrong allocation with next deallocation,
-    // check what offset + size == next_offset - if not create fake allocation
-    if (offset != new_offset) {
-      vmaVirtualFree(new_block, new_allocation);
-
-      VmaVirtualAllocation fake_allocation;
-      VkDeviceSize tmp_offset;
-      VmaVirtualAllocationCreateInfo allocation_info {
-        .size = new_offset - virtual_allocation.byte_size,
-        .alignment = _alignment,
-        .flags = VMA_VIRTUAL_ALLOCATION_CREATE_STRATEGY_MIN_OFFSET_BIT
-      };
-      result = vmaVirtualAllocate(new_block, &allocation_info, &fake_allocation, &tmp_offset);
-      ASSERT(result == VK_SUCCESS);
-      ASSERT(tmp_offset == new_offset);
-      fake_allocations.push_back(fake_allocation);
-
-      result = vmaVirtualAllocate(new_block, &allocation_info,
-                                       &new_allocation,
-                                       &new_offset);
-      ASSERT(result == VK_SUCCESS);
-      ASSERT(offset == new_offset);
-    }
-
-    virtual_allocation.allocation = new_allocation;
-  }
-
-  vmaClearVirtualBlock(_virtual_block);
-  vmaDestroyVirtualBlock(_virtual_block);
-
-  for (auto alloc : fake_allocations) {
-    vmaVirtualFree(new_block, alloc);
-  }
-
-  _virtual_block = new_block;
-  _size = new_size;
+  vmaCreateVirtualBlock(&virtual_block_create_info, &block.virtual_block);
+  // TODO(dk6): make it threadsafe
+  _blocks.emplace_back(std::move(block));
+  _size += block_size;
+  return _blocks.back();
 }
 
 mr::GpuHeap::AllocInfo mr::GpuHeap::allocate(VkDeviceSize allocation_size) noexcept
 {
+  ASSERT(allocation_size % _alignment == 0);
+
+  Allocation allocation { .byte_size = allocation_size };
+  VkDeviceSize offset;
   VmaVirtualAllocationCreateInfo alloc_info {
     .size = allocation_size,
     .alignment = _alignment,
   };
 
-  ASSERT(allocation_size % _alignment == 0);
-
-  Allocation allocation;
-  VkDeviceSize offset;
-  bool was_recreated = false;
-  for (int retry = 0; retry < 2; retry++) {
-    if (vmaVirtualAllocate(_virtual_block, &alloc_info, &allocation.allocation, &offset) == VK_SUCCESS) {
+  bool allocated = false;
+  for (auto &&[i, block] : std::views::enumerate(_blocks)) {
+    if (vmaVirtualAllocate(block.virtual_block, &alloc_info, &allocation.allocation, &offset) == VK_SUCCESS) {
+      offset += block.offset;
+      allocation.block_number = i;
+      block.allocation_number++;
+      allocated = true;
       break;
     }
-    ASSERT(retry == 0, "Can not allocate enough space for vertex buffer");
-    VkDeviceSize new_size = (_size + allocation_size) * 2;
-    resize(new_size);
-    was_recreated = true;
+  }
+
+  if (not allocated) {
+    // TODO(dk6): make it threadsafe
+    allocation.block_number = _blocks.size();
+    const auto &last_block = _blocks.back();
+    auto &new_block = add_block((last_block.size + allocation_size) * 2, last_block.offset + last_block.size);
+    auto result = vmaVirtualAllocate(new_block.virtual_block, &alloc_info, &allocation.allocation, &offset);
+    ASSERT(result == VK_SUCCESS);
+    offset += new_block.offset;
+    new_block.allocation_number++;
   }
 
   ASSERT(offset % _alignment == 0);
-  allocation.byte_size = allocation_size;
 
   // TODO(dk6): make it thread safe critical section
   _allocations.insert({offset, allocation});
-  return AllocInfo {offset, was_recreated};
+  return AllocInfo {offset, not allocated};
 }
 
 void mr::GpuHeap::deallocate(VkDeviceSize offset) noexcept
 {
+  ASSERT(_allocations.contains(offset));
+  // TODO(dk6): make it thread safe critical section
   auto &allocation = _allocations[offset];
-  vmaVirtualFree(_virtual_block, allocation.allocation);
+  vmaVirtualFree(_blocks[allocation.block_number].virtual_block, allocation.allocation);
   _allocations.erase(offset);
 }
 
