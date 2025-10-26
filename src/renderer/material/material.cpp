@@ -26,7 +26,7 @@ mr::graphics::Material::Material(Scene &scene,
 
   std::array layouts { scene.render_context().bindless_set_layout() };
   auto &pipelines_manager = mr::ResourceManager<GraphicsPipeline>::get();
-  auto pipeline_name = std::format("{}_{}", materials_pipeline_name, shader->name());
+  auto pipeline_name = std::format("{}_{}", materials_pipeline_name, shader->id());
   _pipeline = pipelines_manager.find(pipeline_name);
   if (not _pipeline) {
     _pipeline = pipelines_manager.create(pipeline_name,
