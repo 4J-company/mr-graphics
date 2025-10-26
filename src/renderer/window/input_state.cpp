@@ -45,10 +45,16 @@ mr::InputState::KeyCallbackT mr::InputState::get_key_callback() noexcept
   return [this](const vkfw::Window &window, vkfw::Key key, int scan_code,
                 vkfw::KeyAction action, vkfw::ModifierKeyFlags flags) {
     std::lock_guard lock(update_mutex);
-    if (action == vkfw::KeyAction::ePress) {
-      _writer_key_tapped[std::to_underlying(key)] = true;
+    auto idx = std::to_underlying(key);
+
+    if (idx < 0 && idx >= _writer_key_tapped.size()) {
+      return;
     }
-    _writer_key_pressed[std::to_underlying(key)] = true;
+
+    if (action == vkfw::KeyAction::ePress) {
+        _writer_key_tapped[idx] = true;
+    }
+    _writer_key_pressed[idx] = true;
   };
 }
 
