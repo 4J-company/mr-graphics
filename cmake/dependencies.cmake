@@ -32,6 +32,7 @@ if (${vk-bootstrap_ADDED})
 endif()
 
 find_package(Vulkan)
+find_package(TBB REQUIRED tbb)
 
 # set important variables
 set(DEPS_LIBRARIES
@@ -42,17 +43,12 @@ set(DEPS_LIBRARIES
   stb::stb
   beman.inplace_vector
   boost::boost
+  TBB::tbb
 
   mr-math::mr-math
   mr-utils::mr-utils
   mr-importer::mr-importer
 )
-
-# TBB is required since it's dependency of PSTL on GCC and Clang
-if (NOT MSVC)
-  find_package(TBB REQUIRED tbb)
-  set(DEPS_LIBRARIES ${DEPS_LIBRARIES} tbb)
-endif()
 
 # install CMake scripts
 include(${CMAKE_SOURCE_DIR}/cmake/scripts.cmake)
