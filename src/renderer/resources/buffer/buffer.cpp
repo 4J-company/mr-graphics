@@ -228,6 +228,7 @@ mr::StorageBuffer::StorageBuffer(const VulkanState &state, size_t byte_size)
 // Draw inderect buffer
 // ----------------------------------------------------------------------------
 
+// TODO(dk6): make template<typename CommandStruct> public ctr and private with uint32_t argument with sizeof of command
 mr::DrawIndirectBuffer::DrawIndirectBuffer(const VulkanState &state, uint32_t max_draws_count, bool fill_from_cpu)
   : DeviceBuffer(state, sizeof(vk::DrawIndexedIndirectCommand) * max_draws_count,
                  vk::BufferUsageFlagBits::eStorageBuffer |
@@ -241,6 +242,7 @@ mr::DrawIndirectBuffer::DrawIndirectBuffer(const VulkanState &state, uint32_t ma
   }
 }
 
+// TODO(dk6): make it threadsafe
 void mr::DrawIndirectBuffer::add_command(const vk::DrawIndexedIndirectCommand &command) noexcept
 {
   ASSERT(_fill_from_cpu, "add_commmand method is only for indirect buffer which can be filled from cpu");
@@ -337,6 +339,71 @@ mr::VertexVectorBuffer::VertexVectorBuffer(const VulkanState &state, size_t star
 }
 
 // ----------------------------------------------------------------------------
+// Allocation block of GPU heap
+// ----------------------------------------------------------------------------
+
+mr::GpuHeap::AllocationBlock::AllocationBlock(VkDeviceSize size, VkDeviceSize offset, uint32_t block_number) noexcept
+  : _size(size), _offset(offset), _block_number(block_number)
+{
+  VmaVirtualBlockCreateInfo virtual_block_create_info {
+    .size = _size,
+  };
+  vmaCreateVirtualBlock(&virtual_block_create_info, &_virtual_block);
+}
+
+mr::GpuHeap::AllocationBlock::~AllocationBlock() noexcept
+{
+  if (_virtual_block != nullptr) {
+    vmaClearVirtualBlock(_virtual_block);
+    vmaDestroyVirtualBlock(_virtual_block);
+  }
+}
+
+mr::GpuHeap::AllocationBlock & mr::GpuHeap::AllocationBlock::operator=(AllocationBlock &&other) noexcept
+{
+  std::swap(_virtual_block, other._virtual_block);
+  std::swap(_size, other._size);
+  std::swap(_offset, other._offset);
+  _allocation_number = other._allocation_number.load();
+  std::swap(_block_number, other._block_number);
+  return *this;
+}
+
+std::optional<std::pair<VkDeviceSize, mr::GpuHeap::Allocation>>
+mr::GpuHeap::AllocationBlock::allocate(VkDeviceSize allocation_size, uint32_t alignment) noexcept
+{
+  Allocation allocation {
+    .byte_size = allocation_size,
+    .block_number = _block_number,
+  };
+
+  VkDeviceSize offset;
+  VmaVirtualAllocationCreateInfo alloc_info {
+    .size = allocation_size,
+    .alignment = alignment,
+  };
+
+  // vmaVirtualAllocate is not threadsafe (deepseek says)
+  std::unique_lock lock(_mutex);
+  if (vmaVirtualAllocate(_virtual_block, &alloc_info, &allocation.allocation, &offset) != VK_SUCCESS) {
+    return std::nullopt;
+  }
+  lock.unlock();
+
+  offset += _offset;
+  allocation.block_number = _block_number;
+  _allocation_number++;
+  return std::make_pair(offset, allocation);
+}
+
+void mr::GpuHeap::AllocationBlock::deallocate(Allocation &allocation) noexcept
+{
+  std::lock_guard lock(_mutex);
+  vmaVirtualFree(_virtual_block, allocation.allocation);
+  allocation.allocation = nullptr;
+}
+
+// ----------------------------------------------------------------------------
 // GPU Heap
 // ----------------------------------------------------------------------------
 
@@ -353,26 +420,29 @@ mr::GpuHeap::GpuHeap(VkDeviceSize start_byte_size, VkDeviceSize alignment)
   , _alignment(alignment)
 {
   ASSERT(is_pow2(alignment));
-  add_block(start_byte_size, 0);
+  add_block(start_byte_size);
 }
 
-mr::GpuHeap::~GpuHeap() noexcept
+mr::GpuHeap & mr::GpuHeap::operator=(GpuHeap &&other) noexcept
 {
-  for (auto &block : _blocks) {
-    vmaClearVirtualBlock(block.virtual_block);
-    vmaDestroyVirtualBlock(block.virtual_block);
+  std::swap(_alignment, other._alignment);
+  _size = other._size.load();
+  _allocations = std::move(_allocations);
+  _blocks = std::move(_blocks);
+  return *this;
+}
+
+mr::GpuHeap::AllocationBlock & mr::GpuHeap::add_block(VkDeviceSize allocation_size) noexcept
+{
+  std::lock_guard lock(_blocks_mutex);
+  VkDeviceSize block_size = allocation_size;
+  VkDeviceSize offset = 0;
+  if (not _blocks.empty()) {
+    auto &last_block = _blocks.back();
+    block_size = (last_block._size + allocation_size) * 2;
+    offset = last_block._offset + last_block._size;
   }
-}
-
-mr::GpuHeap::AllocationBlock & mr::GpuHeap::add_block(VkDeviceSize block_size, VkDeviceSize offset) noexcept
-{
-  AllocationBlock block(block_size, offset);
-  VmaVirtualBlockCreateInfo virtual_block_create_info {
-    .size = block_size,
-  };
-  vmaCreateVirtualBlock(&virtual_block_create_info, &block.virtual_block);
-  // TODO(dk6): make it threadsafe
-  _blocks.emplace_back(std::move(block));
+  _blocks.emplace_back(block_size, offset, _blocks.size());
   _size += block_size;
   return _blocks.back();
 }
@@ -381,48 +451,39 @@ mr::GpuHeap::AllocInfo mr::GpuHeap::allocate(VkDeviceSize allocation_size) noexc
 {
   ASSERT(allocation_size % _alignment == 0);
 
-  Allocation allocation { .byte_size = allocation_size };
-  VkDeviceSize offset;
-  VmaVirtualAllocationCreateInfo alloc_info {
-    .size = allocation_size,
-    .alignment = _alignment,
-  };
+  std::pair<VkDeviceSize, Allocation> allocation;
 
+  // TODO(dk6): Itterate over blocks is not threadsafe, it can be realocated after emplace back
+  // I think here we must use something like tbb vector
   bool allocated = false;
-  for (auto &&[i, block] : std::views::enumerate(_blocks)) {
-    if (vmaVirtualAllocate(block.virtual_block, &alloc_info, &allocation.allocation, &offset) == VK_SUCCESS) {
-      offset += block.offset;
-      allocation.block_number = i;
-      block.allocation_number++;
+  for (auto &block : _blocks) {
+    auto &&res = block.allocate(allocation_size, _alignment);
+    if (res.has_value()) {
+      allocation = std::move(res.value());
       allocated = true;
       break;
     }
   }
 
   if (not allocated) {
-    // TODO(dk6): make it threadsafe
-    allocation.block_number = _blocks.size();
-    const auto &last_block = _blocks.back();
-    auto &new_block = add_block((last_block.size + allocation_size) * 2, last_block.offset + last_block.size);
-    auto result = vmaVirtualAllocate(new_block.virtual_block, &alloc_info, &allocation.allocation, &offset);
-    ASSERT(result == VK_SUCCESS);
-    offset += new_block.offset;
-    new_block.allocation_number++;
+    auto &&res = add_block(allocation_size).allocate(allocation_size, _alignment);
+    ASSERT(res.has_value());
+    allocation = std::move(res.value());
   }
 
-  ASSERT(offset % _alignment == 0);
+  ASSERT(allocation.first % _alignment == 0);
 
-  // TODO(dk6): make it thread safe critical section
-  _allocations.insert({offset, allocation});
-  return AllocInfo {offset, not allocated};
+  std::lock_guard lock(_allocations_mutex);
+  _allocations.insert(allocation);
+  return AllocInfo {allocation.first, not allocated};
 }
 
 void mr::GpuHeap::deallocate(VkDeviceSize offset) noexcept
 {
+  std::lock_guard lock(_allocations_mutex);
   ASSERT(_allocations.contains(offset));
-  // TODO(dk6): make it thread safe critical section
   auto &allocation = _allocations[offset];
-  vmaVirtualFree(_blocks[allocation.block_number].virtual_block, allocation.allocation);
+  _blocks[allocation.block_number].deallocate(allocation);
   _allocations.erase(offset);
 }
 

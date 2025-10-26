@@ -316,23 +316,27 @@ inline namespace graphics {
       uint32_t block_number;
     };
 
-    struct AllocationBlock {
-      VmaVirtualBlock virtual_block = nullptr;
-      VkDeviceSize size = 0;
-      VkDeviceSize offset = 0;
-      uint32_t allocation_number = 0;
-      // TODO(dk6): if uncomment code we will have `illegal instruction` error with segfault
-      // std::atomic_uint32_t allocation_number = 0;
+    class AllocationBlock {
+      friend class GpuHeap;
 
-      AllocationBlock(VkDeviceSize size = 0, VkDeviceSize offset = 0) : size(size), offset(offset) {}
+    private:
+      VmaVirtualBlock _virtual_block = nullptr;
+      VkDeviceSize _size = 0;
+      VkDeviceSize _offset = 0;
+      std::atomic<uint32_t> _allocation_number = 0;
+      uint32_t _block_number = 0;
+      std::mutex _mutex;
 
-      // AllocationBlock & operator=(AllocationBlock &&other) noexcept
-      // {
-      //   virtual_block = other.virtual_block;
-      //   size = other.size;
-      //   allocation_number.store(other.allocation_number.load());
-      // }
-      // AllocationBlock(AllocationBlock &&other) noexcept { *this = std::move(other); }
+    public:
+      AllocationBlock(VkDeviceSize size, VkDeviceSize offset, uint32_t block_number) noexcept;
+      ~AllocationBlock() noexcept;
+
+      AllocationBlock & operator=(AllocationBlock &&other) noexcept;
+      AllocationBlock(AllocationBlock &&other) noexcept { *this = std::move(other); }
+
+      std::optional<std::pair<VkDeviceSize, Allocation>> allocate(VkDeviceSize allocation_size,
+                                                                  uint32_t alignment) noexcept;
+      void deallocate(Allocation &allocation) noexcept;
     };
 
   public:
@@ -342,20 +346,22 @@ inline namespace graphics {
     };
 
   private:
-    VkDeviceSize _size = 0;
+    std::atomic<uint32_t> _size = 0;
     uint32_t _alignment = 16;
 
     // Not hashtable - very important decreasing order of keys
+    std::mutex _allocations_mutex;
     std::map<VkDeviceSize, Allocation> _allocations;
+
+    std::mutex _blocks_mutex;
     std::vector<AllocationBlock> _blocks;
 
   public:
     // alignment must be pow of 2
     GpuHeap(VkDeviceSize start_byte_size = 1'000'000, VkDeviceSize alignment = 16);
-    ~GpuHeap() noexcept;
 
-    GpuHeap(GpuHeap &&) noexcept = default;
-    GpuHeap & operator=(GpuHeap &&) noexcept = default;
+    GpuHeap(GpuHeap &&other) noexcept { *this = std::move(other); };
+    GpuHeap & operator=(GpuHeap &&) noexcept;
 
     // size must be aligned by alignment parameter
     AllocInfo allocate(VkDeviceSize size) noexcept;
@@ -366,7 +372,7 @@ inline namespace graphics {
     uint32_t alignment() const noexcept { return _alignment; }
 
   private:
-    AllocationBlock & add_block(VkDeviceSize block_size, VkDeviceSize offset) noexcept;
+    AllocationBlock & add_block(VkDeviceSize allocation_size = 0) noexcept;
   };
 
   class HeapBuffer {
