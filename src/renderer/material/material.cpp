@@ -24,7 +24,7 @@ mr::graphics::Material::Material(Scene &scene,
 
   std::ranges::copy(textures, _textures.begin());
 
-  std::array layouts { scene.render_context().bindless_set_layout(), scene.scene_set_layout() };
+  std::array layouts { scene.render_context().bindless_set_layout() };
   auto &pipelines_manager = mr::ResourceManager<GraphicsPipeline>::get();
   auto pipeline_name = std::format("{}_{}", materials_pipeline_name, shader->name());
   _pipeline = pipelines_manager.find(pipeline_name);

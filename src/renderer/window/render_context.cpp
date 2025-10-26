@@ -124,24 +124,8 @@ mr::RenderContext::~RenderContext()
 }
 
 std::vector<VkDeviceSize> mr::RenderContext::add_vertex_buffers(
-  const std::vector<std::span<const std::byte>> &vbufs_data) noexcept
+  std::span<const std::span<const std::byte>> vbufs_data) noexcept
 {
-  // std::println("test heap");
-  // GpuHeap heap(4, 1);
-  // for (int i = 0; i < 4; i++) {
-  //   std::println("test heap i = {}", i);
-  //   auto alloc = heap.allocate(1);
-  //   ASSERT(alloc.offset == i);
-  //   ASSERT(!alloc.resized, "i = {}", i);
-  //   std::println("test heap i = {} done", i);
-  // }
-  // std::println("test heap last");
-  // auto alloc = heap.allocate(1);
-  // ASSERT(alloc.offset == 4);
-  // ASSERT(alloc.resized, "last");
-  // std::println("test heap last done");
-  // std::println("test heap done");
-
   // Tmp theme - fixed attributes layout
   ASSERT(vbufs_data.size() == 2);
 
@@ -169,7 +153,7 @@ std::vector<VkDeviceSize> mr::RenderContext::add_vertex_buffers(
   return std::vector {positions_offset, attributes_offset};
 }
 
-void mr::RenderContext::delete_vertex_buffers(const std::vector<VkDeviceSize> &vbufs) noexcept
+void mr::RenderContext::delete_vertex_buffers(std::span<const VkDeviceSize> vbufs) noexcept
 {
   // Tmp theme - fixed attributes layout
   ASSERT(vbufs.size() == 2);
@@ -314,8 +298,10 @@ void mr::RenderContext::render_models(const SceneHandle scene)
     draw.commands_buffer.update();
     draw.meshes_render_info.write(std::span(draw.meshes_render_info_data));
 
-    uint32_t stride = sizeof(vk::DrawIndexedIndirectCommand);
+    uint32_t stride = sizeof(decltype(draw.commands_buffer)::CommandType);
     _models_command_unit->drawIndexedIndirect(draw.commands_buffer.buffer(), 0, draw.meshes.size(), stride);
+
+    // TODO(dk6): If we rendering different meshes for one indirect commands we can not use conditional rendering :(
 
     // for (auto [draw_number, mesh] : std::views::enumerate(draw.meshes)) {
     //   vk::ConditionalRenderingBeginInfoEXT conditional_rendering_begin_info {

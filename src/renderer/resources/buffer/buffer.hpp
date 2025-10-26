@@ -308,7 +308,7 @@ inline namespace graphics {
   template <IndirectCommand CommandT>
   class CpuWritableDrawIndirectBuffer : public DrawIndirectBuffer {
   public:
-    using type = CommandT;
+    using CommandType = CommandT;
 
   private:
     std::mutex _mutex;

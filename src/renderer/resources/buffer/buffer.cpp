@@ -243,8 +243,8 @@ mr::DrawIndirectBuffer::DrawIndirectBuffer(const VulkanState &state,
 
 void mr::DrawIndirectBuffer::resize_draws_count(uint32_t draws_count) noexcept
 {
-  ASSERT(draws_count > _draws_count);
   resize(draws_count * _command_size);
+  _draws_count = draws_count;
 }
 
 // ----------------------------------------------------------------------------
@@ -285,7 +285,7 @@ void mr::VectorBuffer::recreate_buffer(VkDeviceSize new_size) noexcept
   vk::BufferCopy buffer_copy {
     .srcOffset = 0,
     .dstOffset = 0,
-    .size = _size, // TODO(dk6): copy only used data, not all previously allocated
+    .size = _size,
   };
   // TODO(dk6): pass RenderContext to buffer and get from it
   static CommandUnit command_unit(*_state);

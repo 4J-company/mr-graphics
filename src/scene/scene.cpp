@@ -16,13 +16,6 @@ mr::Scene::Scene(RenderContext &render_context)
 
   _camera_buffer_id = render_context.bindless_set().register_resource(&_camera_uniform_buffer);
   _transforms_buffer_id = render_context.bindless_set().register_resource(&_transforms);
-
-  using BindingDescription = DescriptorSetLayout::BindingDescription;
-  std::array bindings {
-    BindingDescription {0, vk::DescriptorType::eStorageBuffer},
-  };
-  _scene_descriptor_set_layout = ResourceManager<DescriptorSetLayout>::get().create("Scene descriptor set layout",
-    _parent->vulkan_state(), vk::ShaderStageFlagBits::eAllGraphics, bindings);
 }
 
 mr::Scene::~Scene()

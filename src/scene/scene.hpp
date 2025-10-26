@@ -57,8 +57,6 @@ inline namespace graphics {
     ConditionalBuffer _visibility; // u32 visibility mask for each draw call
     std::vector<uint32_t> _visibility_data;
 
-    DescriptorSetLayoutHandle _scene_descriptor_set_layout;
-
     mutable UniformBuffer _camera_uniform_buffer;
     mr::FPSCamera _camera;
     uint32_t _camera_buffer_id;  // id in bindless descriptor set
@@ -105,8 +103,6 @@ inline namespace graphics {
 
     uint32_t transforms_buffer_id() const noexcept { return _transforms_buffer_id; }
     uint32_t camera_buffer_id() const noexcept { return _camera_buffer_id; }
-
-    DescriptorSetLayoutHandle scene_set_layout() const noexcept { return _scene_descriptor_set_layout; }
 
   private:
     void update_camera_buffer() noexcept;
