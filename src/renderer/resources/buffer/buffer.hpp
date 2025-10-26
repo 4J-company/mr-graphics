@@ -277,9 +277,9 @@ inline namespace graphics {
 
   template<typename T>
   concept IndirectCommand =
-    std::is_same_v<T, vk::DrawIndexedIndirectCommand> ||
-    std::is_same_v<T, vk::DrawIndirectCommand> ||
-    std::is_same_v<T, vk::DrawMeshTasksIndirectCommandNV>;
+    std::is_same_v<std::remove_cvref_t<T>, vk::DrawIndexedIndirectCommand> ||
+    std::is_same_v<std::remove_cvref_t<T>, vk::DrawIndirectCommand> ||
+    std::is_same_v<std::remove_cvref_t<T>, vk::DrawMeshTasksIndirectCommandNV>;
 
   class DrawIndirectBuffer : public VectorBuffer {
   protected:
@@ -306,7 +306,7 @@ inline namespace graphics {
   };
 
   template <IndirectCommand CommandT>
-  class CpuWritableDrawIndirectBuffer : public DrawIndirectBuffer {
+  class HostWritableDrawIndirectBuffer : public DrawIndirectBuffer {
   public:
     using CommandType = CommandT;
 
@@ -316,16 +316,16 @@ inline namespace graphics {
     std::vector<CommandT> _draws;
 
   public:
-    CpuWritableDrawIndirectBuffer() = default;
+    HostWritableDrawIndirectBuffer() = default;
 
-    CpuWritableDrawIndirectBuffer(const VulkanState &state, uint32_t start_draws_count = 1000)
+    HostWritableDrawIndirectBuffer(const VulkanState &state, uint32_t start_draws_count = 1000)
       : DrawIndirectBuffer(state, vk::BufferUsageFlagBits::eTransferDst, sizeof(CommandT), start_draws_count)
     {
       _draws.reserve(start_draws_count);
     }
 
-    CpuWritableDrawIndirectBuffer(CpuWritableDrawIndirectBuffer &&other) noexcept { *this = std::move(other); }
-    CpuWritableDrawIndirectBuffer & operator=(CpuWritableDrawIndirectBuffer &&other) noexcept
+    HostWritableDrawIndirectBuffer(HostWritableDrawIndirectBuffer &&other) noexcept { *this = std::move(other); }
+    HostWritableDrawIndirectBuffer & operator=(HostWritableDrawIndirectBuffer &&other) noexcept
     {
       static_cast<DrawIndirectBuffer &>(*this) =std::move(static_cast<DrawIndirectBuffer &>(other));
       std::lock_guard lock(other._mutex);
