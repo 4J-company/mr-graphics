@@ -23,7 +23,7 @@ mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent)
   , _vertex_buffers_heap(default_vertex_number, 1)
   , _positions_vertex_buffer(*_state, default_vertex_number * position_bytes_size)
   , _attributes_vertex_buffer(*_state, default_vertex_number * attributes_bytes_size)
-  , _index_buffer(*_state, 20'000, 4)
+  , _index_buffer(*_state, default_index_number * sizeof(uint32_t), sizeof(uint32_t))
 {
   for (auto _ : std::views::iota(0, gbuffers_number)) {
     _gbuffers.emplace_back(*_state, _extent, vk::Format::eR32G32B32A32Sfloat);

@@ -58,8 +58,9 @@ mr::ModelHandle mr::Scene::create_model(std::string_view filename) noexcept
     auto *pipeline = &material->pipeline();
     if (not _draws.contains(pipeline)) {
       auto &draw = _draws[pipeline];
-      // TODO(dk6): Maybe max_scene_instances is too big number here
-      draw.commands_buffer = DrawIndirectBuffer(_parent->vulkan_state(), max_scene_instances, true);
+      // TODO(dk6): I think max_scene_instances is too big number here
+      draw.commands_buffer =
+        CpuWritableDrawIndirectBuffer<vk::DrawIndexedIndirectCommand>(_parent->vulkan_state(), max_scene_instances);
       draw.meshes_render_info = StorageBuffer(_parent->vulkan_state(), sizeof(Mesh::RenderInfo) * max_scene_instances);
       draw.meshes_render_info_id = _parent->bindless_set().register_resource(&draw.meshes_render_info);
     }

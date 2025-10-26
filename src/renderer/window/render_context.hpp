@@ -44,6 +44,7 @@ inline namespace graphics {
     constexpr static inline uint32_t position_bytes_size = 12;
     constexpr static inline uint32_t attributes_bytes_size = 64;
     constexpr static inline uint32_t default_vertex_number = 10'000'000;
+    constexpr static inline uint32_t default_index_number = default_vertex_number * 2;
 
   private:
     std::shared_ptr<VulkanState> _state;

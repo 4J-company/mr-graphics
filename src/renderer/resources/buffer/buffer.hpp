@@ -248,29 +248,6 @@ inline namespace graphics {
     vk::IndexType index_type() const noexcept { return _index_type; }
   };
 
-  class DrawIndirectBuffer : public DeviceBuffer {
-  private:
-    uint32_t _max_draws_count;
-
-    // TODO(dk6): Maybe it can be unneccessary in future
-    bool _fill_from_cpu = false;
-    // TODO(dk6): make it threadsafe
-    bool _updated = true;
-    std::vector<vk::DrawIndexedIndirectCommand> _draws;
-
-  public:
-    DrawIndirectBuffer() = default;
-
-    DrawIndirectBuffer(const VulkanState &state, uint32_t max_draws_count, bool fill_from_cpu = true);
-
-    DrawIndirectBuffer(DrawIndirectBuffer &&) noexcept = default;
-    DrawIndirectBuffer & operator=(DrawIndirectBuffer &&) noexcept = default;
-
-    void add_command(const vk::DrawIndexedIndirectCommand &command) noexcept;
-    void clear() noexcept;
-    void update() noexcept;
-  };
-
   class VectorBuffer : public DeviceBuffer {
   private:
     vk::BufferUsageFlags _usage_flags {};
@@ -296,6 +273,92 @@ inline namespace graphics {
 
   private:
     void recreate_buffer(VkDeviceSize new_size) noexcept;
+  };
+
+  template<typename T>
+  concept IndirectCommand =
+    std::is_same_v<T, vk::DrawIndexedIndirectCommand> ||
+    std::is_same_v<T, vk::DrawIndirectCommand> ||
+    std::is_same_v<T, vk::DrawMeshTasksIndirectCommandNV>;
+
+  class DrawIndirectBuffer : public VectorBuffer {
+  protected:
+    uint32_t _draws_count = 0;
+    uint32_t _command_size = 0;
+
+  public:
+    DrawIndirectBuffer() = default;
+
+    template <IndirectCommand CommandT>
+    DrawIndirectBuffer(const VulkanState &state, uint32_t start_draws_count = 1000)
+      : DrawIndirectBuffer(state, {}, sizeof(CommandT), start_draws_count) {}
+
+    DrawIndirectBuffer(DrawIndirectBuffer &&) noexcept = default;
+    DrawIndirectBuffer & operator=(DrawIndirectBuffer &&) noexcept = default;
+
+    void resize_draws_count(uint32_t draws_count) noexcept;
+
+  protected:
+    DrawIndirectBuffer(const VulkanState &state,
+                       vk::BufferUsageFlags additional_usage,
+                       uint32_t command_size,
+                       uint32_t start_draws_count = 1000);
+  };
+
+  template <IndirectCommand CommandT>
+  class CpuWritableDrawIndirectBuffer : public DrawIndirectBuffer {
+  public:
+    using type = CommandT;
+
+  private:
+    std::mutex _mutex;
+    std::atomic<bool> _dirty = true;
+    std::vector<CommandT> _draws;
+
+  public:
+    CpuWritableDrawIndirectBuffer() = default;
+
+    CpuWritableDrawIndirectBuffer(const VulkanState &state, uint32_t start_draws_count = 1000)
+      : DrawIndirectBuffer(state, vk::BufferUsageFlagBits::eTransferDst, sizeof(CommandT), start_draws_count)
+    {
+      _draws.reserve(start_draws_count);
+    }
+
+    CpuWritableDrawIndirectBuffer(CpuWritableDrawIndirectBuffer &&other) noexcept { *this = std::move(other); }
+    CpuWritableDrawIndirectBuffer & operator=(CpuWritableDrawIndirectBuffer &&other) noexcept
+    {
+      static_cast<DrawIndirectBuffer &>(*this) =std::move(static_cast<DrawIndirectBuffer &>(other));
+      std::lock_guard lock(other._mutex);
+      _dirty = true;
+      _draws = std::move(other._draws);
+      return *this;
+    }
+
+    void add_command(const CommandT &command) noexcept
+    {
+      std::lock_guard lock(_mutex);
+      _draws.emplace_back(command);
+      _dirty = true;
+    }
+
+    void clear() noexcept
+    {
+      std::lock_guard lock(_mutex);
+      _draws.clear();
+      _dirty = true;
+    }
+
+    void update() noexcept
+    {
+      if (_dirty) {
+        std::lock_guard lock(_mutex);
+        if (_draws.size() > _draws_count) {
+          resize_draws_count(_draws.capacity());
+        }
+        write(std::span(_draws));
+        _dirty = false;
+      }
+    }
   };
 
   class VertexVectorBuffer : public VectorBuffer {

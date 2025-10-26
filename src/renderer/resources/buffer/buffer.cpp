@@ -228,44 +228,23 @@ mr::StorageBuffer::StorageBuffer(const VulkanState &state, size_t byte_size)
 // Draw inderect buffer
 // ----------------------------------------------------------------------------
 
-// TODO(dk6): make template<typename CommandStruct> public ctr and private with uint32_t argument with sizeof of command
-mr::DrawIndirectBuffer::DrawIndirectBuffer(const VulkanState &state, uint32_t max_draws_count, bool fill_from_cpu)
-  : DeviceBuffer(state, sizeof(vk::DrawIndexedIndirectCommand) * max_draws_count,
-                 vk::BufferUsageFlagBits::eStorageBuffer |
-                 vk::BufferUsageFlagBits::eTransferDst |
-                 vk::BufferUsageFlagBits::eIndirectBuffer)
-  , _max_draws_count(max_draws_count)
-  , _fill_from_cpu(fill_from_cpu)
+// vk::BufferUsageFlagBits::eTransferDst |
+mr::DrawIndirectBuffer::DrawIndirectBuffer(const VulkanState &state,
+                                           vk::BufferUsageFlags additional_usage,
+                                           uint32_t command_size,
+                                           uint32_t start_draws_count)
+  : VectorBuffer(state,
+                 vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eIndirectBuffer | additional_usage,
+                 command_size * start_draws_count)
+  , _draws_count(start_draws_count)
+  , _command_size(command_size)
 {
-  if (_fill_from_cpu) {
-    _draws.reserve(max_draws_count);
-  }
 }
 
-// TODO(dk6): make it threadsafe
-void mr::DrawIndirectBuffer::add_command(const vk::DrawIndexedIndirectCommand &command) noexcept
+void mr::DrawIndirectBuffer::resize_draws_count(uint32_t draws_count) noexcept
 {
-  ASSERT(_fill_from_cpu, "add_commmand method is only for indirect buffer which can be filled from cpu");
-  ASSERT(_draws.size() <= _max_draws_count,
-         "not enough space for indirect command storing, increase size of indirect buffer");
-  _draws.emplace_back(command);
-  _updated = false;
-}
-
-void mr::DrawIndirectBuffer::clear() noexcept
-{
-  ASSERT(_fill_from_cpu, "clear method is only for indirect buffer which can be filled from cpu");
-  _draws.clear();
-  _updated = false;
-}
-
-void mr::DrawIndirectBuffer::update() noexcept
-{
-  ASSERT(_fill_from_cpu, "update method is only for indirect buffer which can be filled from cpu");
-  if (not _updated) {
-    write(std::span(_draws));
-    _updated = true;
-  }
+  ASSERT(draws_count > _draws_count);
+  resize(draws_count * _command_size);
 }
 
 // ----------------------------------------------------------------------------
@@ -361,6 +340,7 @@ mr::GpuHeap::AllocationBlock::~AllocationBlock() noexcept
 
 mr::GpuHeap::AllocationBlock & mr::GpuHeap::AllocationBlock::operator=(AllocationBlock &&other) noexcept
 {
+  std::lock_guard lock(other._mutex);
   std::swap(_virtual_block, other._virtual_block);
   std::swap(_size, other._size);
   std::swap(_offset, other._offset);
@@ -425,6 +405,9 @@ mr::GpuHeap::GpuHeap(VkDeviceSize start_byte_size, VkDeviceSize alignment)
 
 mr::GpuHeap & mr::GpuHeap::operator=(GpuHeap &&other) noexcept
 {
+  // TODO(dk6): another reason to use tbb vector for blocks is a opprtunity to have a deadlock
+  std::lock_guard lock1(other._blocks_mutex);
+  std::lock_guard lock2(other._allocations_mutex);
   std::swap(_alignment, other._alignment);
   _size = other._size.load();
   _allocations = std::move(_allocations);

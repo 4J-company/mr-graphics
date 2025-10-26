@@ -20,7 +20,7 @@ inline namespace graphics {
   private:
     struct MeshesWithSamePipeline {
       std::vector<const Mesh *> meshes;
-      DrawIndirectBuffer commands_buffer;
+      CpuWritableDrawIndirectBuffer<vk::DrawIndexedIndirectCommand> commands_buffer;
 
       // Instead have meshes data buffer for each Pipeline we can use one per Scene and passed offset to
       // meshes_render_info by push constants.
