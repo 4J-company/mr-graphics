@@ -40,9 +40,8 @@ inline namespace graphics {
     constexpr static uint32_t uniform_buffer_binding = 1;
     constexpr static uint32_t storage_buffer_binding = 2;
 
-    // TODO(dk6): make this number not magic numbers
-    constexpr static inline uint32_t position_bytes_size = 12;
-    constexpr static inline uint32_t attributes_bytes_size = 64;
+    constexpr static inline uint32_t position_bytes_size = sizeof(mr::Position);
+    constexpr static inline uint32_t attributes_bytes_size = sizeof(mr::VertexAttributes);
     constexpr static inline uint32_t default_vertex_number = 10'000'000;
     constexpr static inline uint32_t default_index_number = default_vertex_number * 2;
 
@@ -77,7 +76,7 @@ inline namespace graphics {
     BindlessDescriptorSetLayoutHandle _bindless_set_layout;
     BindlessDescriptorSet _bindless_set;
 
-    GpuHeap _vertex_buffers_heap;
+    DeviceHeap _vertex_buffers_heap;
     VertexVectorBuffer _positions_vertex_buffer;
     VertexVectorBuffer _attributes_vertex_buffer;
     IndexHeapBuffer _index_buffer;

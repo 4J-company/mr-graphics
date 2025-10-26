@@ -72,9 +72,7 @@ mr::graphics::Model::Model(
       const size_t instance_offset = scene._transforms_data.size();
       const size_t mesh_offset = scene._bounds_data.size();
 
-      ASSERT(std::as_bytes(std::span(mesh.positions)).size() / 12.f ==
-             std::as_bytes(std::span(mesh.attributes)).size() / 64.f);
-      std::vector vbufs_data {
+      std::array vbufs_data {
         std::as_bytes(std::span(mesh.positions)),
         std::as_bytes(std::span(mesh.attributes))
       };

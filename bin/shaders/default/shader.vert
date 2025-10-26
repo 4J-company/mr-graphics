@@ -1,5 +1,5 @@
 /**/
-#version 460 // required fro gl_DrawID (https://wikis.khronos.org/opengl/Vertex_Shader/Defined_Inputs)
+#version 460 // required for gl_DrawID (https://wikis.khronos.org/opengl/Vertex_Shader/Defined_Inputs)
 
 layout(location = 0) in vec3 InPos;
 layout(location = 1) in vec4 InColor;
@@ -20,7 +20,7 @@ layout(location = 5) out vec4 occlusion;
 struct DrawInfo {
   uint mesh_offset;
   uint instance_offset;
-  uint material_ubo_id;
+  uint material_buffer_id;
   uint camera_buffer_id;
   uint transforms_buffer_id;
 };
@@ -54,7 +54,7 @@ void main()
 {
   // TODO(dk6): move readings from texture to fragment shader, because these readings can be useless if fragment isn't on screen
   vec2 tex_coord = InTexCoord.xy;
-  uint mat_id = draw.material_ubo_id;
+  uint mat_id = draw.material_buffer_id;
   vec4 base_color = get_base_color(mat_id, tex_coord);
   vec4 metallic_roughness_color = get_metallic_roughness_color(mat_id, tex_coord);
   vec4 emissive_color = get_emissive_color(mat_id, tex_coord);

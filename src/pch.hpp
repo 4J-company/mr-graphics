@@ -4,6 +4,7 @@
 // libraries includes
 #include <algorithm>
 #include <array>
+#include <bitset>
 #include <chrono>
 #include <concepts>
 #include <cstdlib>

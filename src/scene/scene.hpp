@@ -22,9 +22,6 @@ inline namespace graphics {
       std::vector<const Mesh *> meshes;
       CpuWritableDrawIndirectBuffer<vk::DrawIndexedIndirectCommand> commands_buffer;
 
-      // Instead have meshes data buffer for each Pipeline we can use one per Scene and passed offset to
-      // meshes_render_info by push constants.
-      // But if so it will be difficult to update scene - for insert data we must move data in memory.
       StorageBuffer meshes_render_info; // render data for each mesh
       std::vector<Mesh::RenderInfo> meshes_render_info_data;
       uint32_t meshes_render_info_id = -1;
@@ -43,8 +40,6 @@ inline namespace graphics {
     > _lights;
 
     SmallVector<ModelHandle> _models;
-    // TODO(dk6): Move of Material change pointer, but now we use materials only from Manager so it is not a problem
-    // TODO(dk6): Maybe changes key type from Material to GraphicsPipelines - but now between these class 1:1 relation
     std::unordered_map<const GraphicsPipeline *, MeshesWithSamePipeline> _draws;
 
     StorageBuffer _transforms; // transform matrix    for each instance

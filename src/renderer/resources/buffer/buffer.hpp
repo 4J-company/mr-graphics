@@ -371,7 +371,7 @@ inline namespace graphics {
     VertexVectorBuffer & operator=(VertexVectorBuffer &&) noexcept = default;
   };
 
-  class GpuHeap {
+  class DeviceHeap {
   private:
     struct Allocation {
       VmaVirtualAllocation allocation;
@@ -380,7 +380,7 @@ inline namespace graphics {
     };
 
     class AllocationBlock {
-      friend class GpuHeap;
+      friend class DeviceHeap;
 
     private:
       VmaVirtualBlock _virtual_block = nullptr;
@@ -412,19 +412,18 @@ inline namespace graphics {
     std::atomic<uint32_t> _size = 0;
     uint32_t _alignment = 16;
 
-    // Not hashtable - very important decreasing order of keys
     std::mutex _allocations_mutex;
-    std::map<VkDeviceSize, Allocation> _allocations;
+    boost::unordered_map<VkDeviceSize, Allocation> _allocations;
 
     std::mutex _blocks_mutex;
     std::vector<AllocationBlock> _blocks;
 
   public:
     // alignment must be pow of 2
-    GpuHeap(VkDeviceSize start_byte_size = 1'000'000, VkDeviceSize alignment = 16);
+    DeviceHeap(VkDeviceSize start_byte_size = 1'000'000, VkDeviceSize alignment = 16);
 
-    GpuHeap(GpuHeap &&other) noexcept { *this = std::move(other); };
-    GpuHeap & operator=(GpuHeap &&) noexcept;
+    DeviceHeap(DeviceHeap &&other) noexcept { *this = std::move(other); };
+    DeviceHeap & operator=(DeviceHeap &&) noexcept;
 
     // size must be aligned by alignment parameter
     AllocInfo allocate(VkDeviceSize size) noexcept;
@@ -441,7 +440,7 @@ inline namespace graphics {
   class HeapBuffer {
   private:
     VectorBuffer _buffer;
-    GpuHeap _heap;
+    DeviceHeap _heap;
 
   public:
     HeapBuffer() = default;

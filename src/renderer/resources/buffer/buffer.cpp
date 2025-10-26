@@ -13,9 +13,7 @@ mr::Buffer::Buffer(const VulkanState &state, size_t byte_size,
   : _state(&state)
   , _size(byte_size)
 {
-  auto res = create_buffer(state, usage_flags, memory_properties, byte_size);
-  _buffer = std::move(res.first);
-  _allocation = std::move(res.second);
+  std::tie(_buffer, _allocation) = create_buffer(state, usage_flags, memory_properties, byte_size);
 }
 
 mr::Buffer::~Buffer() noexcept {
@@ -181,7 +179,7 @@ mr::DeviceBuffer & mr::DeviceBuffer::write(std::span<const std::byte> src, VkDev
 {
   ASSERT(_state != nullptr);
   ASSERT(src.data());
-  ASSERT(offset + src.size() <= _size, "offset, src.size()", offset, src.size());
+  ASSERT(offset + src.size() <= _size, "data offset + data size overflow buffer", offset, src.size());
 
   auto buf = HostBuffer(*_state, _size, vk::BufferUsageFlagBits::eTransferSrc);
   buf.write(src);
@@ -321,7 +319,7 @@ mr::VertexVectorBuffer::VertexVectorBuffer(const VulkanState &state, size_t star
 // Allocation block of GPU heap
 // ----------------------------------------------------------------------------
 
-mr::GpuHeap::AllocationBlock::AllocationBlock(VkDeviceSize size, VkDeviceSize offset, uint32_t block_number) noexcept
+mr::DeviceHeap::AllocationBlock::AllocationBlock(VkDeviceSize size, VkDeviceSize offset, uint32_t block_number) noexcept
   : _size(size), _offset(offset), _block_number(block_number)
 {
   VmaVirtualBlockCreateInfo virtual_block_create_info {
@@ -330,7 +328,7 @@ mr::GpuHeap::AllocationBlock::AllocationBlock(VkDeviceSize size, VkDeviceSize of
   vmaCreateVirtualBlock(&virtual_block_create_info, &_virtual_block);
 }
 
-mr::GpuHeap::AllocationBlock::~AllocationBlock() noexcept
+mr::DeviceHeap::AllocationBlock::~AllocationBlock() noexcept
 {
   if (_virtual_block != nullptr) {
     vmaClearVirtualBlock(_virtual_block);
@@ -338,7 +336,7 @@ mr::GpuHeap::AllocationBlock::~AllocationBlock() noexcept
   }
 }
 
-mr::GpuHeap::AllocationBlock & mr::GpuHeap::AllocationBlock::operator=(AllocationBlock &&other) noexcept
+mr::DeviceHeap::AllocationBlock & mr::DeviceHeap::AllocationBlock::operator=(AllocationBlock &&other) noexcept
 {
   std::lock_guard lock(other._mutex);
   std::swap(_virtual_block, other._virtual_block);
@@ -349,8 +347,8 @@ mr::GpuHeap::AllocationBlock & mr::GpuHeap::AllocationBlock::operator=(Allocatio
   return *this;
 }
 
-std::optional<std::pair<VkDeviceSize, mr::GpuHeap::Allocation>>
-mr::GpuHeap::AllocationBlock::allocate(VkDeviceSize allocation_size, uint32_t alignment) noexcept
+std::optional<std::pair<VkDeviceSize, mr::DeviceHeap::Allocation>>
+mr::DeviceHeap::AllocationBlock::allocate(VkDeviceSize allocation_size, uint32_t alignment) noexcept
 {
   Allocation allocation {
     .byte_size = allocation_size,
@@ -376,7 +374,7 @@ mr::GpuHeap::AllocationBlock::allocate(VkDeviceSize allocation_size, uint32_t al
   return std::make_pair(offset, allocation);
 }
 
-void mr::GpuHeap::AllocationBlock::deallocate(Allocation &allocation) noexcept
+void mr::DeviceHeap::AllocationBlock::deallocate(Allocation &allocation) noexcept
 {
   std::lock_guard lock(_mutex);
   vmaVirtualFree(_virtual_block, allocation.allocation);
@@ -388,14 +386,10 @@ void mr::GpuHeap::AllocationBlock::deallocate(Allocation &allocation) noexcept
 // ----------------------------------------------------------------------------
 
 static bool is_pow2(uint32_t n) {
-  if (n == 1) {
-    return true;
-  }
-  auto log2_of_n = std::log2(double(n));
-  return std::abs(log2_of_n - double(int(log2_of_n))) <= 0.0001;
+  return std::bitset<32>(n).count() == 1;
 }
 
-mr::GpuHeap::GpuHeap(VkDeviceSize start_byte_size, VkDeviceSize alignment)
+mr::DeviceHeap::DeviceHeap(VkDeviceSize start_byte_size, VkDeviceSize alignment)
   : _size(0)
   , _alignment(alignment)
 {
@@ -403,7 +397,7 @@ mr::GpuHeap::GpuHeap(VkDeviceSize start_byte_size, VkDeviceSize alignment)
   add_block(start_byte_size);
 }
 
-mr::GpuHeap & mr::GpuHeap::operator=(GpuHeap &&other) noexcept
+mr::DeviceHeap & mr::DeviceHeap::operator=(DeviceHeap &&other) noexcept
 {
   // TODO(dk6): another reason to use tbb vector for blocks is a opprtunity to have a deadlock
   std::lock_guard lock1(other._blocks_mutex);
@@ -415,7 +409,7 @@ mr::GpuHeap & mr::GpuHeap::operator=(GpuHeap &&other) noexcept
   return *this;
 }
 
-mr::GpuHeap::AllocationBlock & mr::GpuHeap::add_block(VkDeviceSize allocation_size) noexcept
+mr::DeviceHeap::AllocationBlock & mr::DeviceHeap::add_block(VkDeviceSize allocation_size) noexcept
 {
   std::lock_guard lock(_blocks_mutex);
   VkDeviceSize block_size = allocation_size;
@@ -430,7 +424,7 @@ mr::GpuHeap::AllocationBlock & mr::GpuHeap::add_block(VkDeviceSize allocation_si
   return _blocks.back();
 }
 
-mr::GpuHeap::AllocInfo mr::GpuHeap::allocate(VkDeviceSize allocation_size) noexcept
+mr::DeviceHeap::AllocInfo mr::DeviceHeap::allocate(VkDeviceSize allocation_size) noexcept
 {
   ASSERT(allocation_size % _alignment == 0);
 
@@ -461,11 +455,13 @@ mr::GpuHeap::AllocInfo mr::GpuHeap::allocate(VkDeviceSize allocation_size) noexc
   return AllocInfo {allocation.first, not allocated};
 }
 
-void mr::GpuHeap::deallocate(VkDeviceSize offset) noexcept
+void mr::DeviceHeap::deallocate(VkDeviceSize offset) noexcept
 {
   std::lock_guard lock(_allocations_mutex);
-  ASSERT(_allocations.contains(offset));
-  auto &allocation = _allocations[offset];
+  auto allocation_it = _allocations.find(offset);
+  ASSERT(allocation_it != _allocations.end(),
+         "Tried to deallocate non-allocated memory block (probably a double-free)", offset);
+  auto &allocation = allocation_it->second;
   _blocks[allocation.block_number].deallocate(allocation);
   _allocations.erase(offset);
 }
