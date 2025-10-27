@@ -275,12 +275,12 @@ inline namespace graphics {
     void recreate_buffer(VkDeviceSize new_size) noexcept;
   };
 
+  // TODO(mt6+dk6): refactor this
   template<typename T>
   concept IndirectCommand =
     std::is_same_v<std::remove_cvref_t<T>, vk::DrawIndexedIndirectCommand> ||
     std::is_same_v<std::remove_cvref_t<T>, vk::DrawIndirectCommand> ||
     std::is_same_v<std::remove_cvref_t<T>, vk::DrawMeshTasksIndirectCommandNV>;
-
   class DrawIndirectBuffer : public VectorBuffer {
   protected:
     uint32_t _draws_count = 0;
@@ -388,12 +388,15 @@ inline namespace graphics {
       VkDeviceSize _offset = 0;
       std::atomic<uint32_t> _allocation_number = 0;
       uint32_t _block_number = 0;
+      // mutex for concurrent work with virtual block.
+      // Maybe it is unneccessary, but now I can not prove what VmaVirtualBlock functions is thread safe)
       std::mutex _mutex;
 
     public:
       AllocationBlock(VkDeviceSize size, VkDeviceSize offset, uint32_t block_number) noexcept;
       ~AllocationBlock() noexcept;
 
+      // these methods aren't thread safe
       AllocationBlock & operator=(AllocationBlock &&other) noexcept;
       AllocationBlock(AllocationBlock &&other) noexcept { *this = std::move(other); }
 
@@ -415,13 +418,15 @@ inline namespace graphics {
     std::mutex _allocations_mutex;
     boost::unordered_map<VkDeviceSize, Allocation> _allocations;
 
-    std::mutex _blocks_mutex;
-    std::vector<AllocationBlock> _blocks;
+    std::mutex _add_block_mutex; // mutex for correct execution of 'add_block' function
+    // we use TBB vector for itteration over this while it can be resized (so memory can be reallocated)
+    tbb::concurrent_vector<AllocationBlock> _blocks;
 
   public:
     // alignment must be pow of 2
     DeviceHeapAllocator(VkDeviceSize start_byte_size = 1'000'000, VkDeviceSize alignment = 16);
 
+    // these methods aren't thread safe
     DeviceHeapAllocator(DeviceHeapAllocator &&other) noexcept { *this = std::move(other); };
     DeviceHeapAllocator & operator=(DeviceHeapAllocator &&) noexcept;
 

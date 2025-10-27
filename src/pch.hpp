@@ -35,6 +35,9 @@
 #include <boost/unordered_map.hpp>
 #include <boost/container/small_vector.hpp>
 
+#include <tbb/concurrent_hash_map.h>
+#include <tbb/concurrent_vector.h>
+
 #define VULKAN_HPP_ASSERT_ON_RESULT
 #define VULKAN_HPP_NO_EXCEPTIONS
 #define VULKAN_HPP_NO_NODISCARD_WARNINGS

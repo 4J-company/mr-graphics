@@ -338,7 +338,6 @@ mr::DeviceHeapAllocator::AllocationBlock::~AllocationBlock() noexcept
 
 mr::DeviceHeapAllocator::AllocationBlock & mr::DeviceHeapAllocator::AllocationBlock::operator=(AllocationBlock &&other) noexcept
 {
-  std::lock_guard lock(other._mutex);
   std::swap(_virtual_block, other._virtual_block);
   std::swap(_size, other._size);
   std::swap(_offset, other._offset);
@@ -399,9 +398,6 @@ mr::DeviceHeapAllocator::DeviceHeapAllocator(VkDeviceSize start_byte_size, VkDev
 
 mr::DeviceHeapAllocator & mr::DeviceHeapAllocator::operator=(DeviceHeapAllocator &&other) noexcept
 {
-  // TODO(dk6): another reason to use tbb vector for blocks is a opprtunity to have a deadlock
-  std::lock_guard lock1(other._blocks_mutex);
-  std::lock_guard lock2(other._allocations_mutex);
   std::swap(_alignment, other._alignment);
   _size = other._size.load();
   _allocations = std::move(_allocations);
@@ -411,9 +407,11 @@ mr::DeviceHeapAllocator & mr::DeviceHeapAllocator::operator=(DeviceHeapAllocator
 
 mr::DeviceHeapAllocator::AllocationBlock & mr::DeviceHeapAllocator::add_block(VkDeviceSize allocation_size) noexcept
 {
-  std::lock_guard lock(_blocks_mutex);
   VkDeviceSize block_size = allocation_size;
   VkDeviceSize offset = 0;
+  // TBB vector give us method's thread safety (we use it for correct ittertation over _blocks in 'allocate')
+  // But in this block we use a lot of different vector's methods, and we want to sequential execution of it.
+  std::lock_guard lock(_add_block_mutex);
   if (not _blocks.empty()) {
     auto &last_block = _blocks.back();
     block_size = (last_block._size + allocation_size) * 2;
@@ -430,8 +428,6 @@ mr::DeviceHeapAllocator::AllocInfo mr::DeviceHeapAllocator::allocate(VkDeviceSiz
 
   std::pair<VkDeviceSize, Allocation> allocation;
 
-  // TODO(dk6): Itterate over blocks is not threadsafe, it can be realocated after emplace back
-  // I think here we must use something like tbb vector
   bool allocated = false;
   for (auto &block : _blocks) {
     auto &&res = block.allocate(allocation_size, _alignment);
