@@ -14,6 +14,7 @@
 #include "resources/command_unit/command_unit.hpp"
 
 #include <VkBootstrap.h>
+#include <vulkan/vulkan_core.h>
 
 namespace mr {
 inline namespace graphics {
@@ -38,6 +39,9 @@ inline namespace graphics {
     constexpr static uint32_t textures_binding = 0;
     constexpr static uint32_t uniform_buffer_binding = 1;
     constexpr static uint32_t storage_buffer_binding = 2;
+
+    constexpr static inline uint32_t default_vertex_number = 10'000'000;
+    constexpr static inline uint32_t default_index_number = default_vertex_number * 2;
 
   private:
     std::shared_ptr<VulkanState> _state;
@@ -64,10 +68,16 @@ inline namespace graphics {
 
     LightsRenderData _lights_render_data;
 
+    // TODO(dk6): Maybe move to class scene
     // Bindless rednering data
     DescriptorAllocator _default_descriptor_allocator;
     BindlessDescriptorSetLayoutHandle _bindless_set_layout;
     BindlessDescriptorSet _bindless_set;
+
+    DeviceHeapAllocator _vertex_buffers_heap;
+    VertexVectorBuffer _positions_vertex_buffer;
+    VertexVectorBuffer _attributes_vertex_buffer;
+    IndexHeapBuffer _index_buffer;
 
   public:
     RenderContext(RenderContext &&other) noexcept = default;
@@ -91,6 +101,10 @@ inline namespace graphics {
     const Extent & extent() const noexcept { return _extent; }
     CommandUnit & transfer_command_unit() const noexcept { return _transfer_command_unit; }
 
+    IndexHeapBuffer & index_buffer() noexcept { return _index_buffer; }
+    VertexBuffersArray add_vertex_buffers(std::span<const std::span<const std::byte>> vbufs_data) noexcept;
+    void delete_vertex_buffers(std::span<const VertexBufferDescription> vbufs) noexcept;
+
     // ===== Resources creation =====
     WindowHandle create_window() const noexcept;
     WindowHandle create_window(const mr::Extent &extent) const noexcept;
@@ -102,6 +116,8 @@ inline namespace graphics {
     DescriptorSetLayoutHandle bindless_set_layout() const noexcept { return _bindless_set_layout; }
     BindlessDescriptorSet & bindless_set() noexcept { return _bindless_set; }
     const BindlessDescriptorSet & bindless_set() const noexcept { return _bindless_set; }
+
+    const DescriptorAllocator & desciptor_allocator() const noexcept { return _default_descriptor_allocator; }
 
   private:
     void init_lights_render_data();

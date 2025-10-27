@@ -15,82 +15,84 @@ inline namespace graphics {
   class Image;
 
   class Shader : public ResourceBase<Shader> {
-    private:
-      static inline const size_t max_shader_modules = 6;
+  private:
+    static inline const size_t max_shader_modules = 6;
 
-      std::filesystem::path _path;
-      std::array<vk::UniqueShaderModule, max_shader_modules> _modules;
-      std::array<vk::PipelineShaderStageCreateInfo, max_shader_modules> _stages;
-      std::atomic<uint> _num_of_loaded_shaders;
-      std::string _define_string;
-      std::string _include_string;
+    std::filesystem::path _path;
+    std::array<vk::UniqueShaderModule, max_shader_modules> _modules;
+    std::array<vk::PipelineShaderStageCreateInfo, max_shader_modules> _stages;
+    std::atomic<uint> _num_of_loaded_shaders;
+    std::string _define_string;
+    std::string _include_string;
 
-    public:
-      using Resource = std::variant<const UniformBuffer *, const StorageBuffer *, const Texture *, const Image *, const ConditionalBuffer*>;
+  public:
+    using Resource = std::variant<const UniformBuffer *, const StorageBuffer *, const Texture *, const Image *, const ConditionalBuffer*>;
 
-      // TODO: consider RT shaders from extensions;
-      // TODO(dk6): remove this enum, use vk::ShaderStageFlagsBits instead
-      enum struct Stage {
-        Compute  = 0,
-        Vertex   = 1,
-        Control  = 2,
-        Evaluate = 3,
-        Geometry = 4,
-        Fragment = 5,
-      };
+    // TODO: consider RT shaders from extensions;
+    // TODO(dk6): remove this enum, use vk::ShaderStageFlagsBits instead
+    enum struct Stage {
+      Compute  = 0,
+      Vertex   = 1,
+      Control  = 2,
+      Evaluate = 3,
+      Geometry = 4,
+      Fragment = 5,
+    };
 
-      struct ResourceView {
-        uint32_t binding;
-        Resource res;
+    struct ResourceView {
+      uint32_t binding;
+      Resource res;
 
-        operator const Resource&() const { return res; }
-      };
+      operator const Resource&() const { return res; }
+    };
 
-      Shader() = default;
+    Shader() = default;
 
-      Shader(const VulkanState &state, std::string_view filename,
-             const boost::unordered_map<std::string, std::string> &define_map = {});
+    Shader(const VulkanState &state, std::string_view filename,
+           const boost::unordered_map<std::string, std::string> &define_map = {});
 
-      // move semantics
-      Shader(Shader &&other) noexcept
-          : _path(std::move(other._path))
-          , _modules(std::move(other._modules))
-          , _stages(std::move(other._stages))
-          , _num_of_loaded_shaders(other._num_of_loaded_shaders.load())
-      {
-      }
+    // move semantics
+    Shader(Shader &&other) noexcept
+        : _path(std::move(other._path))
+        , _modules(std::move(other._modules))
+        , _stages(std::move(other._stages))
+        , _num_of_loaded_shaders(other._num_of_loaded_shaders.load())
+    {
+    }
 
-      Shader &operator=(Shader &&other) noexcept
-      {
-        // do not need a self check
+    Shader &operator=(Shader &&other) noexcept
+    {
+      // do not need a self check
 
-        _path = std::move(other._path);
-        _modules = std::move(other._modules);
-        _stages = std::move(other._stages);
-        _num_of_loaded_shaders = other._num_of_loaded_shaders.load();
-        return *this;
-      }
+      _path = std::move(other._path);
+      _modules = std::move(other._modules);
+      _stages = std::move(other._stages);
+      _num_of_loaded_shaders = other._num_of_loaded_shaders.load();
+      return *this;
+    }
 
-      // reload shader
-      void reload();
+    // reload shader
+    void reload();
 
-    private:
-      // compile sources
-      void compile(Stage stage) const noexcept;
+  private:
+    // compile sources
+    void compile(Stage stage) const noexcept;
 
-      // load sources
-      std::optional<std::vector<char>> load(Stage stage) noexcept;
+    // load sources
+    std::optional<std::vector<char>> load(Stage stage) noexcept;
 
-      bool _validate_stage(Stage stage, bool present)  const noexcept;
+    bool _validate_stage(Stage stage, bool present)  const noexcept;
 
-    public:
-      const std::array<vk::PipelineShaderStageCreateInfo, max_shader_modules> & stages() const { return _stages; }
+  public:
+    const std::array<vk::PipelineShaderStageCreateInfo, max_shader_modules> & stages() const { return _stages; }
 
-      std::array<vk::PipelineShaderStageCreateInfo, max_shader_modules> & stages() { return _stages; }
+    std::array<vk::PipelineShaderStageCreateInfo, max_shader_modules> & stages() { return _stages; }
 
-      uint stage_number() const noexcept { return _num_of_loaded_shaders; }
+    uint stage_number() const noexcept { return _num_of_loaded_shaders; }
 
-      std::string name() const noexcept { return _path.stem(); }
+    std::string name() const noexcept { return _path.stem(); }
+
+    std::string id() const noexcept { return name() + ":" + _define_string; }
   };
 
   MR_DECLARE_HANDLE(Shader)

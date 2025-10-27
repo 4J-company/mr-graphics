@@ -18,6 +18,19 @@ inline namespace graphics {
     friend class Model;
 
   private:
+    struct MeshesWithSamePipeline {
+      std::vector<const Mesh *> meshes;
+
+      // TODO(dk6): Make them dynamic sizable VectorBuffer
+      StorageBuffer commands_buffer;
+      std::vector<vk::DrawIndexedIndirectCommand> commands_buffer_data;
+
+      StorageBuffer meshes_render_info; // render data for each mesh
+      std::vector<Mesh::RenderInfo> meshes_render_info_data;
+      uint32_t meshes_render_info_id = -1;
+    };
+
+  private:
     static inline constexpr int max_scene_instances = 64000;
 
   private:
@@ -30,6 +43,7 @@ inline namespace graphics {
     > _lights;
 
     SmallVector<ModelHandle> _models;
+    boost::unordered_map<GraphicsPipelineHandle, MeshesWithSamePipeline> _draws;
 
     StorageBuffer _transforms; // transform matrix    for each instance
     std::vector<mr::Matr4f> _transforms_data;
@@ -63,6 +77,7 @@ inline namespace graphics {
 
     void remove(ModelHandle model)
     {
+      // TODO(dk6): Also we must delete from _draws array...
       _models.erase(std::ranges::find(_models, model));
       MR_WARNING(
         "mr::Scene::remove(ModelHandle) wastes 84 bytes on CPU."

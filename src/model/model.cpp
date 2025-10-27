@@ -72,17 +72,19 @@ mr::graphics::Model::Model(
       const size_t instance_offset = scene._transforms_data.size();
       const size_t mesh_offset = scene._bounds_data.size();
 
-      std::vector<VertexBuffer> vbufs;
-      vbufs.reserve(2);
-      vbufs.emplace_back(scene.render_context().vulkan_state(),
-          std::span(mesh.positions.data(), mesh.positions.size()));
-      vbufs.emplace_back(scene.render_context().vulkan_state(),
-          std::span(mesh.attributes.data(), mesh.attributes.size()));
+      std::array vbufs_data {
+        std::as_bytes(std::span(mesh.positions)),
+        std::as_bytes(std::span(mesh.attributes))
+      };
+      auto vbufs = scene.render_context().add_vertex_buffers(vbufs_data);
 
-      std::vector<IndexBuffer> ibufs;
+      std::vector<IndexBufferDescription> ibufs;
       ibufs.reserve(mesh.lods.size());
       for (size_t j = 0; j < mesh.lods.size(); j++) {
-        ibufs.emplace_back(scene.render_context().vulkan_state(), mesh.lods[j].indices);
+        ibufs.emplace_back(IndexBufferDescription {
+          .offset = scene.render_context().index_buffer().allocate_and_write(std::span(mesh.lods[j].indices)),
+          .elements_count = static_cast<uint32_t>(mesh.lods[j].indices.size())
+        });
       }
 
       scene._bounds_data.emplace_back();
@@ -101,11 +103,7 @@ mr::graphics::Model::Model(
         instance_offset
       );
 
-      mr::MaterialBuilder builder {
-        scene.render_context().vulkan_state(),
-        scene.render_context(),
-        "default"
-      };
+      mr::MaterialBuilder builder(scene, "default");
 
       builder.add_camera(scene.camera_uniform_buffer());
       builder.add_value(&material.constants);
@@ -123,34 +121,3 @@ mr::graphics::Model::Model(
 
   MR_INFO("Loading model {} finished\n", filename.string());
 }
-
-void mr::graphics::Model::draw(CommandUnit &unit) const noexcept
-{
-  ASSERT(_scene != nullptr, "Parent scene of the model is lost");
-  for (const auto &[material, mesh] : std::views::zip(_materials, _meshes)) {
-    uint32_t offsets[] {
-      mesh._mesh_offset,
-      mesh._instance_offset,
-      material->material_ubo_id(),
-      _scene->camera_buffer_id(),
-      _scene->transforms_buffer_id(),
-    };
-
-    vk::ConditionalRenderingBeginInfoEXT conditional_rendering_begin_info {
-      .buffer = _scene->_visibility.buffer(),
-      .offset = mesh._mesh_offset * 4,
-    };
-
-    _scene->render_context().vulkan_state().dispatch_table().cmdBeginConditionalRenderingEXT(
-      unit.command_buffer(),
-      conditional_rendering_begin_info
-    );
-    material->bind(unit);
-    unit->pushConstants(material->pipeline().layout(), vk::ShaderStageFlagBits::eAllGraphics,
-                        0, sizeof(offsets), offsets);
-    mesh.bind(unit);
-    mesh.draw(unit);
-    _scene->render_context().vulkan_state().dispatch_table().cmdEndConditionalRenderingEXT(unit.command_buffer());
-  }
-}
-

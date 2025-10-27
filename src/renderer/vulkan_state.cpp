@@ -91,7 +91,11 @@ void mr::VulkanGlobalState::_create_phys_device()
     .samplerAnisotropy = true,
   };
 
-  vk::PhysicalDeviceVulkan12Features features12{
+  vk::PhysicalDeviceVulkan11Features features11 {
+    .shaderDrawParameters = true,
+  };
+
+  vk::PhysicalDeviceVulkan12Features features12 {
     .descriptorIndexing = true,
     .descriptorBindingUniformBufferUpdateAfterBind = true,
     .descriptorBindingSampledImageUpdateAfterBind = true,
@@ -101,7 +105,7 @@ void mr::VulkanGlobalState::_create_phys_device()
     .bufferDeviceAddress = true,
   };
 
-  vk::PhysicalDeviceVulkan13Features features13{
+  vk::PhysicalDeviceVulkan13Features features13 {
     .synchronization2 = true,
     .dynamicRendering = true,
   };
@@ -115,6 +119,7 @@ void mr::VulkanGlobalState::_create_phys_device()
     .set_minimum_version(1, 3)
     .defer_surface_initialization()
     .set_required_features(features)
+    .set_required_features_11(features11)
     .set_required_features_12(features12)
     .set_required_features_13(features13)
     .set_required_features_14(features14)

@@ -1,5 +1,6 @@
 #include "scene/scene.hpp"
 #include "renderer/window/render_context.hpp"
+#include "manager/manager.hpp"
 
 mr::Scene::Scene(RenderContext &render_context)
   : _parent(&render_context)
@@ -46,6 +47,48 @@ mr::ModelHandle mr::Scene::create_model(std::string_view filename) noexcept
   auto model_handle = ResourceManager<Model>::get().create(mr::unnamed, *this, filename);
 
   _models.push_back(model_handle);
+  for (const auto &[material, mesh] : model_handle->draws()) {
+    auto pipeline = material->pipeline();
+    if (not _draws.contains(pipeline)) {
+      auto &draw = _draws[pipeline];
+      // TODO(dk6): I think max_scene_instances is too big number here
+      draw.commands_buffer =
+        StorageBuffer(_parent->vulkan_state(),
+        sizeof(vk::DrawIndexedIndirectCommand) * max_scene_instances,
+        vk::BufferUsageFlagBits::eStorageBuffer |
+          vk::BufferUsageFlagBits::eIndirectBuffer |
+          vk::BufferUsageFlagBits::eTransferDst);
+      draw.meshes_render_info = StorageBuffer(_parent->vulkan_state(), sizeof(Mesh::RenderInfo) * max_scene_instances);
+      draw.meshes_render_info_id = _parent->bindless_set().register_resource(&draw.meshes_render_info);
+    }
+    auto &draw = _draws[pipeline];
+
+    // TODO(dk6): rework for only debug
+    std::array attributes_byte_size {position_bytes_size, attributes_bytes_size};
+    ASSERT(!mesh._vbufs.empty());
+    uint32_t vertex_offset = mesh._vbufs.front().offset / attributes_byte_size.front();
+    for (auto [vbuf, size] : std::views::zip(mesh._vbufs, attributes_byte_size)) {
+      ASSERT(vbuf.offset % size == 0);
+      ASSERT(vbuf.offset / size == vertex_offset);
+    }
+
+    draw.meshes.emplace_back(&mesh);
+    draw.commands_buffer_data.emplace_back(vk::DrawIndexedIndirectCommand {
+      .indexCount = mesh.element_count(),
+      .instanceCount = mesh.num_of_instances(),
+      .firstIndex = static_cast<uint32_t>(mesh._ibufs[0].offset / sizeof(uint32_t)),
+      .vertexOffset = static_cast<int32_t>(mesh._vbufs[0].offset / position_bytes_size),
+      .firstInstance = 0,
+    });
+    draw.meshes_render_info_data.emplace_back(Mesh::RenderInfo {
+      .mesh_offset = mesh._mesh_offset,
+      .instance_offset = mesh._instance_offset,
+      .material_ubo_id = material->material_ubo_id(),
+      .camera_buffer_id = _camera_buffer_id,
+      .transforms_buffer_id = _transforms_buffer_id,
+    });
+  }
+
   return model_handle;
 }
 

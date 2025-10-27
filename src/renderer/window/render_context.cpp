@@ -20,6 +20,10 @@ mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent)
   , _depthbuffer(*_state, _extent)
   , _image_fence (_state->device().createFenceUnique({.flags = vk::FenceCreateFlagBits::eSignaled}).value)
   , _default_descriptor_allocator(*_state)
+  , _vertex_buffers_heap(default_vertex_number, 1)
+  , _positions_vertex_buffer(*_state, default_vertex_number * position_bytes_size)
+  , _attributes_vertex_buffer(*_state, default_vertex_number * attributes_bytes_size)
+  , _index_buffer(*_state, default_index_number * sizeof(uint32_t), sizeof(uint32_t))
 {
   for (auto _ : std::views::iota(0, gbuffers_number)) {
     _gbuffers.emplace_back(*_state, _extent, vk::Format::eR32G32B32A32Sfloat);
@@ -105,7 +109,8 @@ void mr::RenderContext::init_bindless_rendering()
   _bindless_set = std::move(set.value());
 }
 
-mr::RenderContext::~RenderContext() {
+mr::RenderContext::~RenderContext()
+{
   ASSERT(_state != nullptr);
 
   _state->queue().waitIdle();
@@ -116,6 +121,47 @@ mr::RenderContext::~RenderContext() {
   _image_fence.reset();
 
   _gbuffers.clear();
+}
+
+mr::VertexBuffersArray mr::RenderContext::add_vertex_buffers(
+  std::span<const std::span<const std::byte>> vbufs_data) noexcept
+{
+  // Tmp theme - fixed attributes layout
+  ASSERT(vbufs_data.size() == 2);
+
+  auto &positions_data = vbufs_data[0];
+  auto &attributes_data = vbufs_data[1];
+
+  ASSERT(positions_data.size() % position_bytes_size == 0);
+  ASSERT(attributes_data.size() % attributes_bytes_size == 0);
+
+  ASSERT(positions_data.size() / position_bytes_size == attributes_data.size() / attributes_bytes_size);
+  VkDeviceSize vertexes_number = positions_data.size() / position_bytes_size;
+
+  auto alloc_info = _vertex_buffers_heap.allocate(vertexes_number);
+  if (alloc_info.resized) {
+    _positions_vertex_buffer.resize(_vertex_buffers_heap.size() * position_bytes_size);
+    _attributes_vertex_buffer.resize(_vertex_buffers_heap.size() * attributes_bytes_size);
+  }
+
+  VkDeviceSize positions_offset = alloc_info.offset * position_bytes_size;
+  VkDeviceSize attributes_offset = alloc_info.offset * attributes_bytes_size;
+
+  _positions_vertex_buffer.write(positions_data, positions_offset);
+  _attributes_vertex_buffer.write(attributes_data, attributes_offset);
+
+  return VertexBuffersArray {
+    VertexBufferDescription { .offset = positions_offset },
+    VertexBufferDescription { .offset = attributes_offset },
+  };
+}
+
+void mr::RenderContext::delete_vertex_buffers(std::span<const VertexBufferDescription> vbufs) noexcept
+{
+  // Tmp theme - fixed attributes layout
+  ASSERT(vbufs.size() == 2);
+  uint32_t heap_offset = vbufs[0].offset / position_bytes_size;
+  _vertex_buffers_heap.deallocate(heap_offset);
 }
 
 mr::WindowHandle mr::RenderContext::create_window() const noexcept
@@ -227,8 +273,55 @@ void mr::RenderContext::render_models(const SceneHandle scene)
   };
   _models_command_unit->setScissor(0, scissors);
 
-  for (ModelHandle model : scene->_models) {
-    model->draw(_models_command_unit);
+  // ===== Rendering geometry ======
+
+  std::array vertex_buffers {
+    _positions_vertex_buffer.buffer(),
+    _attributes_vertex_buffer.buffer(),
+  };
+  std::array vertex_buffers_offsets {0ul, 0ul};
+  _models_command_unit->bindVertexBuffers(0, vertex_buffers, vertex_buffers_offsets);
+
+  _models_command_unit->bindIndexBuffer(_index_buffer.buffer(), 0, vk::IndexType::eUint32);
+
+  for (auto &[pipeline, draw] : scene->_draws) {
+    _models_command_unit->bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline->pipeline());
+
+    std::array sets {_bindless_set.set()};
+    _models_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                                             {pipeline->layout()},
+                                             0, // TODO(dk6): give name for this magic number
+                                             sets,
+                                             {});
+
+    _models_command_unit->pushConstants(pipeline->layout(), vk::ShaderStageFlagBits::eAllGraphics,
+                                        0, sizeof(uint32_t), &draw.meshes_render_info_id);
+
+    // TODO(dk6): Update only if scene updates on this frame
+    draw.commands_buffer.write(std::span(draw.commands_buffer_data));
+    draw.meshes_render_info.write(std::span(draw.meshes_render_info_data));
+
+    uint32_t stride = sizeof(vk::DrawIndexedIndirectCommand);
+    _models_command_unit->drawIndexedIndirect(draw.commands_buffer.buffer(), 0, draw.meshes.size(), stride);
+
+    // TODO(dk6): If we rendering different meshes for one indirect commands we can not use conditional rendering :(
+
+    // for (auto [draw_number, mesh] : std::views::enumerate(draw.meshes)) {
+    //   vk::ConditionalRenderingBeginInfoEXT conditional_rendering_begin_info {
+    //     .buffer = scene->_visibility.buffer(),
+    //     .offset = mesh->_mesh_offset * sizeof(uint32_t),
+    //   };
+
+    //   _state->dispatch_table().cmdBeginConditionalRenderingEXT(
+    //     _models_command_unit.command_buffer(),
+    //     conditional_rendering_begin_info
+    //   );
+
+    //   uint32_t stride = sizeof(vk::DrawIndexedIndirectCommand);
+    //   _models_command_unit->drawIndexedIndirect(draw.commands_buffer.buffer(), draw_number, 1, stride);
+
+    //   _state->dispatch_table().cmdEndConditionalRenderingEXT(_models_command_unit.command_buffer());
+    // }
   }
 
   _models_command_unit->endRendering();
