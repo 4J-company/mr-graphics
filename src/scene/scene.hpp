@@ -20,7 +20,10 @@ inline namespace graphics {
   private:
     struct MeshesWithSamePipeline {
       std::vector<const Mesh *> meshes;
-      HostWritableDrawIndirectBuffer<vk::DrawIndexedIndirectCommand> commands_buffer;
+
+      // TODO(dk6): Make them dynamic sizable VectorBuffer
+      StorageBuffer commands_buffer;
+      std::vector<vk::DrawIndexedIndirectCommand> commands_buffer_data;
 
       StorageBuffer meshes_render_info; // render data for each mesh
       std::vector<Mesh::RenderInfo> meshes_render_info_data;

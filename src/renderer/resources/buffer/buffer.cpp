@@ -223,29 +223,6 @@ mr::StorageBuffer::StorageBuffer(const VulkanState &state, size_t byte_size)
 }
 
 // ----------------------------------------------------------------------------
-// Draw inderect buffer
-// ----------------------------------------------------------------------------
-
-// vk::BufferUsageFlagBits::eTransferDst |
-mr::DrawIndirectBuffer::DrawIndirectBuffer(const VulkanState &state,
-                                           vk::BufferUsageFlags additional_usage,
-                                           uint32_t command_size,
-                                           uint32_t start_draws_count)
-  : VectorBuffer(state,
-                 vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eIndirectBuffer | additional_usage,
-                 command_size * start_draws_count)
-  , _draws_count(start_draws_count)
-  , _command_size(command_size)
-{
-}
-
-void mr::DrawIndirectBuffer::resize_draws_count(uint32_t draws_count) noexcept
-{
-  resize(draws_count * _command_size);
-  _draws_count = draws_count;
-}
-
-// ----------------------------------------------------------------------------
 // Vector buffer
 // ----------------------------------------------------------------------------
 

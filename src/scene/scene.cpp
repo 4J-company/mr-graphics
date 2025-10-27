@@ -53,13 +53,15 @@ mr::ModelHandle mr::Scene::create_model(std::string_view filename) noexcept
       auto &draw = _draws[pipeline];
       // TODO(dk6): I think max_scene_instances is too big number here
       draw.commands_buffer =
-        HostWritableDrawIndirectBuffer<vk::DrawIndexedIndirectCommand>(_parent->vulkan_state(), max_scene_instances);
+        StorageBuffer(_parent->vulkan_state(),
+        sizeof(vk::DrawIndexedIndirectCommand) * max_scene_instances,
+        vk::BufferUsageFlagBits::eStorageBuffer |
+          vk::BufferUsageFlagBits::eIndirectBuffer |
+          vk::BufferUsageFlagBits::eTransferDst);
       draw.meshes_render_info = StorageBuffer(_parent->vulkan_state(), sizeof(Mesh::RenderInfo) * max_scene_instances);
       draw.meshes_render_info_id = _parent->bindless_set().register_resource(&draw.meshes_render_info);
     }
     auto &draw = _draws[pipeline];
-
-    draw.meshes.emplace_back(&mesh);
 
     // TODO(dk6): rework for only debug
     std::array attributes_byte_size {position_bytes_size, attributes_bytes_size};
@@ -70,7 +72,8 @@ mr::ModelHandle mr::Scene::create_model(std::string_view filename) noexcept
       ASSERT(vbuf.offset / size == vertex_offset);
     }
 
-    draw.commands_buffer.add_command(vk::DrawIndexedIndirectCommand {
+    draw.meshes.emplace_back(&mesh);
+    draw.commands_buffer_data.emplace_back(vk::DrawIndexedIndirectCommand {
       .indexCount = mesh.element_count(),
       .instanceCount = mesh.num_of_instances(),
       .firstIndex = static_cast<uint32_t>(mesh._ibufs[0].offset / sizeof(uint32_t)),

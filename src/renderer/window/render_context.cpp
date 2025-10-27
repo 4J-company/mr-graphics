@@ -298,10 +298,10 @@ void mr::RenderContext::render_models(const SceneHandle scene)
                                         0, sizeof(uint32_t), &draw.meshes_render_info_id);
 
     // TODO(dk6): Update only if scene updates on this frame
-    draw.commands_buffer.update();
+    draw.commands_buffer.write(std::span(draw.commands_buffer_data));
     draw.meshes_render_info.write(std::span(draw.meshes_render_info_data));
 
-    uint32_t stride = sizeof(decltype(draw.commands_buffer)::CommandType);
+    uint32_t stride = sizeof(vk::DrawIndexedIndirectCommand);
     _models_command_unit->drawIndexedIndirect(draw.commands_buffer.buffer(), 0, draw.meshes.size(), stride);
 
     // TODO(dk6): If we rendering different meshes for one indirect commands we can not use conditional rendering :(
