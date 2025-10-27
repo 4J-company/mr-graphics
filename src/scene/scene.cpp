@@ -48,7 +48,7 @@ mr::ModelHandle mr::Scene::create_model(std::string_view filename) noexcept
 
   _models.push_back(model_handle);
   for (const auto &[material, mesh] : model_handle->draws()) {
-    auto *pipeline = &material->pipeline();
+    auto pipeline = material->pipeline();
     if (not _draws.contains(pipeline)) {
       auto &draw = _draws[pipeline];
       // TODO(dk6): I think max_scene_instances is too big number here
@@ -61,20 +61,20 @@ mr::ModelHandle mr::Scene::create_model(std::string_view filename) noexcept
 
     draw.meshes.emplace_back(&mesh);
 
-    // TODO(dk6): make this number not magic numbers
-    std::array attributes_byte_size {12, 64};
+    // TODO(dk6): rework for only debug
+    std::array attributes_byte_size {position_bytes_size, attributes_bytes_size};
     ASSERT(!mesh._vbufs.empty());
-    uint32_t vertex_offset = mesh._vbufs.front() / attributes_byte_size.front();
-    for (auto [vbuf_offset, size] : std::views::zip(mesh._vbufs, attributes_byte_size)) {
-      ASSERT(vbuf_offset % size == 0);
-      ASSERT(vbuf_offset / size == vertex_offset);
+    uint32_t vertex_offset = mesh._vbufs.front().offset / attributes_byte_size.front();
+    for (auto [vbuf, size] : std::views::zip(mesh._vbufs, attributes_byte_size)) {
+      ASSERT(vbuf.offset % size == 0);
+      ASSERT(vbuf.offset / size == vertex_offset);
     }
 
     draw.commands_buffer.add_command(vk::DrawIndexedIndirectCommand {
       .indexCount = mesh.element_count(),
       .instanceCount = mesh.num_of_instances(),
       .firstIndex = static_cast<uint32_t>(mesh._ibufs[0].offset / sizeof(uint32_t)),
-      .vertexOffset = static_cast<int32_t>(mesh._vbufs[0] / attributes_byte_size[0]),
+      .vertexOffset = static_cast<int32_t>(mesh._vbufs[0].offset / position_bytes_size),
       .firstInstance = 0,
     });
     draw.meshes_render_info_data.emplace_back(Mesh::RenderInfo {

@@ -40,7 +40,7 @@ inline namespace graphics {
     > _lights;
 
     SmallVector<ModelHandle> _models;
-    std::unordered_map<const GraphicsPipeline *, MeshesWithSamePipeline> _draws;
+    boost::unordered_map<GraphicsPipelineHandle, MeshesWithSamePipeline> _draws;
 
     StorageBuffer _transforms; // transform matrix    for each instance
     std::vector<mr::Matr4f> _transforms_data;

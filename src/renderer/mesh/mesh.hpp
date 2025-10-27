@@ -25,13 +25,8 @@ inline namespace graphics {
       uint32_t transforms_buffer_id;
     };
 
-    struct IndexBufferDescription {
-      VkDeviceSize offset;
-      uint32_t elements_count;
-    };
-
   private:
-    std::vector<VkDeviceSize> _vbufs;
+    VertexBuffersArray _vbufs;
     std::vector<IndexBufferDescription> _ibufs;
 
     std::atomic<uint32_t> _instance_count = 0;
@@ -42,7 +37,7 @@ inline namespace graphics {
   public:
     Mesh() = default;
 
-    Mesh(std::vector<VkDeviceSize> vbufs,
+    Mesh(VertexBuffersArray vbufs,
          std::vector<IndexBufferDescription> ibufs,
          size_t instance_count,
          size_t mesh_offset,

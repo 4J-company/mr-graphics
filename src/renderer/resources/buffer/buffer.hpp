@@ -371,7 +371,7 @@ inline namespace graphics {
     VertexVectorBuffer & operator=(VertexVectorBuffer &&) noexcept = default;
   };
 
-  class DeviceHeap {
+  class DeviceHeapAllocator {
   private:
     struct Allocation {
       VmaVirtualAllocation allocation;
@@ -380,7 +380,7 @@ inline namespace graphics {
     };
 
     class AllocationBlock {
-      friend class DeviceHeap;
+      friend class DeviceHeapAllocator;
 
     private:
       VmaVirtualBlock _virtual_block = nullptr;
@@ -420,10 +420,10 @@ inline namespace graphics {
 
   public:
     // alignment must be pow of 2
-    DeviceHeap(VkDeviceSize start_byte_size = 1'000'000, VkDeviceSize alignment = 16);
+    DeviceHeapAllocator(VkDeviceSize start_byte_size = 1'000'000, VkDeviceSize alignment = 16);
 
-    DeviceHeap(DeviceHeap &&other) noexcept { *this = std::move(other); };
-    DeviceHeap & operator=(DeviceHeap &&) noexcept;
+    DeviceHeapAllocator(DeviceHeapAllocator &&other) noexcept { *this = std::move(other); };
+    DeviceHeapAllocator & operator=(DeviceHeapAllocator &&) noexcept;
 
     // size must be aligned by alignment parameter
     AllocInfo allocate(VkDeviceSize size) noexcept;
@@ -440,7 +440,7 @@ inline namespace graphics {
   class HeapBuffer {
   private:
     VectorBuffer _buffer;
-    DeviceHeap _heap;
+    DeviceHeapAllocator _heap;
 
   public:
     HeapBuffer() = default;
@@ -452,16 +452,23 @@ inline namespace graphics {
     HeapBuffer & operator=(HeapBuffer &&) noexcept = default;
 
     // return offset in buffer
+    VkDeviceSize allocate(VkDeviceSize size) noexcept;
+    void free(VkDeviceSize offset) noexcept;
+
     template <typename T, size_t Extent>
-    const VkDeviceSize add_data(std::span<T, Extent> src) noexcept
+    void write(std::span<T, Extent> src, VkDeviceSize offset = 0) { _buffer.write(src, offset); }
+
+    // return offset in buffer
+    template <typename T, size_t Extent>
+    const VkDeviceSize allocate_and_write(std::span<T, Extent> src) noexcept
     {
       ASSERT(src.data());
-      return add_data(std::as_bytes(src));
+      return allocate_and_write(std::as_bytes(src));
     }
-    VkDeviceSize add_data(std::span<const std::byte> src) noexcept;
+    // return offset in buffer
+    VkDeviceSize allocate_and_write(std::span<const std::byte> src) noexcept;
 
-    void free_data(VkDeviceSize offset) noexcept;
-
+    VkDeviceSize byte_size() const noexcept { return _buffer.byte_size(); }
     vk::Buffer buffer() const noexcept { return _buffer.buffer(); }
   };
 

@@ -286,7 +286,7 @@ void mr::VectorBuffer::recreate_buffer(VkDeviceSize new_size) noexcept
     .size = _size,
   };
   // TODO(dk6): pass RenderContext to buffer and get from it
-  static CommandUnit command_unit(*_state);
+  CommandUnit command_unit(*_state);
   command_unit.begin();
   command_unit->copyBuffer(_buffer, buffer, {buffer_copy});
   command_unit.end();
@@ -319,7 +319,7 @@ mr::VertexVectorBuffer::VertexVectorBuffer(const VulkanState &state, size_t star
 // Allocation block of GPU heap
 // ----------------------------------------------------------------------------
 
-mr::DeviceHeap::AllocationBlock::AllocationBlock(VkDeviceSize size, VkDeviceSize offset, uint32_t block_number) noexcept
+mr::DeviceHeapAllocator::AllocationBlock::AllocationBlock(VkDeviceSize size, VkDeviceSize offset, uint32_t block_number) noexcept
   : _size(size), _offset(offset), _block_number(block_number)
 {
   VmaVirtualBlockCreateInfo virtual_block_create_info {
@@ -328,7 +328,7 @@ mr::DeviceHeap::AllocationBlock::AllocationBlock(VkDeviceSize size, VkDeviceSize
   vmaCreateVirtualBlock(&virtual_block_create_info, &_virtual_block);
 }
 
-mr::DeviceHeap::AllocationBlock::~AllocationBlock() noexcept
+mr::DeviceHeapAllocator::AllocationBlock::~AllocationBlock() noexcept
 {
   if (_virtual_block != nullptr) {
     vmaClearVirtualBlock(_virtual_block);
@@ -336,7 +336,7 @@ mr::DeviceHeap::AllocationBlock::~AllocationBlock() noexcept
   }
 }
 
-mr::DeviceHeap::AllocationBlock & mr::DeviceHeap::AllocationBlock::operator=(AllocationBlock &&other) noexcept
+mr::DeviceHeapAllocator::AllocationBlock & mr::DeviceHeapAllocator::AllocationBlock::operator=(AllocationBlock &&other) noexcept
 {
   std::lock_guard lock(other._mutex);
   std::swap(_virtual_block, other._virtual_block);
@@ -347,8 +347,8 @@ mr::DeviceHeap::AllocationBlock & mr::DeviceHeap::AllocationBlock::operator=(All
   return *this;
 }
 
-std::optional<std::pair<VkDeviceSize, mr::DeviceHeap::Allocation>>
-mr::DeviceHeap::AllocationBlock::allocate(VkDeviceSize allocation_size, uint32_t alignment) noexcept
+std::optional<std::pair<VkDeviceSize, mr::DeviceHeapAllocator::Allocation>>
+mr::DeviceHeapAllocator::AllocationBlock::allocate(VkDeviceSize allocation_size, uint32_t alignment) noexcept
 {
   Allocation allocation {
     .byte_size = allocation_size,
@@ -374,7 +374,7 @@ mr::DeviceHeap::AllocationBlock::allocate(VkDeviceSize allocation_size, uint32_t
   return std::make_pair(offset, allocation);
 }
 
-void mr::DeviceHeap::AllocationBlock::deallocate(Allocation &allocation) noexcept
+void mr::DeviceHeapAllocator::AllocationBlock::deallocate(Allocation &allocation) noexcept
 {
   std::lock_guard lock(_mutex);
   vmaVirtualFree(_virtual_block, allocation.allocation);
@@ -389,7 +389,7 @@ static bool is_pow2(uint32_t n) {
   return std::bitset<32>(n).count() == 1;
 }
 
-mr::DeviceHeap::DeviceHeap(VkDeviceSize start_byte_size, VkDeviceSize alignment)
+mr::DeviceHeapAllocator::DeviceHeapAllocator(VkDeviceSize start_byte_size, VkDeviceSize alignment)
   : _size(0)
   , _alignment(alignment)
 {
@@ -397,7 +397,7 @@ mr::DeviceHeap::DeviceHeap(VkDeviceSize start_byte_size, VkDeviceSize alignment)
   add_block(start_byte_size);
 }
 
-mr::DeviceHeap & mr::DeviceHeap::operator=(DeviceHeap &&other) noexcept
+mr::DeviceHeapAllocator & mr::DeviceHeapAllocator::operator=(DeviceHeapAllocator &&other) noexcept
 {
   // TODO(dk6): another reason to use tbb vector for blocks is a opprtunity to have a deadlock
   std::lock_guard lock1(other._blocks_mutex);
@@ -409,7 +409,7 @@ mr::DeviceHeap & mr::DeviceHeap::operator=(DeviceHeap &&other) noexcept
   return *this;
 }
 
-mr::DeviceHeap::AllocationBlock & mr::DeviceHeap::add_block(VkDeviceSize allocation_size) noexcept
+mr::DeviceHeapAllocator::AllocationBlock & mr::DeviceHeapAllocator::add_block(VkDeviceSize allocation_size) noexcept
 {
   std::lock_guard lock(_blocks_mutex);
   VkDeviceSize block_size = allocation_size;
@@ -424,7 +424,7 @@ mr::DeviceHeap::AllocationBlock & mr::DeviceHeap::add_block(VkDeviceSize allocat
   return _blocks.back();
 }
 
-mr::DeviceHeap::AllocInfo mr::DeviceHeap::allocate(VkDeviceSize allocation_size) noexcept
+mr::DeviceHeapAllocator::AllocInfo mr::DeviceHeapAllocator::allocate(VkDeviceSize allocation_size) noexcept
 {
   ASSERT(allocation_size % _alignment == 0);
 
@@ -455,7 +455,7 @@ mr::DeviceHeap::AllocInfo mr::DeviceHeap::allocate(VkDeviceSize allocation_size)
   return AllocInfo {allocation.first, not allocated};
 }
 
-void mr::DeviceHeap::deallocate(VkDeviceSize offset) noexcept
+void mr::DeviceHeapAllocator::deallocate(VkDeviceSize offset) noexcept
 {
   std::lock_guard lock(_allocations_mutex);
   auto allocation_it = _allocations.find(offset);
@@ -479,17 +479,23 @@ mr::HeapBuffer::HeapBuffer(const VulkanState &state,
 {
 }
 
-VkDeviceSize mr::HeapBuffer::add_data(std::span<const std::byte> src) noexcept
+VkDeviceSize mr::HeapBuffer::allocate(VkDeviceSize size) noexcept
 {
-  auto alloc = _heap.allocate(src.size());
+  auto alloc = _heap.allocate(size);
   if (alloc.resized) {
     _buffer.resize(_heap.size());
   }
-  _buffer.write(src, alloc.offset);
   return alloc.offset;
 }
 
-void mr::HeapBuffer::free_data(VkDeviceSize offset) noexcept
+VkDeviceSize mr::HeapBuffer::allocate_and_write(std::span<const std::byte> src) noexcept
+{
+  auto offset = allocate(src.size());
+  write(src, offset);
+  return offset;
+}
+
+void mr::HeapBuffer::free(VkDeviceSize offset) noexcept
 {
   _heap.deallocate(offset);
 }

@@ -123,7 +123,7 @@ mr::RenderContext::~RenderContext()
   _gbuffers.clear();
 }
 
-std::vector<VkDeviceSize> mr::RenderContext::add_vertex_buffers(
+mr::VertexBuffersArray mr::RenderContext::add_vertex_buffers(
   std::span<const std::span<const std::byte>> vbufs_data) noexcept
 {
   // Tmp theme - fixed attributes layout
@@ -150,14 +150,17 @@ std::vector<VkDeviceSize> mr::RenderContext::add_vertex_buffers(
   _positions_vertex_buffer.write(positions_data, positions_offset);
   _attributes_vertex_buffer.write(attributes_data, attributes_offset);
 
-  return std::vector {positions_offset, attributes_offset};
+  return VertexBuffersArray {
+    VertexBufferDescription { .offset = positions_offset },
+    VertexBufferDescription { .offset = attributes_offset },
+  };
 }
 
-void mr::RenderContext::delete_vertex_buffers(std::span<const VkDeviceSize> vbufs) noexcept
+void mr::RenderContext::delete_vertex_buffers(std::span<const VertexBufferDescription> vbufs) noexcept
 {
   // Tmp theme - fixed attributes layout
   ASSERT(vbufs.size() == 2);
-  uint32_t heap_offset = vbufs[0] / position_bytes_size;
+  uint32_t heap_offset = vbufs[0].offset / position_bytes_size;
   _vertex_buffers_heap.deallocate(heap_offset);
 }
 

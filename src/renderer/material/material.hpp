@@ -64,7 +64,7 @@ inline namespace graphics {
 
     uint32_t material_ubo_id() const noexcept { return _uniform_buffer_id; }
 
-    const mr::GraphicsPipeline & pipeline() const noexcept { return *_pipeline; }
+    GraphicsPipelineHandle pipeline() const noexcept { return _pipeline; }
   };
 
   MR_DECLARE_HANDLE(Material)

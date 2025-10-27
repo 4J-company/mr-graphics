@@ -40,8 +40,6 @@ inline namespace graphics {
     constexpr static uint32_t uniform_buffer_binding = 1;
     constexpr static uint32_t storage_buffer_binding = 2;
 
-    constexpr static inline uint32_t position_bytes_size = sizeof(mr::Position);
-    constexpr static inline uint32_t attributes_bytes_size = sizeof(mr::VertexAttributes);
     constexpr static inline uint32_t default_vertex_number = 10'000'000;
     constexpr static inline uint32_t default_index_number = default_vertex_number * 2;
 
@@ -76,7 +74,7 @@ inline namespace graphics {
     BindlessDescriptorSetLayoutHandle _bindless_set_layout;
     BindlessDescriptorSet _bindless_set;
 
-    DeviceHeap _vertex_buffers_heap;
+    DeviceHeapAllocator _vertex_buffers_heap;
     VertexVectorBuffer _positions_vertex_buffer;
     VertexVectorBuffer _attributes_vertex_buffer;
     IndexHeapBuffer _index_buffer;
@@ -104,8 +102,8 @@ inline namespace graphics {
     CommandUnit & transfer_command_unit() const noexcept { return _transfer_command_unit; }
 
     IndexHeapBuffer & index_buffer() noexcept { return _index_buffer; }
-    std::vector<VkDeviceSize> add_vertex_buffers(std::span<const std::span<const std::byte>> vbufs_data) noexcept;
-    void delete_vertex_buffers(std::span<const VkDeviceSize> vbufs) noexcept;
+    VertexBuffersArray add_vertex_buffers(std::span<const std::span<const std::byte>> vbufs_data) noexcept;
+    void delete_vertex_buffers(std::span<const VertexBufferDescription> vbufs) noexcept;
 
     // ===== Resources creation =====
     WindowHandle create_window() const noexcept;

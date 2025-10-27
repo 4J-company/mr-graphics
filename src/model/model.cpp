@@ -78,12 +78,11 @@ mr::graphics::Model::Model(
       };
       auto vbufs = scene.render_context().add_vertex_buffers(vbufs_data);
 
-      using IndexBufferDescription = Mesh::IndexBufferDescription;
       std::vector<IndexBufferDescription> ibufs;
       ibufs.reserve(mesh.lods.size());
       for (size_t j = 0; j < mesh.lods.size(); j++) {
         ibufs.emplace_back(IndexBufferDescription {
-          .offset = scene.render_context().index_buffer().add_data(std::span(mesh.lods[j].indices)),
+          .offset = scene.render_context().index_buffer().allocate_and_write(std::span(mesh.lods[j].indices)),
           .elements_count = static_cast<uint32_t>(mesh.lods[j].indices.size())
         });
       }
