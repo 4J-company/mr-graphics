@@ -2,10 +2,11 @@
 #define __MR_GRAPHICS_PIPELINE_HPP_
 
 #include "resources/pipelines/pipeline.hpp"
+#include "resources/shaders/shader.hpp"
 
 namespace mr {
 inline namespace graphics {
-  class GraphicsPipeline : public Pipeline {
+  class GraphicsPipeline : public Pipeline, public ResourceBase<GraphicsPipeline> {
     public:
       enum struct Subpass {
         OpaqueGeometry = 0,
@@ -36,6 +37,7 @@ inline namespace graphics {
 
       void apply(vk::CommandBuffer cmd_buffer) const override;
   };
+  MR_DECLARE_HANDLE(GraphicsPipeline);
 }
 } // namespace mr
 #endif // __MR_GRAPHICS_PIPELINE_HPP_

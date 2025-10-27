@@ -4,6 +4,7 @@
 // libraries includes
 #include <algorithm>
 #include <array>
+#include <bitset>
 #include <chrono>
 #include <concepts>
 #include <cstdlib>
@@ -33,6 +34,9 @@
 
 #include <boost/unordered_map.hpp>
 #include <boost/container/small_vector.hpp>
+
+#include <tbb/concurrent_hash_map.h>
+#include <tbb/concurrent_vector.h>
 
 #define VULKAN_HPP_ASSERT_ON_RESULT
 #define VULKAN_HPP_NO_EXCEPTIONS
@@ -70,4 +74,3 @@ using namespace std::literals;
 using namespace mr::literals;
 
 #endif // __MR_PCH_HPP_
-

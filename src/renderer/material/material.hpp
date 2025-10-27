@@ -35,12 +35,16 @@ inline namespace graphics {
 
   class Material : public ResourceBase<Material> {
   private:
+    constexpr static inline auto materials_pipeline_name = "Default material pipeline";
+
+  private:
     mr::UniformBuffer _ubo;
     mr::ShaderHandle _shader;
 
-    mr::GraphicsPipeline _pipeline;
+    // mr::GraphicsPipeline _pipeline;
+    mr::GraphicsPipelineHandle _pipeline;
 
-    RenderContext *_context = nullptr;
+    Scene *_scene = nullptr;
 
     // requires for deinitialization
     std::array<std::optional<mr::TextureHandle>, enum_cast(MaterialParameter::EnumSize)> _textures;
@@ -49,7 +53,7 @@ inline namespace graphics {
     uint32_t _uniform_buffer_id = -1;
 
   public:
-    Material(RenderContext &render_context,
+    Material(Scene &scene,
              mr::ShaderHandle shader,
              std::span<std::byte> ubo_data,
              std::span<std::optional<mr::TextureHandle>> textures,
@@ -58,10 +62,9 @@ inline namespace graphics {
 
     ~Material();
 
-    void bind(CommandUnit &unit) const noexcept;
-    uint32_t material_ubo_id() noexcept { return _uniform_buffer_id; }
+    uint32_t material_ubo_id() const noexcept { return _uniform_buffer_id; }
 
-    const mr::GraphicsPipeline & pipeline() const noexcept { return _pipeline; }
+    GraphicsPipelineHandle pipeline() const noexcept { return _pipeline; }
   };
 
   MR_DECLARE_HANDLE(Material)
@@ -70,8 +73,7 @@ inline namespace graphics {
   private:
     static inline constexpr int max_attached_buffers = 16;
 
-    const mr::VulkanState *_state {};
-    mr::RenderContext *_context {};
+    Scene *_scene {};
 
     std::vector<std::byte> _specialization_data;
     boost::unordered_map<std::string, std::string> _defines;
@@ -84,9 +86,7 @@ inline namespace graphics {
     std::string_view _shader_filename;
 
   public:
-    MaterialBuilder(const mr::VulkanState &state,
-                    mr::RenderContext &context,
-                    std::string_view filename);
+    MaterialBuilder(Scene &scene, std::string_view filename);
 
     MaterialBuilder(MaterialBuilder &&) noexcept = default;
     MaterialBuilder & operator=(MaterialBuilder &&) noexcept = default;
