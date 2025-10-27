@@ -9,27 +9,33 @@ static size_t get_aligned_16_byte(size_t size) {
   return size % 4 == 0 ? size : ((size / 4 + 1) * 4);
 }
 
-mr::graphics::Material::Material(RenderContext &render_context,
+mr::graphics::Material::Material(Scene &scene,
                                  mr::graphics::ShaderHandle shader,
                                  std::span<std::byte> ubo_data,
                                  std::span<std::optional<mr::TextureHandle>> textures,
                                  std::span<mr::StorageBuffer *> storage_buffers,
                                  std::span<mr::ConditionalBuffer *> conditional_buffers) noexcept
-    : _ubo(render_context.vulkan_state(),
+    : _ubo(scene.render_context().vulkan_state(),
            ubo_data.size() + sizeof(uint32_t) * get_aligned_16_byte(textures.size()))
     , _shader(shader)
-    , _context(&render_context)
+    , _scene(&scene)
 {
   ASSERT(_shader.get() != nullptr, "Invalid shader passed to the material", _shader->name());
 
   std::ranges::copy(textures, _textures.begin());
 
-  std::array layouts { render_context.bindless_set_layout() };
-  _pipeline = mr::GraphicsPipeline(render_context,
-                                   mr::GraphicsPipeline::Subpass::OpaqueGeometry,
-                                   _shader,
-                                   std::span {mr::importer::Mesh::vertex_input_attribute_descriptions},
-                                   std::span {layouts});
+  std::array layouts { scene.render_context().bindless_set_layout() };
+  auto &pipelines_manager = mr::ResourceManager<GraphicsPipeline>::get();
+  auto pipeline_name = std::format("{}_{}", materials_pipeline_name, shader->id());
+  _pipeline = pipelines_manager.find(pipeline_name);
+  if (not _pipeline) {
+    _pipeline = pipelines_manager.create(pipeline_name,
+                                         scene.render_context(),
+                                         mr::GraphicsPipeline::Subpass::OpaqueGeometry,
+                                         _shader,
+                                         std::span {mr::importer::Mesh::vertex_input_attribute_descriptions},
+                                         std::span {layouts});
+  }
 
   // TODO: also register storage and conditional buffers
   constexpr size_t max_textures_size = enum_cast(MaterialParameter::EnumSize);
@@ -41,7 +47,7 @@ mr::graphics::Material::Material(RenderContext &render_context,
   }
   resources.push_back(&_ubo);
 
-  auto resources_ids = render_context.bindless_set().register_resources(resources);
+  auto resources_ids = scene.render_context().bindless_set().register_resources(resources);
 
   std::ranges::fill(_textures_ids, -1);
   int index = 0;
@@ -64,31 +70,18 @@ mr::graphics::Material::~Material()
 {
   for (auto &tex : _textures) {
     if (tex.has_value()) {
-      _context->bindless_set().unregister_resource(tex.value().get());
+      _scene->render_context().bindless_set().unregister_resource(tex.value().get());
     }
   }
-  _context->bindless_set().unregister_resource(&_ubo);
-}
-
-void mr::Material::bind(CommandUnit &unit) const noexcept
-{
-  unit->bindPipeline(vk::PipelineBindPoint::eGraphics, _pipeline.pipeline());
-  unit->bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                           {_pipeline.layout()},
-                           0,
-                           {_context->bindless_set().set()}, // here must be descriptor set
-                           {});
+  _scene->render_context().bindless_set().unregister_resource(&_ubo);
 }
 
 // ----------------------------------------------------------------------------
 // Material Builder
 // ----------------------------------------------------------------------------
 
-mr::MaterialBuilder::MaterialBuilder(const mr::VulkanState &state,
-                                     mr::RenderContext &context,
-                                     std::string_view filename)
-  : _state(&state)
-  , _context(&context)
+mr::MaterialBuilder::MaterialBuilder(Scene &scene, std::string_view filename)
+  : _scene(&scene)
   , _shader_filename(filename)
 {
 }
@@ -99,7 +92,7 @@ mr::MaterialBuilder & mr::MaterialBuilder::add_texture(MaterialParameter param,
 {
   ASSERT(tex_data.image.pixels.get() != nullptr, "Image should be valid");
   mr::TextureHandle tex = ResourceManager<Texture>::get().create(mr::unnamed,
-    _context->vulkan_state(),
+    _scene->render_context().vulkan_state(),
     tex_data.image
   );
 
@@ -111,19 +104,20 @@ mr::MaterialBuilder & mr::MaterialBuilder::add_texture(MaterialParameter param,
 
 mr::MaterialHandle mr::MaterialBuilder::build() noexcept
 {
+  ASSERT(_scene != nullptr);
+
   auto &mtlmanager = ResourceManager<Material>::get();
   auto &shdmanager = ResourceManager<Shader>::get();
 
   auto definestr = generate_shader_defines_str();
   auto shdname = std::string(_shader_filename) + ":" + definestr;
   auto shdfindres = shdmanager.find(shdname);
-  auto shdhandle = shdfindres ? shdfindres : shdmanager.create(shdname, *_state, _shader_filename, generate_shader_defines());
+  const auto &state = _scene->render_context().vulkan_state();
+  auto shdhandle = shdfindres ? shdfindres : shdmanager.create(shdname, state, _shader_filename, generate_shader_defines());
 
-  ASSERT(_state != nullptr);
-  ASSERT(_context != nullptr);
 
   return mtlmanager.create(unnamed,
-    *_context,
+    *_scene,
     shdhandle,
     std::span {_ubo_data},
     std::span {_textures},
