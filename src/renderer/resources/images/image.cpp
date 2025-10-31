@@ -89,7 +89,7 @@ mr::Image::~Image() {
   _state->device().destroyImageView(_image_view);
 }
 
-void mr::Image::switch_layout(vk::ImageLayout new_layout) {
+void mr::Image::switch_layout(CommandUnit &command_unit, vk::ImageLayout new_layout) {
   if (new_layout == _layout) {
     return;
   }
@@ -171,27 +171,18 @@ void mr::Image::switch_layout(vk::ImageLayout new_layout) {
     break;
   }
 
-  CommandUnit command_unit(*_state);
-  command_unit.begin();
-  command_unit->pipelineBarrier(
-    source_stage, destination_stage, {}, {}, {}, {barrier});
-  command_unit.end();
-  vk::SubmitInfo submit_info = command_unit.submit_info();
-
-  auto fence = _state->device().createFenceUnique({}).value;
-  _state->queue().submit(submit_info, fence.get());
-  _state->device().waitForFences({fence.get()}, VK_TRUE, UINT64_MAX);
+  command_unit->pipelineBarrier(source_stage, destination_stage, {}, {}, {}, {barrier});
 
   _layout = new_layout;
 }
 
-void mr::Image::write(std::span<const std::byte> src) {
+void mr::Image::write(CommandUnit &command_unit, std::span<const std::byte> src) {
   ASSERT(_state != nullptr);
   ASSERT(src.data());
   ASSERT(src.size() <= _size);
 
-  auto stage_buffer = HostBuffer(*_state, _size, vk::BufferUsageFlagBits::eTransferSrc);
-  stage_buffer.write(std::span {src});
+  command_unit.staging_buffers().emplace_back(*_state, _size, vk::BufferUsageFlagBits::eTransferSrc);
+  command_unit.staging_buffers().back().write(std::span {src});
 
   vk::ImageSubresourceLayers range {
     .aspectMask = _aspect_flags,
@@ -208,17 +199,7 @@ void mr::Image::write(std::span<const std::byte> src) {
       .imageExtent = _extent,
   };
 
-  // TODO: delete static
-  CommandUnit command_unit(*_state);
-  command_unit.begin();
-  command_unit->copyBufferToImage(stage_buffer.buffer(), _image, _layout, {region});
-  command_unit.end();
-
-  vk::SubmitInfo submit_info = command_unit.submit_info();
-
-  auto fence = _state->device().createFenceUnique({}).value;
-  _state->queue().submit(submit_info, fence.get());
-  _state->device().waitForFences({fence.get()}, VK_TRUE, UINT64_MAX);
+  command_unit->copyBufferToImage(command_unit.staging_buffers().back().buffer(), _image, _layout, {region});
 }
 
 void mr::Image::create_image_view() {
@@ -267,9 +248,6 @@ vk::Format mr::Image::find_supported_format(
 
 mr::HostBuffer mr::Image::read_to_host_buffer(CommandUnit &command_unit) noexcept
 {
-  switch_layout(vk::ImageLayout::eTransferSrcOptimal);
-
-  auto stage_buffer = HostBuffer(*_state, _size, vk::BufferUsageFlagBits::eTransferDst);
   vk::ImageSubresourceLayers range {
     .aspectMask = _aspect_flags,
     .mipLevel = _mip_level - 1,
@@ -285,14 +263,10 @@ mr::HostBuffer mr::Image::read_to_host_buffer(CommandUnit &command_unit) noexcep
     .imageExtent = _extent,
   };
 
-  command_unit.begin();
-  command_unit->copyImageToBuffer(_image, _layout, stage_buffer.buffer(), {region});
-  command_unit.end();
-  auto submit_info = command_unit.submit_info();
+  auto stage_buffer = HostBuffer(*_state, _size, vk::BufferUsageFlagBits::eTransferDst);
 
-  auto fence = _state->device().createFenceUnique({}).value;
-  _state->queue().submit(submit_info, fence.get());
-  _state->device().waitForFences({fence.get()}, VK_TRUE, UINT64_MAX);
+  switch_layout(command_unit, vk::ImageLayout::eTransferSrcOptimal);
+  command_unit->copyImageToBuffer(_image, _layout, stage_buffer.buffer(), {region});
 
   return stage_buffer;
 }
@@ -380,7 +354,13 @@ mr::DepthImage::DepthImage(const VulkanState &state, Extent extent, uint mip_lev
       mip_level
     )
 {
-  switch_layout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
+  CommandUnit command_unit {state};
+
+  command_unit.begin();
+  switch_layout(command_unit, vk::ImageLayout::eDepthStencilAttachmentOptimal);
+  command_unit.end();
+
+  UniqueFenceGuard(state.device(), command_unit.submit(state));
 }
 
 vk::RenderingAttachmentInfoKHR mr::DepthImage::attachment_info() const

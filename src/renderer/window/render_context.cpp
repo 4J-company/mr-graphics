@@ -123,7 +123,7 @@ mr::RenderContext::~RenderContext()
   _gbuffers.clear();
 }
 
-mr::VertexBuffersArray mr::RenderContext::add_vertex_buffers(
+mr::VertexBuffersArray mr::RenderContext::add_vertex_buffers(CommandUnit &command_unit,
   std::span<const std::span<const std::byte>> vbufs_data) noexcept
 {
   // Tmp theme - fixed attributes layout
@@ -147,8 +147,8 @@ mr::VertexBuffersArray mr::RenderContext::add_vertex_buffers(
   VkDeviceSize positions_offset = alloc_info.offset * position_bytes_size;
   VkDeviceSize attributes_offset = alloc_info.offset * attributes_bytes_size;
 
-  _positions_vertex_buffer.write(positions_data, positions_offset);
-  _attributes_vertex_buffer.write(attributes_data, attributes_offset);
+  _positions_vertex_buffer.write(command_unit, positions_data, positions_offset);
+  _attributes_vertex_buffer.write(command_unit, attributes_data, attributes_offset);
 
   return VertexBuffersArray {
     VertexBufferDescription { .offset = positions_offset },
@@ -186,8 +186,10 @@ mr::SceneHandle mr::RenderContext::create_scene() noexcept
 
 void mr::RenderContext::render_lights(const SceneHandle scene, Presenter &presenter)
 {
+  CommandUnit command_unit {*_state};
+  command_unit.begin();
   for (auto &gbuf : _gbuffers) {
-    gbuf.switch_layout(vk::ImageLayout::eShaderReadOnlyOptimal);
+    gbuf.switch_layout(command_unit, vk::ImageLayout::eShaderReadOnlyOptimal);
   }
 
   vk::RenderingAttachmentInfoKHR swapchain_image_attachment_info = presenter.target_image_info();
@@ -199,7 +201,10 @@ void mr::RenderContext::render_lights(const SceneHandle scene, Presenter &presen
     .pColorAttachments = &swapchain_image_attachment_info,
   };
 
-  _depthbuffer.switch_layout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
+  _depthbuffer.switch_layout(command_unit, vk::ImageLayout::eDepthStencilAttachmentOptimal);
+  command_unit.end();
+
+  UniqueFenceGuard(_state->device(), command_unit.submit(*_state));
 
   _lights_command_unit->beginRendering(&attachment_info);
 
@@ -222,7 +227,8 @@ void mr::RenderContext::render_lights(const SceneHandle scene, Presenter &presen
 
   // shade all
   _lights_command_unit->bindVertexBuffers(0, {_lights_render_data.screen_vbuf.buffer()}, {0});
-  _lights_command_unit->bindIndexBuffer(_lights_render_data.screen_ibuf.buffer(), 0, vk::IndexType::eUint32);
+  _lights_command_unit->bindIndexBuffer(_lights_render_data.screen_ibuf.buffer(), 0,
+                                        _lights_render_data.screen_ibuf.index_type());
 
   std::apply([this](const auto &lights) {
     for (auto light_handle : lights) {
@@ -235,10 +241,15 @@ void mr::RenderContext::render_lights(const SceneHandle scene, Presenter &presen
 
 void mr::RenderContext::render_models(const SceneHandle scene)
 {
+  CommandUnit command_unit {*_state};
+  command_unit.begin();
   for (auto &gbuf : _gbuffers) {
-    gbuf.switch_layout(vk::ImageLayout::eColorAttachmentOptimal);
+    gbuf.switch_layout(command_unit, vk::ImageLayout::eColorAttachmentOptimal);
   }
-  _depthbuffer.switch_layout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
+  _depthbuffer.switch_layout(command_unit, vk::ImageLayout::eDepthStencilAttachmentOptimal);
+  command_unit.end();
+
+  UniqueFenceGuard(_state->device(), command_unit.submit(*_state));
 
   auto gbufs_attachs = _gbuffers | std::views::transform([](const ColorAttachmentImage &gbuf) {
     return gbuf.attachment_info();
@@ -284,6 +295,12 @@ void mr::RenderContext::render_models(const SceneHandle scene)
 
   _models_command_unit->bindIndexBuffer(_index_buffer.buffer(), 0, vk::IndexType::eUint32);
 
+  CommandUnit indirect_command_unit(*_state);
+
+  if (scene->dirty()) {
+    indirect_command_unit.begin();
+  }
+
   for (auto &[pipeline, draw] : scene->_draws) {
     _models_command_unit->bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline->pipeline());
 
@@ -297,34 +314,24 @@ void mr::RenderContext::render_models(const SceneHandle scene)
     _models_command_unit->pushConstants(pipeline->layout(), vk::ShaderStageFlagBits::eAllGraphics,
                                         0, sizeof(uint32_t), &draw.meshes_render_info_id);
 
-    // TODO(dk6): Update only if scene updates on this frame
-    draw.commands_buffer.write(std::span(draw.commands_buffer_data));
-    draw.meshes_render_info.write(std::span(draw.meshes_render_info_data));
+    if (scene->dirty()) {
+      // TODO(dk6): Update only if scene updates on this frame
+      draw.commands_buffer.write(indirect_command_unit, std::span(draw.commands_buffer_data));
+      draw.meshes_render_info.write(indirect_command_unit, std::span(draw.meshes_render_info_data));
+    }
 
     uint32_t stride = sizeof(vk::DrawIndexedIndirectCommand);
     _models_command_unit->drawIndexedIndirect(draw.commands_buffer.buffer(), 0, draw.meshes.size(), stride);
-
-    // TODO(dk6): If we rendering different meshes for one indirect commands we can not use conditional rendering :(
-
-    // for (auto [draw_number, mesh] : std::views::enumerate(draw.meshes)) {
-    //   vk::ConditionalRenderingBeginInfoEXT conditional_rendering_begin_info {
-    //     .buffer = scene->_visibility.buffer(),
-    //     .offset = mesh->_mesh_offset * sizeof(uint32_t),
-    //   };
-
-    //   _state->dispatch_table().cmdBeginConditionalRenderingEXT(
-    //     _models_command_unit.command_buffer(),
-    //     conditional_rendering_begin_info
-    //   );
-
-    //   uint32_t stride = sizeof(vk::DrawIndexedIndirectCommand);
-    //   _models_command_unit->drawIndexedIndirect(draw.commands_buffer.buffer(), draw_number, 1, stride);
-
-    //   _state->dispatch_table().cmdEndConditionalRenderingEXT(_models_command_unit.command_buffer());
-    // }
   }
-
   _models_command_unit->endRendering();
+
+  if (scene->dirty()) {
+    indirect_command_unit.end();
+
+    UniqueFenceGuard(_state->device(), indirect_command_unit.submit(*_state));
+
+    scene->dirty(false);
+  }
 }
 
 void mr::RenderContext::resize(const mr::Extent &extent)

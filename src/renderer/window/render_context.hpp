@@ -102,7 +102,7 @@ inline namespace graphics {
     CommandUnit & transfer_command_unit() const noexcept { return _transfer_command_unit; }
 
     IndexHeapBuffer & index_buffer() noexcept { return _index_buffer; }
-    VertexBuffersArray add_vertex_buffers(std::span<const std::span<const std::byte>> vbufs_data) noexcept;
+    VertexBuffersArray add_vertex_buffers(CommandUnit &command_unit, std::span<const std::span<const std::byte>> vbufs_data) noexcept;
     void delete_vertex_buffers(std::span<const VertexBufferDescription> vbufs) noexcept;
 
     // ===== Resources creation =====

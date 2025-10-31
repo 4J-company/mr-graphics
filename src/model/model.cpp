@@ -59,6 +59,9 @@ mr::graphics::Model::Model(
   }
   auto& model_value = model.value();
 
+  CommandUnit geometry_command_unit (state);
+  geometry_command_unit.begin();
+
   using enum mr::MaterialParameter;
   static auto &manager = ResourceManager<Texture>::get();
   std::for_each(std::execution::seq, model_value.meshes.begin(), model_value.meshes.end(),
@@ -76,13 +79,13 @@ mr::graphics::Model::Model(
         std::as_bytes(std::span(mesh.positions)),
         std::as_bytes(std::span(mesh.attributes))
       };
-      auto vbufs = scene.render_context().add_vertex_buffers(vbufs_data);
+      auto vbufs = scene.render_context().add_vertex_buffers(geometry_command_unit, vbufs_data);
 
       std::vector<IndexBufferDescription> ibufs;
       ibufs.reserve(mesh.lods.size());
       for (size_t j = 0; j < mesh.lods.size(); j++) {
         ibufs.emplace_back(IndexBufferDescription {
-          .offset = scene.render_context().index_buffer().allocate_and_write(std::span(mesh.lods[j].indices)),
+          .offset = scene.render_context().index_buffer().allocate_and_write(geometry_command_unit, std::span(mesh.lods[j].indices)),
           .elements_count = static_cast<uint32_t>(mesh.lods[j].indices.size())
         });
       }
@@ -117,6 +120,12 @@ mr::graphics::Model::Model(
       _builders.push_back(std::move(builder));
       _materials.push_back(_builders.back().build());
     }
+  );
+  geometry_command_unit.end();
+
+  UniqueFenceGuard(
+    scene.render_context().vulkan_state().device(),
+    geometry_command_unit.submit(scene.render_context().vulkan_state())
   );
 
   MR_INFO("Loading model {} finished\n", filename.string());
