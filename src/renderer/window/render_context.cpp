@@ -148,7 +148,7 @@ mr::RenderContext::~RenderContext()
   _gbuffers.clear();
 }
 
-mr::VertexBuffersArray mr::RenderContext::add_vertex_buffers(
+mr::VertexBuffersArray mr::RenderContext::add_vertex_buffers(CommandUnit &command_unit,
   std::span<const std::span<const std::byte>> vbufs_data) noexcept
 {
   // Tmp theme - fixed attributes layout
@@ -172,8 +172,8 @@ mr::VertexBuffersArray mr::RenderContext::add_vertex_buffers(
   VkDeviceSize positions_offset = alloc_info.offset * position_bytes_size;
   VkDeviceSize attributes_offset = alloc_info.offset * attributes_bytes_size;
 
-  _positions_vertex_buffer.write(positions_data, positions_offset);
-  _attributes_vertex_buffer.write(attributes_data, attributes_offset);
+  _positions_vertex_buffer.write(command_unit, positions_data, positions_offset);
+  _attributes_vertex_buffer.write(command_unit, attributes_data, attributes_offset);
 
   return VertexBuffersArray {
     VertexBufferDescription {
@@ -238,9 +238,15 @@ void mr::RenderContext::render_lights(const SceneHandle scene, Presenter &presen
                                          _timestamps_query_pool.get(),
                                          enum_cast(Timestamp::ShadingStart));
 
+    CommandUnit command_unit {scene->render_context().vulkan_state()};
+    command_unit.begin();
     for (auto &gbuf : _gbuffers) {
-      gbuf.switch_layout(vk::ImageLayout::eShaderReadOnlyOptimal);
+      gbuf.switch_layout(command_unit, vk::ImageLayout::eShaderReadOnlyOptimal);
     }
+    _depthbuffer.switch_layout(command_unit, vk::ImageLayout::eDepthStencilAttachmentOptimal);
+    command_unit.end();
+    UniqueFenceGuard(scene->render_context().vulkan_state().device(),
+        command_unit.submit(scene->render_context().vulkan_state()));
 
     vk::RenderingAttachmentInfoKHR swapchain_image_attachment_info = presenter.target_image_info();
 
@@ -250,8 +256,6 @@ void mr::RenderContext::render_lights(const SceneHandle scene, Presenter &presen
       .colorAttachmentCount = 1,
       .pColorAttachments = &swapchain_image_attachment_info,
     };
-
-    _depthbuffer.switch_layout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
 
     _lights_command_unit->beginRendering(&attachment_info);
 
@@ -306,10 +310,15 @@ void mr::RenderContext::render_models(const SceneHandle scene)
                                          _timestamps_query_pool.get(),
                                          enum_cast(Timestamp::ModelsStart));
 
+    CommandUnit command_unit {scene->render_context().vulkan_state()};
+    command_unit.begin();
     for (auto &gbuf : _gbuffers) {
-      gbuf.switch_layout(vk::ImageLayout::eColorAttachmentOptimal);
+      gbuf.switch_layout(command_unit, vk::ImageLayout::eColorAttachmentOptimal);
     }
-    _depthbuffer.switch_layout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
+    _depthbuffer.switch_layout(command_unit, vk::ImageLayout::eDepthStencilAttachmentOptimal);
+    command_unit.end();
+    UniqueFenceGuard(scene->render_context().vulkan_state().device(),
+        command_unit.submit(scene->render_context().vulkan_state()));
 
     auto gbufs_attachs = _gbuffers | std::views::transform([](const ColorAttachmentImage &gbuf) {
       return gbuf.attachment_info();
@@ -369,8 +378,13 @@ void mr::RenderContext::render_models(const SceneHandle scene)
                                           0, sizeof(uint32_t), &draw.meshes_render_info_id);
 
       // TODO(dk6): Update only if scene updates on this frame
-      draw.commands_buffer.write(std::span(draw.commands_buffer_data));
-      draw.meshes_render_info.write(std::span(draw.meshes_render_info_data));
+      command_unit.begin();
+      draw.commands_buffer.write(command_unit, std::span(draw.commands_buffer_data));
+      draw.meshes_render_info.write(command_unit, std::span(draw.meshes_render_info_data));
+      command_unit.end();
+
+      UniqueFenceGuard(scene->render_context().vulkan_state().device(),
+          command_unit.submit(scene->render_context().vulkan_state()));
 
       uint32_t stride = sizeof(vk::DrawIndexedIndirectCommand);
       _models_command_unit->drawIndexedIndirect(draw.commands_buffer.buffer(), 0, draw.meshes.size(), stride);

@@ -22,9 +22,10 @@ mr::CommandUnit::CommandUnit(const VulkanState &state)
 void mr::CommandUnit::begin()
 {
   clear_semaphores();
+  _staging_buffers.clear();
+  _resized_from_buffers.clear();
   _cmd_buffer->reset();
-  vk::CommandBufferBeginInfo
-    begin_info {}; /// .flags = 0, .pInheritanceInfo = nullptr, };
+  vk::CommandBufferBeginInfo begin_info {}; /// .flags = 0, .pInheritanceInfo = nullptr, };
   _cmd_buffer->begin(begin_info);
 }
 

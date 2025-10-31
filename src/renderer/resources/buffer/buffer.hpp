@@ -7,6 +7,7 @@
 #include <vk_mem_alloc.h>
 
 #include "vulkan_state.hpp"
+#include "resources/command_unit/command_unit.hpp"
 #include <vulkan/vulkan_core.h>
 
 namespace mr {
@@ -15,8 +16,9 @@ inline namespace graphics {
   protected:
     const VulkanState *_state = nullptr;
 
-    size_t _size = 0;
+    vk::DeviceSize _size = 0;
     vk::Buffer _buffer {};
+    vk::BufferUsageFlags _usage_flags {};
     VmaAllocation _allocation {};
 
   public:
@@ -27,32 +29,25 @@ inline namespace graphics {
     Buffer(Buffer &&other) noexcept {
       std::swap(_state, other._state);
       std::swap(_size, other._size);
+      std::swap(_usage_flags, other._usage_flags);
       std::swap(_buffer, other._buffer);
       std::swap(_allocation, other._allocation);
     }
     Buffer & operator=(Buffer &&other) noexcept {
       std::swap(_state, other._state);
       std::swap(_size, other._size);
+      std::swap(_usage_flags, other._usage_flags);
       std::swap(_buffer, other._buffer);
       std::swap(_allocation, other._allocation);
       return *this;
     }
     virtual ~Buffer() noexcept;
 
-    // void resize(size_t byte_size);
-
-    static uint find_memory_type(const VulkanState &state, uint filter,
-                                 vk::MemoryPropertyFlags properties) noexcept;
-
+    const VulkanState & state() const noexcept { return *_state; }
     vk::Buffer buffer() const noexcept { return _buffer; }
+    VmaAllocation allocation() const noexcept { return _allocation; }
 
     size_t byte_size() const noexcept { return _size; }
-
-  protected:
-    static std::pair<vk::Buffer, VmaAllocation> create_buffer(const VulkanState &state,
-                                                              vk::BufferUsageFlags usage_flags,
-                                                              vk::MemoryPropertyFlags memory_properties,
-                                                              size_t byte_size);
   };
 
   class HostBuffer : public Buffer {
@@ -63,7 +58,6 @@ inline namespace graphics {
       void *_data = nullptr;
 
     public:
-
       MappedData(HostBuffer &buf) : _buf(&buf) {}
       ~MappedData() { if (mapped()) { unmap(); } }
 
@@ -82,7 +76,11 @@ inline namespace graphics {
     MappedData _mapped_data;
 
   public:
-    ~HostBuffer();
+    HostBuffer() noexcept : Buffer(), _mapped_data(*this) {}
+    HostBuffer(HostBuffer &&) noexcept = default;
+    HostBuffer &operator=(HostBuffer &&) noexcept = default;
+    HostBuffer(const HostBuffer&) noexcept = delete;
+    HostBuffer& operator=(const HostBuffer&) noexcept = delete;
 
     HostBuffer(
       const VulkanState &state, std::size_t size,
@@ -96,16 +94,24 @@ inline namespace graphics {
     {
     }
 
-    HostBuffer(HostBuffer &&) = default;
-    HostBuffer &operator=(HostBuffer &&) = default;
+    ~HostBuffer() noexcept override {}
 
-    // This method just map device memory and collect it to span
+    // returns view on CPU memory mapped to GPU memory region
+    // modification is slow and forbidden
+    // if you want to modify buffer data checkout `copy` method
     std::span<const std::byte> read() noexcept;
 
-    HostBuffer &write(std::span<const std::byte> src);
-
-    // This method copy to CPU memory and unmap device memory
+    // returns copied data from GPU memory region
+    // cheap to modify - do things in this order: copy -> modify -> write
     std::vector<std::byte> copy() noexcept;
+
+    HostBuffer & write(std::span<const std::byte> src);
+
+    template <size_t Extent>
+    HostBuffer & write(std::span<const std::byte, Extent> src)
+    {
+      return write(std::span<const std::byte>(src.data(), src.size()));
+    }
 
     template <typename T, size_t Extent>
     HostBuffer &write(std::span<T, Extent> src) { return write(std::as_bytes(src)); }
@@ -113,9 +119,11 @@ inline namespace graphics {
 
   class DeviceBuffer : public Buffer {
   public:
-    DeviceBuffer() = default;
-    DeviceBuffer(DeviceBuffer &&) = default;
-    DeviceBuffer &operator=(DeviceBuffer &&) = default;
+    DeviceBuffer() noexcept = default;
+    DeviceBuffer(DeviceBuffer &&) noexcept = default;
+    DeviceBuffer &operator=(DeviceBuffer &&) noexcept = default;
+    DeviceBuffer(const DeviceBuffer&) noexcept = delete;
+    DeviceBuffer& operator=(const DeviceBuffer&) noexcept = delete;
 
     DeviceBuffer(
       const VulkanState &state, std::size_t size,
@@ -126,35 +134,32 @@ inline namespace graphics {
     {
     }
 
-    DeviceBuffer & write(std::span<const std::byte> src, VkDeviceSize offset = 0);
+    DeviceBuffer & resize(CommandUnit &command_unit, std::size_t new_size) noexcept;
+
+    DeviceBuffer & write(CommandUnit &command_unit, std::span<const std::byte> src, vk::DeviceSize offset = 0);
 
     template <size_t Extent>
-    DeviceBuffer & write(std::span<const std::byte, Extent> src, VkDeviceSize offset = 0)
+    DeviceBuffer & write(CommandUnit &command_unit, std::span<const std::byte, Extent> src, vk::DeviceSize offset = 0)
     {
-      return write(std::span<const std::byte>(src.data(), src.size()));
+      return write(command_unit, std::span<const std::byte>(src.data(), src.size()), offset);
     }
 
     template <typename T, size_t Extent>
-    DeviceBuffer & write(std::span<T, Extent> src, VkDeviceSize offset = 0) { return write(std::as_bytes(src), offset); }
-  };
-
-  class ConditionalBuffer : public DeviceBuffer {
-  public:
-    ConditionalBuffer() = default;
-    ConditionalBuffer(ConditionalBuffer &&) noexcept = default;
-    ConditionalBuffer & operator=(ConditionalBuffer &&) noexcept = default;
-
-    ConditionalBuffer(const VulkanState &state, size_t byte_size)
-      : DeviceBuffer(state, byte_size,
-                     vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer |
-                       vk::BufferUsageFlagBits::eConditionalRenderingEXT)
+    DeviceBuffer & write(CommandUnit &command_unit, std::span<T, Extent> src, vk::DeviceSize offset = 0)
     {
+      return write(command_unit, std::as_bytes(src), offset);
     }
   };
 
   class UniformBuffer : public HostBuffer {
   public:
-    UniformBuffer(const VulkanState &state, size_t size);
+    UniformBuffer() noexcept = default;
+    UniformBuffer(UniformBuffer&&) noexcept = default;
+    UniformBuffer& operator=(UniformBuffer&&) noexcept = default;
+    UniformBuffer(const UniformBuffer&) noexcept = delete;
+    UniformBuffer& operator=(const UniformBuffer&) noexcept = delete;
+
+    UniformBuffer(const VulkanState &state, size_t size, vk::BufferUsageFlags usage_flags = {});
 
     template <typename T, size_t Extent>
     UniformBuffer(const VulkanState &state, std::span<T, Extent> src)
@@ -167,16 +172,26 @@ inline namespace graphics {
 
   class StorageBuffer : public DeviceBuffer {
   public:
-    using DeviceBuffer::DeviceBuffer;
+    StorageBuffer() noexcept = default;
+    StorageBuffer(StorageBuffer&&) noexcept = default;
+    StorageBuffer& operator=(StorageBuffer&&) noexcept = default;
+    StorageBuffer(const StorageBuffer&) noexcept = delete;
+    StorageBuffer& operator=(const StorageBuffer&) noexcept = delete;
 
-    StorageBuffer(const VulkanState &state, size_t byte_size);
+    StorageBuffer(const VulkanState &state, size_t byte_size, vk::BufferUsageFlags usage_flags = {});
 
     template <typename T, size_t Extent>
     StorageBuffer(const VulkanState &state, std::span<T, Extent> src)
         : StorageBuffer(state, src.size() * sizeof(T))
     {
-      assert(src.data());
-      write(src);
+      ASSERT(src.data());
+
+      CommandUnit command_unit {state};
+      command_unit.begin();
+      write(command_unit, src);
+      command_unit.end();
+
+      UniqueFenceGuard(_state->device(), command_unit.submit(*_state));
     }
   };
 
@@ -199,7 +214,12 @@ inline namespace graphics {
         : VertexBuffer(state, src.size() * sizeof(T))
     {
       ASSERT(src.data());
-      write(src);
+      CommandUnit command_unit {state};
+      command_unit.begin();
+      write(command_unit, src);
+      command_unit.end();
+
+      UniqueFenceGuard(_state->device(), command_unit.submit(*_state));
     }
   };
 
@@ -225,10 +245,16 @@ inline namespace graphics {
     IndexBuffer(const VulkanState &state, std::span<T, Extent> src)
         : IndexBuffer(state, src.size() * sizeof(T))
     {
-      static_assert(sizeof(T) == 1 || sizeof(T) == 2 || sizeof(T) == 4,
-                    "Unsupported index element size for IndexBuffer");
+      ASSERT(sizeof(T) == 1 || sizeof(T) == 2 || sizeof(T) == 4,
+             "Unsupported index element size for IndexBuffer",
+             src);
 
-      write(src);
+      CommandUnit command_unit(state) ;
+      command_unit.begin();
+      write(command_unit, src);
+      command_unit.end();
+
+      UniqueFenceGuard(_state->device(), command_unit.submit(*_state));
 
       _element_count = src.size();
 
@@ -248,58 +274,113 @@ inline namespace graphics {
     vk::IndexType index_type() const noexcept { return _index_type; }
   };
 
+  // for VK_EXT_conditional_rendering
+  class ConditionalBuffer : public StorageBuffer {
+  public:
+    ConditionalBuffer() = default;
+    ConditionalBuffer(ConditionalBuffer &&) noexcept = default;
+    ConditionalBuffer & operator=(ConditionalBuffer &&) noexcept = default;
+    ConditionalBuffer(const ConditionalBuffer &) noexcept = delete;
+    ConditionalBuffer & operator=(const ConditionalBuffer &) noexcept = delete;
+    ConditionalBuffer(const VulkanState &state, size_t byte_size, vk::BufferUsageFlags usage_flags = {})
+      : StorageBuffer(state, byte_size, usage_flags | vk::BufferUsageFlagBits::eConditionalRenderingEXT)
+    {
+    }
+  };
+
   class VectorBuffer : public DeviceBuffer {
   private:
-    vk::BufferUsageFlags _usage_flags {};
-    VkDeviceSize _current_size;
+    vk::DeviceSize _current_size;
 
   public:
+    static inline constexpr float resize_coefficient = 1.5;
+    static inline constexpr vk::DeviceSize default_initial_byte_size = 1 << 20;
+
     VectorBuffer() = default;
-
-    VectorBuffer(const VulkanState &state, vk::BufferUsageFlags usage_flags, VkDeviceSize start_byte_size = 1'000'000);
-
     VectorBuffer(VectorBuffer &&) noexcept = default;
     VectorBuffer & operator=(VectorBuffer &&) noexcept = default;
+    VectorBuffer(const VectorBuffer &) noexcept = delete;
+    VectorBuffer & operator=(const VectorBuffer &) noexcept = delete;
+
+    VectorBuffer(const VulkanState &state, vk::BufferUsageFlags usage_flags,
+        vk::DeviceSize byte_size = default_initial_byte_size);
+
+    vk::DeviceSize capacity() const noexcept { return DeviceBuffer::_size; }
+    vk::DeviceSize size() const noexcept { return _current_size; }
+
+    void resize(vk::DeviceSize new_size) noexcept;
+
+    vk::DeviceSize append_range(CommandUnit &command_unit, std::span<const std::byte> src) noexcept;
+
+    template <size_t Extent>
+    vk::DeviceSize append_range(CommandUnit &command_unit, std::span<const std::byte, Extent> src)
+    {
+      return append_range(command_unit, std::span<const std::byte>(src.data(), src.size()));
+    }
 
     template <typename T, size_t Extent>
-    const VkDeviceSize push_data_back(std::span<T, Extent> src) noexcept
+    const vk::DeviceSize append_range(CommandUnit &command_unit, std::span<T, Extent> src) noexcept
     {
-      ASSERT(src.data());
-      return push_data_back(std::as_bytes(src));
+      return append_range(command_unit, std::as_bytes(src));
     }
-    VkDeviceSize push_data_back(std::span<const std::byte> src) noexcept;
-
-    void resize(VkDeviceSize new_size) noexcept;
-
-  private:
-    void recreate_buffer(VkDeviceSize new_size) noexcept;
   };
 
   class VertexVectorBuffer : public VectorBuffer {
   public:
     VertexVectorBuffer() = default;
-
-    VertexVectorBuffer(const VulkanState &state, VkDeviceSize start_byte_size = 1'000'000);
-
     VertexVectorBuffer(VertexVectorBuffer &&) noexcept = default;
     VertexVectorBuffer & operator=(VertexVectorBuffer &&) noexcept = default;
+    VertexVectorBuffer(const VertexVectorBuffer &) noexcept = delete;
+    VertexVectorBuffer & operator=(const VertexVectorBuffer &) noexcept = delete;
+    VertexVectorBuffer(const VulkanState &state,
+        vk::DeviceSize initial_byte_size = VectorBuffer::default_initial_byte_size)
+      : VectorBuffer(state,
+          vk::BufferUsageFlagBits::eVertexBuffer |
+            vk::BufferUsageFlagBits::eTransferDst,
+          initial_byte_size)
+    {
+    }
   };
 
+  class IndexVectorBuffer : public VectorBuffer {
+  public:
+    IndexVectorBuffer() = default;
+    IndexVectorBuffer(IndexVectorBuffer &&) noexcept = default;
+    IndexVectorBuffer & operator=(IndexVectorBuffer &&) noexcept = default;
+    IndexVectorBuffer(const IndexVectorBuffer &) noexcept = delete;
+    IndexVectorBuffer & operator=(const IndexVectorBuffer &) noexcept = delete;
+    IndexVectorBuffer(const VulkanState &state,
+        vk::DeviceSize initial_byte_size = VectorBuffer::default_initial_byte_size)
+      : VectorBuffer(state,
+          vk::BufferUsageFlagBits::eIndexBuffer |
+            vk::BufferUsageFlagBits::eTransferDst,
+          initial_byte_size)
+    {
+    }
+  };
+
+  /* VmaVirtualBlock is not resizeable. This is a workaround.
+   * This structure handles array of VmaVirtualBlock
+   * If allocation of requested size is not possible -
+   *     create another VmaVirtualBlock larger than last one
+   */
   class DeviceHeapAllocator {
   private:
+    // individual allocation wrapper
     struct Allocation {
       VmaVirtualAllocation allocation;
-      VkDeviceSize byte_size;
+      vk::DeviceSize byte_size;
       uint32_t block_number;
     };
 
+    // wrapper around single VmaVirtualBlock
     class AllocationBlock {
       friend class DeviceHeapAllocator;
 
     private:
       VmaVirtualBlock _virtual_block = nullptr;
-      VkDeviceSize _size = 0;
-      VkDeviceSize _offset = 0;
+      vk::DeviceSize _size = 0;
+      vk::DeviceSize _offset = 0;
       std::atomic<uint32_t> _allocation_number = 0;
       uint32_t _block_number = 0;
       // mutex for concurrent work with virtual block.
@@ -307,21 +388,21 @@ inline namespace graphics {
       std::mutex _mutex;
 
     public:
-      AllocationBlock(VkDeviceSize size, VkDeviceSize offset, uint32_t block_number) noexcept;
+      AllocationBlock(vk::DeviceSize size, vk::DeviceSize offset, uint32_t block_number) noexcept;
       ~AllocationBlock() noexcept;
 
       // these methods aren't thread safe
       AllocationBlock & operator=(AllocationBlock &&other) noexcept;
       AllocationBlock(AllocationBlock &&other) noexcept { *this = std::move(other); }
 
-      std::optional<std::pair<VkDeviceSize, Allocation>> allocate(VkDeviceSize allocation_size,
+      std::optional<std::pair<vk::DeviceSize, Allocation>> allocate(vk::DeviceSize allocation_size,
                                                                   uint32_t alignment) noexcept;
       void deallocate(Allocation &allocation) noexcept;
     };
 
   public:
-    struct AllocInfo {
-      VkDeviceSize offset;
+    struct AllocationInfo {
+      vk::DeviceSize offset;
       bool resized = false;
     };
 
@@ -329,8 +410,8 @@ inline namespace graphics {
     std::atomic<uint32_t> _size = 0;
     uint32_t _alignment = 16;
 
-    std::mutex _allocations_mutex;
-    boost::unordered_map<VkDeviceSize, Allocation> _allocations;
+    std::shared_mutex _allocations_mutex;
+    tbb::concurrent_unordered_map<vk::DeviceSize, Allocation> _allocations;
 
     std::mutex _add_block_mutex; // mutex for correct execution of 'add_block' function
     // we use TBB vector for itteration over this while it can be resized (so memory can be reallocated)
@@ -338,22 +419,22 @@ inline namespace graphics {
 
   public:
     // alignment must be pow of 2
-    DeviceHeapAllocator(VkDeviceSize start_byte_size = 1'000'000, VkDeviceSize alignment = 16);
+    DeviceHeapAllocator(vk::DeviceSize start_byte_size = 1'000'000, vk::DeviceSize alignment = 16);
 
     // these methods aren't thread safe
     DeviceHeapAllocator(DeviceHeapAllocator &&other) noexcept { *this = std::move(other); };
     DeviceHeapAllocator & operator=(DeviceHeapAllocator &&) noexcept;
 
     // size must be aligned by alignment parameter
-    AllocInfo allocate(VkDeviceSize size) noexcept;
+    AllocationInfo allocate(vk::DeviceSize size) noexcept;
     // offset if offset to allocation returned by allocate
-    void deallocate(VkDeviceSize offset) noexcept;
+    void deallocate(vk::DeviceSize offset) noexcept;
 
-    VkDeviceSize size() const noexcept { return _size; }
+    vk::DeviceSize size() const noexcept { return _size; }
     uint32_t alignment() const noexcept { return _alignment; }
 
   private:
-    AllocationBlock & add_block(VkDeviceSize allocation_size = 0) noexcept;
+    AllocationBlock & add_block(vk::DeviceSize allocation_size = 0) noexcept;
   };
 
   class HeapBuffer {
@@ -362,56 +443,104 @@ inline namespace graphics {
     DeviceHeapAllocator _heap;
 
   public:
+    static inline constexpr auto default_initial_byte_size = VectorBuffer::default_initial_byte_size;
+    static inline constexpr auto default_alignment = 16;
+
     HeapBuffer() = default;
-
-    HeapBuffer(const VulkanState &state, vk::BufferUsageFlags usage_flags,
-               VkDeviceSize start_byte_size = 1'000'000, VkDeviceSize alignment = 16);
-
     HeapBuffer(HeapBuffer &&) noexcept = default;
     HeapBuffer & operator=(HeapBuffer &&) noexcept = default;
+    HeapBuffer(const HeapBuffer &) noexcept = delete;
+    HeapBuffer & operator=(const HeapBuffer &) noexcept = delete;
+
+    HeapBuffer(const VulkanState &state, vk::BufferUsageFlags usage_flags,
+               vk::DeviceSize start_byte_size = HeapBuffer::default_initial_byte_size,
+               vk::DeviceSize alignment = HeapBuffer::default_alignment);
 
     // return offset in buffer
-    VkDeviceSize allocate(VkDeviceSize size) noexcept;
-    void free(VkDeviceSize offset) noexcept;
+    vk::DeviceSize allocate(vk::DeviceSize size) noexcept;
+    void free(vk::DeviceSize offset) noexcept;
 
     template <typename T, size_t Extent>
-    void write(std::span<T, Extent> src, VkDeviceSize offset = 0) { _buffer.write(src, offset); }
+    void write(CommandUnit &command_unit, std::span<T, Extent> src, vk::DeviceSize offset = 0)
+    {
+      _buffer.write(command_unit, src, offset);
+    }
 
     // return offset in buffer
     template <typename T, size_t Extent>
-    const VkDeviceSize allocate_and_write(std::span<T, Extent> src) noexcept
+    const vk::DeviceSize allocate_and_write(CommandUnit &command_unit, std::span<T, Extent> src) noexcept
     {
       ASSERT(src.data());
-      return allocate_and_write(std::as_bytes(src));
+      return allocate_and_write(command_unit, std::as_bytes(src));
     }
     // return offset in buffer
-    VkDeviceSize allocate_and_write(std::span<const std::byte> src) noexcept;
+    vk::DeviceSize allocate_and_write(CommandUnit &command_unit, std::span<const std::byte> src) noexcept;
 
-    VkDeviceSize byte_size() const noexcept { return _buffer.byte_size(); }
+    vk::DeviceSize byte_size() const noexcept { return _buffer.byte_size(); }
     vk::Buffer buffer() const noexcept { return _buffer.buffer(); }
   };
 
   class VertexHeapBuffer : public HeapBuffer {
   public:
     VertexHeapBuffer() = default;
-
-    VertexHeapBuffer(const VulkanState &state, VkDeviceSize start_byte_size = 1'000'000, VkDeviceSize alignment = 16);
-
     VertexHeapBuffer(VertexHeapBuffer &&) noexcept = default;
     VertexHeapBuffer & operator=(VertexHeapBuffer &&) noexcept = default;
+    VertexHeapBuffer(const VertexHeapBuffer &) noexcept = delete;
+    VertexHeapBuffer & operator=(const VertexHeapBuffer &) noexcept = delete;
+
+    VertexHeapBuffer(const VulkanState &state,
+        vk::DeviceSize start_byte_size = HeapBuffer::default_initial_byte_size,
+        vk::DeviceSize alignment = HeapBuffer::default_alignment)
+      : HeapBuffer(state,
+          vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
+          start_byte_size,
+          alignment)
+    {
+    }
   };
 
   class IndexHeapBuffer : public HeapBuffer {
   public:
     IndexHeapBuffer() = default;
-
-    IndexHeapBuffer(const VulkanState &state, VkDeviceSize start_byte_size = 1'000'000, VkDeviceSize alignment = 16);
-
     IndexHeapBuffer(IndexHeapBuffer &&) noexcept = default;
     IndexHeapBuffer & operator=(IndexHeapBuffer &&) noexcept = default;
+    IndexHeapBuffer(const IndexHeapBuffer &) noexcept = delete;
+    IndexHeapBuffer & operator=(const IndexHeapBuffer &&) noexcept = delete;
+
+    IndexHeapBuffer(const VulkanState &state,
+        vk::DeviceSize start_byte_size = HeapBuffer::default_initial_byte_size,
+        vk::DeviceSize alignment = HeapBuffer::default_alignment)
+      : HeapBuffer(state,
+          vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst,
+          start_byte_size,
+          alignment)
+    {
+    }
   };
 
+  struct BufferRegion {
+    const VulkanState &state {};
+    vk::Buffer buffer {};
+    vk::DeviceSize offset {};
+    vk::DeviceSize size {};
 
+    BufferRegion() noexcept = default;
+    BufferRegion(BufferRegion &&) noexcept = default;
+    BufferRegion & operator=(BufferRegion &&) noexcept = delete;
+    BufferRegion(const BufferRegion &) noexcept = default;
+    BufferRegion & operator=(const BufferRegion &) noexcept = delete;
+
+    template <std::derived_from<Buffer> BufferT>
+    BufferRegion(const BufferT &buf, vk::DeviceSize o = 0, vk::DeviceSize s = 0)
+    : state(buf.state())
+    , buffer(buf.buffer())
+    , offset(o)
+    , size(s == 0 ? buf.byte_size() - o : s)
+    {
+    }
+  };
+
+  void bufcopy(CommandUnit &command_unit, BufferRegion src, BufferRegion dst);
 }
 } // namespace mr
 
