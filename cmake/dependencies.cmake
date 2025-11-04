@@ -13,6 +13,7 @@ find_package(stb REQUIRED)
 find_package(mr-math REQUIRED)
 find_package(mr-utils REQUIRED)
 find_package(mr-importer REQUIRED)
+find_package(Tracy REQUIRED)
 
 CPMAddPackage("gh:Cvelth/vkfw#main")
 CPMAddPackage("gh:charles-lunarg/vk-bootstrap@1.4.321")
@@ -44,6 +45,7 @@ set(DEPS_LIBRARIES
   beman.inplace_vector
   boost::boost
   TBB::tbb
+  Tracy::TracyClient
 
   mr-math::mr-math
   mr-utils::mr-utils

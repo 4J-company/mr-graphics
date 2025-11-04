@@ -8,8 +8,11 @@
 #include "resources/images/image.hpp"
 #include "resources/pipelines/graphics_pipeline.hpp"
 #include "vkfw/vkfw.hpp"
+#include "window/dummy_presenter.hpp"
 #include <vulkan/vulkan_core.h>
 #include <vulkan/vulkan_enums.hpp>
+
+#define TRACY_VK_ZONE_BEGIN()
 
 mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent)
   : _state(std::make_shared<VulkanState>(global_state))
@@ -32,6 +35,25 @@ mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent)
 
   init_bindless_rendering();
   init_lights_render_data();
+
+  vk::QueryPoolCreateInfo query_pool_create_info {
+    .queryType = vk::QueryType::eTimestamp,
+    .queryCount = timestamps_number,
+  };
+  auto [res, query_pool] = _state->device().createQueryPoolUnique(query_pool_create_info);
+  ASSERT(res == vk::Result::eSuccess);
+  _timestamps_query_pool = std::move(query_pool);
+
+  uint64_t timestamp_period = _state->phys_device().getProperties().limits.timestampPeriod; // ns per clock
+  _timestamp_to_ms = timestamp_period / 1e6;
+
+  _models_tracy_gpu_context = TracyVkContext(_state->phys_device(), _state->device(),
+                                             _state->queue(), _models_command_unit.command_buffer());
+  TracyVkContextName(_models_tracy_gpu_context, "models tracy context", 19);
+
+  _lights_tracy_gpu_context = TracyVkContext(_state->phys_device(), _state->device(),
+                                             _state->queue(), _lights_command_unit.command_buffer());
+  TracyVkContextName(_lights_tracy_gpu_context, "lights tracy context", 19);
 }
 
 // TODO(dk6): maybe create lights_render_data.cpp file and move this function?
@@ -113,6 +135,9 @@ mr::RenderContext::~RenderContext()
 {
   ASSERT(_state != nullptr);
 
+  TracyVkDestroy(_models_tracy_gpu_context);
+  TracyVkDestroy(_lights_tracy_gpu_context);
+
   _state->queue().waitIdle();
 
   _image_available_semaphore.clear();
@@ -151,8 +176,14 @@ mr::VertexBuffersArray mr::RenderContext::add_vertex_buffers(
   _attributes_vertex_buffer.write(attributes_data, attributes_offset);
 
   return VertexBuffersArray {
-    VertexBufferDescription { .offset = positions_offset },
-    VertexBufferDescription { .offset = attributes_offset },
+    VertexBufferDescription {
+      .offset = positions_offset,
+      .vertex_count = static_cast<uint32_t>(positions_data.size()) / position_bytes_size,
+    },
+    VertexBufferDescription {
+      .offset = attributes_offset,
+      .vertex_count = static_cast<uint32_t>(attributes_data.size()) / attributes_bytes_size,
+    },
   };
 }
 
@@ -184,6 +215,11 @@ mr::FileWriterHandle mr::RenderContext::create_file_writer(const mr::Extent &ext
   return ResourceManager<FileWriter>::get().create(mr::unnamed, *this, extent);
 }
 
+mr::DummyPresenterHandle mr::RenderContext::create_dummy_presenter(const mr::Extent &extent) const noexcept
+{
+  return ResourceManager<DummyPresenter>::get().create(mr::unnamed, *this, extent);
+}
+
 mr::SceneHandle mr::RenderContext::create_scene() noexcept
 {
   return ResourceManager<Scene>::get().create(mr::unnamed, *this);
@@ -191,145 +227,164 @@ mr::SceneHandle mr::RenderContext::create_scene() noexcept
 
 void mr::RenderContext::render_lights(const SceneHandle scene, Presenter &presenter)
 {
-  for (auto &gbuf : _gbuffers) {
-    gbuf.switch_layout(vk::ImageLayout::eShaderReadOnlyOptimal);
+  ZoneScoped;
+  _lights_command_unit.begin();
+
+  TRACY_VK_ZONE_BEGIN() {
+    TracyVkZone(_lights_tracy_gpu_context, _lights_command_unit.command_buffer(), "Light pass GPU");
+
+    _lights_command_unit->resetQueryPool(_timestamps_query_pool.get(), enum_cast(Timestamp::ShadingStart), 2);
+    _lights_command_unit->writeTimestamp(vk::PipelineStageFlagBits::eTopOfPipe,
+                                         _timestamps_query_pool.get(),
+                                         enum_cast(Timestamp::ShadingStart));
+
+    for (auto &gbuf : _gbuffers) {
+      gbuf.switch_layout(vk::ImageLayout::eShaderReadOnlyOptimal);
+    }
+
+    vk::RenderingAttachmentInfoKHR swapchain_image_attachment_info = presenter.target_image_info();
+
+    vk::RenderingInfoKHR attachment_info {
+      .renderArea = { 0, 0, presenter.extent().width, presenter.extent().height },
+      .layerCount = 1,
+      .colorAttachmentCount = 1,
+      .pColorAttachments = &swapchain_image_attachment_info,
+    };
+
+    _depthbuffer.switch_layout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
+
+    _lights_command_unit->beginRendering(&attachment_info);
+
+    vk::Viewport viewport {
+      .x = 0, .y = 0,
+      .width = static_cast<float>(presenter.extent().width),
+      .height = static_cast<float>(presenter.extent().height),
+      .minDepth = 0, .maxDepth = 1,
+    };
+    _lights_command_unit->setViewport(0, viewport);
+
+    vk::Rect2D scissors {
+      .offset = {0, 0},
+      .extent = {
+        static_cast<uint32_t>(presenter.extent().width),
+        static_cast<uint32_t>(presenter.extent().height),
+      },
+    };
+    _lights_command_unit->setScissor(0, scissors);
+
+    // shade all
+    _lights_command_unit->bindVertexBuffers(0, {_lights_render_data.screen_vbuf.buffer()}, {0});
+    _lights_command_unit->bindIndexBuffer(_lights_render_data.screen_ibuf.buffer(), 0, vk::IndexType::eUint32);
+
+    std::apply([this](const auto &lights) {
+      for (auto light_handle : lights) {
+        light_handle->shade(_lights_command_unit);
+      }
+    }, scene->_lights);
+
+    _lights_command_unit->endRendering();
+
+    _lights_command_unit->writeTimestamp(vk::PipelineStageFlagBits::eBottomOfPipe,
+                                         _timestamps_query_pool.get(),
+                                         enum_cast(Timestamp::ShadingEnd));
   }
 
-  vk::RenderingAttachmentInfoKHR swapchain_image_attachment_info = presenter.target_image_info();
-
-  vk::RenderingInfoKHR attachment_info {
-    .renderArea = { 0, 0, presenter.extent().width, presenter.extent().height },
-    .layerCount = 1,
-    .colorAttachmentCount = 1,
-    .pColorAttachments = &swapchain_image_attachment_info,
-  };
-
-  _depthbuffer.switch_layout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
-
-  _lights_command_unit->beginRendering(&attachment_info);
-
-  vk::Viewport viewport {
-    .x = 0, .y = 0,
-    .width = static_cast<float>(presenter.extent().width),
-    .height = static_cast<float>(presenter.extent().height),
-    .minDepth = 0, .maxDepth = 1,
-  };
-  _lights_command_unit->setViewport(0, viewport);
-
-  vk::Rect2D scissors {
-    .offset = {0, 0},
-    .extent = {
-      static_cast<uint32_t>(presenter.extent().width),
-      static_cast<uint32_t>(presenter.extent().height),
-    },
-  };
-  _lights_command_unit->setScissor(0, scissors);
-
-  // shade all
-  _lights_command_unit->bindVertexBuffers(0, {_lights_render_data.screen_vbuf.buffer()}, {0});
-  _lights_command_unit->bindIndexBuffer(_lights_render_data.screen_ibuf.buffer(), 0, vk::IndexType::eUint32);
-
-  std::apply([this](const auto &lights) {
-    for (auto light_handle : lights) {
-      light_handle->shade(_lights_command_unit);
-    }
-  }, scene->_lights);
-
-  _lights_command_unit->endRendering();
+  TracyVkCollect(_lights_tracy_gpu_context, _lights_command_unit.command_buffer());
+  _lights_command_unit.end();
 }
 
 void mr::RenderContext::render_models(const SceneHandle scene)
 {
-  for (auto &gbuf : _gbuffers) {
-    gbuf.switch_layout(vk::ImageLayout::eColorAttachmentOptimal);
+  ZoneScoped;
+  _models_command_unit.begin();
+
+  TRACY_VK_ZONE_BEGIN() {
+    TracyVkZone(_models_tracy_gpu_context, _models_command_unit.command_buffer(), "Models pass GPU");
+
+    _models_command_unit->resetQueryPool(_timestamps_query_pool.get(), enum_cast(Timestamp::ModelsStart), 2);
+    _models_command_unit->writeTimestamp(vk::PipelineStageFlagBits::eTopOfPipe,
+                                         _timestamps_query_pool.get(),
+                                         enum_cast(Timestamp::ModelsStart));
+
+    for (auto &gbuf : _gbuffers) {
+      gbuf.switch_layout(vk::ImageLayout::eColorAttachmentOptimal);
+    }
+    _depthbuffer.switch_layout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
+
+    auto gbufs_attachs = _gbuffers | std::views::transform([](const ColorAttachmentImage &gbuf) {
+      return gbuf.attachment_info();
+    }) | std::ranges::to<InplaceVector<vk::RenderingAttachmentInfoKHR, gbuffers_number>>();
+    auto depth_attachment_info = _depthbuffer.attachment_info();
+
+    vk::RenderingInfoKHR attachment_info {
+      .renderArea = { 0, 0, _extent.width, _extent.height },
+      .layerCount = 1,
+      .colorAttachmentCount = static_cast<uint32_t>(gbufs_attachs.size()),
+      .pColorAttachments = gbufs_attachs.data(),
+      .pDepthAttachment = &depth_attachment_info,
+      // .pStencilAttachment = &depth_attachment_info,
+    };
+
+    _models_command_unit->beginRendering(&attachment_info);
+
+    vk::Viewport viewport {
+      .x = 0, .y = 0,
+      .width = static_cast<float>(_extent.width),
+      .height = static_cast<float>(_extent.height),
+      .minDepth = 0, .maxDepth = 1,
+    };
+    _models_command_unit->setViewport(0, viewport);
+
+    vk::Rect2D scissors {
+      .offset = {0, 0},
+      .extent = {
+        static_cast<uint32_t>(_extent.width),
+        static_cast<uint32_t>(_extent.height),
+      },
+    };
+    _models_command_unit->setScissor(0, scissors);
+
+    // ===== Rendering geometry ======
+
+    std::array vertex_buffers {
+      _positions_vertex_buffer.buffer(),
+      _attributes_vertex_buffer.buffer(),
+    };
+    std::array vertex_buffers_offsets {0ul, 0ul};
+    _models_command_unit->bindVertexBuffers(0, vertex_buffers, vertex_buffers_offsets);
+
+    _models_command_unit->bindIndexBuffer(_index_buffer.buffer(), 0, vk::IndexType::eUint32);
+
+    for (auto &[pipeline, draw] : scene->_draws) {
+      _models_command_unit->bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline->pipeline());
+
+      std::array sets {_bindless_set.set()};
+      _models_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                                               {pipeline->layout()},
+                                               0, // TODO(dk6): give name for this magic number
+                                               sets,
+                                               {});
+
+      _models_command_unit->pushConstants(pipeline->layout(), vk::ShaderStageFlagBits::eAllGraphics,
+                                          0, sizeof(uint32_t), &draw.meshes_render_info_id);
+
+      // TODO(dk6): Update only if scene updates on this frame
+      draw.commands_buffer.write(std::span(draw.commands_buffer_data));
+      draw.meshes_render_info.write(std::span(draw.meshes_render_info_data));
+
+      uint32_t stride = sizeof(vk::DrawIndexedIndirectCommand);
+      _models_command_unit->drawIndexedIndirect(draw.commands_buffer.buffer(), 0, draw.meshes.size(), stride);
+    }
+
+    _models_command_unit->endRendering();
+
+    _models_command_unit->writeTimestamp(vk::PipelineStageFlagBits::eBottomOfPipe,
+                                         _timestamps_query_pool.get(),
+                                         enum_cast(Timestamp::ModelsEnd));
   }
-  _depthbuffer.switch_layout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
 
-  auto gbufs_attachs = _gbuffers | std::views::transform([](const ColorAttachmentImage &gbuf) {
-    return gbuf.attachment_info();
-  }) | std::ranges::to<InplaceVector<vk::RenderingAttachmentInfoKHR, gbuffers_number>>();
-  auto depth_attachment_info = _depthbuffer.attachment_info();
-
-  vk::RenderingInfoKHR attachment_info {
-    .renderArea = { 0, 0, _extent.width, _extent.height },
-    .layerCount = 1,
-    .colorAttachmentCount = static_cast<uint32_t>(gbufs_attachs.size()),
-    .pColorAttachments = gbufs_attachs.data(),
-    .pDepthAttachment = &depth_attachment_info,
-    // .pStencilAttachment = &depth_attachment_info,
-  };
-
-  _models_command_unit->beginRendering(&attachment_info);
-
-  vk::Viewport viewport {
-    .x = 0, .y = 0,
-    .width = static_cast<float>(_extent.width),
-    .height = static_cast<float>(_extent.height),
-    .minDepth = 0, .maxDepth = 1,
-  };
-  _models_command_unit->setViewport(0, viewport);
-
-  vk::Rect2D scissors {
-    .offset = {0, 0},
-    .extent = {
-      static_cast<uint32_t>(_extent.width),
-      static_cast<uint32_t>(_extent.height),
-    },
-  };
-  _models_command_unit->setScissor(0, scissors);
-
-  // ===== Rendering geometry ======
-
-  std::array vertex_buffers {
-    _positions_vertex_buffer.buffer(),
-    _attributes_vertex_buffer.buffer(),
-  };
-  std::array vertex_buffers_offsets {0ul, 0ul};
-  _models_command_unit->bindVertexBuffers(0, vertex_buffers, vertex_buffers_offsets);
-
-  _models_command_unit->bindIndexBuffer(_index_buffer.buffer(), 0, vk::IndexType::eUint32);
-
-  for (auto &[pipeline, draw] : scene->_draws) {
-    _models_command_unit->bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline->pipeline());
-
-    std::array sets {_bindless_set.set()};
-    _models_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                                             {pipeline->layout()},
-                                             0, // TODO(dk6): give name for this magic number
-                                             sets,
-                                             {});
-
-    _models_command_unit->pushConstants(pipeline->layout(), vk::ShaderStageFlagBits::eAllGraphics,
-                                        0, sizeof(uint32_t), &draw.meshes_render_info_id);
-
-    // TODO(dk6): Update only if scene updates on this frame
-    draw.commands_buffer.write(std::span(draw.commands_buffer_data));
-    draw.meshes_render_info.write(std::span(draw.meshes_render_info_data));
-
-    uint32_t stride = sizeof(vk::DrawIndexedIndirectCommand);
-    _models_command_unit->drawIndexedIndirect(draw.commands_buffer.buffer(), 0, draw.meshes.size(), stride);
-
-    // TODO(dk6): If we rendering different meshes for one indirect commands we can not use conditional rendering :(
-
-    // for (auto [draw_number, mesh] : std::views::enumerate(draw.meshes)) {
-    //   vk::ConditionalRenderingBeginInfoEXT conditional_rendering_begin_info {
-    //     .buffer = scene->_visibility.buffer(),
-    //     .offset = mesh->_mesh_offset * sizeof(uint32_t),
-    //   };
-
-    //   _state->dispatch_table().cmdBeginConditionalRenderingEXT(
-    //     _models_command_unit.command_buffer(),
-    //     conditional_rendering_begin_info
-    //   );
-
-    //   uint32_t stride = sizeof(vk::DrawIndexedIndirectCommand);
-    //   _models_command_unit->drawIndexedIndirect(draw.commands_buffer.buffer(), draw_number, 1, stride);
-
-    //   _state->dispatch_table().cmdEndConditionalRenderingEXT(_models_command_unit.command_buffer());
-    // }
-  }
-
-  _models_command_unit->endRendering();
+  TracyVkCollect(_models_tracy_gpu_context, _models_command_unit.command_buffer());
+  _models_command_unit.end();
 }
 
 void mr::RenderContext::resize(const mr::Extent &extent)
@@ -342,6 +397,12 @@ void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
   ASSERT(this == &scene->render_context());
   ASSERT(this == &presenter.render_context());
 
+  ZoneScoped;
+  const char *frame_name = "render";
+  FrameMarkStart(frame_name);
+
+  auto render_start_time = ClockT::now();
+
   _state->device().waitForFences(_image_fence.get(), VK_TRUE, UINT64_MAX);
   _state->device().resetFences(_image_fence.get());
 
@@ -353,35 +414,104 @@ void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
   // Model rendering pass
   // --------------------------------------------------------------------------
 
-  _models_command_unit.begin();
+  auto cpu_models_start_time = ClockT::now();
   render_models(scene);
+  auto cpu_models_time = ClockT::now() - cpu_models_start_time;
 
   _models_command_unit.add_signal_semaphore(_models_render_finished_semaphore.get());
-  _models_command_unit.end();
-  vk::SubmitInfo models_submit_info = _models_command_unit.submit_info();
 
+  vk::SubmitInfo models_submit_info = _models_command_unit.submit_info();
   _state->queue().submit(models_submit_info);
 
   // --------------------------------------------------------------------------
   // Lights shading pass
   // --------------------------------------------------------------------------
 
-  _lights_command_unit.begin();
+  auto cpu_shading_start_time = ClockT::now();
   render_lights(scene, presenter);
+  auto cpu_shading_time = ClockT::now() - cpu_shading_start_time;
 
   _lights_command_unit.add_wait_semaphore(_models_render_finished_semaphore.get(),
-                                   vk::PipelineStageFlagBits::eColorAttachmentOutput);
+                                          vk::PipelineStageFlagBits::eColorAttachmentOutput);
   auto image_available_semaphore = presenter.image_available_semaphore();
   if (image_available_semaphore) {
     _lights_command_unit.add_wait_semaphore(image_available_semaphore,
                                             vk::PipelineStageFlagBits::eColorAttachmentOutput);
   }
-  _lights_command_unit.add_signal_semaphore(presenter.render_finished_semaphore());
-  _lights_command_unit.end();
+  auto render_finished_semaphore = presenter.render_finished_semaphore();
+  if (render_finished_semaphore) {
+    _lights_command_unit.add_signal_semaphore(render_finished_semaphore);
+  }
 
   vk::SubmitInfo light_submit_info = _lights_command_unit.submit_info();
-
   _state->queue().submit(light_submit_info, _image_fence.get());
 
   presenter.present();
+
+  FrameMarkEnd(frame_name);
+
+  calculate_stat(scene, render_start_time, ClockT::now(), cpu_models_time, cpu_shading_time);
+}
+
+void mr::RenderContext::calculate_stat(SceneHandle scene,
+                                       ClockT::time_point render_start_time,
+                                       ClockT::time_point render_finish_time,
+                                       ClockT::duration models_time,
+                                       ClockT::duration shading_time)
+{
+  auto get_ms = [](ClockT::duration time) -> double {
+    using namespace std::chrono;
+    return duration_cast<duration<double, std::milli>>(time).count();
+  };
+  _render_stat.render_cpu_time_ms = get_ms(render_finish_time - render_start_time);
+  _render_stat.cpu_time_ms = get_ms(render_start_time - _prev_start_time);
+  _render_stat.cpu_fps = 1000 / _render_stat.cpu_time_ms;
+
+  _prev_start_time = render_start_time;
+
+  _render_stat.models_cpu_time_ms = get_ms(models_time);
+  _render_stat.shading_cpu_time_ms = get_ms(models_time);
+
+  std::array<std::pair<uint64_t, uint32_t>, timestamps_number> timestamps;
+  _state->device().getQueryPoolResults(_timestamps_query_pool.get(),
+                                       0, timestamps_number,
+                                       sizeof(timestamps[0]) * timestamps_number,
+                                       timestamps.data(),
+                                       sizeof(timestamps[0]), // stride
+                                       vk::QueryResultFlagBits::e64 | vk::QueryResultFlagBits::eWithAvailability);
+
+  // TODO(dk6): Init it in constructor
+  _render_stat.models_gpu_time_ms = (timestamps[enum_cast(Timestamp::ModelsEnd)].first -
+                                     timestamps[enum_cast(Timestamp::ModelsStart)].first) * _timestamp_to_ms;
+  _render_stat.shading_gpu_time_ms = (timestamps[enum_cast(Timestamp::ShadingEnd)].first -
+                                      timestamps[enum_cast(Timestamp::ShadingStart)].first) * _timestamp_to_ms;
+  _render_stat.render_gpu_time_ms = _render_stat.models_gpu_time_ms + _render_stat.shading_gpu_time_ms;
+  _render_stat.gpu_time_ms =
+    (timestamps[enum_cast(Timestamp::ModelsStart)].first - _prev_first_timestamp) * _timestamp_to_ms;
+  _render_stat.gpu_fps = 1000 / _render_stat.gpu_time_ms;
+  _prev_first_timestamp = timestamps[enum_cast(Timestamp::ModelsStart)].first;
+
+  _render_stat.triangles_number = scene->_triangles_number.load();
+  _render_stat.vertexes_number = scene->_vertexes_number.load();
+}
+
+void mr::RenderStat::write_to_json(std::ofstream &out) const noexcept
+{
+  double triangles_per_second = triangles_number / (gpu_time_ms / 1000);
+  std::println(out, "{{");
+  std::println(out, "  \"cpu_fps\": {:.2f},", cpu_fps);
+  std::println(out, "  \"cpu_time_ms\": {:.2f},", cpu_time_ms);
+  std::println(out, "  \"gpu_fps\": {:.2f},", gpu_fps);
+  std::println(out, "  \"gpu_time_ms\": {:.2f},", gpu_time_ms);
+  std::println(out, "  \"cpu_rendering_time_ms\": {:.2f},", render_cpu_time_ms);
+  std::println(out, "  \"cpu_models_time_ms\": {:.2f},", models_cpu_time_ms);
+  std::println(out, "  \"cpu_shading_time_ms\": {:.2f},", shading_cpu_time_ms);
+  std::println(out, "  \"gpu_rendering_time_ms\": {:.2f},", render_gpu_time_ms);
+  std::println(out, "  \"gpu_models_time_ms\": {:.2f},", models_gpu_time_ms);
+  std::println(out, "  \"gpu_shading_time_ms\": {:.2f},", shading_gpu_time_ms);
+  std::println(out, "  \"triangles_per_second\": {:.3f},", triangles_per_second);
+  std::println(out, "  \"triangles_per_second_millions\": {:.3f},", triangles_per_second * 1e-6);
+  std::println(out, "  \"triangles_number\": {},", triangles_number);
+  std::println(out, "  \"vertexes_number\": {}", vertexes_number);
+  std::println(out, "}}");
 }

@@ -69,12 +69,9 @@ std::optional<mr::RenderOptions> mr::RenderOptions::parse(int argc, const char *
     ("disable-culling",
      po::bool_switch()->default_value(false),
      "Disable culling")
-    ("enable-stat",
-     po::bool_switch()->default_value(false),
-     "Enable statistic of render, print it to stat-file. Always used in bench mode")
-    ("stat-file",
-     po::value<std::string>()->default_value("render_stat.txt"),
-     "Path to statistics file (default: ./render_stat.txt). Used only if enable-stat is defined")
+    ("stat-dir",
+     po::value<std::string>()->default_value("render_stats"),
+     "Path to directory in which frame stats will be writed (default: ./render_stat.txt).")
     ("models",
      po::value<std::vector<std::string>>()->multitoken(),
      "GLTF model files to render (can be specified anywhere in arguments)")
@@ -119,8 +116,7 @@ std::optional<mr::RenderOptions> mr::RenderOptions::parse(int argc, const char *
   options.dst_dir = vm["dst-dir"].as<std::string>();
   options.frames_number = vm["frames-number"].as<int>();
   options.disable_culling = vm["disable-culling"].as<bool>();
-  options.enable_stat = vm["enable-stat"].as<bool>();
-  options.stat_file = vm["stat-file"].as<std::string>();
+  options.stat_dir = vm["stat-dir"].as<std::string>();
 
   auto mode_str = vm["mode"].as<std::string>();
   auto mode_opt = parse_mode(mode_str);
@@ -186,7 +182,7 @@ void mr::RenderOptions::print() const noexcept
   }
   std::println("Resolution: {}x{}", width, height);
   std::println("Culling: {}", disable_culling ? "DISABLED" : "ENABLED");
-  std::println("Statistic: {}, statistics file: {}", enable_stat ? "ENABLED" : "DISABLED", stat_file.c_str());
+  std::println("Statistics directory: {}", stat_dir.c_str());
 
   if (camera) {
     std::println("camera:");

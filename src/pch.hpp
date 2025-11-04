@@ -56,6 +56,9 @@
 #define VKFW_NO_STRUCT_CONSTRUCTORS
 #include <vkfw/vkfw.hpp>
 
+#include "tracy/Tracy.hpp"
+#include "tracy/TracyVulkan.hpp"
+
 // WinAPI macros undefined :(
 #undef max
 #undef min

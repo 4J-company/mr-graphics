@@ -21,6 +21,7 @@ namespace mr {
 
   struct VertexBufferDescription {
     VkDeviceSize offset;
+    uint32_t vertex_count;
   };
 
   using VertexBuffersArray = SmallVector<VertexBufferDescription, vertex_buffers_number>;
