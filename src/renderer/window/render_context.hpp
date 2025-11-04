@@ -13,12 +13,34 @@
 #include "scene/scene.hpp"
 #include "resources/command_unit/command_unit.hpp"
 
+#include "window/dummy_presenter.hpp"
 #include <VkBootstrap.h>
 #include <vulkan/vulkan_core.h>
 
 namespace mr {
 inline namespace graphics {
   class Window;
+
+  struct RenderStat {
+    double render_gpu_time_ms = 0;
+    double models_gpu_time_ms = 0;
+    double shading_gpu_time_ms = 0;
+
+    double gpu_time_ms = 0;
+    double gpu_fps = 0;
+
+    double render_cpu_time_ms = 0;
+    double models_cpu_time_ms = 0;
+    double shading_cpu_time_ms = 0;
+
+    double cpu_time_ms = 0; // time between calls of render
+    double cpu_fps = 0;
+
+    uint64_t vertexes_number = 0;
+    uint64_t triangles_number = 0;
+
+    void write_to_json(std::ofstream &out) const noexcept;
+  };
 
   class RenderContext {
   public:
@@ -44,8 +66,30 @@ inline namespace graphics {
     constexpr static inline uint32_t default_index_number = default_vertex_number * 2;
 
   private:
+    // Timestamps
+    enum struct Timestamp : uint32_t {
+      ModelsStart,
+      ModelsEnd,
+      ShadingStart,
+      ShadingEnd,
+      TimestampsNumber,
+    };
+    constexpr static inline uint32_t timestamps_number = enum_cast(Timestamp::TimestampsNumber);
+
+    using ClockT = std::chrono::steady_clock;
+
+  private:
     std::shared_ptr<VulkanState> _state;
     Extent _extent;
+
+    vk::UniqueQueryPool _timestamps_query_pool {};
+    RenderStat _render_stat;
+    ClockT::time_point _prev_start_time {};
+    uint64_t _prev_first_timestamp = 0;
+    double _timestamp_to_ms = 0;
+
+    TracyVkCtx _models_tracy_gpu_context {};
+    TracyVkCtx _lights_tracy_gpu_context {};
 
     CommandUnit _models_command_unit;
     CommandUnit _lights_command_unit;
@@ -99,7 +143,9 @@ inline namespace graphics {
     const LightsRenderData & lights_render_data() const noexcept { return _lights_render_data; }
     const VulkanState & vulkan_state() const noexcept { return *_state; }
     const Extent & extent() const noexcept { return _extent; }
+    const RenderStat & stat() const noexcept { return _render_stat; }
     CommandUnit & transfer_command_unit() const noexcept { return _transfer_command_unit; }
+
 
     IndexHeapBuffer & index_buffer() noexcept { return _index_buffer; }
     VertexBuffersArray add_vertex_buffers(std::span<const std::span<const std::byte>> vbufs_data) noexcept;
@@ -110,6 +156,7 @@ inline namespace graphics {
     WindowHandle create_window(const mr::Extent &extent) const noexcept;
     FileWriterHandle create_file_writer() const noexcept;
     FileWriterHandle create_file_writer(const mr::Extent &extent) const noexcept;
+    DummyPresenterHandle create_dummy_presenter(const mr::Extent &extent) const noexcept;
 
     SceneHandle create_scene() noexcept;
 
@@ -128,6 +175,12 @@ inline namespace graphics {
     void render_lights(const SceneHandle scene, Presenter &presenter);
 
     void update_camera_buffer(UniformBuffer &uniform_buffer);
+
+    void calculate_stat(SceneHandle scene,
+                        ClockT::time_point render_start_time,
+                        ClockT::time_point render_finish_time,
+                        ClockT::duration models_time,
+                        ClockT::duration shading_time);
   };
 }
 } // namespace mr

@@ -43,6 +43,7 @@ compile_commands.json
 bin/cache
 bin/models
 *.spv
+*.tracy
 
 _deps
 CMakeUserPresets.json

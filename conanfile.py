@@ -37,6 +37,8 @@ class MrGraphicsRecipe(ConanFile):
 
         self.requires("onetbb/2022.2.0")
 
+        self.requires("tracy/0.12.2")
+
     def build_requirements(self):
         self.tool_requires("cmake/[>3.26]")
         self.tool_requires("ninja/[~1.12]")

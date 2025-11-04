@@ -37,6 +37,9 @@ inline namespace graphics {
   private:
     RenderContext *_parent = nullptr;
 
+    std::atomic_uint64_t _vertexes_number;
+    std::atomic_uint64_t _triangles_number;
+
     // One array for each light type
     // TODO(mt6): Maybe use https://github.com/rollbear/columnist or https://github.com/skypjack/entt here
     std::tuple<
@@ -102,6 +105,8 @@ inline namespace graphics {
 
     uint32_t transforms_buffer_id() const noexcept { return _transforms_buffer_id; }
     uint32_t camera_buffer_id() const noexcept { return _camera_buffer_id; }
+
+    FPSCamera & camera() noexcept { return _camera; }
 
   private:
     void update_camera_buffer() noexcept;
