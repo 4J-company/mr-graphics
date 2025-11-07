@@ -48,11 +48,20 @@ void mr::FileWriter::present() noexcept
   const auto &state = _parent->vulkan_state();
 
   auto &command_unit = _parent->transfer_command_unit();
+  command_unit.begin();
+
   command_unit.add_signal_semaphore(_image_available_semaphore[_image_index].first.get());
   command_unit.add_wait_semaphore(_render_finished_semaphore[_image_index].get(),
                                   vk::PipelineStageFlagBits::eColorAttachmentOutput);
 
   auto stage_buffer = image.read_to_host_buffer(command_unit);
+
+  command_unit.end();
+  auto submit_info = command_unit.submit_info();
+
+  auto fence = _parent->vulkan_state().device().createFenceUnique({}).value;
+  _parent->vulkan_state().queue().submit(submit_info, fence.get());
+  _parent->vulkan_state().device().waitForFences({fence.get()}, VK_TRUE, UINT64_MAX);
 
   auto data = stage_buffer.copy();
   ASSERT(data.size() % 4 == 0);
