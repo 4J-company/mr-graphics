@@ -40,7 +40,7 @@ mr::DirectionalLightHandle mr::Scene::create_directional_light(const Norm3f &dir
   return dir_light_handle;
 }
 
-mr::ModelHandle mr::Scene::create_model(std::string_view filename) noexcept
+mr::ModelHandle mr::Scene::create_model(std::fs::path filename) noexcept
 {
   ASSERT(_parent != nullptr);
 

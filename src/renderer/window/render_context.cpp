@@ -176,7 +176,12 @@ mr::WindowHandle mr::RenderContext::create_window(const mr::Extent &extent) cons
 
 mr::FileWriterHandle mr::RenderContext::create_file_writer() const noexcept
 {
-  return ResourceManager<FileWriter>::get().create(mr::unnamed, *this, _extent);
+  return create_file_writer(_extent);
+}
+
+mr::FileWriterHandle mr::RenderContext::create_file_writer(const mr::Extent &extent) const noexcept
+{
+  return ResourceManager<FileWriter>::get().create(mr::unnamed, *this, extent);
 }
 
 mr::SceneHandle mr::RenderContext::create_scene() noexcept
@@ -369,7 +374,7 @@ void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
   auto image_available_semaphore = presenter.image_available_semaphore();
   if (image_available_semaphore) {
     _lights_command_unit.add_wait_semaphore(image_available_semaphore,
-                                     vk::PipelineStageFlagBits::eColorAttachmentOutput);
+                                            vk::PipelineStageFlagBits::eColorAttachmentOutput);
   }
   _lights_command_unit.add_signal_semaphore(presenter.render_finished_semaphore());
   _lights_command_unit.end();

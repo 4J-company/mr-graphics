@@ -285,14 +285,7 @@ mr::HostBuffer mr::Image::read_to_host_buffer(CommandUnit &command_unit) noexcep
     .imageExtent = _extent,
   };
 
-  command_unit.begin();
   command_unit->copyImageToBuffer(_image, _layout, stage_buffer.buffer(), {region});
-  command_unit.end();
-  auto submit_info = command_unit.submit_info();
-
-  auto fence = _state->device().createFenceUnique({}).value;
-  _state->queue().submit(submit_info, fence.get());
-  _state->device().waitForFences({fence.get()}, VK_TRUE, UINT64_MAX);
 
   return stage_buffer;
 }

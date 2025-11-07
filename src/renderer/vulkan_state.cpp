@@ -1,11 +1,13 @@
 #include "vulkan_state.hpp"
 #include <vulkan/vulkan_core.h>
 
-mr::VulkanGlobalState::VulkanGlobalState()
+mr::VulkanGlobalState::VulkanGlobalState(bool init_vkfw)
 {
   // TODO(dk6): it must be removed (it must be called only in window.cpp, because we won't initialize vkfw
   //            if we will not create window), but now without this windows can not be created
-  while (vkfw::init() != vkfw::Result::eSuccess) {}
+  if (init_vkfw) {
+    while (vkfw::init() != vkfw::Result::eSuccess) {}
+  }
 
   _create_instance();
   _create_phys_device();
