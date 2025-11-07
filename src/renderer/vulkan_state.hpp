@@ -17,7 +17,7 @@ inline namespace graphics {
 
       // VulkanGlobalState is managed by Application
       friend class Application;
-      VulkanGlobalState();
+      VulkanGlobalState(bool init_vkfw = true);
       ~VulkanGlobalState();
 
       void _create_instance();

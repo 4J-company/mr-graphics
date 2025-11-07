@@ -1,6 +1,7 @@
 #ifndef __MR_SCENE_HPP_
 #define __MR_SCENE_HPP_
 
+#include <filesystem>
 #include "lights/lights.hpp"
 #include "model/model.hpp"
 #include "manager/resource.hpp"
@@ -67,7 +68,7 @@ inline namespace graphics {
     DirectionalLightHandle create_directional_light(const Norm3f &direction = Norm3f(0, 1, 0),
                                                     const Vec3f &color = Vec3f(1.0)) noexcept;
 
-    ModelHandle create_model(std::string_view filename) noexcept;
+    ModelHandle create_model(std::fs::path filename) noexcept;
 
     template <std::derived_from<Light> L>
     void remove(Handle<L> light)

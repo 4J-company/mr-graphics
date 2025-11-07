@@ -109,6 +109,7 @@ inline namespace graphics {
     WindowHandle create_window() const noexcept;
     WindowHandle create_window(const mr::Extent &extent) const noexcept;
     FileWriterHandle create_file_writer() const noexcept;
+    FileWriterHandle create_file_writer(const mr::Extent &extent) const noexcept;
 
     SceneHandle create_scene() noexcept;
 

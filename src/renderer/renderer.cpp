@@ -1,9 +1,12 @@
 #include "renderer.hpp"
+#include <filesystem>
+#include <format>
 #include "resources/command_unit/command_unit.hpp"
 #include "window/render_context.hpp"
+#include <string_view>
 
 // mr::Application class defualt constructor (initializes vulkan instance, device ...)
-mr::Application::Application()
+mr::Application::Application(bool init_vkfw) : _state(init_vkfw)
 {
 }
 
@@ -38,17 +41,21 @@ void mr::Application::start_render_loop(RenderContext &render_context, SceneHand
 void mr::Application::render_frames(RenderContext &render_context,
                                     SceneHandle scene,
                                     FileWriterHandle file_writer,
-                                    const std::string_view filename_prefix,
+                                    std::fs::path dst_dir,
+                                    std::string_view filename_prefix,
                                     uint32_t frames) const noexcept
 {
   ASSERT(frames > 0);
   ASSERT(not filename_prefix.empty());
 
-  file_writer->filename("frame");
+  std::fs::create_directory(dst_dir);
+
+  auto base_filename = std::format("{}/{}", dst_dir.c_str(), filename_prefix);
+  file_writer->filename(base_filename);
   for (uint32_t i = 0; i < frames; i++) {
     if (frames > 1) {
-      auto str = std::format("frame{}", i);
-      file_writer->filename(str);
+      auto filename = std::format("{}{}", base_filename, i);
+      file_writer->filename(filename);
     }
 
     scene->update();

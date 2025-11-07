@@ -21,7 +21,7 @@ inline namespace graphics {
       VulkanGlobalState _state;
 
     public:
-      Application();
+      Application(bool init_vkfw = true);
       ~Application();
 
       [[nodiscard]] std::unique_ptr<RenderContext> create_render_context(Extent extent);
@@ -32,7 +32,8 @@ inline namespace graphics {
       void render_frames(RenderContext &render_context,
                          SceneHandle scene,
                          FileWriterHandle file_writer,
-                         const std::string_view filename_prefix = "frame",
+                         std::fs::path dst_dir = "",
+                         std::string_view filename_prefix = "frame",
                          uint32_t frames = 1) const noexcept;
   };
 }
