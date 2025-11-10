@@ -1,10 +1,4 @@
 CPMAddPackage(
-  NAME GroupSourcesByFolder.cmake
-  GITHUB_REPOSITORY TheLartians/GroupSourcesByFolder.cmake
-  VERSION 1.0
-)
-
-CPMAddPackage(
   NAME cmake-scripts
   GITHUB_REPOSITORY StableCoder/cmake-scripts
   GIT_TAG 24.04.1
