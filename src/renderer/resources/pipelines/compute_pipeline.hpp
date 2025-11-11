@@ -6,13 +6,19 @@
 namespace mr {
 inline namespace graphics {
   class ComputePipeline : public Pipeline {
-    private:
-      uint32_t _subpass;
+  private:
+    constexpr static inline vk::PushConstantRange compute_pipeline_push_constants {
+      .stageFlags = vk::ShaderStageFlagBits::eCompute,
+      .offset = 0,
+      .size = 32,
+    };
 
-      vk::PrimitiveTopology _topology;
-      vk::VertexInputBindingDescription _binding_descriptor;
+  public:
+    ComputePipeline() = default;
 
-      uint32_t PipelineParametersFlag;
+    ComputePipeline(const VulkanState &state,
+                    mr::ShaderHandle shader,
+                    std::span<const DescriptorSetLayoutHandle> descriptor_layouts);
   };
 }
 } // namespace mr

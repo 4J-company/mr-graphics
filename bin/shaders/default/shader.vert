@@ -24,12 +24,12 @@ struct DrawInfo {
   uint mesh_offset;
   uint instance_offset;
   uint material_buffer_id;
-  uint camera_buffer_id;
-  uint transforms_buffer_id;
 };
 
 layout(push_constant) uniform DrawsIndosBufferId {
   uint draw_infos_buffer;
+  uint camera_buffer_id;
+  uint transforms_buffer_id;
 };
 
 layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer DrawIndoBuffers {
@@ -46,12 +46,12 @@ layout(set = BINDLESS_SET, binding = UNIFORM_BUFFERS_BINDING) readonly uniform C
   float speed;
   float sens;
 } CameraUboArray[];
-#define cam_ubo CameraUboArray[draw.camera_buffer_id]
+#define cam_ubo CameraUboArray[camera_buffer_id]
 
 layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer Transforms {
   mat4 transforms[];
 } SSBOArray[];
-#define transforms SSBOArray[draw.transforms_buffer_id].transforms
+#define transforms SSBOArray[transforms_buffer_id].transforms
 
 void main()
 {

@@ -19,13 +19,29 @@ inline namespace graphics {
     friend class Model;
 
   private:
+    struct MeshFillDrawCommandInfo {
+      vk::DrawIndexedIndirectCommand draw_command;
+      uint32_t bound_boxes_buffer_id;
+      uint32_t bound_box_index;
+      uint32_t transform_first_index;
+      Mesh::RenderInfo render_info;
+    };
+
+    // TODO(dk6): destruct all this stuff in Scene destructor
     struct MeshesWithSamePipeline {
       std::vector<const Mesh *> meshes;
 
       // TODO(dk6): Make them dynamic sizable VectorBuffer
-      StorageBuffer commands_buffer;
-      std::vector<vk::DrawIndexedIndirectCommand> commands_buffer_data;
+      StorageBuffer commands_buffer; // Draw commands for all rendering meshes
+      StorageBuffer draws_commands; // It must have same size as commands_buffer
+      StorageBuffer draws_count_buffer; // 4-byte buffer for int
+      std::vector<MeshFillDrawCommandInfo> commands_buffer_data;
 
+      uint32_t commands_buffer_id = -1;
+      uint32_t draws_commands_buffer_id = -1;
+      uint32_t draws_count_buffer_id = -1;
+
+      // It must have same elements as in 'commands_buffer'
       StorageBuffer meshes_render_info; // render data for each mesh
       std::vector<Mesh::RenderInfo> meshes_render_info_data;
       uint32_t meshes_render_info_id = static_cast<uint32_t>(-1);
@@ -51,12 +67,18 @@ inline namespace graphics {
 
     CommandUnit _transfer_command_unit;
 
-    StorageBuffer _transforms; // transform matrix    for each instance
+    std::atomic_uint32_t _mesh_offset = 0;
+
+    StorageBuffer _transforms; // transform matrix for each instance
+    // Must be same size as _transforms
+    StorageBuffer _render_transforms; // transform matrix for each visible instance
     std::vector<mr::Matr4f> _transforms_data;
     uint32_t _transforms_buffer_id;  // id in bindless descriptor set
+    uint32_t _render_transforms_buffer_id;  // id in bindless descriptor set
 
-    StorageBuffer _bounds;     // AABB                for each instance
-    std::vector<mr::AABBf> _bounds_data;
+    StorageBuffer _bound_boxes;
+    uint32_t _bound_boxes_buffer_id;
+    std::vector<AABBf> _bound_boxes_data;
 
     ConditionalBuffer _visibility; // u32 visibility mask for each draw call
     std::vector<uint32_t> _visibility_data;
