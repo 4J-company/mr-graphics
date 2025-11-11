@@ -47,6 +47,11 @@ void main( void )
   vec3 color = subpassLoad(InColorTrans).xyz;
   vec3 norm = subpassLoad(InNIsShade).xyz;
 
+  if (norm == vec3(0)) {
+    OutColor = vec4(color, 1);
+    return;
+  }
+
   vec3 occlusion_roughness_metallic = subpassLoad(InOMR).xyz;
   vec3 emissive = subpassLoad(InEmissive).xyz;
 

@@ -21,7 +21,7 @@ void mr::Window::update_swapchain() noexcept
     _extent.width = w;
     _extent.height = h;
 
-    _swapchain = mr::Swapchain(_parent->vulkan_state(), _surface.get(), _extent);
+    _swapchain = mr::Swapchain(_parent->vulkan_state(), _surface.get(), _extent, _vsync_enabled);
   }
 }
 
@@ -46,17 +46,16 @@ vkfw::UniqueWindow mr::Window::_create_window(const Extent &extent) noexcept
     std::exit(1);
   }
 
-  // glfwSetInputMode(window.get(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-
   // TODO(dk6): without move compiler tries to call copy constructor, which is deleted
   return std::move(window);
 }
 
-mr::Window::Window(const RenderContext &parent, Extent extent)
+mr::Window::Window(const RenderContext &parent, Extent extent, bool enable_vsync)
   : Presenter(parent, extent)
+  , _vsync_enabled(enable_vsync)
   , _window(_create_window(_extent))
   , _surface(vkfw::createWindowSurfaceUnique(_parent->vulkan_state().instance(), _window.get()))
-  , _swapchain(_parent->vulkan_state(), _surface.get(), _extent)
+  , _swapchain(_parent->vulkan_state(), _surface.get(), _extent, enable_vsync)
 {
   for (uint32_t i = 0; i < _swapchain._images.size(); i++) {
     _image_available_semaphore.emplace_back(_parent->vulkan_state().device().createSemaphoreUnique({}).value);
@@ -65,6 +64,7 @@ mr::Window::Window(const RenderContext &parent, Extent extent)
 
   _window->callbacks()->on_cursor_move = _input_state.get_mouse_callback();
   _window->callbacks()->on_key = _input_state.get_key_callback();
+  _window->callbacks()->on_scroll = _input_state.get_mouse_scroll_callback();
   _window->callbacks()->on_window_resize = [this](const vkfw::Window&, uint32_t, uint32_t) { _should_update_swapchain = true; };
 }
 
@@ -164,5 +164,10 @@ void mr::Window::update_state() noexcept
     } else {
       _window->maximize();
     }
+  }
+
+  if (_input_state.key_tapped(vkfw::Key::eM)) {
+    _mouse_enabled = !_mouse_enabled;
+    glfwSetInputMode(_window.get(), GLFW_CURSOR, _mouse_enabled ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
   }
 }

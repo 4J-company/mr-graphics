@@ -1,13 +1,13 @@
 #include "swapchain.hpp"
 
-mr::Swapchain::Swapchain(const VulkanState &state, vk::SurfaceKHR surface, Extent extent)
+mr::Swapchain::Swapchain(const VulkanState &state, vk::SurfaceKHR surface, Extent extent, bool enable_vsync)
   : _state(&state)
 {
   vkb::SwapchainBuilder builder{state.phys_device(), state.device(), surface};
   vkb::Result<vkb::Swapchain> swapchain = builder
     .set_desired_format({static_cast<VkFormat>(_format), VK_COLORSPACE_SRGB_NONLINEAR_KHR})
     .set_image_usage_flags(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
-    .set_desired_present_mode(VK_PRESENT_MODE_IMMEDIATE_KHR)
+    .set_desired_present_mode(enable_vsync ? VK_PRESENT_MODE_FIFO_KHR : VK_PRESENT_MODE_IMMEDIATE_KHR)
     .set_desired_extent(extent.width, extent.height)
     .build();
 

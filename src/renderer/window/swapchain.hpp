@@ -24,7 +24,7 @@ inline namespace graphics {
     Swapchain(Swapchain &&) noexcept = default;
     Swapchain & operator=(Swapchain &&) noexcept = default;
 
-    Swapchain(const VulkanState &state, vk::SurfaceKHR surface, Extent extent);
+    Swapchain(const VulkanState &state, vk::SurfaceKHR surface, Extent extent, bool enable_vsync = false);
 
     operator vk::SwapchainKHR() noexcept {
       return _swapchain.swapchain;

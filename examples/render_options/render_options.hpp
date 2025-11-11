@@ -5,7 +5,7 @@
 
 namespace mr {
 inline namespace graphics {
-  struct RenderOptions {
+  struct CliOptions {
     enum struct Mode {
       Default,
       Frames,
@@ -19,11 +19,13 @@ inline namespace graphics {
     uint32_t width, height;
     std::optional<mr::math::Camera<float>> camera;
     bool disable_culling;
+    bool enable_vsync;
     std::fs::path stat_dir;
     std::vector<std::fs::path> models;
     std::optional<std::string> bench_name;
+    bool enable_bound_boxes;
 
-    static std::optional<RenderOptions> parse(int argc, const char **argv);
+    static std::optional<CliOptions> parse(int argc, const char **argv);
 
     void print() const noexcept;
   };

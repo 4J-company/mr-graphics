@@ -5,7 +5,8 @@ void mr::Pipeline::apply(vk::CommandBuffer cmd_buffer) const {}
 
 mr::Pipeline::Pipeline(const VulkanState &state,
                        mr::ShaderHandle shader,
-                       std::span<const DescriptorSetLayoutHandle> descriptor_layouts)
+                       std::span<const DescriptorSetLayoutHandle> descriptor_layouts,
+                       std::optional<vk::PushConstantRange> push_constant_range)
   : _shader(shader)
 {
   ASSERT(shader.get(), "Shader should be valid");
@@ -24,8 +25,8 @@ mr::Pipeline::Pipeline(const VulkanState &state,
   vk::PipelineLayoutCreateInfo pipeline_layout_create_info {
     .setLayoutCount = static_cast<uint32_t>(vk_descriptor_layouts.size()),
     .pSetLayouts = vk_descriptor_layouts.data(),
-    .pushConstantRangeCount = 1,
-    .pPushConstantRanges = &_push_constant_range,
+    .pushConstantRangeCount = push_constant_range.has_value() ? 1u : 0u,
+    .pPushConstantRanges = &push_constant_range.value(),
   };
 
   auto [res, layout] = state.device().createPipelineLayoutUnique(pipeline_layout_create_info);

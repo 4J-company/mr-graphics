@@ -14,8 +14,9 @@
 
 #define TRACY_VK_ZONE_BEGIN()
 
-mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent)
+mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent, RenderOptions options)
   : _state(std::make_shared<VulkanState>(global_state))
+  , _render_options(options)
   , _models_command_unit(*_state)
   , _lights_command_unit(*_state)
   , _pre_model_layout_transition_semaphore(_state->device().createSemaphoreUnique({}).value)
@@ -38,25 +39,9 @@ mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent)
 
   init_bindless_rendering();
   init_lights_render_data();
-
-  vk::QueryPoolCreateInfo query_pool_create_info {
-    .queryType = vk::QueryType::eTimestamp,
-    .queryCount = timestamps_number,
-  };
-  auto [res, query_pool] = _state->device().createQueryPoolUnique(query_pool_create_info);
-  ASSERT(res == vk::Result::eSuccess);
-  _timestamps_query_pool = std::move(query_pool);
-
-  uint64_t timestamp_period = _state->phys_device().getProperties().limits.timestampPeriod; // ns per clock
-  _timestamp_to_ms = timestamp_period / 1e6;
-
-  _models_tracy_gpu_context = TracyVkContext(_state->phys_device(), _state->device(),
-                                             _state->queue(), _models_command_unit.command_buffer());
-  TracyVkContextName(_models_tracy_gpu_context, "models tracy context", 19);
-
-  _lights_tracy_gpu_context = TracyVkContext(_state->phys_device(), _state->device(),
-                                             _state->queue(), _lights_command_unit.command_buffer());
-  TracyVkContextName(_lights_tracy_gpu_context, "lights tracy context", 19);
+  init_profiling();
+  init_culling();
+  init_bound_box_drawer();
 }
 
 // TODO(dk6): maybe create lights_render_data.cpp file and move this function?
@@ -107,7 +92,7 @@ void mr::RenderContext::init_lights_render_data() {
 
     std::array set_layouts {
       _lights_render_data.lights_set_layout,
-      DescriptorSetLayoutHandle(_bindless_set_layout),
+      _bindless_set_layout_converted,
     };
 
     // TODO(dk6): here move instead inplace contruct, because without move this doesn't compile
@@ -127,11 +112,87 @@ void mr::RenderContext::init_bindless_rendering()
   };
 
   _bindless_set_layout = ResourceManager<BindlessDescriptorSetLayout>::get().create("BindlessSetLayout",
-    *_state, vk::ShaderStageFlagBits::eAllGraphics, bindings);
+    *_state, vk::ShaderStageFlagBits::eAllGraphics | vk::ShaderStageFlagBits::eCompute, bindings);
 
   auto set = _default_descriptor_allocator.allocate_bindless_set(_bindless_set_layout);
   ASSERT(set.has_value(), "Failed to allocate bindless descriptor set");
   _bindless_set = std::move(set.value());
+
+  _bindless_set_layout_converted = DescriptorSetLayoutHandle(_bindless_set_layout);
+}
+
+void mr::RenderContext::init_profiling()
+{
+  vk::QueryPoolCreateInfo query_pool_create_info {
+    .queryType = vk::QueryType::eTimestamp,
+    .queryCount = timestamps_number,
+  };
+  auto [res, query_pool] = _state->device().createQueryPoolUnique(query_pool_create_info);
+  ASSERT(res == vk::Result::eSuccess);
+  _timestamps_query_pool = std::move(query_pool);
+
+  uint64_t timestamp_period = _state->phys_device().getProperties().limits.timestampPeriod; // ns per clock
+  _timestamp_to_ms = timestamp_period / 1e6;
+
+  _models_tracy_gpu_context = TracyVkContext(_state->phys_device(), _state->device(),
+                                             _state->queue(), _models_command_unit.command_buffer());
+  TracyVkContextName(_models_tracy_gpu_context, "models tracy context", 19);
+
+  _lights_tracy_gpu_context = TracyVkContext(_state->phys_device(), _state->device(),
+                                             _state->queue(), _lights_command_unit.command_buffer());
+  TracyVkContextName(_lights_tracy_gpu_context, "lights tracy context", 19);
+}
+
+void mr::RenderContext::init_culling()
+{
+  boost::unordered_map<std::string, std::string> defines {
+    {"TEXTURES_BINDING",        std::to_string(textures_binding)},
+    {"UNIFORM_BUFFERS_BINDING", std::to_string(uniform_buffer_binding)},
+    {"STORAGE_BUFFERS_BINDING", std::to_string(storage_buffer_binding)},
+    {"BINDLESS_SET", std::to_string(bindless_set_number)},
+    {"THREADS_NUM", std::to_string(culling_work_gpoup_size)},
+  };
+  if (is_render_option_enabled(_render_options, RenderOptions::DisableCulling)) {
+    defines.insert({"DISABLE_CULLING", "ON"});
+  }
+  _culling_shader = ResourceManager<Shader>::get().create("CullingShader", *_state, "culling", defines);
+
+  std::array set_layouts {
+    _bindless_set_layout_converted,
+  };
+  _culling_pipeline = ComputePipeline(*_state, _culling_shader, set_layouts);
+}
+
+void mr::RenderContext::init_bound_box_drawer()
+{
+  boost::unordered_map<std::string, std::string> defines {
+    {"TEXTURES_BINDING",        std::to_string(textures_binding)},
+    {"UNIFORM_BUFFERS_BINDING", std::to_string(uniform_buffer_binding)},
+    {"STORAGE_BUFFERS_BINDING", std::to_string(storage_buffer_binding)},
+    {"BINDLESS_SET", std::to_string(bindless_set_number)},
+  };
+  _bound_boxes_draw_shader = ResourceManager<Shader>::get().create("BoundBoxShader", *_state, "bound_box", defines);
+
+  std::array set_layouts {
+    _bindless_set_layout_converted,
+  };
+  _bound_boxes_draw_pipeline =
+    GraphicsPipeline(*this, GraphicsPipeline::Subpass::OpaqueGeometry, _bound_boxes_draw_shader, {}, set_layouts);
+
+  // TODO(dk6): use dynamic buffer
+  _bound_boxes_buffer = StorageBuffer(*_state, sizeof(BoundBoxRenderData) * 10000);
+  _bound_boxes_buffer_id = _bindless_set.register_resource(&_bound_boxes_buffer);
+}
+
+void mr::RenderContext::draw_bound_box(uint32_t transforms_buffer_id, uint32_t transform_index,
+                                       uint32_t bound_boxes_buffer_id, uint32_t bound_box_index) noexcept
+{
+  _bound_boxes_data.emplace_back(BoundBoxRenderData {
+    .transforms_buffer_id = transforms_buffer_id,
+    .transform_index = transform_index,
+    .bound_boxes_buffer_id = bound_boxes_buffer_id,
+    .bound_box_index = bound_box_index,
+  });
 }
 
 mr::RenderContext::~RenderContext()
@@ -205,7 +266,8 @@ mr::WindowHandle mr::RenderContext::create_window() const noexcept
 
 mr::WindowHandle mr::RenderContext::create_window(const mr::Extent &extent) const noexcept
 {
-  return ResourceManager<Window>::get().create(mr::unnamed, *this, extent);
+  return ResourceManager<Window>::get().create(mr::unnamed, *this, extent,
+    is_render_option_enabled(_render_options, RenderOptions::EnableVsync));
 }
 
 mr::FileWriterHandle mr::RenderContext::create_file_writer() const noexcept
@@ -306,16 +368,176 @@ void mr::RenderContext::render_lights(const SceneHandle scene, Presenter &presen
 
 void mr::RenderContext::render_models(const SceneHandle scene)
 {
+  _models_command_unit->writeTimestamp(vk::PipelineStageFlagBits::eDrawIndirect,
+                                       _timestamps_query_pool.get(),
+                                       enum_cast(Timestamp::ModelsStart));
+
+  std::array vertex_buffers {
+    _positions_vertex_buffer.buffer(),
+    _attributes_vertex_buffer.buffer(),
+  };
+  std::array<vk::DeviceSize, vertex_buffers.size()> vertex_buffers_offsets {0, 0};
+  _models_command_unit->bindVertexBuffers(0, vertex_buffers, vertex_buffers_offsets);
+
+  _models_command_unit->bindIndexBuffer(_index_buffer.buffer(), 0, vk::IndexType::eUint32);
+
+  for (auto &[pipeline, draw] : scene->_draws) {
+    _models_command_unit->bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline->pipeline());
+
+    std::array sets {_bindless_set.set()};
+    _models_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                                             {pipeline->layout()},
+                                             bindless_set_number,
+                                             sets,
+                                             {});
+
+    uint32_t model_push_constant[] {
+      draw.meshes_render_info_id,
+      scene->camera_buffer_id(),
+      is_render_option_enabled(_render_options, RenderOptions::DisableCulling)
+        ? scene->_transforms_buffer_id : scene->_render_transforms_buffer_id,
+    };
+
+    _models_command_unit->pushConstants(pipeline->layout(), vk::ShaderStageFlagBits::eAllGraphics,
+                                        0, sizeof(model_push_constant), model_push_constant);
+
+    CommandUnit command_unit {scene->render_context().vulkan_state()};
+    command_unit.begin();
+    draw.commands_buffer.write(command_unit, std::span(draw.commands_buffer_data));
+    command_unit.end();
+    UniqueFenceGuard(_state->device(), command_unit.submit(*_state));
+
+    uint32_t stride = sizeof(vk::DrawIndexedIndirectCommand);
+    uint32_t max_draws_count = static_cast<uint32_t>(draw.commands_buffer_data.size());
+    _models_command_unit->drawIndexedIndirectCount(draw.draws_commands.buffer(), 0,
+                                                   draw.draws_count_buffer.buffer(), 0,
+                                                   max_draws_count, stride);
+  }
+
+  _models_command_unit->writeTimestamp(vk::PipelineStageFlagBits::eBottomOfPipe,
+                                       _timestamps_query_pool.get(),
+                                       enum_cast(Timestamp::ModelsEnd));
+}
+
+void mr::RenderContext::culling_geometry(const SceneHandle scene)
+{
+  _models_command_unit->resetQueryPool(_timestamps_query_pool.get(), enum_cast(Timestamp::CullingStart), 2);
+
+  _models_command_unit->writeTimestamp(vk::PipelineStageFlagBits::eTopOfPipe,
+                                       _timestamps_query_pool.get(),
+                                       enum_cast(Timestamp::CullingStart));
+
+  // ===== Fill count buffer by zeroes =====
+  for (auto &[pipeline, draw] : scene->_draws) {
+    _models_command_unit->fillBuffer(draw.draws_count_buffer.buffer(), 0, draw.draws_count_buffer.byte_size(), 0);
+    vk::BufferMemoryBarrier set_count_to_zero_barrier {
+      .dstAccessMask = vk::AccessFlagBits::eShaderRead,
+      .buffer = draw.draws_count_buffer.buffer(),
+      .offset = 0,
+      .size = draw.draws_count_buffer.byte_size(),
+    };
+    _models_command_unit->pipelineBarrier(
+      vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eComputeShader, {},
+      {}, {set_count_to_zero_barrier}, {});
+  }
+
+  // TODO(dk6): Maybe rework to run compute shader once per frame
+  // ===== Setup and call culling shader =====
+  for (auto &[pipeline, draw] : scene->_draws) {
+    _models_command_unit->bindPipeline(vk::PipelineBindPoint::eCompute, _culling_pipeline.pipeline());
+
+    std::array culling_descriptor_sets {_bindless_set.set()};
+    _models_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eCompute,
+                                             {_culling_pipeline.layout()},
+                                             bindless_set_number,
+                                             culling_descriptor_sets,
+                                             {});
+
+    // TODO(dk6): it can be trouble for sync it with GPU
+    uint32_t max_draws_count = static_cast<uint32_t>(draw.commands_buffer_data.size());
+    uint32_t culling_push_contants[] {
+      draw.commands_buffer_id,
+      draw.draws_commands_buffer_id,
+      draw.draws_count_buffer_id,
+      max_draws_count,
+      scene->camera_buffer_id(),
+      scene->_transforms_buffer_id,
+      scene->_render_transforms_buffer_id,
+      draw.meshes_render_info_id,
+    };
+    _models_command_unit->pushConstants(_culling_pipeline.layout(), vk::ShaderStageFlagBits::eCompute,
+                                        0, sizeof(culling_push_contants), culling_push_contants);
+
+    _models_command_unit->dispatch((max_draws_count + culling_work_gpoup_size - 1) / culling_work_gpoup_size, 1, 1);
+
+    vk::BufferMemoryBarrier draws_culling_barrier {
+      .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
+      .dstAccessMask = vk::AccessFlagBits::eIndirectCommandRead,
+      .buffer = draw.draws_commands.buffer(),
+      .offset = 0,
+      .size = draw.draws_commands.byte_size(),
+    };
+
+    vk::BufferMemoryBarrier draws_count_culling_barrier {
+      .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
+      .dstAccessMask = vk::AccessFlagBits::eIndirectCommandRead,
+      .buffer = draw.draws_count_buffer.buffer(),
+      .offset = 0,
+      .size = draw.draws_count_buffer.byte_size(),
+    };
+
+    _models_command_unit->pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
+                                          vk::PipelineStageFlagBits::eDrawIndirect,
+                                          {}, {}, {draws_culling_barrier, draws_count_culling_barrier}, {});
+  }
+  _models_command_unit->writeTimestamp(vk::PipelineStageFlagBits::eComputeShader,
+                                       _timestamps_query_pool.get(),
+                                       enum_cast(Timestamp::CullingEnd));
+}
+
+void mr::RenderContext::render_bound_boxes(const SceneHandle scene)
+{
+  if (not _bound_boxes_draw_enabled) {
+    return;
+  }
+
+  uint32_t bound_boxes_number = _bound_boxes_data.size();
+  static std::once_flag bound_box_flag;
+  std::call_once(bound_box_flag, [&] {
+    CommandUnit command_unit {scene->render_context().vulkan_state()};
+    command_unit.begin();
+    _bound_boxes_buffer.write(command_unit, std::as_bytes(std::span(_bound_boxes_data)));
+    command_unit.end();
+    UniqueFenceGuard(_state->device(), command_unit.submit(*_state));
+  });
+  // _bound_boxes_data.clear();
+
+  _models_command_unit->bindPipeline(vk::PipelineBindPoint::eGraphics, _bound_boxes_draw_pipeline.pipeline());
+
+  _models_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                                           {_bound_boxes_draw_pipeline.layout()},
+                                           bindless_set_number,
+                                           {_bindless_set.set()},
+                                           {});
+
+  uint32_t markers_push_contants[] {
+    scene->camera_buffer_id(),
+    _bound_boxes_buffer_id,
+  };
+  _models_command_unit->pushConstants(_bound_boxes_draw_pipeline.layout(),
+                                      vk::ShaderStageFlagBits::eAllGraphics,
+                                      0, sizeof(markers_push_contants), markers_push_contants);
+
+  _models_command_unit->draw(1, bound_boxes_number, 0, 0);
+}
+
+void mr::RenderContext::render_geometry(const SceneHandle scene)
+{
   ZoneScoped;
   _models_command_unit.begin();
 
   TRACY_VK_ZONE_BEGIN() {
     TracyVkZone(_models_tracy_gpu_context, _models_command_unit.command_buffer(), "Models pass GPU");
-
-    _models_command_unit->resetQueryPool(_timestamps_query_pool.get(), enum_cast(Timestamp::ModelsStart), 2);
-    _models_command_unit->writeTimestamp(vk::PipelineStageFlagBits::eTopOfPipe,
-                                         _timestamps_query_pool.get(),
-                                         enum_cast(Timestamp::ModelsStart));
 
     _pre_model_layout_transition_command_unit.begin();
     for (auto &gbuf : _gbuffers) {
@@ -326,10 +548,13 @@ void mr::RenderContext::render_models(const SceneHandle scene)
     _pre_model_layout_transition_command_unit.add_signal_semaphore(
         _pre_model_layout_transition_semaphore.get());
 
+    // TODO(dk6): think about sync
     _models_command_unit.add_wait_semaphore(
       _pre_model_layout_transition_semaphore.get(),
       vk::PipelineStageFlagBits::eVertexShader
     );
+
+    culling_geometry(scene);
 
     auto gbufs_attachs = _gbuffers | std::views::transform([](const ColorAttachmentImage &gbuf) {
       return gbuf.attachment_info();
@@ -344,6 +569,8 @@ void mr::RenderContext::render_models(const SceneHandle scene)
       .pDepthAttachment = &depth_attachment_info,
       // .pStencilAttachment = &depth_attachment_info,
     };
+
+    _models_command_unit->resetQueryPool(_timestamps_query_pool.get(), enum_cast(Timestamp::ModelsStart), 2);
 
     _models_command_unit->beginRendering(&attachment_info);
 
@@ -364,49 +591,11 @@ void mr::RenderContext::render_models(const SceneHandle scene)
     };
     _models_command_unit->setScissor(0, scissors);
 
-    // ===== Rendering geometry ======
+    render_bound_boxes(scene);
 
-    std::array vertex_buffers {
-      _positions_vertex_buffer.buffer(),
-      _attributes_vertex_buffer.buffer(),
-    };
-    std::array<vk::DeviceSize, vertex_buffers.size()> vertex_buffers_offsets {0, 0};
-    _models_command_unit->bindVertexBuffers(0, vertex_buffers, vertex_buffers_offsets);
-
-    _models_command_unit->bindIndexBuffer(_index_buffer.buffer(), 0, vk::IndexType::eUint32);
-
-    for (auto &[pipeline, draw] : scene->_draws) {
-      _models_command_unit->bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline->pipeline());
-
-      std::array sets {_bindless_set.set()};
-      _models_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                                               {pipeline->layout()},
-                                               0, // TODO(dk6): give name for this magic number
-                                               sets,
-                                               {});
-
-      _models_command_unit->pushConstants(pipeline->layout(), vk::ShaderStageFlagBits::eAllGraphics,
-                                          0, sizeof(uint32_t), &draw.meshes_render_info_id);
-
-      CommandUnit command_unit {scene->render_context().vulkan_state()};
-
-      command_unit.begin();
-      draw.commands_buffer.write(command_unit, std::span(draw.commands_buffer_data));
-      draw.meshes_render_info.write(command_unit, std::span(draw.meshes_render_info_data));
-      command_unit.end();
-
-      UniqueFenceGuard(scene->render_context().vulkan_state().device(),
-          command_unit.submit(scene->render_context().vulkan_state()));
-
-      uint32_t stride = sizeof(vk::DrawIndexedIndirectCommand);
-      _models_command_unit->drawIndexedIndirect(draw.commands_buffer.buffer(), 0, draw.meshes.size(), stride);
-    }
+    render_models(scene);
 
     _models_command_unit->endRendering();
-
-    _models_command_unit->writeTimestamp(vk::PipelineStageFlagBits::eBottomOfPipe,
-                                         _timestamps_query_pool.get(),
-                                         enum_cast(Timestamp::ModelsEnd));
   }
 
   TracyVkCollect(_models_tracy_gpu_context, _models_command_unit.command_buffer());
@@ -441,7 +630,7 @@ void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
   // --------------------------------------------------------------------------
 
   auto cpu_models_start_time = ClockT::now();
-  render_models(scene);
+  render_geometry(scene);
   auto cpu_models_time = ClockT::now() - cpu_models_start_time;
 
   _models_command_unit.add_signal_semaphore(_models_render_finished_semaphore.get());
@@ -506,30 +695,44 @@ void mr::RenderContext::calculate_stat(SceneHandle scene,
   _render_stat.models_cpu_time_ms = get_ms(models_time);
   _render_stat.shading_cpu_time_ms = get_ms(models_time);
 
-  std::array<std::pair<uint64_t, uint32_t>, timestamps_number> timestamps;
+// #define QUERY_RES_WAIT
+#ifdef QUERY_RES_WAIT
+  struct QueryRes { uint64_t first; };
+  vk::QueryResultFlags query_res_flags = vk::QueryResultFlagBits::e64 | vk::QueryResultFlagBits::eWait;
+#else // QUERY_RES_WAIT
+  using QueryRes = std::pair<uint64_t, uint32_t>;
+  vk::QueryResultFlags query_res_flags = vk::QueryResultFlagBits::e64 | vk::QueryResultFlagBits::eWithAvailability;
+#endif // QUERY_RES_WAIT
+
+  std::array<QueryRes, timestamps_number> timestamps;
   _state->device().getQueryPoolResults(_timestamps_query_pool.get(),
                                        0, timestamps_number,
                                        sizeof(timestamps[0]) * timestamps_number,
                                        timestamps.data(),
                                        sizeof(timestamps[0]), // stride
-                                       vk::QueryResultFlagBits::e64 | vk::QueryResultFlagBits::eWithAvailability);
+                                       query_res_flags);
 
-  // TODO(dk6): Init it in constructor
+  _render_stat.culling_gpu_time_ms = (timestamps[enum_cast(Timestamp::CullingEnd)].first -
+                                      timestamps[enum_cast(Timestamp::CullingStart)].first) * _timestamp_to_ms;
   _render_stat.models_gpu_time_ms = (timestamps[enum_cast(Timestamp::ModelsEnd)].first -
                                      timestamps[enum_cast(Timestamp::ModelsStart)].first) * _timestamp_to_ms;
   _render_stat.shading_gpu_time_ms = (timestamps[enum_cast(Timestamp::ShadingEnd)].first -
                                       timestamps[enum_cast(Timestamp::ShadingStart)].first) * _timestamp_to_ms;
-  _render_stat.render_gpu_time_ms = _render_stat.models_gpu_time_ms + _render_stat.shading_gpu_time_ms;
-  _render_stat.gpu_time_ms =
-    (timestamps[enum_cast(Timestamp::ModelsStart)].first - _prev_first_timestamp) * _timestamp_to_ms;
+
+  // TODO(dk6): calculate using formula end(timestamps) - start(timestamps)
+  // _render_stat.render_gpu_time_ms = _render_stat.models_gpu_time_ms + _render_stat.shading_gpu_time_ms;
+  _render_stat.render_gpu_time_ms = (timestamps[enum_cast(Timestamp::TimestampsNumber) - 1].first -
+                                     timestamps[0].first) * _timestamp_to_ms;
+
+  _render_stat.gpu_time_ms = (timestamps[0].first - _prev_first_timestamp) * _timestamp_to_ms;
+  _prev_first_timestamp = timestamps[0].first;
   _render_stat.gpu_fps = 1000 / _render_stat.gpu_time_ms;
-  _prev_first_timestamp = timestamps[enum_cast(Timestamp::ModelsStart)].first;
 
   _render_stat.triangles_number = scene->_triangles_number.load();
   _render_stat.vertexes_number = scene->_vertexes_number.load();
 }
 
-void mr::RenderStat::write_to_json(std::ofstream &out) const noexcept
+void mr::RenderStat::write_to_json(std::ostream &out) const noexcept
 {
   double triangles_per_second = triangles_number / (gpu_time_ms / 1000);
   std::println(out, "{{");
@@ -540,6 +743,7 @@ void mr::RenderStat::write_to_json(std::ofstream &out) const noexcept
   std::println(out, "  \"cpu_rendering_time_ms\": {:.2f},", render_cpu_time_ms);
   std::println(out, "  \"cpu_models_time_ms\": {:.2f},", models_cpu_time_ms);
   std::println(out, "  \"cpu_shading_time_ms\": {:.2f},", shading_cpu_time_ms);
+  std::println(out, "  \"culling_gpu_time_ms\": {:.3f},", culling_gpu_time_ms);
   std::println(out, "  \"gpu_rendering_time_ms\": {:.2f},", render_gpu_time_ms);
   std::println(out, "  \"gpu_models_time_ms\": {:.2f},", models_gpu_time_ms);
   std::println(out, "  \"gpu_shading_time_ms\": {:.2f},", shading_gpu_time_ms);

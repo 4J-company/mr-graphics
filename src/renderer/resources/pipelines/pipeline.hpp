@@ -8,13 +8,6 @@
 namespace mr {
 inline namespace graphics {
   class Pipeline {
-    private:
-    static inline constexpr vk::PushConstantRange _push_constant_range {
-      .stageFlags = vk::ShaderStageFlagBits::eAllGraphics,
-      .offset = 0,
-      .size = sizeof(uint32_t) * 5
-    };
-
     protected:
       vk::UniquePipeline _pipeline;
       vk::UniquePipelineLayout _layout;
@@ -27,7 +20,8 @@ inline namespace graphics {
       Pipeline() = default;
 
       Pipeline(const VulkanState &state, mr::ShaderHandle _shader,
-               std::span<const DescriptorSetLayoutHandle> descriptor_layouts);
+               std::span<const DescriptorSetLayoutHandle> descriptor_layouts,
+               std::optional<vk::PushConstantRange> push_constant_range = std::nullopt);
 
       const vk::Pipeline pipeline() const { return _pipeline.get(); }
 

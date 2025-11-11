@@ -7,7 +7,8 @@ mr::Scene::Scene(RenderContext &render_context)
   , _camera_uniform_buffer(_parent->vulkan_state(), sizeof(ShaderCameraData))
   , _transfer_command_unit(_parent->vulkan_state())
   , _transforms(_parent->vulkan_state(), max_scene_instances * sizeof(mr::Matr4f))
-  , _bounds(_parent->vulkan_state(),     max_scene_instances * sizeof(mr::AABBf))
+  , _bound_boxes(_parent->vulkan_state(), max_scene_instances * sizeof(AABBf))
+  , _render_transforms(_parent->vulkan_state(), max_scene_instances * sizeof(mr::Matr4f))
   , _visibility(_parent->vulkan_state(), max_scene_instances * sizeof(uint32_t))
 {
   ASSERT(_parent != nullptr);
@@ -17,6 +18,8 @@ mr::Scene::Scene(RenderContext &render_context)
 
   _camera_buffer_id = render_context.bindless_set().register_resource(&_camera_uniform_buffer);
   _transforms_buffer_id = render_context.bindless_set().register_resource(&_transforms);
+  _render_transforms_buffer_id = render_context.bindless_set().register_resource(&_render_transforms);
+  _bound_boxes_buffer_id = render_context.bindless_set().register_resource(&_bound_boxes);
 }
 
 mr::Scene::~Scene()
@@ -30,6 +33,7 @@ mr::Scene::~Scene()
   //            method 'notify_render_context_deleted` and use it as destuctor and move Scene in "disabeld" state
   _parent->bindless_set().unregister_resource(&_camera_uniform_buffer);
   _parent->bindless_set().unregister_resource(&_transforms);
+  _parent->bindless_set().unregister_resource(&_render_transforms);
 }
 
 mr::DirectionalLightHandle mr::Scene::create_directional_light(const Norm3f &direction, const Vec3f &color) noexcept
@@ -57,31 +61,57 @@ mr::ModelHandle mr::Scene::create_model(std::fs::path filename) noexcept
     auto &draw = draw_it->second;
     if (is_new_pipeline) {
       // TODO(dk6): I think max_scene_instances is too big number here
-      draw.commands_buffer =
-        StorageBuffer(_parent->vulkan_state(),
-        sizeof(vk::DrawIndexedIndirectCommand) * max_scene_instances,
-        vk::BufferUsageFlagBits::eStorageBuffer |
-          vk::BufferUsageFlagBits::eIndirectBuffer |
-          vk::BufferUsageFlagBits::eTransferDst);
+      draw.commands_buffer = StorageBuffer(_parent->vulkan_state(),
+                                           sizeof(MeshFillDrawCommandInfo) * max_scene_instances,
+                                           vk::BufferUsageFlagBits::eStorageBuffer |
+                                           vk::BufferUsageFlagBits::eIndirectBuffer |
+                                           vk::BufferUsageFlagBits::eTransferDst);
+      draw.draws_commands = StorageBuffer(_parent->vulkan_state(),
+                                          sizeof(vk::DrawIndexedIndirectCommand) * max_scene_instances,
+                                          vk::BufferUsageFlagBits::eStorageBuffer |
+                                          vk::BufferUsageFlagBits::eIndirectBuffer);
+      draw.draws_count_buffer = StorageBuffer(_parent->vulkan_state(),
+                                              sizeof(uint32_t),
+                                              vk::BufferUsageFlagBits::eStorageBuffer |
+                                              vk::BufferUsageFlagBits::eIndirectBuffer |
+                                              // for vkCmdFill
+                                              vk::BufferUsageFlagBits::eTransferDst);
+
+      draw.commands_buffer_id = _parent->bindless_set().register_resource(&draw.commands_buffer);
+      draw.draws_commands_buffer_id = _parent->bindless_set().register_resource(&draw.draws_commands);
+      draw.draws_count_buffer_id = _parent->bindless_set().register_resource(&draw.draws_count_buffer);
+
       draw.meshes_render_info = StorageBuffer(_parent->vulkan_state(), sizeof(Mesh::RenderInfo) * max_scene_instances);
       draw.meshes_render_info_id = _parent->bindless_set().register_resource(&draw.meshes_render_info);
     }
 
     draw.meshes.emplace_back(&mesh);
-    draw.commands_buffer_data.emplace_back(vk::DrawIndexedIndirectCommand {
-      .indexCount = mesh.element_count(),
-      .instanceCount = mesh.num_of_instances(),
-      .firstIndex = static_cast<uint32_t>(mesh._ibufs[0].offset / sizeof(uint32_t)),
-      .vertexOffset = static_cast<int32_t>(mesh._vbufs[0].offset / position_bytes_size),
-      .firstInstance = 0,
+    // TODO: here can be trouble in multithreading
+    uint32_t bound_box_index = static_cast<uint32_t>(_bound_boxes_data.size());
+    _bound_boxes_data.emplace_back(mesh._bound_box);
+    static_assert(sizeof(AABBf::VecT) == 4 * sizeof(float));
+    draw.commands_buffer_data.emplace_back(MeshFillDrawCommandInfo {
+      .draw_command = vk::DrawIndexedIndirectCommand {
+        .indexCount = mesh.element_count(),
+        .instanceCount = mesh.num_of_instances(),
+        .firstIndex = static_cast<uint32_t>(mesh._ibufs[0].offset / sizeof(uint32_t)),
+        .vertexOffset = static_cast<int32_t>(mesh._vbufs[0].offset / position_bytes_size),
+        .firstInstance = 0,
+      },
+      .bound_boxes_buffer_id = _bound_boxes_buffer_id,
+      .bound_box_index = bound_box_index,
+      .transform_first_index = mesh._instance_offset,
+      .render_info = Mesh::RenderInfo {
+        .mesh_offset = mesh._mesh_offset,
+        .instance_offset = mesh._instance_offset,
+        .material_ubo_id = material->material_ubo_id(),
+      },
     });
-    draw.meshes_render_info_data.emplace_back(Mesh::RenderInfo {
-      .mesh_offset = mesh._mesh_offset,
-      .instance_offset = mesh._instance_offset,
-      .material_ubo_id = material->material_ubo_id(),
-      .camera_buffer_id = _camera_buffer_id,
-      .transforms_buffer_id = _transforms_buffer_id,
-    });
+
+    for (uint32_t i = 0; i < mesh._instance_count; i++) {
+      _parent->draw_bound_box(_transforms_buffer_id, mesh._instance_offset + i,
+                              _bound_boxes_buffer_id, bound_box_index);
+    }
 
     _triangles_number += mesh.element_count() / 3;
     _vertexes_number += mesh._vbufs[0].vertex_count;
@@ -99,7 +129,7 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
   if (_is_buffers_dirty) {
     _transfer_command_unit.begin();
     _transforms.write(_transfer_command_unit, std::span(_transforms_data));
-    _bounds.write(_transfer_command_unit, std::span(_bounds_data));
+    _bound_boxes.write(_transfer_command_unit, std::span(_bound_boxes_data));
     _visibility.write(_transfer_command_unit, std::span(_visibility_data));
     _transfer_command_unit.end();
 
@@ -111,6 +141,14 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
 
   if (input_state_ref) {
     const auto &input_state = input_state_ref->get();
+
+    float min_speed = 0.05;
+    float max_speed = 5;
+    float speed_delta_coef = 0.05;
+    float new_speed = _camera.speed() + input_state.mouse_scroll() * speed_delta_coef;
+    if (new_speed >= min_speed && new_speed <= max_speed) {
+      _camera.speed(new_speed);
+    }
 
     mr::Vec3f angular_delta {
       input_state.mouse_pos_delta().x() / _parent->extent().width,

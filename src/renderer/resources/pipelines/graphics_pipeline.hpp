@@ -14,6 +14,12 @@ inline namespace graphics {
       };
 
     private:
+      constexpr static inline vk::PushConstantRange graphics_pipeline_push_constants {
+        .stageFlags = vk::ShaderStageFlagBits::eAllGraphics,
+        .offset = 0,
+        .size = 32,
+      };
+
       Subpass _subpass;
 
       vk::PrimitiveTopology _topology;

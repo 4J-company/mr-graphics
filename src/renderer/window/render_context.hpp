@@ -2,18 +2,23 @@
 #define __MR_RENDER_CONTEXT_HPP_
 
 #include "pch.hpp"
-#include "resources/images/image.hpp"
-#include "resources/resources.hpp"
+
 #include "vulkan_state.hpp"
+#include "render_context_options.hpp"
+
 #include "camera/camera.hpp"
 #include "lights/lights.hpp"
 #include "model/model.hpp"
-#include "window.hpp"
-#include "file_writer.hpp"
 #include "scene/scene.hpp"
+
+#include "resources/images/image.hpp"
+#include "resources/resources.hpp"
 #include "resources/command_unit/command_unit.hpp"
 
-#include "window/dummy_presenter.hpp"
+#include "window.hpp"
+#include "file_writer.hpp"
+#include "dummy_presenter.hpp"
+
 #include <VkBootstrap.h>
 #include <vulkan/vulkan_core.h>
 
@@ -22,6 +27,7 @@ inline namespace graphics {
   class Window;
 
   struct RenderStat {
+    double culling_gpu_time_ms = 0;
     double render_gpu_time_ms = 0;
     double models_gpu_time_ms = 0;
     double shading_gpu_time_ms = 0;
@@ -29,6 +35,7 @@ inline namespace graphics {
     double gpu_time_ms = 0;
     double gpu_fps = 0;
 
+    double culling_cpu_time_ms = 0;
     double render_cpu_time_ms = 0;
     double models_cpu_time_ms = 0;
     double shading_cpu_time_ms = 0;
@@ -39,7 +46,7 @@ inline namespace graphics {
     uint64_t vertexes_number = 0;
     uint64_t triangles_number = 0;
 
-    void write_to_json(std::ofstream &out) const noexcept;
+    void write_to_json(std::ostream &out) const noexcept;
   };
 
   class RenderContext {
@@ -58,16 +65,21 @@ inline namespace graphics {
     };
 
     // Bindings numbers in bindless descriptor set
-    constexpr static uint32_t textures_binding = 0;
-    constexpr static uint32_t uniform_buffer_binding = 1;
-    constexpr static uint32_t storage_buffer_binding = 2;
+    constexpr static inline uint32_t textures_binding = 0;
+    constexpr static inline uint32_t uniform_buffer_binding = 1;
+    constexpr static inline uint32_t storage_buffer_binding = 2;
+    constexpr static inline uint32_t bindless_set_number = 0;
 
     constexpr static inline uint32_t default_vertex_number = 10'000'000;
     constexpr static inline uint32_t default_index_number = default_vertex_number * 2;
 
+    constexpr static inline uint32_t culling_work_gpoup_size = 32;
+
   private:
     // Timestamps
     enum struct Timestamp : uint32_t {
+      CullingStart,
+      CullingEnd,
       ModelsStart,
       ModelsEnd,
       ShadingStart,
@@ -78,9 +90,17 @@ inline namespace graphics {
 
     using ClockT = std::chrono::steady_clock;
 
+    struct BoundBoxRenderData {
+      uint32_t transforms_buffer_id;
+      uint32_t transform_index;
+      uint32_t bound_boxes_buffer_id;
+      uint32_t bound_box_index;
+    };
+
   private:
     std::shared_ptr<VulkanState> _state;
     Extent _extent;
+    RenderOptions _render_options;
 
     vk::UniqueQueryPool _timestamps_query_pool {};
     RenderStat _render_stat;
@@ -122,12 +142,23 @@ inline namespace graphics {
     // Bindless rednering data
     DescriptorAllocator _default_descriptor_allocator;
     BindlessDescriptorSetLayoutHandle _bindless_set_layout;
+    DescriptorSetLayoutHandle _bindless_set_layout_converted;
     BindlessDescriptorSet _bindless_set;
 
     DeviceHeapAllocator _vertex_buffers_heap;
     VertexVectorBuffer _positions_vertex_buffer;
     VertexVectorBuffer _attributes_vertex_buffer;
     IndexHeapBuffer _index_buffer;
+
+    ShaderHandle _culling_shader;
+    ComputePipeline _culling_pipeline;
+
+    ShaderHandle _bound_boxes_draw_shader;
+    GraphicsPipeline _bound_boxes_draw_pipeline;
+    StorageBuffer _bound_boxes_buffer;
+    uint32_t _bound_boxes_buffer_id = -1;
+    std::vector<BoundBoxRenderData> _bound_boxes_data;
+    std::atomic_bool _bound_boxes_draw_enabled = false;
 
   public:
     RenderContext(RenderContext &&other) noexcept = default;
@@ -137,7 +168,7 @@ inline namespace graphics {
     RenderContext & operator=(const RenderContext &other) noexcept = delete;
 
     // TODO(dk6): change pointer to reference
-    RenderContext(VulkanGlobalState *global_state, Extent extent);
+    RenderContext(VulkanGlobalState *global_state, Extent extent, RenderOptions options = RenderOptions::None);
 
     ~RenderContext();
 
@@ -152,6 +183,8 @@ inline namespace graphics {
     const RenderStat & stat() const noexcept { return _render_stat; }
     CommandUnit & transfer_command_unit() const noexcept { return _transfer_command_unit; }
 
+    void enable_bound_boxes() noexcept { _bound_boxes_draw_enabled = true; }
+    void disable_bound_boxes() noexcept { _bound_boxes_draw_enabled = false; }
 
     IndexHeapBuffer & index_buffer() noexcept { return _index_buffer; }
     VertexBuffersArray add_vertex_buffers(CommandUnit &command_unit, std::span<const std::span<const std::byte>> vbufs_data) noexcept;
@@ -173,10 +206,19 @@ inline namespace graphics {
 
     const DescriptorAllocator & desciptor_allocator() const noexcept { return _default_descriptor_allocator; }
 
+    void draw_bound_box(uint32_t transforms_buffer_id, uint32_t transform_index,
+                        uint32_t bound_boxes_buffer_id, uint32_t bound_box_index) noexcept;
+
   private:
     void init_lights_render_data();
     void init_bindless_rendering();
+    void init_profiling();
+    void init_culling();
+    void init_bound_box_drawer();
 
+    void render_geometry(const SceneHandle scene);
+    void culling_geometry(const SceneHandle scene);
+    void render_bound_boxes(const SceneHandle scene);
     void render_models(const SceneHandle scene);
     void render_lights(const SceneHandle scene, Presenter &presenter);
 
