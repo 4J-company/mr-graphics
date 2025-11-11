@@ -73,6 +73,7 @@ mr::graphics::Model::Model(
 
       const size_t instance_count = mesh.transforms.size();
       const size_t instance_offset = scene._transforms_data.size();
+      // const size_t mesh_offset = scene._mesh_offset++;
       const size_t mesh_offset = scene._bounds_data.size();
 
       std::array vbufs_data {
@@ -90,7 +91,7 @@ mr::graphics::Model::Model(
         });
       }
 
-      scene._bounds_data.emplace_back();
+      scene._bounds_data.emplace_back(mesh.aabb);
       scene._visibility_data.emplace_back(1);
       scene._transforms_data.insert(
         scene._transforms_data.end(),
@@ -103,7 +104,8 @@ mr::graphics::Model::Model(
         std::move(ibufs),
         instance_count,
         mesh_offset,
-        instance_offset
+        instance_offset,
+        mesh.aabb
       );
 
       mr::MaterialBuilder builder(scene, "default");
@@ -114,7 +116,6 @@ mr::graphics::Model::Model(
         builder.add_texture(importer2graphics(texture.type), texture);
       }
       builder.add_storage_buffer(&scene._transforms);
-      builder.add_storage_buffer(&scene._bounds);
       builder.add_conditional_buffer(&scene._visibility);
 
       _builders.push_back(std::move(builder));

@@ -22,6 +22,7 @@ inline namespace graphics {
   class Window;
 
   struct RenderStat {
+    double culling_gpu_time_ms = 0;
     double render_gpu_time_ms = 0;
     double models_gpu_time_ms = 0;
     double shading_gpu_time_ms = 0;
@@ -29,6 +30,7 @@ inline namespace graphics {
     double gpu_time_ms = 0;
     double gpu_fps = 0;
 
+    double culling_cpu_time_ms = 0;
     double render_cpu_time_ms = 0;
     double models_cpu_time_ms = 0;
     double shading_cpu_time_ms = 0;
@@ -58,16 +60,21 @@ inline namespace graphics {
     };
 
     // Bindings numbers in bindless descriptor set
-    constexpr static uint32_t textures_binding = 0;
-    constexpr static uint32_t uniform_buffer_binding = 1;
-    constexpr static uint32_t storage_buffer_binding = 2;
+    constexpr static inline uint32_t textures_binding = 0;
+    constexpr static inline uint32_t uniform_buffer_binding = 1;
+    constexpr static inline uint32_t storage_buffer_binding = 2;
+    constexpr static inline uint32_t bindless_set_number = 0;
 
     constexpr static inline uint32_t default_vertex_number = 10'000'000;
     constexpr static inline uint32_t default_index_number = default_vertex_number * 2;
 
+    constexpr static inline uint32_t culling_work_gpoup_size = 32;
+
   private:
     // Timestamps
     enum struct Timestamp : uint32_t {
+      CullingStart,
+      CullingEnd,
       ModelsStart,
       ModelsEnd,
       ShadingStart,
@@ -122,12 +129,16 @@ inline namespace graphics {
     // Bindless rednering data
     DescriptorAllocator _default_descriptor_allocator;
     BindlessDescriptorSetLayoutHandle _bindless_set_layout;
+    DescriptorSetLayoutHandle _bindless_set_layout_converted;
     BindlessDescriptorSet _bindless_set;
 
     DeviceHeapAllocator _vertex_buffers_heap;
     VertexVectorBuffer _positions_vertex_buffer;
     VertexVectorBuffer _attributes_vertex_buffer;
     IndexHeapBuffer _index_buffer;
+
+    ShaderHandle _culling_shader;
+    ComputePipeline _culling_pipeline;
 
   public:
     RenderContext(RenderContext &&other) noexcept = default;
@@ -176,6 +187,8 @@ inline namespace graphics {
   private:
     void init_lights_render_data();
     void init_bindless_rendering();
+    void init_profiling();
+    void init_culling();
 
     void render_models(const SceneHandle scene);
     void render_lights(const SceneHandle scene, Presenter &presenter);

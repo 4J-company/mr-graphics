@@ -7,7 +7,8 @@ mr::GraphicsPipeline::GraphicsPipeline(const RenderContext &render_context,
                                        mr::ShaderHandle shader,
                                        std::span<const vk::VertexInputAttributeDescription> attributes,
                                        std::span<const DescriptorSetLayoutHandle> descriptor_layouts)
-  : Pipeline(render_context.vulkan_state(), shader, descriptor_layouts), _subpass(subpass)
+  : Pipeline(render_context.vulkan_state(), shader, descriptor_layouts, graphics_pipeline_push_constants)
+  , _subpass(subpass)
 {
   // dynamic states of pipeline (viewport)
   _dynamic_states.push_back(vk::DynamicState::eViewport);

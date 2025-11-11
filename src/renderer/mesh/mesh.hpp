@@ -34,6 +34,8 @@ inline namespace graphics {
     uint32_t _mesh_offset = 0;     // offset to the *per mesh*     data buffer in the scene
     uint32_t _instance_offset = 0; // offset to the *per instance* data buffer in the scene
 
+    AABBf _bound_box;
+
   public:
     Mesh() = default;
 
@@ -41,7 +43,8 @@ inline namespace graphics {
          std::vector<IndexBufferDescription> ibufs,
          size_t instance_count,
          size_t mesh_offset,
-         size_t instance_offset) noexcept;
+         size_t instance_offset,
+         const AABBf &bound_box) noexcept;
 
     // move semantics
     Mesh(Mesh &&other) noexcept { *this = std::move(other); }

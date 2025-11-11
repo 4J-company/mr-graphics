@@ -19,12 +19,24 @@ inline namespace graphics {
     friend class Model;
 
   private:
+    struct MeshFillDrawCommandInfo {
+      vk::DrawIndexedIndirectCommand draw_command;
+      mr::AABBf bound_box;
+    };
+
+    // TODO(dk6): destruct all this stuff in Scene destructor
     struct MeshesWithSamePipeline {
       std::vector<const Mesh *> meshes;
 
       // TODO(dk6): Make them dynamic sizable VectorBuffer
-      StorageBuffer commands_buffer;
-      std::vector<vk::DrawIndexedIndirectCommand> commands_buffer_data;
+      StorageBuffer commands_buffer; // Draw commands for all rendering meshes
+      StorageBuffer draws_commands; // It must have same size as commands_buffer
+      StorageBuffer draws_count_buffer; // 4-byte buffer for int
+      std::vector<MeshFillDrawCommandInfo> commands_buffer_data;
+
+      uint32_t commands_buffer_id = -1;
+      uint32_t draws_commands_buffer_id = -1;
+      uint32_t draws_count_buffer_id = -1;
 
       StorageBuffer meshes_render_info; // render data for each mesh
       std::vector<Mesh::RenderInfo> meshes_render_info_data;
@@ -55,11 +67,11 @@ inline namespace graphics {
     std::vector<mr::Matr4f> _transforms_data;
     uint32_t _transforms_buffer_id;  // id in bindless descriptor set
 
-    StorageBuffer _bounds;     // AABB                for each instance
-    std::vector<mr::AABBf> _bounds_data;
-
     ConditionalBuffer _visibility; // u32 visibility mask for each draw call
     std::vector<uint32_t> _visibility_data;
+
+    std::vector<mr::AABBf> _bounds_data; // TODO: remove it!
+    // uint32_t _mesh_offset = 0;
 
     mutable UniformBuffer _camera_uniform_buffer;
     mr::FPSCamera _camera;

@@ -7,7 +7,6 @@ mr::Scene::Scene(RenderContext &render_context)
   , _camera_uniform_buffer(_parent->vulkan_state(), sizeof(ShaderCameraData))
   , _transfer_command_unit(_parent->vulkan_state())
   , _transforms(_parent->vulkan_state(), max_scene_instances * sizeof(mr::Matr4f))
-  , _bounds(_parent->vulkan_state(),     max_scene_instances * sizeof(mr::AABBf))
   , _visibility(_parent->vulkan_state(), max_scene_instances * sizeof(uint32_t))
 {
   ASSERT(_parent != nullptr);
@@ -57,23 +56,41 @@ mr::ModelHandle mr::Scene::create_model(std::fs::path filename) noexcept
     auto &draw = draw_it->second;
     if (is_new_pipeline) {
       // TODO(dk6): I think max_scene_instances is too big number here
-      draw.commands_buffer =
-        StorageBuffer(_parent->vulkan_state(),
-        sizeof(vk::DrawIndexedIndirectCommand) * max_scene_instances,
-        vk::BufferUsageFlagBits::eStorageBuffer |
-          vk::BufferUsageFlagBits::eIndirectBuffer |
-          vk::BufferUsageFlagBits::eTransferDst);
+      draw.commands_buffer = StorageBuffer(_parent->vulkan_state(),
+                                           sizeof(MeshFillDrawCommandInfo) * max_scene_instances,
+                                           vk::BufferUsageFlagBits::eStorageBuffer |
+                                           vk::BufferUsageFlagBits::eIndirectBuffer |
+                                           vk::BufferUsageFlagBits::eTransferDst);
+      draw.draws_commands = StorageBuffer(_parent->vulkan_state(),
+                                          sizeof(vk::DrawIndexedIndirectCommand) * max_scene_instances,
+                                          vk::BufferUsageFlagBits::eStorageBuffer |
+                                          vk::BufferUsageFlagBits::eIndirectBuffer);
+      draw.draws_count_buffer = StorageBuffer(_parent->vulkan_state(),
+                                              sizeof(uint32_t),
+                                              vk::BufferUsageFlagBits::eStorageBuffer |
+                                              vk::BufferUsageFlagBits::eIndirectBuffer |
+                                              // for vkCmdFill
+                                              vk::BufferUsageFlagBits::eTransferDst);
+
+      draw.commands_buffer_id = _parent->bindless_set().register_resource(&draw.commands_buffer);
+      draw.draws_commands_buffer_id = _parent->bindless_set().register_resource(&draw.draws_commands);
+      draw.draws_count_buffer_id = _parent->bindless_set().register_resource(&draw.draws_count_buffer);
+
       draw.meshes_render_info = StorageBuffer(_parent->vulkan_state(), sizeof(Mesh::RenderInfo) * max_scene_instances);
       draw.meshes_render_info_id = _parent->bindless_set().register_resource(&draw.meshes_render_info);
     }
 
     draw.meshes.emplace_back(&mesh);
-    draw.commands_buffer_data.emplace_back(vk::DrawIndexedIndirectCommand {
-      .indexCount = mesh.element_count(),
-      .instanceCount = mesh.num_of_instances(),
-      .firstIndex = static_cast<uint32_t>(mesh._ibufs[0].offset / sizeof(uint32_t)),
-      .vertexOffset = static_cast<int32_t>(mesh._vbufs[0].offset / position_bytes_size),
-      .firstInstance = 0,
+    static_assert(sizeof(AABBf::VecT) == 4 * 4);
+    draw.commands_buffer_data.emplace_back(MeshFillDrawCommandInfo {
+      .draw_command = vk::DrawIndexedIndirectCommand {
+        .indexCount = mesh.element_count(),
+        .instanceCount = mesh.num_of_instances(),
+        .firstIndex = static_cast<uint32_t>(mesh._ibufs[0].offset / sizeof(uint32_t)),
+        .vertexOffset = static_cast<int32_t>(mesh._vbufs[0].offset / position_bytes_size),
+        .firstInstance = 0,
+      },
+      .bound_box = mesh._bound_box,
     });
     draw.meshes_render_info_data.emplace_back(Mesh::RenderInfo {
       .mesh_offset = mesh._mesh_offset,
@@ -99,7 +116,7 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
   if (_is_buffers_dirty) {
     _transfer_command_unit.begin();
     _transforms.write(_transfer_command_unit, std::span(_transforms_data));
-    _bounds.write(_transfer_command_unit, std::span(_bounds_data));
+    // _bounds.write(_transfer_command_unit, std::span(_bounds_data));
     _visibility.write(_transfer_command_unit, std::span(_visibility_data));
     _transfer_command_unit.end();
 
