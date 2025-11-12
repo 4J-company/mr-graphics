@@ -56,6 +56,7 @@ inline namespace graphics {
       _instance_count = std::move(other._instance_count.load());
       _mesh_offset = std::move(other._mesh_offset);
       _instance_offset = std::move(other._instance_offset);
+      _bound_box = other._bound_box;
 
       return *this;
     }

@@ -48,6 +48,8 @@ void main()
     return;
   }
 
+  // cull
+
   uint draw_id = atomicAdd(draws_count, 1);
 
   draws[draw_id].indexCount = commands[command_id].command.indexCount;

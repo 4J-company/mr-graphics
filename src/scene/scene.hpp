@@ -63,15 +63,14 @@ inline namespace graphics {
 
     CommandUnit _transfer_command_unit;
 
+    std::atomic_uint32_t _mesh_offset = 0;
+
     StorageBuffer _transforms; // transform matrix    for each instance
     std::vector<mr::Matr4f> _transforms_data;
     uint32_t _transforms_buffer_id;  // id in bindless descriptor set
 
     ConditionalBuffer _visibility; // u32 visibility mask for each draw call
     std::vector<uint32_t> _visibility_data;
-
-    std::vector<mr::AABBf> _bounds_data; // TODO: remove it!
-    // uint32_t _mesh_offset = 0;
 
     mutable UniformBuffer _camera_uniform_buffer;
     mr::FPSCamera _camera;

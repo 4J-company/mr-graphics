@@ -81,7 +81,7 @@ mr::ModelHandle mr::Scene::create_model(std::fs::path filename) noexcept
     }
 
     draw.meshes.emplace_back(&mesh);
-    static_assert(sizeof(AABBf::VecT) == 4 * 4);
+    static_assert(sizeof(AABBf::VecT) == 4 * sizeof(float));
     draw.commands_buffer_data.emplace_back(MeshFillDrawCommandInfo {
       .draw_command = vk::DrawIndexedIndirectCommand {
         .indexCount = mesh.element_count(),
@@ -92,6 +92,11 @@ mr::ModelHandle mr::Scene::create_model(std::fs::path filename) noexcept
       },
       .bound_box = mesh._bound_box,
     });
+
+    for (uint32_t i = 0; i < mesh._instance_count; i++) {
+      _parent->draw_bound_box(mesh._bound_box, _transforms_buffer_id, mesh._instance_offset + i);
+    }
+
     draw.meshes_render_info_data.emplace_back(Mesh::RenderInfo {
       .mesh_offset = mesh._mesh_offset,
       .instance_offset = mesh._instance_offset,

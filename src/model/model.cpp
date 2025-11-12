@@ -73,8 +73,7 @@ mr::graphics::Model::Model(
 
       const size_t instance_count = mesh.transforms.size();
       const size_t instance_offset = scene._transforms_data.size();
-      // const size_t mesh_offset = scene._mesh_offset++;
-      const size_t mesh_offset = scene._bounds_data.size();
+      const size_t mesh_offset = scene._mesh_offset++;
 
       std::array vbufs_data {
         std::as_bytes(std::span(mesh.positions)),
@@ -91,7 +90,6 @@ mr::graphics::Model::Model(
         });
       }
 
-      scene._bounds_data.emplace_back(mesh.aabb);
       scene._visibility_data.emplace_back(1);
       scene._transforms_data.insert(
         scene._transforms_data.end(),

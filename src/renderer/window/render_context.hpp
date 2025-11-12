@@ -85,6 +85,12 @@ inline namespace graphics {
 
     using ClockT = std::chrono::steady_clock;
 
+    struct BoundBoxRenderData {
+      mr::AABBf bound_box;
+      uint32_t transforms_buffer_id;
+      uint32_t transform_index;
+    };
+
   private:
     std::shared_ptr<VulkanState> _state;
     Extent _extent;
@@ -140,6 +146,12 @@ inline namespace graphics {
     ShaderHandle _culling_shader;
     ComputePipeline _culling_pipeline;
 
+    ShaderHandle _bound_boxes_draw_shader;
+    GraphicsPipeline _bound_boxes_draw_pipeline;
+    StorageBuffer _bound_boxes_buffer;
+    uint32_t _bound_boxes_buffer_id = -1;
+    std::vector<BoundBoxRenderData> _bound_boxes_data;
+
   public:
     RenderContext(RenderContext &&other) noexcept = default;
     RenderContext & operator=(RenderContext &&other) noexcept = default;
@@ -163,7 +175,6 @@ inline namespace graphics {
     const RenderStat & stat() const noexcept { return _render_stat; }
     CommandUnit & transfer_command_unit() const noexcept { return _transfer_command_unit; }
 
-
     IndexHeapBuffer & index_buffer() noexcept { return _index_buffer; }
     VertexBuffersArray add_vertex_buffers(CommandUnit &command_unit, std::span<const std::span<const std::byte>> vbufs_data) noexcept;
     void delete_vertex_buffers(std::span<const VertexBufferDescription> vbufs) noexcept;
@@ -184,11 +195,14 @@ inline namespace graphics {
 
     const DescriptorAllocator & desciptor_allocator() const noexcept { return _default_descriptor_allocator; }
 
+    void draw_bound_box(const mr::AABBf &bound_box, uint32_t transforms_buffer_id, uint32_t transform_index) noexcept;
+
   private:
     void init_lights_render_data();
     void init_bindless_rendering();
     void init_profiling();
     void init_culling();
+    void init_bound_box_drawer();
 
     void render_models(const SceneHandle scene);
     void render_lights(const SceneHandle scene, Presenter &presenter);

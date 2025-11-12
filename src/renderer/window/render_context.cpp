@@ -40,6 +40,7 @@ mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent)
   init_lights_render_data();
   init_profiling();
   init_culling();
+  init_bound_box_drawer();
 }
 
 // TODO(dk6): maybe create lights_render_data.cpp file and move this function?
@@ -158,6 +159,38 @@ void mr::RenderContext::init_culling()
   _culling_pipeline = ComputePipeline(*_state, _culling_shader, set_layouts);
 }
 
+void mr::RenderContext::init_bound_box_drawer()
+{
+  boost::unordered_map<std::string, std::string> defines {
+    {"TEXTURES_BINDING",        std::to_string(textures_binding)},
+    {"UNIFORM_BUFFERS_BINDING", std::to_string(uniform_buffer_binding)},
+    {"STORAGE_BUFFERS_BINDING", std::to_string(storage_buffer_binding)},
+    {"BINDLESS_SET", std::to_string(bindless_set_number)},
+  };
+  _bound_boxes_draw_shader = ResourceManager<Shader>::get().create("BoundBoxShader", *_state, "bound_box", defines);
+
+  std::array set_layouts {
+    _bindless_set_layout_converted,
+  };
+  _bound_boxes_draw_pipeline =
+    GraphicsPipeline(*this, GraphicsPipeline::Subpass::OpaqueGeometry, _bound_boxes_draw_shader, {}, set_layouts);
+
+  // TODO(dk6): use dynamic buffer
+  _bound_boxes_buffer = StorageBuffer(*_state, sizeof(BoundBoxRenderData) * 10000);
+  _bound_boxes_buffer_id = _bindless_set.register_resource(&_bound_boxes_buffer);
+}
+
+void mr::RenderContext::draw_bound_box(const mr::AABBf &bound_box,
+                                       uint32_t transforms_buffer_id,
+                                       uint32_t transform_index) noexcept
+{
+  _bound_boxes_data.emplace_back(BoundBoxRenderData {
+    .bound_box = bound_box,
+    // .bound_box = mr::AABBf(Vec3f(-0.05), Vec3f(0.05)),
+    .transforms_buffer_id = transforms_buffer_id,
+    .transform_index = transform_index,
+  });
+}
 
 mr::RenderContext::~RenderContext()
 {
@@ -392,8 +425,7 @@ void mr::RenderContext::render_models(const SceneHandle scene)
         draw.draws_count_buffer_id,
         max_draws_count,
       };
-      _models_command_unit->pushConstants(_culling_pipeline.layout(),
-                                          vk::ShaderStageFlagBits::eCompute,
+      _models_command_unit->pushConstants(_culling_pipeline.layout(), vk::ShaderStageFlagBits::eCompute,
                                           0, sizeof(culling_push_contants), culling_push_contants);
 
       _models_command_unit->dispatch((max_draws_count + culling_work_gpoup_size - 1) / culling_work_gpoup_size, 1, 1);
@@ -459,6 +491,33 @@ void mr::RenderContext::render_models(const SceneHandle scene)
       },
     };
     _models_command_unit->setScissor(0, scissors);
+
+    // ===== Rendering markers ======
+
+    uint32_t bound_boxes_number = _bound_boxes_data.size();
+    static std::once_flag bound_box_flag;
+    std::call_once(bound_box_flag, [&] {
+      _bound_boxes_buffer.write(std::as_bytes(std::span(_bound_boxes_data)));
+    });
+    // _bound_boxes_data.clear();
+
+    _models_command_unit->bindPipeline(vk::PipelineBindPoint::eGraphics, _bound_boxes_draw_pipeline.pipeline());
+
+    _models_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                                             {_bound_boxes_draw_pipeline.layout()},
+                                             bindless_set_number,
+                                             {_bindless_set.set()},
+                                             {});
+
+    uint32_t markers_push_contants[] {
+      scene->camera_buffer_id(),
+      _bound_boxes_buffer_id,
+    };
+    _models_command_unit->pushConstants(_bound_boxes_draw_pipeline.layout(),
+                                        vk::ShaderStageFlagBits::eAllGraphics,
+                                        0, sizeof(markers_push_contants), markers_push_contants);
+
+    _models_command_unit->draw(1, bound_boxes_number, 0, 0);
 
     // ===== Rendering geometry ======
 
