@@ -18,7 +18,7 @@ class MrGraphicsRecipe(ConanFile):
     options = {"shared": [True, False]}
     default_options = {"shared": False}
 
-    exports_sources = "CMakeLists.txt", "src/*", "cmake/*"
+    exports_sources = "CMakeLists.txt", "src/*", "cmake/*", "include/*", "examples/*"
 
     def requirements(self):
         self.requires("fmt/10.2.1")
@@ -30,8 +30,8 @@ class MrGraphicsRecipe(ConanFile):
         self.requires("glfw/3.4")
 
         self.requires("mr-math/1.1.4")
-        self.requires("mr-utils/1.0.4")
-        self.requires("mr-importer/2.7.0")
+        self.requires("mr-utils/1.1.2")
+        self.requires("mr-importer/2.9.0")
 
         self.requires("stb/cci.20240531")
 
