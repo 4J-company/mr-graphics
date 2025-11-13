@@ -197,3 +197,4 @@ void mr::RenderOptions::print() const noexcept
     std::println("  - {}", path.c_str());
   }
 }
+

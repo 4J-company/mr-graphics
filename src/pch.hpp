@@ -47,7 +47,7 @@
 #include <mr-math/math.hpp>
 #include <mr-utils/assert.hpp>
 #include <mr-utils/misc.hpp>
-#include <mr-utils/path.hpp>
+#include "path.hpp"
 #include <mr-utils/log.hpp>
 #include <mr-importer/importer.hpp>
 
