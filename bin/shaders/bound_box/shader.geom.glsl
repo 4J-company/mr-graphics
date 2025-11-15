@@ -37,7 +37,6 @@ layout(set = BINDLESS_SET, binding = UNIFORM_BUFFERS_BINDING) readonly uniform C
   float speed;
   float sens;
 } CameraUboArray[];
-
 #define cam_ubo CameraUboArray[draw.camera_buffer_id]
 
 void main()

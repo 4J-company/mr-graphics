@@ -7,6 +7,7 @@ mr::Scene::Scene(RenderContext &render_context)
   , _camera_uniform_buffer(_parent->vulkan_state(), sizeof(ShaderCameraData))
   , _transfer_command_unit(_parent->vulkan_state())
   , _transforms(_parent->vulkan_state(), max_scene_instances * sizeof(mr::Matr4f))
+  , _render_transforms(_parent->vulkan_state(), max_scene_instances * sizeof(mr::Matr4f))
   , _visibility(_parent->vulkan_state(), max_scene_instances * sizeof(uint32_t))
 {
   ASSERT(_parent != nullptr);
@@ -16,6 +17,7 @@ mr::Scene::Scene(RenderContext &render_context)
 
   _camera_buffer_id = render_context.bindless_set().register_resource(&_camera_uniform_buffer);
   _transforms_buffer_id = render_context.bindless_set().register_resource(&_transforms);
+  _render_transforms_buffer_id = render_context.bindless_set().register_resource(&_render_transforms);
 }
 
 mr::Scene::~Scene()
@@ -29,6 +31,7 @@ mr::Scene::~Scene()
   //            method 'notify_render_context_deleted` and use it as destuctor and move Scene in "disabeld" state
   _parent->bindless_set().unregister_resource(&_camera_uniform_buffer);
   _parent->bindless_set().unregister_resource(&_transforms);
+  _parent->bindless_set().unregister_resource(&_render_transforms);
 }
 
 mr::DirectionalLightHandle mr::Scene::create_directional_light(const Norm3f &direction, const Vec3f &color) noexcept
@@ -91,19 +94,17 @@ mr::ModelHandle mr::Scene::create_model(std::fs::path filename) noexcept
         .firstInstance = 0,
       },
       .bound_box = mesh._bound_box,
+      .transform_first_index = mesh._instance_offset,
+      .render_info = Mesh::RenderInfo {
+        .mesh_offset = mesh._mesh_offset,
+        .instance_offset = mesh._instance_offset,
+        .material_ubo_id = material->material_ubo_id(),
+      },
     });
 
     for (uint32_t i = 0; i < mesh._instance_count; i++) {
       _parent->draw_bound_box(mesh._bound_box, _transforms_buffer_id, mesh._instance_offset + i);
     }
-
-    draw.meshes_render_info_data.emplace_back(Mesh::RenderInfo {
-      .mesh_offset = mesh._mesh_offset,
-      .instance_offset = mesh._instance_offset,
-      .material_ubo_id = material->material_ubo_id(),
-      .camera_buffer_id = _camera_buffer_id,
-      .transforms_buffer_id = _transforms_buffer_id,
-    });
 
     _triangles_number += mesh.element_count() / 3;
     _vertexes_number += mesh._vbufs[0].vertex_count;

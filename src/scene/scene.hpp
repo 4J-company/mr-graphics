@@ -22,6 +22,8 @@ inline namespace graphics {
     struct MeshFillDrawCommandInfo {
       vk::DrawIndexedIndirectCommand draw_command;
       mr::AABBf bound_box;
+      uint32_t transform_first_index;
+      Mesh::RenderInfo render_info;
     };
 
     // TODO(dk6): destruct all this stuff in Scene destructor
@@ -38,8 +40,8 @@ inline namespace graphics {
       uint32_t draws_commands_buffer_id = -1;
       uint32_t draws_count_buffer_id = -1;
 
+      // It must have same elements as in 'commands_buffer'
       StorageBuffer meshes_render_info; // render data for each mesh
-      std::vector<Mesh::RenderInfo> meshes_render_info_data;
       uint32_t meshes_render_info_id = -1;
     };
 
@@ -65,9 +67,12 @@ inline namespace graphics {
 
     std::atomic_uint32_t _mesh_offset = 0;
 
-    StorageBuffer _transforms; // transform matrix    for each instance
+    StorageBuffer _transforms; // transform matrix for each instance
+    // Must be same size as _transforms
+    StorageBuffer _render_transforms; // transform matrix for each visible instance
     std::vector<mr::Matr4f> _transforms_data;
     uint32_t _transforms_buffer_id;  // id in bindless descriptor set
+    uint32_t _render_transforms_buffer_id;  // id in bindless descriptor set
 
     ConditionalBuffer _visibility; // u32 visibility mask for each draw call
     std::vector<uint32_t> _visibility_data;

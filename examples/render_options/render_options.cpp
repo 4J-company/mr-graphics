@@ -69,6 +69,9 @@ std::optional<mr::RenderOptions> mr::RenderOptions::parse(int argc, const char *
     ("disable-culling",
      po::bool_switch()->default_value(false),
      "Disable culling")
+    ("enable-bound-boxes",
+     po::bool_switch()->default_value(false),
+     "Enable drawing bound boxes of models for debug")
     ("stat-dir",
      po::value<std::string>()->default_value("render_stats"),
      "Path to directory in which frame stats will be writed (default: ./render_stat.txt).")
@@ -116,6 +119,7 @@ std::optional<mr::RenderOptions> mr::RenderOptions::parse(int argc, const char *
   options.dst_dir = vm["dst-dir"].as<std::string>();
   options.frames_number = vm["frames-number"].as<int>();
   options.disable_culling = vm["disable-culling"].as<bool>();
+  options.enable_bound_boxes = vm["enable-bound-boxes"].as<bool>();
   options.stat_dir = vm["stat-dir"].as<std::string>();
 
   auto mode_str = vm["mode"].as<std::string>();

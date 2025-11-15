@@ -151,6 +151,7 @@ inline namespace graphics {
     StorageBuffer _bound_boxes_buffer;
     uint32_t _bound_boxes_buffer_id = -1;
     std::vector<BoundBoxRenderData> _bound_boxes_data;
+    std::atomic_bool _bound_boxes_draw_enabled = false;
 
   public:
     RenderContext(RenderContext &&other) noexcept = default;
@@ -174,6 +175,9 @@ inline namespace graphics {
     const Extent & extent() const noexcept { return _extent; }
     const RenderStat & stat() const noexcept { return _render_stat; }
     CommandUnit & transfer_command_unit() const noexcept { return _transfer_command_unit; }
+
+    void enable_bound_boxes() noexcept { _bound_boxes_draw_enabled = true; }
+    void disable_bound_boxes() noexcept { _bound_boxes_draw_enabled = false; }
 
     IndexHeapBuffer & index_buffer() noexcept { return _index_buffer; }
     VertexBuffersArray add_vertex_buffers(CommandUnit &command_unit, std::span<const std::span<const std::byte>> vbufs_data) noexcept;
@@ -204,6 +208,9 @@ inline namespace graphics {
     void init_culling();
     void init_bound_box_drawer();
 
+    void render_geometry(const SceneHandle scene);
+    void culling_geometry(const SceneHandle scene);
+    void render_bound_boxes(const SceneHandle scene);
     void render_models(const SceneHandle scene);
     void render_lights(const SceneHandle scene, Presenter &presenter);
 
