@@ -18,7 +18,10 @@ mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent)
   : _state(std::make_shared<VulkanState>(global_state))
   , _models_command_unit(*_state)
   , _lights_command_unit(*_state)
-  , _transfer_command_unit(*_state)
+  , _pre_model_layout_transition_semaphore(_state->device().createSemaphoreUnique({}).value)
+  , _pre_model_layout_transition_command_unit(*_state)
+  , _pre_light_layout_transition_semaphore(_state->device().createSemaphoreUnique({}).value)
+  , _pre_light_layout_transition_command_unit(*_state)
   , _extent(extent)
   , _depthbuffer(*_state, _extent)
   , _image_fence (_state->device().createFenceUnique({.flags = vk::FenceCreateFlagBits::eSignaled}).value)
@@ -238,15 +241,19 @@ void mr::RenderContext::render_lights(const SceneHandle scene, Presenter &presen
                                          _timestamps_query_pool.get(),
                                          enum_cast(Timestamp::ShadingStart));
 
-    CommandUnit command_unit {scene->render_context().vulkan_state()};
-    command_unit.begin();
+    // CommandUnit command_unit {scene->render_context().vulkan_state()};
+    _pre_light_layout_transition_command_unit.begin();
     for (auto &gbuf : _gbuffers) {
-      gbuf.switch_layout(command_unit, vk::ImageLayout::eShaderReadOnlyOptimal);
+      gbuf.switch_layout(_pre_light_layout_transition_command_unit, vk::ImageLayout::eShaderReadOnlyOptimal);
     }
-    _depthbuffer.switch_layout(command_unit, vk::ImageLayout::eDepthStencilAttachmentOptimal);
-    command_unit.end();
-    UniqueFenceGuard(scene->render_context().vulkan_state().device(),
-        command_unit.submit(scene->render_context().vulkan_state()));
+    _depthbuffer.switch_layout(_pre_light_layout_transition_command_unit, vk::ImageLayout::eDepthStencilAttachmentOptimal);
+    _pre_light_layout_transition_command_unit.end();
+    _pre_light_layout_transition_command_unit.add_signal_semaphore(
+        _pre_light_layout_transition_semaphore.get());
+    _lights_command_unit.add_wait_semaphore(
+      _pre_light_layout_transition_semaphore.get(),
+      vk::PipelineStageFlagBits::eFragmentShader
+    );
 
     vk::RenderingAttachmentInfoKHR swapchain_image_attachment_info = presenter.target_image_info();
 
@@ -310,15 +317,19 @@ void mr::RenderContext::render_models(const SceneHandle scene)
                                          _timestamps_query_pool.get(),
                                          enum_cast(Timestamp::ModelsStart));
 
-    CommandUnit command_unit {scene->render_context().vulkan_state()};
-    command_unit.begin();
+    _pre_model_layout_transition_command_unit.begin();
     for (auto &gbuf : _gbuffers) {
-      gbuf.switch_layout(command_unit, vk::ImageLayout::eColorAttachmentOptimal);
+      gbuf.switch_layout(_pre_model_layout_transition_command_unit, vk::ImageLayout::eColorAttachmentOptimal);
     }
-    _depthbuffer.switch_layout(command_unit, vk::ImageLayout::eDepthStencilAttachmentOptimal);
-    command_unit.end();
-    UniqueFenceGuard(scene->render_context().vulkan_state().device(),
-        command_unit.submit(scene->render_context().vulkan_state()));
+    _depthbuffer.switch_layout(_pre_model_layout_transition_command_unit, vk::ImageLayout::eDepthStencilAttachmentOptimal);
+    _pre_model_layout_transition_command_unit.end();
+    _pre_model_layout_transition_command_unit.add_signal_semaphore(
+        _pre_model_layout_transition_semaphore.get());
+
+    _models_command_unit.add_wait_semaphore(
+      _pre_model_layout_transition_semaphore.get(),
+      vk::PipelineStageFlagBits::eVertexShader
+    );
 
     auto gbufs_attachs = _gbuffers | std::views::transform([](const ColorAttachmentImage &gbuf) {
       return gbuf.attachment_info();
@@ -377,7 +388,8 @@ void mr::RenderContext::render_models(const SceneHandle scene)
       _models_command_unit->pushConstants(pipeline->layout(), vk::ShaderStageFlagBits::eAllGraphics,
                                           0, sizeof(uint32_t), &draw.meshes_render_info_id);
 
-      // TODO(dk6): Update only if scene updates on this frame
+      CommandUnit command_unit {scene->render_context().vulkan_state()};
+
       command_unit.begin();
       draw.commands_buffer.write(command_unit, std::span(draw.commands_buffer_data));
       draw.meshes_render_info.write(command_unit, std::span(draw.meshes_render_info_data));
@@ -434,6 +446,10 @@ void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
 
   _models_command_unit.add_signal_semaphore(_models_render_finished_semaphore.get());
 
+  vk::SubmitInfo pre_model_layout_transition_submit_info =
+    _pre_model_layout_transition_command_unit.submit_info();
+  _state->queue().submit(pre_model_layout_transition_submit_info);
+
   vk::SubmitInfo models_submit_info = _models_command_unit.submit_info();
   _state->queue().submit(models_submit_info);
 
@@ -456,6 +472,10 @@ void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
   if (render_finished_semaphore) {
     _lights_command_unit.add_signal_semaphore(render_finished_semaphore);
   }
+
+  vk::SubmitInfo pre_light_layout_transition_submit_info =
+    _pre_light_layout_transition_command_unit.submit_info();
+  _state->queue().submit(pre_light_layout_transition_submit_info);
 
   vk::SubmitInfo light_submit_info = _lights_command_unit.submit_info();
   _state->queue().submit(light_submit_info, _image_fence.get());

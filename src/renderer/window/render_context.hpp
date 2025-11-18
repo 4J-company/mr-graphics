@@ -106,6 +106,12 @@ inline namespace graphics {
     // semaphores for waiting frame is ready before presentin
     InplaceVector<vk::UniqueSemaphore, max_images_number> _render_finished_semaphore;
 
+    vk::UniqueSemaphore _pre_model_layout_transition_semaphore;
+    CommandUnit _pre_model_layout_transition_command_unit;
+
+    vk::UniqueSemaphore _pre_light_layout_transition_semaphore;
+    CommandUnit _pre_light_layout_transition_command_unit;
+
     // semaphore for sync opaque models rendering and light shading
     vk::UniqueSemaphore _models_render_finished_semaphore;
     vk::UniqueFence _image_fence; // fence for swapchain image?

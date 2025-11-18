@@ -8,7 +8,7 @@
 
 void mr::bufcopy(mr::CommandUnit &command_unit, mr::BufferRegion src, mr::BufferRegion dst)
 {
-  ASSERT(&src.state == &dst.state, "Buffers were created by different VulkanState objects", src, dst);
+  ASSERT(src.state == dst.state, "Buffers were created by different VulkanState objects", src, dst);
   ASSERT(dst.size >= src.size, "This copy would cause an overflow", src, dst);
   vk::BufferCopy buffer_copy {
     .srcOffset = src.offset,

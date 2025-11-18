@@ -290,7 +290,7 @@ inline namespace graphics {
 
   class VectorBuffer : public DeviceBuffer {
   private:
-    vk::DeviceSize _current_size;
+    vk::DeviceSize _current_size = 0;
 
   public:
     static inline constexpr float resize_coefficient = 1.5;
@@ -519,7 +519,7 @@ inline namespace graphics {
   };
 
   struct BufferRegion {
-    const VulkanState &state {};
+    const VulkanState *state = nullptr;
     vk::Buffer buffer {};
     vk::DeviceSize offset {};
     vk::DeviceSize size {};
@@ -532,7 +532,7 @@ inline namespace graphics {
 
     template <std::derived_from<Buffer> BufferT>
     BufferRegion(const BufferT &buf, vk::DeviceSize o = 0, vk::DeviceSize s = 0)
-    : state(buf.state())
+    : state(&buf.state())
     , buffer(buf.buffer())
     , offset(o)
     , size(s == 0 ? buf.byte_size() - o : s)

@@ -105,6 +105,7 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
 
     fence = _transfer_command_unit.submit(_parent->vulkan_state());
 
+    _is_buffers_dirty = false;
     guard.fence = fence.get();
   }
 
