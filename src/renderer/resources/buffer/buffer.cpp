@@ -159,9 +159,9 @@ void mr::HostBuffer::MappedData::unmap() noexcept
 
 mr::DeviceBuffer & mr::DeviceBuffer::resize(CommandUnit &command_unit, std::size_t new_size) noexcept
 {
-  command_unit.resized_from_buffers().emplace_back(*_state, new_size, _usage_flags); // create resized temporary
-  bufcopy(command_unit, {*this}, {command_unit.resized_from_buffers().back()});      // copy current data to resized temporary
-  std::swap(*this, command_unit.resized_from_buffers().back());                      // reclaim memory of the temporary
+  auto &it = command_unit.resized_from_buffers().emplace_back(*_state, new_size, _usage_flags); // create resized temporary
+  bufcopy(command_unit, {*this}, {it});                                                         // copy current data to resized temporary
+  std::swap(*this, it);                                                                         // reclaim memory of the temporary
 
   return *this;
 }
@@ -173,8 +173,8 @@ mr::DeviceBuffer & mr::DeviceBuffer::write(CommandUnit &command_unit,
   ASSERT(src.data());
   ASSERT(offset + src.size() <= _size, "This write would cause buffer overflow", offset, src.size());
 
-  command_unit.staging_buffers().emplace_back(*_state, src.size(), vk::BufferUsageFlagBits::eTransferSrc);
-  command_unit.staging_buffers().back().write(src);
+  auto& it = command_unit.staging_buffers().emplace_back(*_state, src.size(), vk::BufferUsageFlagBits::eTransferSrc);
+  it.write(src);
 
   bufcopy(command_unit, {command_unit.staging_buffers().back()}, {*this, offset});
   return *this;

@@ -505,7 +505,7 @@ inline namespace graphics {
     IndexHeapBuffer(IndexHeapBuffer &&) noexcept = default;
     IndexHeapBuffer & operator=(IndexHeapBuffer &&) noexcept = default;
     IndexHeapBuffer(const IndexHeapBuffer &) noexcept = delete;
-    IndexHeapBuffer & operator=(const IndexHeapBuffer &&) noexcept = delete;
+    IndexHeapBuffer & operator=(const IndexHeapBuffer &) noexcept = delete;
 
     IndexHeapBuffer(const VulkanState &state,
         vk::DeviceSize start_byte_size = HeapBuffer::default_initial_byte_size,
