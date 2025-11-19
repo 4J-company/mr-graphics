@@ -5,17 +5,17 @@
 
 int main(int argc, const char **argv)
 {
-  auto options_opt = mr::RenderOptions::parse(argc, argv);
+  auto options_opt = mr::CliOptions::parse(argc, argv);
   if (options_opt == std::nullopt) {
     return 1;
   }
   auto options = *options_opt;
   options.print();
 
-  mr::Application app(options.mode == mr::RenderOptions::Mode::Default);
+  mr::Application app(options.mode == mr::CliOptions::Mode::Default);
 
   mr::Extent render_context_extent = {};
-  if (options.mode == mr::RenderOptions::Mode::Default) {
+  if (options.mode == mr::CliOptions::Mode::Default) {
     auto [vkfw_res, monitors] = vkfw::getMonitors();
     ASSERT(vkfw_res == vkfw::Result::eSuccess);
     uint32_t max_height = 0, max_width = 0;
@@ -28,7 +28,12 @@ int main(int argc, const char **argv)
     render_context_extent = {options.width, options.height};
   }
 
-  auto render_context = app.create_render_context(render_context_extent);
+  mr::RenderOptions render_options = mr::RenderOptions::None;
+  if (options.disable_culling) {
+    render_options |= mr::RenderOptions::DisableCulling;
+  }
+
+  auto render_context = app.create_render_context(render_context_extent, render_options);
 
   if (options.enable_bound_boxes) {
     render_context->enable_bound_boxes();
@@ -45,14 +50,14 @@ int main(int argc, const char **argv)
     scene->camera().cam() = options.camera.value();
   }
 
-  if (options.mode == mr::RenderOptions::Mode::Default) {
+  if (options.mode == mr::CliOptions::Mode::Default) {
     auto window = render_context->create_window({options.width, options.height});
     app.start_render_loop(*render_context, scene, window);
-  } else if (options.mode == mr::RenderOptions::Mode::Frames) {
+  } else if (options.mode == mr::CliOptions::Mode::Frames) {
     auto file_writer = render_context->create_file_writer({options.width, options.height});
     app.render_frames(*render_context, scene, file_writer,
                       options.dst_dir, "frame", options.frames_number);
-  } else if (options.mode == mr::RenderOptions::Mode::Bench) {
+  } else if (options.mode == mr::CliOptions::Mode::Bench) {
     std::fs::create_directory(options.stat_dir);
     auto presenter = render_context->create_dummy_presenter({options.width, options.height});
     for (uint32_t i = 0; i < options.frames_number; i++) {

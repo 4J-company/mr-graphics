@@ -14,8 +14,9 @@
 
 #define TRACY_VK_ZONE_BEGIN()
 
-mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent)
+mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent, RenderOptions options)
   : _state(std::make_shared<VulkanState>(global_state))
+  , _render_options(options)
   , _models_command_unit(*_state)
   , _lights_command_unit(*_state)
   , _pre_model_layout_transition_semaphore(_state->device().createSemaphoreUnique({}).value)
@@ -151,6 +152,9 @@ void mr::RenderContext::init_culling()
     {"BINDLESS_SET", std::to_string(bindless_set_number)},
     {"THREADS_NUM", std::to_string(culling_work_gpoup_size)},
   };
+  if (is_render_option_enabled(_render_options, RenderOptions::DisableCulling)) {
+    defines.insert({"DISABLE_CULLING", "ON"});
+  }
   _culling_shader = ResourceManager<Shader>::get().create("CullingShader", *_state, "culling", defines);
 
   std::array set_layouts {
@@ -389,7 +393,8 @@ void mr::RenderContext::render_models(const SceneHandle scene)
     uint32_t model_push_constant[] {
       draw.meshes_render_info_id,
       scene->camera_buffer_id(),
-      scene->_render_transforms_buffer_id,
+      is_render_option_enabled(_render_options, RenderOptions::DisableCulling)
+        ? scene->_transforms_buffer_id : scene->_render_transforms_buffer_id,
     };
 
     _models_command_unit->pushConstants(pipeline->layout(), vk::ShaderStageFlagBits::eAllGraphics,
@@ -403,7 +408,6 @@ void mr::RenderContext::render_models(const SceneHandle scene)
 
     uint32_t stride = sizeof(vk::DrawIndexedIndirectCommand);
     uint32_t max_draws_count = static_cast<uint32_t>(draw.commands_buffer_data.size());
-    // _models_command_unit->drawIndexedIndirect(draw.commands_buffer.buffer(), 0, draw.meshes.size(), stride);
     _models_command_unit->drawIndexedIndirectCount(draw.draws_commands.buffer(), 0,
                                                    draw.draws_count_buffer.buffer(), 0,
                                                    max_draws_count, stride);

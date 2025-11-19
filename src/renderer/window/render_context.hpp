@@ -2,18 +2,23 @@
 #define __MR_RENDER_CONTEXT_HPP_
 
 #include "pch.hpp"
-#include "resources/images/image.hpp"
-#include "resources/resources.hpp"
+
 #include "vulkan_state.hpp"
+#include "render_context_options.hpp"
+
 #include "camera/camera.hpp"
 #include "lights/lights.hpp"
 #include "model/model.hpp"
-#include "window.hpp"
-#include "file_writer.hpp"
 #include "scene/scene.hpp"
+
+#include "resources/images/image.hpp"
+#include "resources/resources.hpp"
 #include "resources/command_unit/command_unit.hpp"
 
-#include "window/dummy_presenter.hpp"
+#include "window.hpp"
+#include "file_writer.hpp"
+#include "dummy_presenter.hpp"
+
 #include <VkBootstrap.h>
 #include <vulkan/vulkan_core.h>
 
@@ -94,6 +99,7 @@ inline namespace graphics {
   private:
     std::shared_ptr<VulkanState> _state;
     Extent _extent;
+    RenderOptions _render_options;
 
     vk::UniqueQueryPool _timestamps_query_pool {};
     RenderStat _render_stat;
@@ -161,7 +167,7 @@ inline namespace graphics {
     RenderContext & operator=(const RenderContext &other) noexcept = delete;
 
     // TODO(dk6): change pointer to reference
-    RenderContext(VulkanGlobalState *global_state, Extent extent);
+    RenderContext(VulkanGlobalState *global_state, Extent extent, RenderOptions options = RenderOptions::None);
 
     ~RenderContext();
 

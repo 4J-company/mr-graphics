@@ -13,9 +13,10 @@ mr::Application::Application(bool init_vkfw) : _state(init_vkfw)
 // destructor
 mr::Application::~Application() {}
 
-[[nodiscard]] std::unique_ptr<mr::RenderContext> mr::Application::create_render_context(Extent extent)
+[[nodiscard]] std::unique_ptr<mr::RenderContext>
+mr::Application::create_render_context(Extent extent, RenderOptions options)
 {
-  return std::make_unique<RenderContext>(&_state, extent);
+  return std::make_unique<RenderContext>(&_state, extent, options);
 }
 
 void mr::Application::start_render_loop(RenderContext &render_context, SceneHandle scene,

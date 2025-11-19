@@ -124,6 +124,17 @@ uint frustum_culling(uint command_id)
   return visible_instances_number;
 }
 
+void fill_command(uint draw_id, uint command_id, uint instance_number)
+{
+  draws[draw_id].index_count = commands[command_id].command.index_count;
+  draws[draw_id].instance_count = instance_number;
+  draws[draw_id].first_index = commands[command_id].command.first_index;
+  draws[draw_id].vertex_offset = commands[command_id].command.vertex_offset;
+  draws[draw_id].first_instance = commands[command_id].command.first_instance;
+
+  meshes_draw_info[draw_id] = commands[command_id].mesh_draw_info;
+}
+
 void main()
 {
   uint command_id = gl_LocalInvocationID.x + gl_WorkGroupID.x * THREADS_NUM;
@@ -131,16 +142,16 @@ void main()
     return;
   }
 
+#ifdef DISABLE_CULLING
+  if (command_id == 0) {
+    draws_count = buffers_data.commands_number;
+  }
+  fill_command(command_id, command_id, commands[command_id].command.instance_count);
+#else // DISABLE_CULLING
   uint instance_number = frustum_culling(command_id);
   if (instance_number > 0) {
     uint draw_id = atomicAdd(draws_count, 1);
-
-    draws[draw_id].index_count = commands[command_id].command.index_count;
-    draws[draw_id].instance_count = instance_number;
-    draws[draw_id].first_index = commands[command_id].command.first_index;
-    draws[draw_id].vertex_offset = commands[command_id].command.vertex_offset;
-    draws[draw_id].first_instance = commands[command_id].command.first_instance;
-
-    meshes_draw_info[draw_id] = commands[command_id].mesh_draw_info;
+    fill_command(draw_id, command_id, instance_number);
   }
+#endif // DISABLE_CULLING
 }

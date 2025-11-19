@@ -5,7 +5,7 @@
 
 namespace mr {
 inline namespace graphics {
-  struct RenderOptions {
+  struct CliOptions {
     enum struct Mode {
       Default,
       Frames,
@@ -24,7 +24,7 @@ inline namespace graphics {
     std::optional<std::string> bench_name;
     bool enable_bound_boxes;
 
-    static std::optional<RenderOptions> parse(int argc, const char **argv);
+    static std::optional<CliOptions> parse(int argc, const char **argv);
 
     void print() const noexcept;
   };
