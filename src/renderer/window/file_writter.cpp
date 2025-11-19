@@ -28,7 +28,12 @@ vk::RenderingAttachmentInfoKHR mr::FileWriter::target_image_info() noexcept
   _image_index = (_image_index + 1) % images_number;
 
   auto &image = _images[_image_index];
-  image.switch_layout(vk::ImageLayout::eColorAttachmentOptimal);
+  CommandUnit command_unit {_parent->vulkan_state()};
+  command_unit.begin();
+  image.switch_layout(command_unit, vk::ImageLayout::eColorAttachmentOptimal);
+  command_unit.end();
+
+  UniqueFenceGuard(_parent->vulkan_state().device(), command_unit.submit(_parent->vulkan_state()));
 
   auto &[sem, first_usage] = _image_available_semaphore[_image_index];
   _current_image_available_semaphore = first_usage ? VK_NULL_HANDLE : sem.get();
@@ -56,12 +61,7 @@ void mr::FileWriter::present() noexcept
 
   auto stage_buffer = image.read_to_host_buffer(command_unit);
 
-  command_unit.end();
-  auto submit_info = command_unit.submit_info();
-
-  auto fence = _parent->vulkan_state().device().createFenceUnique({}).value;
-  _parent->vulkan_state().queue().submit(submit_info, fence.get());
-  _parent->vulkan_state().device().waitForFences({fence.get()}, VK_TRUE, UINT64_MAX);
+  UniqueFenceGuard(_parent->vulkan_state().device(), command_unit.submit(_parent->vulkan_state()));
 
   auto data = stage_buffer.copy();
   ASSERT(data.size() % 4 == 0);

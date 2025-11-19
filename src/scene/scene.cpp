@@ -5,6 +5,7 @@
 mr::Scene::Scene(RenderContext &render_context)
   : _parent(&render_context)
   , _camera_uniform_buffer(_parent->vulkan_state(), sizeof(ShaderCameraData))
+  , _transfer_command_unit(_parent->vulkan_state())
   , _transforms(_parent->vulkan_state(), max_scene_instances * sizeof(mr::Matr4f))
   , _bounds(_parent->vulkan_state(),     max_scene_instances * sizeof(mr::AABBf))
   , _visibility(_parent->vulkan_state(), max_scene_instances * sizeof(uint32_t))
@@ -35,6 +36,8 @@ mr::DirectionalLightHandle mr::Scene::create_directional_light(const Norm3f &dir
 {
   ASSERT(_parent != nullptr);
 
+  _is_buffers_dirty = true;
+
   auto dir_light_handle = ResourceManager<DirectionalLight>::get().create(mr::unnamed, *this, direction, color);
   lights<DirectionalLight>().push_back(dir_light_handle);
   return dir_light_handle;
@@ -43,6 +46,8 @@ mr::DirectionalLightHandle mr::Scene::create_directional_light(const Norm3f &dir
 mr::ModelHandle mr::Scene::create_model(std::fs::path filename) noexcept
 {
   ASSERT(_parent != nullptr);
+
+  _is_buffers_dirty = true;
 
   auto model_handle = ResourceManager<Model>::get().create(mr::unnamed, *this, filename);
 
@@ -89,9 +94,20 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
 {
   ASSERT(_parent != nullptr);
 
-  _transforms.write(std::span(_transforms_data));
-  _bounds.write(std::span(_bounds_data));
-  _visibility.write(std::span(_visibility_data));
+  vk::UniqueFence fence {};
+  FenceGuard guard { _parent->vulkan_state().device() };
+  if (_is_buffers_dirty) {
+    _transfer_command_unit.begin();
+    _transforms.write(_transfer_command_unit, std::span(_transforms_data));
+    _bounds.write(_transfer_command_unit, std::span(_bounds_data));
+    _visibility.write(_transfer_command_unit, std::span(_visibility_data));
+    _transfer_command_unit.end();
+
+    fence = _transfer_command_unit.submit(_parent->vulkan_state());
+
+    _is_buffers_dirty = false;
+    guard.fence = fence.get();
+  }
 
   if (input_state_ref) {
     const auto &input_state = input_state_ref->get();
