@@ -21,7 +21,7 @@ void mr::Window::update_swapchain() noexcept
     _extent.width = w;
     _extent.height = h;
 
-    _swapchain = mr::Swapchain(_parent->vulkan_state(), _surface.get(), _extent);
+    _swapchain = mr::Swapchain(_parent->vulkan_state(), _surface.get(), _extent, _vsync_enabled);
   }
 }
 
@@ -52,11 +52,12 @@ vkfw::UniqueWindow mr::Window::_create_window(const Extent &extent) noexcept
   return std::move(window);
 }
 
-mr::Window::Window(const RenderContext &parent, Extent extent)
+mr::Window::Window(const RenderContext &parent, Extent extent, bool enable_vsync)
   : Presenter(parent, extent)
+  , _vsync_enabled(enable_vsync)
   , _window(_create_window(_extent))
   , _surface(vkfw::createWindowSurfaceUnique(_parent->vulkan_state().instance(), _window.get()))
-  , _swapchain(_parent->vulkan_state(), _surface.get(), _extent)
+  , _swapchain(_parent->vulkan_state(), _surface.get(), _extent, enable_vsync)
 {
   for (uint32_t i = 0; i < _swapchain._images.size(); i++) {
     _image_available_semaphore.emplace_back(_parent->vulkan_state().device().createSemaphoreUnique({}).value);

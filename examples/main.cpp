@@ -32,6 +32,9 @@ int main(int argc, const char **argv)
   if (options.disable_culling) {
     render_options |= mr::RenderOptions::DisableCulling;
   }
+  if (options.enable_vsync) {
+    render_options |= mr::RenderOptions::EnableVsync;
+  }
 
   auto render_context = app.create_render_context(render_context_extent, render_options);
 

@@ -266,7 +266,8 @@ mr::WindowHandle mr::RenderContext::create_window() const noexcept
 
 mr::WindowHandle mr::RenderContext::create_window(const mr::Extent &extent) const noexcept
 {
-  return ResourceManager<Window>::get().create(mr::unnamed, *this, extent);
+  return ResourceManager<Window>::get().create(mr::unnamed, *this, extent,
+    is_render_option_enabled(_render_options, RenderOptions::EnableVsync));
 }
 
 mr::FileWriterHandle mr::RenderContext::create_file_writer() const noexcept

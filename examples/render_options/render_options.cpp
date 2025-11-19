@@ -69,6 +69,9 @@ std::optional<mr::CliOptions> mr::CliOptions::parse(int argc, const char **argv)
     ("disable-culling",
      po::bool_switch()->default_value(false),
      "Disable culling")
+    ("enable-vsync",
+     po::bool_switch()->default_value(false),
+     "Enable VSYNC")
     ("enable-bound-boxes",
      po::bool_switch()->default_value(false),
      "Enable drawing bound boxes of models for debug")
@@ -119,6 +122,7 @@ std::optional<mr::CliOptions> mr::CliOptions::parse(int argc, const char **argv)
   options.dst_dir = vm["dst-dir"].as<std::string>();
   options.frames_number = vm["frames-number"].as<int>();
   options.disable_culling = vm["disable-culling"].as<bool>();
+  options.enable_vsync = vm["enable-vsync"].as<bool>();
   options.enable_bound_boxes = vm["enable-bound-boxes"].as<bool>();
   options.stat_dir = vm["stat-dir"].as<std::string>();
 
