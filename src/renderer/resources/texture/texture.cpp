@@ -4,16 +4,30 @@ mr::Texture::Texture(const VulkanState &state, const std::byte *data, Extent ext
   : _image (state, extent, format)
   , _sampler (state, vk::Filter::eLinear, vk::SamplerAddressMode::eRepeat)
 {
-  _image.switch_layout(vk::ImageLayout::eTransferDstOptimal);
-  _image.write<const std::byte>(std::span{data, _image.size()});
-  _image.switch_layout(vk::ImageLayout::eShaderReadOnlyOptimal);
+  CommandUnit command_unit {state};
+  command_unit.begin();
+
+  _image.switch_layout(command_unit, vk::ImageLayout::eTransferDstOptimal);
+  _image.write<const std::byte>(command_unit, std::span{data, _image.size()});
+  _image.switch_layout(command_unit, vk::ImageLayout::eShaderReadOnlyOptimal);
+
+  command_unit.end();
+
+  UniqueFenceGuard(state.device(), command_unit.submit(state));
 }
 
 mr::Texture::Texture(const VulkanState &state, const mr::importer::ImageData &image) noexcept
   : _image (state, image)
   , _sampler (state, vk::Filter::eLinear, vk::SamplerAddressMode::eRepeat)
 {
-  _image.switch_layout(vk::ImageLayout::eTransferDstOptimal);
-  _image.write<const std::byte>(image.mips[0]);
-  _image.switch_layout(vk::ImageLayout::eShaderReadOnlyOptimal);
+  CommandUnit command_unit {state};
+  command_unit.begin();
+
+  _image.switch_layout(command_unit, vk::ImageLayout::eTransferDstOptimal);
+  _image.write<const std::byte>(command_unit, image.mips[0]);
+  _image.switch_layout(command_unit, vk::ImageLayout::eShaderReadOnlyOptimal);
+
+  command_unit.end();
+
+  UniqueFenceGuard(state.device(), command_unit.submit(state));
 }

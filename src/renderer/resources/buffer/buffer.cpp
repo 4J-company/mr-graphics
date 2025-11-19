@@ -6,28 +6,25 @@
 
 #include "window/render_context.hpp"
 
+void mr::bufcopy(mr::CommandUnit &command_unit, mr::BufferRegion src, mr::BufferRegion dst)
+{
+  ASSERT(src.state == dst.state, "Buffers were created by different VulkanState objects", src, dst);
+  ASSERT(dst.size >= src.size, "This copy would cause an overflow", src, dst);
+  vk::BufferCopy buffer_copy {
+    .srcOffset = src.offset,
+    .dstOffset = dst.offset,
+    .size = src.size
+  };
+  command_unit->copyBuffer(src.buffer, dst.buffer, {buffer_copy});
+}
+
 // constructor
 mr::Buffer::Buffer(const VulkanState &state, size_t byte_size,
                    vk::BufferUsageFlags usage_flags,
                    vk::MemoryPropertyFlags memory_properties)
   : _state(&state)
+  , _usage_flags(usage_flags)
   , _size(byte_size)
-{
-  std::tie(_buffer, _allocation) = create_buffer(state, usage_flags, memory_properties, byte_size);
-}
-
-mr::Buffer::~Buffer() noexcept {
-  if (_buffer != VK_NULL_HANDLE) {
-    ASSERT(_state != nullptr);
-    vmaDestroyBuffer(_state->allocator(), _buffer, _allocation);
-    _buffer = VK_NULL_HANDLE;
-  }
-}
-
-std::pair<vk::Buffer, VmaAllocation> mr::Buffer::create_buffer(const VulkanState &state,
-                                                               vk::BufferUsageFlags usage_flags,
-                                                               vk::MemoryPropertyFlags memory_properties,
-                                                               size_t byte_size)
 {
   vk::BufferCreateInfo buffer_create_info {
     .size = byte_size,
@@ -42,15 +39,12 @@ std::pair<vk::Buffer, VmaAllocation> mr::Buffer::create_buffer(const VulkanState
     allocation_create_info.flags |= VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
   }
 
-  vk::Buffer buffer;
-  VmaAllocation allocation;
-
   auto result = vmaCreateBuffer(
     state.allocator(),
     (VkBufferCreateInfo *)&buffer_create_info,
     &allocation_create_info,
-    (VkBuffer *)&buffer,
-    &allocation,
+    (VkBuffer *)&_buffer,
+    &_allocation,
     nullptr
   );
 
@@ -71,30 +65,16 @@ std::pair<vk::Buffer, VmaAllocation> mr::Buffer::create_buffer(const VulkanState
           budgets[heapIndex].usage / (float)budgets[heapIndex].budget);
     }
 #endif
-    ASSERT(false, "Failed to create vk::Buffer", result);
+    PANIC("Failed to create vk::Buffer", result);
   }
-
-  return {buffer, allocation};
 }
 
-// find memory type
-uint32_t mr::Buffer::find_memory_type(
-    const VulkanState &state,
-    uint32_t filter,
-    vk::MemoryPropertyFlags properties) noexcept
-{
-  vk::PhysicalDeviceMemoryProperties mem_properties =
-    state.phys_device().getMemoryProperties();
-
-  for (uint32_t i = 0; i < mem_properties.memoryTypeCount; i++) {
-    if ((filter & (1 << i)) && (mem_properties.memoryTypes[i].propertyFlags &
-                                properties) == properties) {
-      return i;
-    }
+mr::Buffer::~Buffer() noexcept {
+  if (_buffer != VK_NULL_HANDLE) {
+    ASSERT(_state != nullptr);
+    vmaDestroyBuffer(_state->allocator(), _buffer, _allocation);
+    _buffer = VK_NULL_HANDLE;
   }
-
-  ASSERT(false, "Cannot find memory format");
-  return 0;
 }
 
 std::span<const std::byte> mr::HostBuffer::read() noexcept
@@ -132,8 +112,6 @@ mr::HostBuffer & mr::HostBuffer::write(std::span<const std::byte> src)
 
   return *this;
 }
-
-mr::HostBuffer::~HostBuffer() {}
 
 // ----------------------------------------------------------------------------
 // Data mapper
@@ -175,31 +153,30 @@ void mr::HostBuffer::MappedData::unmap() noexcept
   _data = nullptr;
 }
 
-mr::DeviceBuffer & mr::DeviceBuffer::write(std::span<const std::byte> src, VkDeviceSize offset)
+// ----------------------------------------------------------------------------
+// Device buffer
+// ----------------------------------------------------------------------------
+
+mr::DeviceBuffer & mr::DeviceBuffer::resize(CommandUnit &command_unit, std::size_t new_size) noexcept
+{
+  auto &it = command_unit.resized_from_buffers().emplace_back(*_state, new_size, _usage_flags); // create resized temporary
+  bufcopy(command_unit, {*this}, {it});                                                         // copy current data to resized temporary
+  std::swap(*this, it);                                                                         // reclaim memory of the temporary
+
+  return *this;
+}
+
+mr::DeviceBuffer & mr::DeviceBuffer::write(CommandUnit &command_unit,
+    std::span<const std::byte> src, vk::DeviceSize offset)
 {
   ASSERT(_state != nullptr);
   ASSERT(src.data());
-  ASSERT(offset + src.size() <= _size, "data offset + data size overflow buffer", offset, src.size());
+  ASSERT(offset + src.size() <= _size, "This write would cause buffer overflow", offset, src.size());
 
-  auto buf = HostBuffer(*_state, _size, vk::BufferUsageFlagBits::eTransferSrc);
-  buf.write(src);
+  auto& it = command_unit.staging_buffers().emplace_back(*_state, src.size(), vk::BufferUsageFlagBits::eTransferSrc);
+  it.write(src);
 
-  vk::BufferCopy buffer_copy {
-    .dstOffset = offset,
-    .size = src.size()
-  };
-
-  CommandUnit command_unit(*_state);
-  command_unit.begin();
-  command_unit->copyBuffer(buf.buffer(), _buffer, {buffer_copy});
-  command_unit.end();
-
-  vk::SubmitInfo submit_info  = command_unit.submit_info();
-
-  auto fence = _state->device().createFenceUnique({}).value;
-  _state->queue().submit(submit_info, fence.get());
-  _state->device().waitForFences({fence.get()}, VK_TRUE, UINT64_MAX);
-
+  bufcopy(command_unit, {command_unit.staging_buffers().back()}, {*this, offset});
   return *this;
 }
 
@@ -207,8 +184,8 @@ mr::DeviceBuffer & mr::DeviceBuffer::write(std::span<const std::byte> src, VkDev
 // Uniform buffer
 // ----------------------------------------------------------------------------
 
-mr::UniformBuffer::UniformBuffer(const VulkanState &state, size_t size)
-  : HostBuffer(state, size, vk::BufferUsageFlagBits::eUniformBuffer)
+mr::UniformBuffer::UniformBuffer(const VulkanState &state, size_t size, vk::BufferUsageFlags usage_flags)
+  : HostBuffer(state, size, usage_flags | vk::BufferUsageFlagBits::eUniformBuffer)
 {
 }
 
@@ -216,9 +193,16 @@ mr::UniformBuffer::UniformBuffer(const VulkanState &state, size_t size)
 // Storage buffer
 // ----------------------------------------------------------------------------
 
-mr::StorageBuffer::StorageBuffer(const VulkanState &state, size_t byte_size)
-  : DeviceBuffer(state, byte_size,
-                 vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst)
+mr::StorageBuffer::StorageBuffer(
+    const VulkanState &state,
+    size_t byte_size,
+    vk::BufferUsageFlags usage_flags)
+  : DeviceBuffer(state,
+                 byte_size,
+                 usage_flags
+                   | vk::BufferUsageFlagBits::eStorageBuffer
+                   | vk::BufferUsageFlagBits::eTransferDst
+                 )
 {
 }
 
@@ -227,81 +211,51 @@ mr::StorageBuffer::StorageBuffer(const VulkanState &state, size_t byte_size)
 // ----------------------------------------------------------------------------
 
 mr::VectorBuffer::VectorBuffer(const VulkanState &state,
-                             vk::BufferUsageFlags usage_flags,
-                             VkDeviceSize start_byte_size)
+                               vk::BufferUsageFlags usage_flags,
+                               vk::DeviceSize start_byte_size)
   : DeviceBuffer(state, start_byte_size, usage_flags | vk::BufferUsageFlagBits::eTransferSrc)
-  , _usage_flags(usage_flags)
   , _current_size(0)
 {
 }
 
-VkDeviceSize mr::VectorBuffer::push_data_back(std::span<const std::byte> src) noexcept
+vk::DeviceSize mr::VectorBuffer::append_range(CommandUnit &command_unit, std::span<const std::byte> src) noexcept
 {
-  VkDeviceSize offset = _current_size;
+  vk::DeviceSize offset = _current_size;
   _current_size += src.size();
   if (_current_size > _size) {
-    recreate_buffer(_current_size * 2);
+    DeviceBuffer::resize(command_unit, _current_size * resize_coefficient);
   }
-  write(src, offset);
+  write(command_unit, src, offset);
   return offset;
 }
 
-void mr::VectorBuffer::resize(VkDeviceSize new_size) noexcept
+void mr::VectorBuffer::resize(vk::DeviceSize new_size) noexcept
 {
-  if (new_size > _size) {
-    recreate_buffer(new_size);
+  if (new_size > capacity()) {
+    CommandUnit command_unit {*_state};
+    command_unit.begin();
+    DeviceBuffer::resize(command_unit, new_size);
+    command_unit.end();
+
+    UniqueFenceGuard(_state->device(), command_unit.submit(*_state));
   }
+
   _current_size = new_size;
-}
-
-void mr::VectorBuffer::recreate_buffer(VkDeviceSize new_size) noexcept
-{
-  auto &&[buffer, allocation] = create_buffer(*_state, _usage_flags | vk::BufferUsageFlagBits::eTransferSrc, {}, new_size);
-  vk::BufferCopy buffer_copy {
-    .srcOffset = 0,
-    .dstOffset = 0,
-    .size = _size,
-  };
-  // TODO(dk6): pass RenderContext to buffer and get from it
-  CommandUnit command_unit(*_state);
-  command_unit.begin();
-  command_unit->copyBuffer(_buffer, buffer, {buffer_copy});
-  command_unit.end();
-
-  vk::SubmitInfo submit_info  = command_unit.submit_info();
-
-  auto fence = _state->device().createFenceUnique({}).value;
-  _state->queue().submit(submit_info, fence.get());
-  _state->device().waitForFences({fence.get()}, VK_TRUE, UINT64_MAX);
-
-  vmaDestroyBuffer(_state->allocator(), _buffer, _allocation);
-
-  _size = new_size;
-  _buffer = std::move(buffer);
-  _allocation = std::move(allocation);
 }
 
 // ----------------------------------------------------------------------------
 // Vector vertex buffer
 // ----------------------------------------------------------------------------
 
-mr::VertexVectorBuffer::VertexVectorBuffer(const VulkanState &state, size_t start_byte_size)
-  : VectorBuffer(state,
-                vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
-                start_byte_size)
-{
-}
-
 // ----------------------------------------------------------------------------
 // Allocation block of GPU heap
 // ----------------------------------------------------------------------------
 
-mr::DeviceHeapAllocator::AllocationBlock::AllocationBlock(VkDeviceSize size, VkDeviceSize offset, uint32_t block_number) noexcept
+mr::DeviceHeapAllocator::AllocationBlock::AllocationBlock(
+    vk::DeviceSize size, vk::DeviceSize offset, uint32_t block_number) noexcept
   : _size(size), _offset(offset), _block_number(block_number)
 {
-  VmaVirtualBlockCreateInfo virtual_block_create_info {
-    .size = _size,
-  };
+  VmaVirtualBlockCreateInfo virtual_block_create_info { .size = _size, };
   vmaCreateVirtualBlock(&virtual_block_create_info, &_virtual_block);
 }
 
@@ -323,15 +277,15 @@ mr::DeviceHeapAllocator::AllocationBlock & mr::DeviceHeapAllocator::AllocationBl
   return *this;
 }
 
-std::optional<std::pair<VkDeviceSize, mr::DeviceHeapAllocator::Allocation>>
-mr::DeviceHeapAllocator::AllocationBlock::allocate(VkDeviceSize allocation_size, uint32_t alignment) noexcept
+std::optional<std::pair<vk::DeviceSize, mr::DeviceHeapAllocator::Allocation>>
+mr::DeviceHeapAllocator::AllocationBlock::allocate(vk::DeviceSize allocation_size, uint32_t alignment) noexcept
 {
   Allocation allocation {
     .byte_size = allocation_size,
     .block_number = _block_number,
   };
 
-  VkDeviceSize offset;
+  vk::DeviceSize offset;
   VmaVirtualAllocationCreateInfo alloc_info {
     .size = allocation_size,
     .alignment = alignment,
@@ -361,32 +315,28 @@ void mr::DeviceHeapAllocator::AllocationBlock::deallocate(Allocation &allocation
 // GPU Heap
 // ----------------------------------------------------------------------------
 
-static bool is_pow2(uint32_t n) {
-  return std::bitset<32>(n).count() == 1;
-}
-
-mr::DeviceHeapAllocator::DeviceHeapAllocator(VkDeviceSize start_byte_size, VkDeviceSize alignment)
+mr::DeviceHeapAllocator::DeviceHeapAllocator(vk::DeviceSize start_byte_size, vk::DeviceSize alignment)
   : _size(0)
   , _alignment(alignment)
 {
-  ASSERT(is_pow2(alignment));
+  ASSERT(std::bitset<64>(alignment).count() == 1);
   add_block(start_byte_size);
 }
 
 mr::DeviceHeapAllocator & mr::DeviceHeapAllocator::operator=(DeviceHeapAllocator &&other) noexcept
 {
-  std::swap(_alignment, other._alignment);
+  _alignment = other._alignment;
   _size = other._size.load();
   _allocations = std::move(_allocations);
   _blocks = std::move(_blocks);
   return *this;
 }
 
-mr::DeviceHeapAllocator::AllocationBlock & mr::DeviceHeapAllocator::add_block(VkDeviceSize allocation_size) noexcept
+mr::DeviceHeapAllocator::AllocationBlock & mr::DeviceHeapAllocator::add_block(vk::DeviceSize allocation_size) noexcept
 {
-  VkDeviceSize block_size = allocation_size;
-  VkDeviceSize offset = 0;
-  // TBB vector give us method's thread safety (we use it for correct ittertation over _blocks in 'allocate')
+  vk::DeviceSize block_size = allocation_size;
+  vk::DeviceSize offset = 0;
+  // TBB vector give us method's thread safety (we use it for correct iteration over _blocks in 'allocate')
   // But in this block we use a lot of different vector's methods, and we want to sequential execution of it.
   std::lock_guard lock(_add_block_mutex);
   if (not _blocks.empty()) {
@@ -399,11 +349,11 @@ mr::DeviceHeapAllocator::AllocationBlock & mr::DeviceHeapAllocator::add_block(Vk
   return _blocks.back();
 }
 
-mr::DeviceHeapAllocator::AllocInfo mr::DeviceHeapAllocator::allocate(VkDeviceSize allocation_size) noexcept
+mr::DeviceHeapAllocator::AllocationInfo mr::DeviceHeapAllocator::allocate(vk::DeviceSize allocation_size) noexcept
 {
   ASSERT(allocation_size % _alignment == 0);
 
-  std::pair<VkDeviceSize, Allocation> allocation;
+  std::pair<vk::DeviceSize, Allocation> allocation;
 
   bool allocated = false;
   for (auto &block : _blocks) {
@@ -423,20 +373,25 @@ mr::DeviceHeapAllocator::AllocInfo mr::DeviceHeapAllocator::allocate(VkDeviceSiz
 
   ASSERT(allocation.first % _alignment == 0);
 
-  std::lock_guard lock(_allocations_mutex);
-  _allocations.insert(allocation);
-  return AllocInfo {allocation.first, not allocated};
+  {
+    std::shared_lock lock(_allocations_mutex);
+    _allocations.insert(allocation);
+  }
+
+  return AllocationInfo {allocation.first, not allocated};
 }
 
-void mr::DeviceHeapAllocator::deallocate(VkDeviceSize offset) noexcept
+void mr::DeviceHeapAllocator::deallocate(vk::DeviceSize offset) noexcept
 {
-  std::lock_guard lock(_allocations_mutex);
+  std::unique_lock lock(_allocations_mutex);
+
   auto allocation_it = _allocations.find(offset);
   ASSERT(allocation_it != _allocations.end(),
          "Tried to deallocate non-allocated memory block (probably a double-free)", offset);
   auto &allocation = allocation_it->second;
+
   _blocks[allocation.block_number].deallocate(allocation);
-  _allocations.erase(offset);
+  _allocations.unsafe_extract(allocation_it);
 }
 
 // ----------------------------------------------------------------------------
@@ -445,14 +400,14 @@ void mr::DeviceHeapAllocator::deallocate(VkDeviceSize offset) noexcept
 
 mr::HeapBuffer::HeapBuffer(const VulkanState &state,
                            vk::BufferUsageFlags usage_flags,
-                           VkDeviceSize start_byte_size,
-                           VkDeviceSize alignment)
+                           vk::DeviceSize start_byte_size,
+                           vk::DeviceSize alignment)
   : _buffer(state, usage_flags, start_byte_size)
   , _heap(start_byte_size, alignment)
 {
 }
 
-VkDeviceSize mr::HeapBuffer::allocate(VkDeviceSize size) noexcept
+vk::DeviceSize mr::HeapBuffer::allocate(vk::DeviceSize size) noexcept
 {
   auto alloc = _heap.allocate(size);
   if (alloc.resized) {
@@ -461,40 +416,15 @@ VkDeviceSize mr::HeapBuffer::allocate(VkDeviceSize size) noexcept
   return alloc.offset;
 }
 
-VkDeviceSize mr::HeapBuffer::allocate_and_write(std::span<const std::byte> src) noexcept
+vk::DeviceSize mr::HeapBuffer::allocate_and_write(CommandUnit &command_unit, std::span<const std::byte> src) noexcept
 {
   auto offset = allocate(src.size());
-  write(src, offset);
+  write(command_unit, src, offset);
   return offset;
 }
 
-void mr::HeapBuffer::free(VkDeviceSize offset) noexcept
+void mr::HeapBuffer::free(vk::DeviceSize offset) noexcept
 {
   _heap.deallocate(offset);
 }
-
-// ----------------------------------------------------------------------------
-// Heap vertex buffer
-// ----------------------------------------------------------------------------
-
-mr::VertexHeapBuffer::VertexHeapBuffer(const VulkanState &state, VkDeviceSize start_byte_size, VkDeviceSize alignment)
-  : HeapBuffer(state,
-               vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
-               start_byte_size,
-               alignment)
-{
-}
-
-// ----------------------------------------------------------------------------
-// Heap index buffer
-// ----------------------------------------------------------------------------
-
-mr::IndexHeapBuffer::IndexHeapBuffer(const VulkanState &state, VkDeviceSize start_byte_size, VkDeviceSize alignment)
-  : HeapBuffer(state,
-               vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst,
-               start_byte_size,
-               alignment)
-{
-}
-
 

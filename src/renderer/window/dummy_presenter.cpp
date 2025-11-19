@@ -7,11 +7,18 @@ mr::DummyPresenter::DummyPresenter(const RenderContext &parent, Extent extent) :
 {
   ASSERT(_parent != nullptr);
 
+  CommandUnit command_unit {parent.vulkan_state()};
+
+  command_unit.begin();
   for (uint32_t i = 0; i < images_number; i++) {
     // Same format as for swapchain
     _images.emplace_back(_parent->vulkan_state(), _extent, Swapchain::default_format);
-    _images.back().switch_layout(vk::ImageLayout::eColorAttachmentOptimal);
+    _images.back().switch_layout(command_unit, vk::ImageLayout::eColorAttachmentOptimal);
   }
+  command_unit.end();
+
+  UniqueFenceGuard(parent.vulkan_state().device(),
+      command_unit.submit(parent.vulkan_state()));
 }
 
 vk::RenderingAttachmentInfoKHR mr::DummyPresenter::target_image_info() noexcept

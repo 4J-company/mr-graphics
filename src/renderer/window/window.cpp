@@ -103,7 +103,12 @@ std::optional<vk::RenderingAttachmentInfoKHR> mr::Window::target_image_info_impl
     return std::nullopt;
   }
 
-  _swapchain._images[image_index].switch_layout(vk::ImageLayout::eColorAttachmentOptimal);
+  CommandUnit command_unit {_parent->vulkan_state()};
+  command_unit.begin();
+  _swapchain._images[image_index].switch_layout(command_unit, vk::ImageLayout::eColorAttachmentOptimal);
+  command_unit.end();
+
+  UniqueFenceGuard(_parent->vulkan_state().device(), command_unit.submit(_parent->vulkan_state()));
 
   _current_image_available_semaphore =_image_available_semaphore[prev_image_index].get();
   _current_render_finished_semaphore = _render_finished_semaphore[image_index].get();
@@ -120,7 +125,13 @@ std::optional<vk::RenderingAttachmentInfoKHR> mr::Window::target_image_info_impl
 
 void mr::Window::present() noexcept
 {
-  _swapchain._images[image_index].switch_layout(vk::ImageLayout::ePresentSrcKHR);
+  CommandUnit command_unit {_parent->vulkan_state()};
+  command_unit.begin();
+  _swapchain._images[image_index].switch_layout(command_unit, vk::ImageLayout::ePresentSrcKHR);
+  command_unit.end();
+
+  UniqueFenceGuard(_parent->vulkan_state().device(), command_unit.submit(_parent->vulkan_state()));
+
   std::array sems = {_render_finished_semaphore[image_index].get()};
   vk::PresentInfoKHR present_info {
     .waitSemaphoreCount = sems.size(),
@@ -129,6 +140,7 @@ void mr::Window::present() noexcept
     .pSwapchains = (vk::SwapchainKHR*)&_swapchain._swapchain.swapchain,
     .pImageIndices = &image_index,
   };
+
   auto result = _parent->vulkan_state().queue().presentKHR(present_info);
   if (result == vk::Result::eErrorOutOfDateKHR) {
     _should_update_swapchain = true;

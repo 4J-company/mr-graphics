@@ -49,6 +49,8 @@ inline namespace graphics {
     SmallVector<ModelHandle> _models;
     boost::unordered_map<GraphicsPipelineHandle, MeshesWithSamePipeline> _draws;
 
+    CommandUnit _transfer_command_unit;
+
     StorageBuffer _transforms; // transform matrix    for each instance
     std::vector<mr::Matr4f> _transforms_data;
     uint32_t _transforms_buffer_id;  // id in bindless descriptor set
@@ -62,6 +64,8 @@ inline namespace graphics {
     mutable UniformBuffer _camera_uniform_buffer;
     mr::FPSCamera _camera;
     uint32_t _camera_buffer_id;  // id in bindless descriptor set
+
+    bool _is_buffers_dirty = true;
 
     template <std::derived_from<Light> L>
     constexpr SmallVector<Handle<L>> & lights() noexcept { return std::get<get_light_type<L>()>(_lights); }
@@ -102,6 +106,9 @@ inline namespace graphics {
 
     using OptionalInputStateReference = std::optional<std::reference_wrapper<const InputState>>;
     void update(OptionalInputStateReference input_state = std::nullopt) noexcept;
+
+    bool dirty() const noexcept { return _is_buffers_dirty; }
+    void dirty(bool d) noexcept { _is_buffers_dirty = d; }
 
     uint32_t transforms_buffer_id() const noexcept { return _transforms_buffer_id; }
     uint32_t camera_buffer_id() const noexcept { return _camera_buffer_id; }

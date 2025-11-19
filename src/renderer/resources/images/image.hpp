@@ -67,7 +67,7 @@ inline namespace graphics {
 
     virtual ~Image();
 
-    void switch_layout(vk::ImageLayout new_layout);
+    void switch_layout(CommandUnit &command_unit, vk::ImageLayout new_layout);
 
     // Copy data from to host visible buffer
     HostBuffer read_to_host_buffer(CommandUnit &command_unit) noexcept;
@@ -77,10 +77,10 @@ inline namespace graphics {
     // Vec4f get_pixel(x, y) -> get small size (16 bytes)
 
   public:
-    void write(std::span<const std::byte> src);
+    void write(CommandUnit &command_unit, std::span<const std::byte> src);
 
     template <typename T>
-    void write(std::span<T> src) { write(std::as_bytes(src)); }
+    void write(CommandUnit &command_unit, std::span<T> src) { write(command_unit, std::as_bytes(src)); }
 
   protected:
     void create_image_view();
