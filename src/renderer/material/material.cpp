@@ -97,7 +97,8 @@ mr::MaterialBuilder & mr::MaterialBuilder::add_texture(MaterialParameter param,
   if (tex.get() == nullptr) {
     tex = ResourceManager<Texture>::get().create(name,
       _scene->render_context().vulkan_state(),
-      tex_data.image
+      tex_data.image,
+      tex_data.sampler
     );
   }
 
