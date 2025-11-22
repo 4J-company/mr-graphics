@@ -1,5 +1,5 @@
 struct PointData {
-  vec3 LightPos;
+  vec3 LightDir;
   vec3 LightColor;
 
   vec3 Pos;
@@ -60,7 +60,7 @@ vec3 ShadePBR( PointData point_data,
   vec3 N = normalize(point_data.Norm.xyz);
   // TODO(dk6): don't use cam_uniform_buffer, add camera position to function arguments
   vec3 V = normalize(point_data.Pos - cam_uniform_buffer.pos.xyz);
-  vec3 L = normalize(point_data.LightPos - point_data.Pos);
+  vec3 L = normalize(point_data.LightDir);
   vec3 H = normalize(V + L);
   float NdotL = max(dot(N, L), 0.0);
   float NdotV = max(dot(N, V), 0.0);
@@ -69,9 +69,7 @@ vec3 ShadePBR( PointData point_data,
   vec3 F0 = vec3(0.04);
   F0 = mix(F0, color, metallic);
 
-  float distance = length(point_data.LightPos - point_data.Pos);
-  float attenuation = 1.0 / (distance * distance);
-  vec3 radiance = point_data.LightColor * attenuation;
+  vec3 radiance = point_data.LightColor;
 
   // Cook-Torrance BRDF
   float NDF = DistributionGGX(N, H, roughness);

@@ -16,9 +16,11 @@ mr::Texture::Texture(const VulkanState &state, const std::byte *data, Extent ext
   UniqueFenceGuard(state.device(), command_unit.submit(state));
 }
 
-mr::Texture::Texture(const VulkanState &state, const mr::importer::ImageData &image) noexcept
+mr::Texture::Texture(const VulkanState &state,
+  const mr::importer::ImageData &image,
+  const mr::importer::SamplerData &sampler) noexcept
   : _image (state, image)
-  , _sampler (state, vk::Filter::eLinear, vk::SamplerAddressMode::eRepeat)
+  , _sampler (state, sampler.mag, vk::SamplerAddressMode::eRepeat)
 {
   CommandUnit command_unit {state};
   command_unit.begin();

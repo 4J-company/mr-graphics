@@ -1,4 +1,6 @@
+#ifndef BINDLESS_SET
 #define BINDLESS_SET 0
+#endif
 
 // For texture array
 #extension GL_EXT_nonuniform_qualifier : enable
@@ -62,8 +64,12 @@ vec4 get_occlusion_color(uint mat_id, vec2 tex_coord) {
 
 vec4 get_normal_color(uint mat_id, vec2 tex_coord) {
 #ifdef NORMAL_MAP_BINDING
-  return texture(NormalMapTex(mat_id), tex_coord) * ubo(mat_id).normal_map_intensity;
+  // TODO(dk6): added normal maps. Reference implementation
+  // OutNIsShade = vec4(normalize(mix(DrawNormal, mat3(DrawTangent, DrawBitangent, DrawNormal) *
+  //               (texture(NormalMap, DrawTexCoord).rgb * 2 - vec3(1, 1, 1)), TexFlags1.y)), 1);
+  // return texture(NormalMapTex(mat_id), tex_coord) * ubo(mat_id).normal_map_intensity;
+  return normal;
 #else
-  return vec4(InNorm, 1.0);
+  return normal;
 #endif
 }
