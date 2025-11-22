@@ -11,14 +11,18 @@ mr::Swapchain::Swapchain(const VulkanState &state, vk::SurfaceKHR surface, Exten
     .set_desired_extent(extent.width, extent.height)
     .build();
 
-  if (not swapchain) {
-    MR_ERROR("Cannot create VkSwapchainKHR. {}\n", swapchain.error().message());
-    std::exit(1);
-  }
-  _swapchain = swapchain.value();
+  ASSERT(swapchain,
+    "Cannot create VkSwapchainKHR. Your models likely consumed all the VRAM.\n"
+    "Try out headless rendering or lower number of textures in your model.",
+    swapchain.error().message(),
+    (int)swapchain.full_error().vk_result,
+    extent.width, extent.height
+  );
 
-  std::vector<VkImage> images = swapchain.value().get_images().value();
-  std::vector<VkImageView> image_views = swapchain.value().get_image_views().value();
+  _swapchain = std::move(swapchain.value());
+
+  std::vector<VkImage> images = _swapchain.get_images().value();
+  std::vector<VkImageView> image_views = _swapchain.get_image_views().value();
 
   _images.reserve(images.size());
   for (int i = 0; i < images.size(); i++) {
