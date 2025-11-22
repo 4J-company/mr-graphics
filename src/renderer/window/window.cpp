@@ -46,8 +46,6 @@ vkfw::UniqueWindow mr::Window::_create_window(const Extent &extent) noexcept
     std::exit(1);
   }
 
-  // glfwSetInputMode(window.get(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-
   // TODO(dk6): without move compiler tries to call copy constructor, which is deleted
   return std::move(window);
 }
@@ -165,5 +163,10 @@ void mr::Window::update_state() noexcept
     } else {
       _window->maximize();
     }
+  }
+
+  if (_input_state.key_tapped(vkfw::Key::eM)) {
+    _mouse_enabled = !_mouse_enabled;
+    glfwSetInputMode(_window.get(), GLFW_CURSOR, _mouse_enabled ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
   }
 }

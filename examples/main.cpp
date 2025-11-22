@@ -46,6 +46,9 @@ int main(int argc, const char **argv)
 
   auto scene = render_context->create_scene();
   scene->create_directional_light(mr::Norm3f(1, 1, -1));
+  scene->create_directional_light(mr::Norm3f(-1, 1, -1));
+  scene->create_directional_light(mr::Norm3f(-1, 1, 1));
+  scene->create_directional_light(mr::Norm3f(0.3, 1, 0.3));
   for (const auto &model_path : options.models) {
     scene->create_model(model_path);
   }

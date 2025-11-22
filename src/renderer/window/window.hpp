@@ -24,6 +24,8 @@ inline namespace graphics {
 
     InputState _input_state;
 
+    bool _mouse_enabled = true;
+
     // semaphores for waiting swapchain image is ready before light pass
     InplaceVector<vk::UniqueSemaphore, Swapchain::max_images_number> _image_available_semaphore;
     // semaphores for waiting frame is ready before presentin
