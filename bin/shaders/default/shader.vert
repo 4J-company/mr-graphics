@@ -1,6 +1,13 @@
 /**/
 #version 460 // required for gl_DrawID (https://wikis.khronos.org/opengl/Vertex_Shader/Defined_Inputs)
 
+// For uniforms array
+#extension GL_EXT_nonuniform_qualifier : enable
+
+#ifndef BINDLESS_SET
+#define BINDLESS_SET 0
+#endif
+
 layout(location = 0) in vec3 InPos;
 layout(location = 1) in vec4 InColor;
 layout(location = 2) in vec3 InNorm;
@@ -10,12 +17,8 @@ layout(location = 5) in vec2 InTexCoord;
 
 layout(location = 0) out vec4 position;
 layout(location = 1) out vec4 normal;
-layout(location = 2) out vec4 color;
-layout(location = 3) out vec4 metallic_roughness;
-layout(location = 4) out vec4 emissive;
-layout(location = 5) out vec4 occlusion;
-
-#include "pbr_params.h"
+layout(location = 2) out vec2 texcoord;
+layout(location = 3) out flat uint materialid;
 
 struct DrawInfo {
   uint mesh_offset;
@@ -52,29 +55,15 @@ layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer Tr
 
 void main()
 {
-  // TODO(dk6): move readings from texture to fragment shader, because these readings can be useless if fragment isn't on screen
-  vec2 tex_coord = InTexCoord.xy;
-  uint mat_id = draw.material_buffer_id;
-  vec4 base_color = get_base_color(mat_id, tex_coord);
-  vec4 metallic_roughness_color = get_metallic_roughness_color(mat_id, tex_coord);
-  vec4 emissive_color = get_emissive_color(mat_id, tex_coord);
-  vec4 occlusion_color = get_occlusion_color(mat_id, tex_coord);
-  vec4 normal_color = get_normal_color(mat_id, tex_coord);
+  uint instance_index = draw.instance_offset + gl_InstanceIndex;
 
-  mat4 transform = transpose(transforms[draw.instance_offset + gl_InstanceIndex]);
-  // mat4 transform = transpose(transforms[gl_DrawID + gl_InstanceIndex]);
+  texcoord = InTexCoord;
+  materialid = draw.material_buffer_id;
 
+  mat4 transform = transpose(transforms[instance_index]);
   position = transform * vec4(InPos.xyz, 1.0);
-  color = base_color;
-  metallic_roughness = metallic_roughness_color;
-  emissive = emissive_color;
-  occlusion = occlusion_color;
+  normal = vec4(InNorm, 1);
 
-  // TODO(dk6): added normal maps. You can see this:
-  // OutNIsShade = vec4(normalize(mix(DrawNormal, mat3(DrawTangent, DrawBitangent, DrawNormal) *
-  //               (texture(NormalMap, DrawTexCoord).rgb * 2 - vec3(1, 1, 1)), TexFlags1.y)), 1);
-  normal = vec4(InNorm, 0);
-
-  gl_Position = cam_ubo.vp * transform * vec4(InPos.xyz, 1.0);
+  gl_Position = cam_ubo.vp * position;
   gl_Position = vec4(gl_Position.x, -gl_Position.y, gl_Position.z, gl_Position.w);
 }
