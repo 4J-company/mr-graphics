@@ -9,10 +9,10 @@ layout(location = 5) out vec4 OutColorTrans;
 
 layout(location = 0) in vec4 position;
 layout(location = 1) in vec4 normal;
-layout(location = 2) in vec4 color;
-layout(location = 3) in vec4 metallic_roughness;
-layout(location = 4) in vec4 emissive;
-layout(location = 5) in vec4 occlusion;
+layout(location = 2) in vec2 texcoord;
+layout(location = 3) in flat uint materialid;
+
+#include "pbr_params.h"
 
 void main()
 {
@@ -20,8 +20,9 @@ void main()
 
   OutPos = position;
   OutNIsShade = normal;
-  OutMR = metallic_roughness;
-  OutEmissive = emissive;
-  OutOcclusion = occlusion;
-  OutColorTrans = color;
+
+  OutMR         = get_metallic_roughness_color(materialid, texcoord);
+  OutEmissive   = get_emissive_color(materialid, texcoord);
+  OutOcclusion  = get_occlusion_color(materialid, texcoord);
+  OutColorTrans = get_base_color(materialid, texcoord);
 }
