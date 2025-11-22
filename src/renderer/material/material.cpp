@@ -91,10 +91,15 @@ mr::MaterialBuilder & mr::MaterialBuilder::add_texture(MaterialParameter param,
                                                        math::Color factor)
 {
   ASSERT(tex_data.image.pixels.get() != nullptr, "Image should be valid");
-  mr::TextureHandle tex = ResourceManager<Texture>::get().create(mr::unnamed,
-    _scene->render_context().vulkan_state(),
-    tex_data.image
-  );
+
+  auto name = std::to_string((uint64_t)tex_data.image.pixels.get());
+  mr::TextureHandle tex = ResourceManager<Texture>::get().find(name);
+  if (tex.get() == nullptr) {
+    tex = ResourceManager<Texture>::get().create(name,
+      _scene->render_context().vulkan_state(),
+      tex_data.image
+    );
+  }
 
   ASSERT(enum_cast(param) < enum_cast(MaterialParameter::EnumSize));
   _textures[enum_cast(param)] = std::move(tex);
