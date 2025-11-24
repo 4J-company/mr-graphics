@@ -103,7 +103,8 @@ mr::graphics::Model::Model(
         instance_count,
         mesh_offset,
         instance_offset,
-        mesh.aabb
+        mesh.aabb,
+        std::move(mesh.transforms)
       );
 
       mr::MaterialBuilder builder(scene, "default");
@@ -129,3 +130,16 @@ mr::graphics::Model::Model(
 
   MR_INFO("Loading model {} finished\n", filename.string());
 }
+
+void mr::graphics::Model::transform(const Matr4f &transform) noexcept
+{
+  _transform = transform;
+
+  for (auto &mesh : _meshes) {
+    for (uint32_t instance = 0; instance < mesh._instance_count; instance++) {
+      _scene->_transforms_data[mesh._instance_offset + instance] = mesh._base_transforms[instance] * transform;
+    }
+  }
+  _scene->_is_buffers_dirty = true;
+}
+

@@ -33,6 +33,7 @@ inline namespace graphics {
     uint32_t _instance_offset = 0; // offset to the *per instance* data buffer in the scene
 
     AABBf _bound_box;
+    std::vector<Matr4f> _base_transforms;
 
   public:
     Mesh() = default;
@@ -42,7 +43,8 @@ inline namespace graphics {
          size_t instance_count,
          size_t mesh_offset,
          size_t instance_offset,
-         const AABBf &bound_box) noexcept;
+         const AABBf &bound_box,
+         std::vector<Matr4f> transforms) noexcept;
 
     // move semantics
     Mesh(Mesh &&other) noexcept { *this = std::move(other); }
@@ -55,6 +57,7 @@ inline namespace graphics {
       _mesh_offset = std::move(other._mesh_offset);
       _instance_offset = std::move(other._instance_offset);
       _bound_box = other._bound_box;
+      _base_transforms = std::move(other._base_transforms);
 
       return *this;
     }
