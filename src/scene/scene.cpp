@@ -14,7 +14,6 @@ mr::Scene::Scene(RenderContext &render_context)
 
   _camera.cam() = mr::math::Camera<float>({1}, {-1}, {0, 1, 0});
   _camera.cam().projection() = mr::math::Camera<float>::Projection(45_deg);
-  // _camera.speed(3); // TODO(dk6): change with input
 
   _camera_buffer_id = render_context.bindless_set().register_resource(&_camera_uniform_buffer);
   _transforms_buffer_id = render_context.bindless_set().register_resource(&_transforms);
@@ -135,6 +134,14 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
 
   if (input_state_ref) {
     const auto &input_state = input_state_ref->get();
+
+    float min_speed = 0.05;
+    float max_speed = 5;
+    float speed_delta_coef = 0.05;
+    float new_speed = _camera.speed() + input_state.mouse_scroll() * speed_delta_coef;
+    if (new_speed >= min_speed && new_speed <= max_speed) {
+      _camera.speed(new_speed);
+    }
 
     mr::Vec3f angular_delta {
       input_state.mouse_pos_delta().x() / _parent->extent().width,
