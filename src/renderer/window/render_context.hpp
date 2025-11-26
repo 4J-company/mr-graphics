@@ -46,7 +46,7 @@ inline namespace graphics {
     uint64_t vertexes_number = 0;
     uint64_t triangles_number = 0;
 
-    void write_to_json(std::ofstream &out) const noexcept;
+    void write_to_json(std::ostream &out) const noexcept;
   };
 
   class RenderContext {

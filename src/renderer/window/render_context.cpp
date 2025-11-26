@@ -732,7 +732,7 @@ void mr::RenderContext::calculate_stat(SceneHandle scene,
   _render_stat.vertexes_number = scene->_vertexes_number.load();
 }
 
-void mr::RenderStat::write_to_json(std::ofstream &out) const noexcept
+void mr::RenderStat::write_to_json(std::ostream &out) const noexcept
 {
   double triangles_per_second = triangles_number / (gpu_time_ms / 1000);
   std::println(out, "{{");
