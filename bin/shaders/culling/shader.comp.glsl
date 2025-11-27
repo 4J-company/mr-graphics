@@ -31,16 +31,26 @@ struct IndirectCommand {
 
 struct DrawCommandData {
   IndirectCommand command;
-  vec4 minBB;
-  vec4 maxBB;
+  uint bound_boxes_buffer_id;
+  uint bound_box_index;
   uint transform_first_index;
   MeshDrawInfo mesh_draw_info;
+};
+
+struct BoundBox {
+  vec4 minBB;
+  vec4 maxBB;
 };
 
 layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer DrawCommandsBuffer {
   DrawCommandData[] data;
 } DrawCommands[];
 #define commands DrawCommands[buffers_data.commands_buffer_id].data
+
+layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer BoudBoxesBuffer {
+  BoundBox[] data;
+} BoundBoxes[];
+#define bb(command) BoundBoxes[command.bound_boxes_buffer_id].data[command.bound_box_index]
 
 layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) writeonly buffer DrawsBuffer {
   IndirectCommand[] data;
@@ -93,8 +103,8 @@ bool is_point_visible(vec3 point)
 
 uint frustum_culling(uint command_id)
 {
-  vec3 minBB = commands[command_id].minBB.xyz;
-  vec3 maxBB = commands[command_id].maxBB.xyz;
+  vec3 minBB = bb(commands[command_id]).minBB.xyz;
+  vec3 maxBB = bb(commands[command_id]).maxBB.xyz;
   uint transforms_start = commands[command_id].transform_first_index;
 
   uint visible_instances_number = 0;

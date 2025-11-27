@@ -7,6 +7,7 @@ mr::Scene::Scene(RenderContext &render_context)
   , _camera_uniform_buffer(_parent->vulkan_state(), sizeof(ShaderCameraData))
   , _transfer_command_unit(_parent->vulkan_state())
   , _transforms(_parent->vulkan_state(), max_scene_instances * sizeof(mr::Matr4f))
+  , _bound_boxes(_parent->vulkan_state(), max_scene_instances * sizeof(AABBf))
   , _render_transforms(_parent->vulkan_state(), max_scene_instances * sizeof(mr::Matr4f))
   , _visibility(_parent->vulkan_state(), max_scene_instances * sizeof(uint32_t))
 {
@@ -18,6 +19,7 @@ mr::Scene::Scene(RenderContext &render_context)
   _camera_buffer_id = render_context.bindless_set().register_resource(&_camera_uniform_buffer);
   _transforms_buffer_id = render_context.bindless_set().register_resource(&_transforms);
   _render_transforms_buffer_id = render_context.bindless_set().register_resource(&_render_transforms);
+  _bound_boxes_buffer_id = render_context.bindless_set().register_resource(&_bound_boxes);
 }
 
 mr::Scene::~Scene()
@@ -84,6 +86,9 @@ mr::ModelHandle mr::Scene::create_model(std::fs::path filename) noexcept
     }
 
     draw.meshes.emplace_back(&mesh);
+    // TODO: here can be trouble in multithreading
+    uint32_t bound_box_index = static_cast<uint32_t>(_bound_boxes_data.size());
+    _bound_boxes_data.emplace_back(mesh._bound_box);
     static_assert(sizeof(AABBf::VecT) == 4 * sizeof(float));
     draw.commands_buffer_data.emplace_back(MeshFillDrawCommandInfo {
       .draw_command = vk::DrawIndexedIndirectCommand {
@@ -93,7 +98,8 @@ mr::ModelHandle mr::Scene::create_model(std::fs::path filename) noexcept
         .vertexOffset = static_cast<int32_t>(mesh._vbufs[0].offset / position_bytes_size),
         .firstInstance = 0,
       },
-      .bound_box = mesh._bound_box,
+      .bound_boxes_buffer_id = _bound_boxes_buffer_id,
+      .bound_box_index = bound_box_index,
       .transform_first_index = mesh._instance_offset,
       .render_info = Mesh::RenderInfo {
         .mesh_offset = mesh._mesh_offset,
@@ -103,7 +109,8 @@ mr::ModelHandle mr::Scene::create_model(std::fs::path filename) noexcept
     });
 
     for (uint32_t i = 0; i < mesh._instance_count; i++) {
-      _parent->draw_bound_box(mesh._bound_box, _transforms_buffer_id, mesh._instance_offset + i);
+      _parent->draw_bound_box(_transforms_buffer_id, mesh._instance_offset + i,
+                              _bound_boxes_buffer_id, bound_box_index);
     }
 
     _triangles_number += mesh.element_count() / 3;
@@ -122,7 +129,7 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
   if (_is_buffers_dirty) {
     _transfer_command_unit.begin();
     _transforms.write(_transfer_command_unit, std::span(_transforms_data));
-    // _bounds.write(_transfer_command_unit, std::span(_bounds_data));
+    _bound_boxes.write(_transfer_command_unit, std::span(_bound_boxes_data));
     _visibility.write(_transfer_command_unit, std::span(_visibility_data));
     _transfer_command_unit.end();
 

@@ -184,14 +184,14 @@ void mr::RenderContext::init_bound_box_drawer()
   _bound_boxes_buffer_id = _bindless_set.register_resource(&_bound_boxes_buffer);
 }
 
-void mr::RenderContext::draw_bound_box(const mr::AABBf &bound_box,
-                                       uint32_t transforms_buffer_id,
-                                       uint32_t transform_index) noexcept
+void mr::RenderContext::draw_bound_box(uint32_t transforms_buffer_id, uint32_t transform_index,
+                                       uint32_t bound_boxes_buffer_id, uint32_t bound_box_index) noexcept
 {
   _bound_boxes_data.emplace_back(BoundBoxRenderData {
-    .bound_box = bound_box,
     .transforms_buffer_id = transforms_buffer_id,
     .transform_index = transform_index,
+    .bound_boxes_buffer_id = bound_boxes_buffer_id,
+    .bound_box_index = bound_box_index,
   });
 }
 

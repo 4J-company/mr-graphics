@@ -91,9 +91,10 @@ inline namespace graphics {
     using ClockT = std::chrono::steady_clock;
 
     struct BoundBoxRenderData {
-      mr::AABBf bound_box;
       uint32_t transforms_buffer_id;
       uint32_t transform_index;
+      uint32_t bound_boxes_buffer_id;
+      uint32_t bound_box_index;
     };
 
   private:
@@ -205,7 +206,8 @@ inline namespace graphics {
 
     const DescriptorAllocator & desciptor_allocator() const noexcept { return _default_descriptor_allocator; }
 
-    void draw_bound_box(const mr::AABBf &bound_box, uint32_t transforms_buffer_id, uint32_t transform_index) noexcept;
+    void draw_bound_box(uint32_t transforms_buffer_id, uint32_t transform_index,
+                        uint32_t bound_boxes_buffer_id, uint32_t bound_box_index) noexcept;
 
   private:
     void init_lights_render_data();

@@ -21,7 +21,8 @@ inline namespace graphics {
   private:
     struct MeshFillDrawCommandInfo {
       vk::DrawIndexedIndirectCommand draw_command;
-      mr::AABBf bound_box;
+      uint32_t bound_boxes_buffer_id;
+      uint32_t bound_box_index;
       uint32_t transform_first_index;
       Mesh::RenderInfo render_info;
     };
@@ -73,6 +74,10 @@ inline namespace graphics {
     std::vector<mr::Matr4f> _transforms_data;
     uint32_t _transforms_buffer_id;  // id in bindless descriptor set
     uint32_t _render_transforms_buffer_id;  // id in bindless descriptor set
+
+    StorageBuffer _bound_boxes;
+    uint32_t _bound_boxes_buffer_id;
+    std::vector<AABBf> _bound_boxes_data;
 
     ConditionalBuffer _visibility; // u32 visibility mask for each draw call
     std::vector<uint32_t> _visibility_data;
