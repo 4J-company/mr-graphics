@@ -10,6 +10,7 @@ mr::Scene::Scene(RenderContext &render_context)
   , _bound_boxes(_parent->vulkan_state(), max_scene_instances * sizeof(AABBf))
   , _render_transforms(_parent->vulkan_state(), max_scene_instances * sizeof(mr::Matr4f))
   , _visibility(_parent->vulkan_state(), max_scene_instances * sizeof(uint32_t))
+  , _counters_buffer(_parent->vulkan_state(), max_scene_instances * sizeof(uint32_t))
 {
   ASSERT(_parent != nullptr);
 
@@ -20,6 +21,7 @@ mr::Scene::Scene(RenderContext &render_context)
   _transforms_buffer_id = render_context.bindless_set().register_resource(&_transforms);
   _render_transforms_buffer_id = render_context.bindless_set().register_resource(&_render_transforms);
   _bound_boxes_buffer_id = render_context.bindless_set().register_resource(&_bound_boxes);
+  _counters_buffer_id = render_context.bindless_set().register_resource(&_counters_buffer);
 }
 
 mr::Scene::~Scene()
@@ -60,37 +62,41 @@ mr::ModelHandle mr::Scene::create_model(std::fs::path filename) noexcept
     auto [draw_it, is_new_pipeline] = _draws.insert({material->pipeline(), {}});
     auto &draw = draw_it->second;
     if (is_new_pipeline) {
-      // TODO(dk6): I think max_scene_instances is too big number here
-      draw.commands_buffer = StorageBuffer(_parent->vulkan_state(),
-                                           sizeof(MeshFillDrawCommandInfo) * max_scene_instances,
+      // TODO(dk6): I think max_scene_instances is too big number here. But anyway we must use dynamic buffers
+      draw.instances_data_buffer = StorageBuffer(_parent->vulkan_state(),
+                                                sizeof(MeshInstanceCullingData) * max_scene_instances,
+                                                vk::BufferUsageFlagBits::eStorageBuffer |
+                                                vk::BufferUsageFlagBits::eTransferDst);
+      draw.meshes_data_buffer = StorageBuffer(_parent->vulkan_state(),
+                                           sizeof(MeshCullingData) * max_scene_instances,
                                            vk::BufferUsageFlagBits::eStorageBuffer |
-                                           vk::BufferUsageFlagBits::eIndirectBuffer |
                                            vk::BufferUsageFlagBits::eTransferDst);
-      draw.draws_commands = StorageBuffer(_parent->vulkan_state(),
-                                          sizeof(vk::DrawIndexedIndirectCommand) * max_scene_instances,
-                                          vk::BufferUsageFlagBits::eStorageBuffer |
-                                          vk::BufferUsageFlagBits::eIndirectBuffer);
-      draw.draws_count_buffer = StorageBuffer(_parent->vulkan_state(),
-                                              sizeof(uint32_t),
-                                              vk::BufferUsageFlagBits::eStorageBuffer |
-                                              vk::BufferUsageFlagBits::eIndirectBuffer |
-                                              // for vkCmdFill
-                                              vk::BufferUsageFlagBits::eTransferDst);
+      draw.draw_commands_buffer = StorageBuffer(_parent->vulkan_state(),
+                                                sizeof(vk::DrawIndexedIndirectCommand) * max_scene_instances,
+                                                vk::BufferUsageFlagBits::eStorageBuffer |
+                                                vk::BufferUsageFlagBits::eIndirectBuffer);
 
-      draw.commands_buffer_id = _parent->bindless_set().register_resource(&draw.commands_buffer);
-      draw.draws_commands_buffer_id = _parent->bindless_set().register_resource(&draw.draws_commands);
-      draw.draws_count_buffer_id = _parent->bindless_set().register_resource(&draw.draws_count_buffer);
+      draw.draw_counter_index = _current_counter_index++;
+
+      draw.instances_data_buffer_id = _parent->bindless_set().register_resource(&draw.instances_data_buffer);
+      draw.meshes_data_buffer_id = _parent->bindless_set().register_resource(&draw.meshes_data_buffer);
+      draw.draw_commands_buffer_id = _parent->bindless_set().register_resource(&draw.draw_commands_buffer);
 
       draw.meshes_render_info = StorageBuffer(_parent->vulkan_state(), sizeof(Mesh::RenderInfo) * max_scene_instances);
       draw.meshes_render_info_id = _parent->bindless_set().register_resource(&draw.meshes_render_info);
     }
-
     draw.meshes.emplace_back(&mesh);
+
     // TODO: here can be trouble in multithreading
     uint32_t bound_box_index = static_cast<uint32_t>(_bound_boxes_data.size());
     _bound_boxes_data.emplace_back(mesh._bound_box);
-    static_assert(sizeof(AABBf::VecT) == 4 * sizeof(float));
-    draw.commands_buffer_data.emplace_back(MeshFillDrawCommandInfo {
+    for (uint32_t i = 0; i < mesh._instance_count; i++) {
+      _parent->draw_bound_box(_transforms_buffer_id, mesh._instance_offset + i,
+                              _bound_boxes_buffer_id, bound_box_index);
+    }
+
+    uint32_t mesh_culling_data_index = static_cast<uint32_t>(draw.meshes_data_buffer_data.size());
+    draw.meshes_data_buffer_data.emplace_back(MeshCullingData {
       .draw_command = vk::DrawIndexedIndirectCommand {
         .indexCount = mesh.element_count(),
         .instanceCount = mesh.num_of_instances(),
@@ -98,19 +104,20 @@ mr::ModelHandle mr::Scene::create_model(std::fs::path filename) noexcept
         .vertexOffset = static_cast<int32_t>(mesh._vbufs[0].offset / position_bytes_size),
         .firstInstance = 0,
       },
-      .bound_boxes_buffer_id = _bound_boxes_buffer_id,
-      .bound_box_index = bound_box_index,
-      .transform_first_index = mesh._instance_offset,
       .render_info = Mesh::RenderInfo {
         .mesh_offset = mesh._mesh_offset,
         .instance_offset = mesh._instance_offset,
         .material_ubo_id = material->material_ubo_id(),
       },
+      .instance_counter_index = _current_counter_index++,
+      .bound_box_index = bound_box_index,
     });
 
-    for (uint32_t i = 0; i < mesh._instance_count; i++) {
-      _parent->draw_bound_box(_transforms_buffer_id, mesh._instance_offset + i,
-                              _bound_boxes_buffer_id, bound_box_index);
+    for (uint32_t instance = 0; instance < mesh._instance_count; instance++) {
+      draw.instances_data_buffer_data.emplace_back(MeshInstanceCullingData {
+        .transform_index = mesh._instance_offset + instance,
+        .mesh_culling_data_index = mesh_culling_data_index,
+      });
     }
 
     _triangles_number += mesh.element_count() / 3;

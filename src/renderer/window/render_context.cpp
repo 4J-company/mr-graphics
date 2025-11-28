@@ -155,12 +155,18 @@ void mr::RenderContext::init_culling()
   if (is_render_option_enabled(_render_options, RenderOptions::DisableCulling)) {
     defines.insert({"DISABLE_CULLING", "ON"});
   }
-  _culling_shader = ResourceManager<Shader>::get().create("CullingShader", *_state, "culling", defines);
 
   std::array set_layouts {
     _bindless_set_layout_converted,
   };
-  _culling_pipeline = ComputePipeline(*_state, _culling_shader, set_layouts);
+
+  _instances_culling_shader = ResourceManager<Shader>::get().create("InstancesCullingShader",
+    *_state, "culling/instances_culling", defines);
+  _instances_culling_pipeline = ComputePipeline(*_state, _instances_culling_shader, set_layouts);
+
+  _instances_collect_shader = ResourceManager<Shader>::get().create("InstancesCollectShader",
+    *_state, "culling/instances_collect", defines);
+  _instances_collect_pipeline = ComputePipeline(*_state, _instances_collect_shader, set_layouts);
 }
 
 void mr::RenderContext::init_bound_box_drawer()
@@ -401,16 +407,18 @@ void mr::RenderContext::render_models(const SceneHandle scene)
     _models_command_unit->pushConstants(pipeline->layout(), vk::ShaderStageFlagBits::eAllGraphics,
                                         0, sizeof(model_push_constant), model_push_constant);
 
+    // TODO(dk6): why is it here?
     CommandUnit command_unit {scene->render_context().vulkan_state()};
     command_unit.begin();
-    draw.commands_buffer.write(command_unit, std::span(draw.commands_buffer_data));
+    draw.meshes_data_buffer.write(command_unit, std::span(draw.meshes_data_buffer_data));
+    draw.instances_data_buffer.write(command_unit, std::span(draw.instances_data_buffer_data));
     command_unit.end();
     UniqueFenceGuard(_state->device(), command_unit.submit(*_state));
 
     uint32_t stride = sizeof(vk::DrawIndexedIndirectCommand);
-    uint32_t max_draws_count = static_cast<uint32_t>(draw.commands_buffer_data.size());
-    _models_command_unit->drawIndexedIndirectCount(draw.draws_commands.buffer(), 0,
-                                                   draw.draws_count_buffer.buffer(), 0,
+    uint32_t max_draws_count = static_cast<uint32_t>(draw.meshes_data_buffer_data.size());
+    _models_command_unit->drawIndexedIndirectCount(draw.draw_commands_buffer.buffer(), 0,
+                                                   scene->_counters_buffer.buffer(), draw.draw_counter_index,
                                                    max_draws_count, stride);
   }
 
@@ -427,45 +435,87 @@ void mr::RenderContext::culling_geometry(const SceneHandle scene)
                                        _timestamps_query_pool.get(),
                                        enum_cast(Timestamp::CullingStart));
 
-  // ===== Fill count buffer by zeroes =====
+  // ===== Fill all counters by zeroes =====
+  // TODO(dk6): validate size
+  _models_command_unit->fillBuffer(scene->_counters_buffer.buffer(), 0, scene->_counters_buffer.byte_size(), 0);
+  vk::BufferMemoryBarrier set_count_to_zero_barrier {
+    .dstAccessMask = vk::AccessFlagBits::eShaderRead,
+    .buffer = scene->_counters_buffer.buffer(),
+    .offset = 0,
+    .size = scene->_counters_buffer.byte_size(),
+  };
+  _models_command_unit->pipelineBarrier(
+    vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eComputeShader, {},
+    {}, {set_count_to_zero_barrier}, {});
+
+  // ===== Setup and call culling instances shader =====
+  _models_command_unit->bindPipeline(vk::PipelineBindPoint::eCompute, _instances_culling_pipeline.pipeline());
+
+  std::array culling_descriptor_sets {_bindless_set.set()};
+  _models_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eCompute,
+                                           {_instances_culling_pipeline.layout()},
+                                           bindless_set_number,
+                                           culling_descriptor_sets,
+                                           {});
+  // TODO(dk6): Maybe rework to run compute shaders once per frame
   for (auto &[pipeline, draw] : scene->_draws) {
-    _models_command_unit->fillBuffer(draw.draws_count_buffer.buffer(), 0, draw.draws_count_buffer.byte_size(), 0);
-    vk::BufferMemoryBarrier set_count_to_zero_barrier {
-      .dstAccessMask = vk::AccessFlagBits::eShaderRead,
-      .buffer = draw.draws_count_buffer.buffer(),
-      .offset = 0,
-      .size = draw.draws_count_buffer.byte_size(),
-    };
-    _models_command_unit->pipelineBarrier(
-      vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eComputeShader, {},
-      {}, {set_count_to_zero_barrier}, {});
-  }
-
-  // TODO(dk6): Maybe rework to run compute shader once per frame
-  // ===== Setup and call culling shader =====
-  for (auto &[pipeline, draw] : scene->_draws) {
-    _models_command_unit->bindPipeline(vk::PipelineBindPoint::eCompute, _culling_pipeline.pipeline());
-
-    std::array culling_descriptor_sets {_bindless_set.set()};
-    _models_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eCompute,
-                                             {_culling_pipeline.layout()},
-                                             bindless_set_number,
-                                             culling_descriptor_sets,
-                                             {});
-
     // TODO(dk6): it can be trouble for sync it with GPU
-    uint32_t max_draws_count = static_cast<uint32_t>(draw.commands_buffer_data.size());
+    uint32_t instances_number = static_cast<uint32_t>(draw.instances_data_buffer_data.size());
     uint32_t culling_push_contants[] {
-      draw.commands_buffer_id,
-      draw.draws_commands_buffer_id,
-      draw.draws_count_buffer_id,
-      max_draws_count,
-      scene->camera_buffer_id(),
+      draw.meshes_data_buffer_id,
+      draw.instances_data_buffer_id,
+      instances_number,
+
+      scene->_counters_buffer_id,
+
       scene->_transforms_buffer_id,
       scene->_render_transforms_buffer_id,
-      draw.meshes_render_info_id,
+
+      scene->camera_buffer_id(),
+      scene->_bound_boxes_buffer_id,
     };
-    _models_command_unit->pushConstants(_culling_pipeline.layout(), vk::ShaderStageFlagBits::eCompute,
+    _models_command_unit->pushConstants(_instances_culling_pipeline.layout(), vk::ShaderStageFlagBits::eCompute,
+                                        0, sizeof(culling_push_contants), culling_push_contants);
+
+    _models_command_unit->dispatch((instances_number + culling_work_gpoup_size - 1) / culling_work_gpoup_size, 1, 1);
+
+    vk::BufferMemoryBarrier instances_count_culling_barrier {
+      .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
+      // TODO: !!!!
+      // write are also exists... maybe it is correct to have different buffers for instances counters and draws counters
+      .dstAccessMask = vk::AccessFlagBits::eShaderRead,
+      .buffer = scene->_counters_buffer.buffer(),
+      .offset = 0,
+      .size = scene->_counters_buffer.byte_size(),
+    };
+
+    _models_command_unit->pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
+                                          vk::PipelineStageFlagBits::eComputeShader,
+                                          {}, {}, {instances_count_culling_barrier}, {});
+  }
+
+  // ===== Setup and call instances collect shader =====
+  _models_command_unit->bindPipeline(vk::PipelineBindPoint::eCompute, _instances_collect_pipeline.pipeline());
+
+  _models_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eCompute,
+                                           {_instances_collect_pipeline.layout()},
+                                           bindless_set_number,
+                                           culling_descriptor_sets,
+                                           {});
+
+  for (auto &[pipeline, draw] : scene->_draws) {
+    uint32_t max_draws_count = static_cast<uint32_t>(draw.meshes_data_buffer_data.size());
+    uint32_t culling_push_contants[] {
+      max_draws_count,
+      draw.meshes_data_buffer_id,
+      draw.draw_commands_buffer_id,
+      draw.meshes_render_info_id,
+
+      scene->_counters_buffer_id,
+      draw.draw_counter_index,
+    };
+
+    _models_command_unit->pushConstants(_instances_collect_pipeline.layout(), vk::ShaderStageFlagBits::eCompute,
                                         0, sizeof(culling_push_contants), culling_push_contants);
 
     _models_command_unit->dispatch((max_draws_count + culling_work_gpoup_size - 1) / culling_work_gpoup_size, 1, 1);
@@ -473,23 +523,24 @@ void mr::RenderContext::culling_geometry(const SceneHandle scene)
     vk::BufferMemoryBarrier draws_culling_barrier {
       .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
       .dstAccessMask = vk::AccessFlagBits::eIndirectCommandRead,
-      .buffer = draw.draws_commands.buffer(),
+      .buffer = draw.draw_commands_buffer.buffer(),
       .offset = 0,
-      .size = draw.draws_commands.byte_size(),
+      .size = draw.draw_commands_buffer.byte_size(),
     };
 
     vk::BufferMemoryBarrier draws_count_culling_barrier {
       .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
       .dstAccessMask = vk::AccessFlagBits::eIndirectCommandRead,
-      .buffer = draw.draws_count_buffer.buffer(),
+      .buffer = scene->_counters_buffer.buffer(),
       .offset = 0,
-      .size = draw.draws_count_buffer.byte_size(),
+      .size = scene->_counters_buffer.byte_size(),
     };
 
     _models_command_unit->pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
-                                          vk::PipelineStageFlagBits::eDrawIndirect,
+                                          vk::PipelineStageFlagBits::eComputeShader,
                                           {}, {}, {draws_culling_barrier, draws_count_culling_barrier}, {});
   }
+
   _models_command_unit->writeTimestamp(vk::PipelineStageFlagBits::eComputeShader,
                                        _timestamps_query_pool.get(),
                                        enum_cast(Timestamp::CullingEnd));

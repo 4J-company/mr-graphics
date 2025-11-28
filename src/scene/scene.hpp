@@ -19,29 +19,38 @@ inline namespace graphics {
     friend class Model;
 
   private:
-    struct MeshFillDrawCommandInfo {
+    struct MeshInstanceCullingData {
+      uint32_t transform_index;
+      uint32_t mesh_culling_data_index;
+    };
+
+    struct MeshCullingData {
       vk::DrawIndexedIndirectCommand draw_command;
-      uint32_t bound_boxes_buffer_id;
+      Mesh::RenderInfo render_info; // just for copy
+
+      uint32_t instance_counter_index; // index of visible instances number counter in counters buffer
       uint32_t bound_box_index;
-      uint32_t transform_first_index;
-      Mesh::RenderInfo render_info;
     };
 
     // TODO(dk6): destruct all this stuff in Scene destructor
     struct MeshesWithSamePipeline {
       std::vector<const Mesh *> meshes;
 
-      // TODO(dk6): Make them dynamic sizable VectorBuffer
-      StorageBuffer commands_buffer; // Draw commands for all rendering meshes
-      StorageBuffer draws_commands; // It must have same size as commands_buffer
-      StorageBuffer draws_count_buffer; // 4-byte buffer for int
-      std::vector<MeshFillDrawCommandInfo> commands_buffer_data;
+      // TODO(dk6): Use dynamic sizable VectorBuffer
+      StorageBuffer instances_data_buffer; // Data for each drawed instance
+      StorageBuffer meshes_data_buffer; // Draw commands for all rendering meshes
+      StorageBuffer draw_commands_buffer; // It must have same size as meshes_data_buffer
 
-      uint32_t commands_buffer_id = -1;
-      uint32_t draws_commands_buffer_id = -1;
-      uint32_t draws_count_buffer_id = -1;
+      uint32_t draw_counter_index; // index of draws number counter in counters buffer
 
-      // It must have same elements as in 'commands_buffer'
+      std::vector<MeshInstanceCullingData> instances_data_buffer_data;
+      std::vector<MeshCullingData> meshes_data_buffer_data;
+
+      uint32_t instances_data_buffer_id = -1;
+      uint32_t meshes_data_buffer_id = -1;
+      uint32_t draw_commands_buffer_id = -1;
+
+      // It must have same elements as 'meshes_data_buffer'
       StorageBuffer meshes_render_info; // render data for each mesh
       uint32_t meshes_render_info_id = -1;
     };
@@ -52,6 +61,7 @@ inline namespace graphics {
   private:
     RenderContext *_parent = nullptr;
 
+    // For statistic
     std::atomic_uint64_t _vertexes_number;
     std::atomic_uint64_t _triangles_number;
 
@@ -81,6 +91,11 @@ inline namespace graphics {
 
     ConditionalBuffer _visibility; // u32 visibility mask for each draw call
     std::vector<uint32_t> _visibility_data;
+
+    // TODO: Use VectorBuffer
+    StorageBuffer _counters_buffer; // Buffer for different counters in compute shaders
+    uint32_t _counters_buffer_id = -1;
+    std::atomic_uint32_t _current_counter_index = 0;
 
     mutable UniformBuffer _camera_uniform_buffer;
     mr::FPSCamera _camera;
