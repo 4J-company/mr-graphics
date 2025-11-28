@@ -115,14 +115,6 @@ void main()
   MeshCullingData mesh_data = meshes_datas[instance_data.mesh_culling_data_index];
   uint transforms_start = mesh_data.mesh_draw_info.instance_offset;
 
-// #ifdef DISABLE_CULLING
-// 
-//   if (id == transforms_start) {
-//     intances_count(mesh_data.instance_counter_index) = mesh_data.command.instance_count;
-//   }
-// 
-// #else // DISABLE_CULLING
-
   vec3 minBB = bb(mesh_data).minBB.xyz;
   vec3 maxBB = bb(mesh_data).maxBB.xyz;
   mat4 transfrom = transpose(transforms_in[instance_data.transform_index]);
@@ -146,5 +138,4 @@ void main()
       break;
     }
   }
-// #endif // DISABLE_CULLING
 }

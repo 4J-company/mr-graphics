@@ -449,51 +449,55 @@ void mr::RenderContext::culling_geometry(const SceneHandle scene)
     vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eComputeShader, {},
     {}, {set_count_to_zero_barrier}, {});
 
-  // ===== Setup and call culling instances shader =====
-  _models_command_unit->bindPipeline(vk::PipelineBindPoint::eCompute, _instances_culling_pipeline.pipeline());
 
   std::array culling_descriptor_sets {_bindless_set.set()};
-  _models_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eCompute,
-                                           {_instances_culling_pipeline.layout()},
-                                           bindless_set_number,
-                                           culling_descriptor_sets,
-                                           {});
-  // TODO(dk6): Maybe rework to run compute shaders once per frame
-  for (auto &[pipeline, draw] : scene->_draws) {
-    // TODO(dk6): it can be trouble for sync it with GPU
-    uint32_t instances_number = static_cast<uint32_t>(draw.instances_data_buffer_data.size());
-    uint32_t culling_push_contants[] {
-      draw.meshes_data_buffer_id,
-      draw.instances_data_buffer_id,
-      instances_number,
 
-      scene->_counters_buffer_id,
+  // ===== Setup and call culling instances shader =====
+  if (not is_render_option_enabled(_render_options, RenderOptions::DisableCulling)) {
+    _models_command_unit->bindPipeline(vk::PipelineBindPoint::eCompute, _instances_culling_pipeline.pipeline());
 
-      scene->_transforms_buffer_id,
-      scene->_render_transforms_buffer_id,
+    _models_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eCompute,
+                                             {_instances_culling_pipeline.layout()},
+                                             bindless_set_number,
+                                             culling_descriptor_sets,
+                                             {});
+    // TODO(dk6): Maybe rework to run compute shaders once per frame
+    for (auto &[pipeline, draw] : scene->_draws) {
+      // TODO(dk6): it can be trouble for sync it with GPU
+      uint32_t instances_number = static_cast<uint32_t>(draw.instances_data_buffer_data.size());
+      uint32_t culling_push_contants[] {
+        draw.meshes_data_buffer_id,
+        draw.instances_data_buffer_id,
+        instances_number,
 
-      scene->camera_buffer_id(),
-      scene->_bound_boxes_buffer_id,
-    };
-    _models_command_unit->pushConstants(_instances_culling_pipeline.layout(), vk::ShaderStageFlagBits::eCompute,
-                                        0, sizeof(culling_push_contants), culling_push_contants);
+        scene->_counters_buffer_id,
 
-    _models_command_unit->dispatch((instances_number + culling_work_gpoup_size - 1) / culling_work_gpoup_size, 1, 1);
+        scene->_transforms_buffer_id,
+        scene->_render_transforms_buffer_id,
 
-    vk::BufferMemoryBarrier instances_count_culling_barrier {
-      .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
-      // Write are also exists on next shader...
-      // Maybe it is correct to have different buffers for instances counters and draws counters
-      // But now it works
-      .dstAccessMask = vk::AccessFlagBits::eShaderRead,
-      .buffer = scene->_counters_buffer.buffer(),
-      .offset = 0,
-      .size = scene->_counters_buffer.byte_size(),
-    };
+        scene->camera_buffer_id(),
+        scene->_bound_boxes_buffer_id,
+      };
+      _models_command_unit->pushConstants(_instances_culling_pipeline.layout(), vk::ShaderStageFlagBits::eCompute,
+                                          0, sizeof(culling_push_contants), culling_push_contants);
 
-    _models_command_unit->pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
-                                          vk::PipelineStageFlagBits::eComputeShader,
-                                          {}, {}, {instances_count_culling_barrier}, {});
+      _models_command_unit->dispatch((instances_number + culling_work_gpoup_size - 1) / culling_work_gpoup_size, 1, 1);
+
+      vk::BufferMemoryBarrier instances_count_culling_barrier {
+        .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
+        // Write are also exists on next shader...
+        // Maybe it is correct to have different buffers for instances counters and draws counters
+        // But now it works
+        .dstAccessMask = vk::AccessFlagBits::eShaderRead,
+        .buffer = scene->_counters_buffer.buffer(),
+        .offset = 0,
+        .size = scene->_counters_buffer.byte_size(),
+      };
+
+      _models_command_unit->pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
+                                            vk::PipelineStageFlagBits::eComputeShader,
+                                            {}, {}, {instances_count_culling_barrier}, {});
+    }
   }
 
   // ===== Setup and call instances collect shader =====

@@ -54,7 +54,7 @@ layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) writeonly buffer D
 layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) buffer CountersBuffer {
   uint data[];
 } Counters[];
-#define draws_count(index) Counters[buffers_data.counters_buffer_id].data[index]
+#define draws_count Counters[buffers_data.counters_buffer_id].data[buffers_data.draw_count_index]
 #define instances_count(index) Counters[buffers_data.counters_buffer_id].data[index]
 
 layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) writeonly buffer DrawInfoBuffer {
@@ -88,7 +88,7 @@ void main()
 #else // DISABLE_CULLING
   uint instance_number = instances_count(meshes_data[id].instance_counter_index);
   if (instance_number > 0) {
-    uint draw_id = atomicAdd(draws_count(buffers_data.draw_count_index), 1);
+    uint draw_id = atomicAdd(draws_count, 1);
     fill_command(draw_id, id, instance_number);
   }
 #endif // DISABLE_CULLING
