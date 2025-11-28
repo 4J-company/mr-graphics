@@ -93,7 +93,7 @@ inline namespace graphics {
     struct BoundBoxRenderData {
       uint32_t transforms_buffer_id;
       uint32_t transform_index;
-      uint32_t bound_boxes_buffer_id;
+      uint32_t bound_boxes_buffer_id; // TODO: move to push contants
       uint32_t bound_box_index;
     };
 
@@ -150,8 +150,10 @@ inline namespace graphics {
     VertexVectorBuffer _attributes_vertex_buffer;
     IndexHeapBuffer _index_buffer;
 
-    ShaderHandle _culling_shader;
-    ComputePipeline _culling_pipeline;
+    ShaderHandle _instances_culling_shader;
+    ComputePipeline _instances_culling_pipeline;
+    ShaderHandle _instances_collect_shader;
+    ComputePipeline _instances_collect_pipeline;
 
     ShaderHandle _bound_boxes_draw_shader;
     GraphicsPipeline _bound_boxes_draw_pipeline;
