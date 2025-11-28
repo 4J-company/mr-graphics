@@ -7,6 +7,7 @@ layout(local_size_x = THREADS_NUM, local_size_y = 1, local_size_z = 1) in;
 layout(push_constant) uniform PushContants {
   uint meshes_number;
   uint meshes_data_buffer_id;
+  uint draw_commands_buffer_id;
   uint meshes_render_info_buffer_id;
 
   uint counters_buffer_id;
@@ -43,9 +44,9 @@ struct BoundBox {
 layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer MeshCullingDatasBuffer {
   MeshCullingData[] data;
 } MeshCullingDatas[];
-#define meshes_datas MeshCullingDatas[buffers_data.meshes_data_buffer_id].data
+#define meshes_data MeshCullingDatas[buffers_data.meshes_data_buffer_id].data
 
-layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) writeonly buffer DrawCommands {
+layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) writeonly buffer DrawCommandsBuffer {
   IndirectCommand[] data;
 } DrawCommands[];
 #define draw_commands DrawCommands[buffers_data.draw_commands_buffer_id].data
@@ -61,13 +62,13 @@ layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) writeonly buffer D
 } DrawInfosArray[];
 #define meshes_draw_info DrawInfosArray[buffers_data.meshes_render_info_buffer_id].data
 
-void fill_command(uint draw_id, id, uint instance_number)
+void fill_command(uint draw_id, uint id, uint instance_number)
 {
-  draws[draw_id].index_count = meshes_data[id].command.index_count;
-  draws[draw_id].instance_count = instance_number;
-  draws[draw_id].first_index = meshes_data[id].command.first_index;
-  draws[draw_id].vertex_offset = meshes_data[id].command.vertex_offset;
-  draws[draw_id].first_instance = meshes_data[id].command.first_instance;
+  draw_commands[draw_id].index_count = meshes_data[id].command.index_count;
+  draw_commands[draw_id].instance_count = instance_number;
+  draw_commands[draw_id].first_index = meshes_data[id].command.first_index;
+  draw_commands[draw_id].vertex_offset = meshes_data[id].command.vertex_offset;
+  draw_commands[draw_id].first_instance = meshes_data[id].command.first_instance;
 
   meshes_draw_info[draw_id] = meshes_data[id].mesh_draw_info;
 }

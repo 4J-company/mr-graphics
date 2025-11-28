@@ -10,7 +10,10 @@ mr::Scene::Scene(RenderContext &render_context)
   , _bound_boxes(_parent->vulkan_state(), max_scene_instances * sizeof(AABBf))
   , _render_transforms(_parent->vulkan_state(), max_scene_instances * sizeof(mr::Matr4f))
   , _visibility(_parent->vulkan_state(), max_scene_instances * sizeof(uint32_t))
-  , _counters_buffer(_parent->vulkan_state(), max_scene_instances * sizeof(uint32_t))
+  , _counters_buffer(_parent->vulkan_state(), max_scene_instances * sizeof(uint32_t),
+                     vk::BufferUsageFlagBits::eStorageBuffer |
+                     vk::BufferUsageFlagBits::eIndirectBuffer |
+                     vk::BufferUsageFlagBits::eTransferSrc)
 {
   ASSERT(_parent != nullptr);
 

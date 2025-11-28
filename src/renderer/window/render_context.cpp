@@ -418,7 +418,8 @@ void mr::RenderContext::render_models(const SceneHandle scene)
     uint32_t stride = sizeof(vk::DrawIndexedIndirectCommand);
     uint32_t max_draws_count = static_cast<uint32_t>(draw.meshes_data_buffer_data.size());
     _models_command_unit->drawIndexedIndirectCount(draw.draw_commands_buffer.buffer(), 0,
-                                                   scene->_counters_buffer.buffer(), draw.draw_counter_index,
+                                                   scene->_counters_buffer.buffer(),
+                                                   draw.draw_counter_index * sizeof(uint32_t),
                                                    max_draws_count, stride);
   }
 
@@ -481,8 +482,9 @@ void mr::RenderContext::culling_geometry(const SceneHandle scene)
 
     vk::BufferMemoryBarrier instances_count_culling_barrier {
       .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
-      // TODO: !!!!
-      // write are also exists... maybe it is correct to have different buffers for instances counters and draws counters
+      // Write are also exists on next shader...
+      // Maybe it is correct to have different buffers for instances counters and draws counters
+      // But now it works
       .dstAccessMask = vk::AccessFlagBits::eShaderRead,
       .buffer = scene->_counters_buffer.buffer(),
       .offset = 0,
@@ -537,7 +539,7 @@ void mr::RenderContext::culling_geometry(const SceneHandle scene)
     };
 
     _models_command_unit->pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
-                                          vk::PipelineStageFlagBits::eComputeShader,
+                                          vk::PipelineStageFlagBits::eDrawIndirect,
                                           {}, {}, {draws_culling_barrier, draws_count_culling_barrier}, {});
   }
 
