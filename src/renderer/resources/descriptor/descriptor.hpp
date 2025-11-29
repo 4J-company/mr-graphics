@@ -101,6 +101,9 @@ inline namespace graphics {
   class BindlessDescriptorSet {
     friend class DescriptorAllocator;
 
+  public:
+    static constexpr inline uint32_t invalid_id = -1;
+
   private:
     class ResourcePoolData {
       struct ResourceStat {

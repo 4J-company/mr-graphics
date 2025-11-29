@@ -6,9 +6,10 @@ mr::Scene::Scene(RenderContext &render_context)
   : _parent(&render_context)
   , _camera_uniform_buffer(_parent->vulkan_state(), sizeof(ShaderCameraData))
   , _transfer_command_unit(_parent->vulkan_state())
+  , _transfers_semaphore(_parent->vulkan_state().device().createSemaphoreUnique({}).value)
   , _transforms(_parent->vulkan_state(), max_scene_instances * sizeof(mr::Matr4f))
   , _bound_boxes(_parent->vulkan_state(), max_scene_instances * sizeof(AABBf))
-  , _render_transforms(_parent->vulkan_state(), max_scene_instances * sizeof(mr::Matr4f))
+  , _visible_instances_transforms(_parent->vulkan_state(), max_scene_instances * sizeof(mr::Matr4f))
   , _visibility(_parent->vulkan_state(), max_scene_instances * sizeof(uint32_t))
   , _counters_buffer(_parent->vulkan_state(), max_scene_instances * sizeof(uint32_t),
                      vk::BufferUsageFlagBits::eStorageBuffer |
@@ -22,7 +23,7 @@ mr::Scene::Scene(RenderContext &render_context)
 
   _camera_buffer_id = render_context.bindless_set().register_resource(&_camera_uniform_buffer);
   _transforms_buffer_id = render_context.bindless_set().register_resource(&_transforms);
-  _render_transforms_buffer_id = render_context.bindless_set().register_resource(&_render_transforms);
+  _render_transforms_buffer_id = render_context.bindless_set().register_resource(&_visible_instances_transforms);
   _bound_boxes_buffer_id = render_context.bindless_set().register_resource(&_bound_boxes);
   _counters_buffer_id = render_context.bindless_set().register_resource(&_counters_buffer);
 }
@@ -38,7 +39,9 @@ mr::Scene::~Scene()
   //            method 'notify_render_context_deleted` and use it as destuctor and move Scene in "disabeld" state
   _parent->bindless_set().unregister_resource(&_camera_uniform_buffer);
   _parent->bindless_set().unregister_resource(&_transforms);
-  _parent->bindless_set().unregister_resource(&_render_transforms);
+  _parent->bindless_set().unregister_resource(&_visible_instances_transforms);
+  _parent->bindless_set().unregister_resource(&_counters_buffer);
+  _parent->bindless_set().unregister_resource(&_bound_boxes);
 }
 
 mr::DirectionalLightHandle mr::Scene::create_directional_light(const Norm3f &direction, const Vec3f &color) noexcept
@@ -134,19 +137,31 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
 {
   ASSERT(_parent != nullptr);
 
-  vk::UniqueFence fence {};
-  FenceGuard guard { _parent->vulkan_state().device() };
+  _was_transfer_in_this_frame = false;
   if (_is_buffers_dirty) {
+    if (_transfers_fence) {
+      _parent->vulkan_state().device().waitForFences({_transfers_fence.get()}, vk::True, UINT64_MAX);
+    }
     _transfer_command_unit.begin();
+
     _transforms.write(_transfer_command_unit, std::span(_transforms_data));
     _bound_boxes.write(_transfer_command_unit, std::span(_bound_boxes_data));
     _visibility.write(_transfer_command_unit, std::span(_visibility_data));
+
+    for (auto &[_, draw] : _draws) {
+      draw.meshes_data_buffer.write(_transfer_command_unit, std::span(draw.meshes_data_buffer_data));
+      draw.instances_data_buffer.write(_transfer_command_unit, std::span(draw.instances_data_buffer_data));
+    }
+
     _transfer_command_unit.end();
 
-    fence = _transfer_command_unit.submit(_parent->vulkan_state());
+    _transfer_command_unit.add_signal_semaphore(_transfers_semaphore.get());
+
+    // Don't use fence becase sync is provided by semaphores
+    _transfers_fence = _transfer_command_unit.submit(_parent->vulkan_state());
 
     _is_buffers_dirty = false;
-    guard.fence = fence.get();
+    _was_transfer_in_this_frame = true;
   }
 
   if (input_state_ref) {
@@ -213,6 +228,7 @@ void mr::Scene::update_camera_buffer() noexcept
     .gamma = _camera.gamma(),
     .speed = _camera.speed(),
     .sens = _camera.sensetivity(),
+    .frustum_planes = _camera.frustum_planes(),
   };
 
   _camera_uniform_buffer.write(std::span<mr::ShaderCameraData> {&cam_data, 1});

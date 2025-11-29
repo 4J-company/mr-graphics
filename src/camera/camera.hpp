@@ -12,6 +12,7 @@ inline namespace graphics {
     float gamma;
     float speed;
     float sens;
+    std::array<Vec4f, 6> frustum_planes;
   };
 
   class FPSCamera {
@@ -48,7 +49,26 @@ inline namespace graphics {
     constexpr void fov(mr::Degreesf fov) noexcept { _fov = fov; }
     constexpr void gamma(float gamma) noexcept { _gamma = gamma; }
     constexpr void speed(float speed) noexcept { _speed = speed; }
-    constexpr void sensetivity(float sens) noexcept { _sensetivity = sens; }
+    void sensetivity(float sens) noexcept { _sensetivity = sens; }
+
+    constexpr std::array<mr::Vec4f, 6> frustum_planes() const noexcept
+    {
+      auto vp = viewproj().transposed();
+      // xyz - normal, w - distance
+      std::array<Vec4f, 6> planes {
+        vp[3] + vp[0], // Left plane
+        vp[3] - vp[0], // Right plane
+        vp[3] + vp[1], // Bottom plane
+        vp[3] - vp[1], // Top plane
+        vp[3] + vp[2], // Near plane
+        vp[3] - vp[2], // Far plane
+      };
+      for (auto &plane : planes) {
+        auto norm_len = Vec3f(plane.x(), plane.y(), plane.z()).length();
+        plane /= norm_len;
+      }
+      return planes;
+    }
 
   private:
     mr::math::Camera<float> _cam;

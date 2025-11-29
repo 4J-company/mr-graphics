@@ -8,6 +8,8 @@
 #define BINDLESS_SET 0
 #endif
 
+#include "types.h"
+
 layout(location = 0) in vec3 InPos;
 layout(location = 1) in vec4 InColor;
 layout(location = 2) in vec3 InNorm;
@@ -16,15 +18,9 @@ layout(location = 4) in vec3 InBiTan;
 layout(location = 5) in vec2 InTexCoord;
 
 layout(location = 0) out vec4 position;
-layout(location = 1) out vec4 normal;
+layout(location = 1) out vec3 normal;
 layout(location = 2) out vec2 texcoord;
 layout(location = 3) out flat uint materialid;
-
-struct DrawInfo {
-  uint mesh_offset;
-  uint instance_offset;
-  uint material_buffer_id;
-};
 
 layout(push_constant) uniform DrawsIndosBufferId {
   uint draw_infos_buffer;
@@ -33,7 +29,7 @@ layout(push_constant) uniform DrawsIndosBufferId {
 };
 
 layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer DrawIndoBuffers {
-  DrawInfo draws[];
+  MeshDrawInfo draws[];
 } DrawInfosArray[];
 #define draws DrawInfosArray[draw_infos_buffer].draws
 #define draw draws[gl_DrawID]
@@ -62,7 +58,7 @@ void main()
 
   mat4 transform = transpose(transforms[instance_index]);
   position = transform * vec4(InPos.xyz, 1.0);
-  normal = vec4(InNorm, 1);
+  normal = InNorm;
 
   gl_Position = cam_ubo.vp * position;
   gl_Position = vec4(gl_Position.x, -gl_Position.y, gl_Position.z, gl_Position.w);

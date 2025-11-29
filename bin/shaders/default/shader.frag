@@ -8,7 +8,7 @@ layout(location = 4) out vec4 OutOcclusion;
 layout(location = 5) out vec4 OutColorTrans;
 
 layout(location = 0) in vec4 position;
-layout(location = 1) in vec4 normal;
+layout(location = 1) in vec3 normal;
 layout(location = 2) in vec2 texcoord;
 layout(location = 3) in flat uint materialid;
 
@@ -19,7 +19,7 @@ void main()
   vec4 bckg_color = vec4(0.3, 0.47, 0.8, 1);
 
   OutPos = position;
-  OutNIsShade = normal;
+  OutNIsShade = vec4(normal, 1);
 
   OutMR         = get_metallic_roughness_color(materialid, texcoord);
   OutEmissive   = get_emissive_color(materialid, texcoord);

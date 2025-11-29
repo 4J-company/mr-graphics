@@ -4,6 +4,8 @@
 
 layout(local_size_x = THREADS_NUM, local_size_y = 1, local_size_z = 1) in;
 
+#include "culling/culling.h"
+
 layout(push_constant) uniform PushContants {
   uint meshes_number;
   uint meshes_data_buffer_id;
@@ -13,33 +15,6 @@ layout(push_constant) uniform PushContants {
   uint counters_buffer_id;
   uint draw_count_index;
 } buffers_data;
-
-struct MeshDrawInfo {
-  uint mesh_offset;
-  uint instance_offset;
-  uint material_buffer_id;
-};
-
-struct IndirectCommand {
-  uint index_count;
-  uint instance_count;
-  uint first_index;
-  int  vertex_offset;
-  uint first_instance;
-};
-
-struct MeshCullingData {
-  IndirectCommand command;
-  MeshDrawInfo mesh_draw_info;
-
-  uint instance_counter_index;
-  uint bound_box_index;
-};
-
-struct BoundBox {
-  vec4 minBB;
-  vec4 maxBB;
-};
 
 layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer MeshCullingDatasBuffer {
   MeshCullingData[] data;

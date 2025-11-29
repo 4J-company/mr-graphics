@@ -66,6 +66,9 @@ std::optional<mr::CliOptions> mr::CliOptions::parse(int argc, const char **argv)
     ("bench-name",
      po::value<std::string>(),
      "Name of benchmark")
+    ("bench-models-number",
+     po::value<uint32_t>(),
+     "Number of models to render for benchmarking")
     ("disable-culling",
      po::bool_switch()->default_value(false),
      "Disable culling")
@@ -77,7 +80,10 @@ std::optional<mr::CliOptions> mr::CliOptions::parse(int argc, const char **argv)
      "Enable drawing bound boxes of models for debug")
     ("stat-dir",
      po::value<std::string>()->default_value("render_stats"),
-     "Path to directory in which frame stats will be writed (default: ./render_stat.txt).")
+     "Path to directory in which frame stats will be written (default: render_stats).")
+    ("print-stat",
+     po::bool_switch()->default_value(false),
+     "Print stat in cout")
     ("models",
      po::value<std::vector<std::string>>()->multitoken(),
      "GLTF model files to render (can be specified anywhere in arguments)")
@@ -125,6 +131,7 @@ std::optional<mr::CliOptions> mr::CliOptions::parse(int argc, const char **argv)
   options.enable_vsync = vm["enable-vsync"].as<bool>();
   options.enable_bound_boxes = vm["enable-bound-boxes"].as<bool>();
   options.stat_dir = vm["stat-dir"].as<std::string>();
+  options.print_stat = vm["print-stat"].as<bool>();
 
   auto mode_str = vm["mode"].as<std::string>();
   auto mode_opt = parse_mode(mode_str);
@@ -157,6 +164,10 @@ std::optional<mr::CliOptions> mr::CliOptions::parse(int argc, const char **argv)
 
   if (vm.count("bench-name")) {
     options.bench_name = vm["bench-name"].as<std::string>();
+  }
+
+  if (vm.count("bench-models-number")) {
+    options.bench_models_number = vm["bench-models-number"].as<uint32_t>();
   }
 
   if (vm.count("models")) {

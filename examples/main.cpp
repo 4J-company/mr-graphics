@@ -52,43 +52,8 @@ int main(int argc, const char **argv)
   scene->create_directional_light(mr::Norm3f(-1, 1, 1));
   scene->create_directional_light(mr::Norm3f(0.3, 1, 0.3));
 
-  if (options.bench_name.has_value() && *options.bench_name == "kittens") {
-    auto &kitten_path = options.models.front();
-    uint32_t kittens_number = 1000;
-    float size = 1;
-    for (uint32_t i = 0; i < kittens_number; i++) {
-      auto model = scene->create_model(kitten_path);
-
-      auto rnd = [](float min, float max) -> float {
-        float v = float(rand()) / RAND_MAX; // between 0 and 1
-        // [0, 1] -> [min, max]:
-        return v * (max - min) + min;
-      };
-
-      float max_dist = 20;
-      auto pos = mr::Vec4f(rnd(-max_dist, max_dist), rnd(-max_dist, max_dist), rnd(-max_dist, max_dist), 0);
-      auto scale = rnd(0.1, 5.3);
-      auto scale_vec = mr::Vec4f(scale, scale, scale, 1);
-      auto rot_axis_opt = mr::Vec3f(rnd(-1, 1), rnd(-1, 1), rnd(-1, 1)).normalized();
-      while (not rot_axis_opt) {
-        rot_axis_opt = mr::Vec3f(rnd(-1, 1), rnd(-1, 1), rnd(-1, 1)).normalized();
-      }
-      auto rot_axis = *rot_axis_opt;
-      auto rot_angle = mr::Radiansf(rnd(0, 2 * M_PI));
-
-      auto translate = (mr::Matr4f::identity() * mr::translate(pos)).transposed();
-      auto transform = (translate * mr::scale(scale_vec)) * mr::rotate(rot_axis, rot_angle);
-
-      std::cout << transform << std::endl;
-      std::cout << "\n\n";
-      model->transform(transform);
-
-      size *= 1.5;
-    }
-  } else {
-    for (const auto &model_path : options.models) {
-      scene->create_model(model_path);
-    }
+  for (const auto &model_path : options.models) {
+    scene->create_model(model_path);
   }
 
   if (options.camera.has_value()) {
@@ -97,7 +62,7 @@ int main(int argc, const char **argv)
 
   if (options.mode == mr::CliOptions::Mode::Default) {
     auto window = render_context->create_window({options.width, options.height});
-    app.start_render_loop(*render_context, scene, window);
+    app.start_render_loop(*render_context, scene, window, options.print_stat);
   } else if (options.mode == mr::CliOptions::Mode::Frames) {
     auto file_writer = render_context->create_file_writer({options.width, options.height});
     app.render_frames(*render_context, scene, file_writer,

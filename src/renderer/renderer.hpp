@@ -29,7 +29,7 @@ inline namespace graphics {
       create_render_context(Extent extent, RenderOptions options = RenderOptions::None);
 
       void start_render_loop(RenderContext &render_context, SceneHandle scene,
-                                                            WindowHandle window) const noexcept;
+                             WindowHandle window, bool print_stat = false) const noexcept;
 
       void render_frames(RenderContext &render_context,
                          SceneHandle scene,
