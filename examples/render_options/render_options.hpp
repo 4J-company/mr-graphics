@@ -23,7 +23,9 @@ inline namespace graphics {
     std::fs::path stat_dir;
     std::vector<std::fs::path> models;
     std::optional<std::string> bench_name;
+    std::optional<uint32_t> bench_models_number;
     bool enable_bound_boxes;
+    bool print_stat;
 
     static std::optional<CliOptions> parse(int argc, const char **argv);
 

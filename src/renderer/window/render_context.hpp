@@ -35,7 +35,6 @@ inline namespace graphics {
     double gpu_time_ms = 0;
     double gpu_fps = 0;
 
-    double culling_cpu_time_ms = 0;
     double render_cpu_time_ms = 0;
     double models_cpu_time_ms = 0;
     double shading_cpu_time_ms = 0;
@@ -73,7 +72,7 @@ inline namespace graphics {
     constexpr static inline uint32_t default_vertex_number = 10'000'000;
     constexpr static inline uint32_t default_index_number = default_vertex_number * 2;
 
-    constexpr static inline uint32_t culling_work_gpoup_size = 32;
+    constexpr static inline uint32_t culling_work_group_size = 32;
 
   private:
     // Timestamps
@@ -142,7 +141,7 @@ inline namespace graphics {
     // Bindless rednering data
     DescriptorAllocator _default_descriptor_allocator;
     BindlessDescriptorSetLayoutHandle _bindless_set_layout;
-    DescriptorSetLayoutHandle _bindless_set_layout_converted;
+    DescriptorSetLayoutHandle _converted_bindless_set_layout;
     BindlessDescriptorSet _bindless_set;
 
     DeviceHeapAllocator _vertex_buffers_heap;
@@ -150,16 +149,20 @@ inline namespace graphics {
     VertexVectorBuffer _attributes_vertex_buffer;
     IndexHeapBuffer _index_buffer;
 
+    CommandUnit _culling_command_unit;
+    vk::UniqueSemaphore _culling_semaphore;
     ShaderHandle _instances_culling_shader;
     ComputePipeline _instances_culling_pipeline;
     ShaderHandle _instances_collect_shader;
     ComputePipeline _instances_collect_pipeline;
 
+    // TODO(dk6): rework it to MarkerSystem
     ShaderHandle _bound_boxes_draw_shader;
     GraphicsPipeline _bound_boxes_draw_pipeline;
     StorageBuffer _bound_boxes_buffer;
     uint32_t _bound_boxes_buffer_id = -1;
     std::vector<BoundBoxRenderData> _bound_boxes_data;
+    std::atomic_bool _bound_boxes_data_dirty = false;
     std::atomic_bool _bound_boxes_draw_enabled = false;
 
   public:
@@ -216,7 +219,7 @@ inline namespace graphics {
     void init_bindless_rendering();
     void init_profiling();
     void init_culling();
-    void init_bound_box_drawer();
+    void init_bound_box_rendering();
 
     void render_geometry(const SceneHandle scene);
     void culling_geometry(const SceneHandle scene);
@@ -224,6 +227,7 @@ inline namespace graphics {
     void render_models(const SceneHandle scene);
     void render_lights(const SceneHandle scene, Presenter &presenter);
 
+    void update_bound_boxes_data();
     void update_camera_buffer(UniformBuffer &uniform_buffer);
 
     void calculate_stat(SceneHandle scene,

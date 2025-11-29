@@ -62,7 +62,7 @@ vec4 get_occlusion_color(uint mat_id, vec2 tex_coord) {
 #endif
 }
 
-vec4 get_normal_color(uint mat_id, vec2 tex_coord) {
+vec3 get_normal_color(uint mat_id, vec2 tex_coord) {
 #ifdef NORMAL_MAP_BINDING
   // TODO(dk6): added normal maps. Reference implementation
   // OutNIsShade = vec4(normalize(mix(DrawNormal, mat3(DrawTangent, DrawBitangent, DrawNormal) *

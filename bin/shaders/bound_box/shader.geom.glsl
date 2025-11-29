@@ -1,6 +1,8 @@
 #version 460
 #extension GL_EXT_nonuniform_qualifier : enable
 
+#include "bounds.h"
+
 layout (points) in;
 layout (line_strip, max_vertices = 24) out;
 
@@ -17,11 +19,6 @@ struct DrawData {
   uint transform_index;
   uint bound_boxes_buffer_id;
   uint bound_box_index;
-};
-
-struct BoundBox {
-  vec4 minBB;
-  vec4 maxBB;
 };
 
 layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer DrawCommandsBuffer {
@@ -53,14 +50,14 @@ void main()
 {
   // bounding box vertexes
   vec3 v[8];
-  v[0] = vec3(bb.minBB.x, bb.minBB.y, bb.minBB.z);
-  v[1] = vec3(bb.maxBB.x, bb.minBB.y, bb.minBB.z);
-  v[2] = vec3(bb.maxBB.x, bb.maxBB.y, bb.minBB.z);
-  v[3] = vec3(bb.minBB.x, bb.maxBB.y, bb.minBB.z);
-  v[4] = vec3(bb.minBB.x, bb.minBB.y, bb.maxBB.z);
-  v[5] = vec3(bb.maxBB.x, bb.minBB.y, bb.maxBB.z);
-  v[6] = vec3(bb.maxBB.x, bb.maxBB.y, bb.maxBB.z);
-  v[7] = vec3(bb.minBB.x, bb.maxBB.y, bb.maxBB.z);
+  v[0] = vec3(bb.min.x, bb.min.y, bb.min.z);
+  v[1] = vec3(bb.max.x, bb.min.y, bb.min.z);
+  v[2] = vec3(bb.max.x, bb.max.y, bb.min.z);
+  v[3] = vec3(bb.min.x, bb.max.y, bb.min.z);
+  v[4] = vec3(bb.min.x, bb.min.y, bb.max.z);
+  v[5] = vec3(bb.max.x, bb.min.y, bb.max.z);
+  v[6] = vec3(bb.max.x, bb.max.y, bb.max.z);
+  v[7] = vec3(bb.min.x, bb.max.y, bb.max.z);
 
   mat4 mvp = cam_ubo.vp * transpose(transform);
 

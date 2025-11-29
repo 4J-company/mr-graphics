@@ -131,7 +131,7 @@ mr::graphics::Model::Model(
   MR_INFO("Loading model {} finished\n", filename.string());
 }
 
-void mr::graphics::Model::transform(const Matr4f &transform) noexcept
+void mr::graphics::Model::transform(Matr4f transform) noexcept
 {
   _transform = transform;
 

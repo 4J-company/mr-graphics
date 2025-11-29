@@ -46,14 +46,13 @@ inline namespace graphics {
       std::vector<MeshInstanceCullingData> instances_data_buffer_data;
       std::vector<MeshCullingData> meshes_data_buffer_data;
 
-      uint32_t instances_data_buffer_id = -1;
-      uint32_t meshes_data_buffer_id = -1;
-      uint32_t draw_commands_buffer_id = -1;
+      uint32_t instances_data_buffer_id = BindlessDescriptorSet::invalid_id;
+      uint32_t meshes_data_buffer_id = BindlessDescriptorSet::invalid_id;
+      uint32_t draw_commands_buffer_id = BindlessDescriptorSet::invalid_id;
 
       // It must have same elements as 'meshes_data_buffer'
       StorageBuffer meshes_render_info; // render data for each mesh
-      std::vector<Mesh::RenderInfo> meshes_render_info_data;
-      uint32_t meshes_render_info_id = static_cast<uint32_t>(-1);
+      uint32_t meshes_render_info_id = BindlessDescriptorSet::invalid_id;
     };
 
   private:
@@ -76,31 +75,36 @@ inline namespace graphics {
     boost::unordered_map<GraphicsPipelineHandle, MeshesWithSamePipeline> _draws;
 
     CommandUnit _transfer_command_unit;
+    vk::UniqueSemaphore _transfers_semaphore;
+    vk::UniqueFence _transfers_fence;
+    bool _was_transfer_in_this_frame = false;
 
     std::atomic_uint32_t _mesh_offset = 0;
 
     StorageBuffer _transforms; // transform matrix for each instance
     // Must be same size as _transforms
-    StorageBuffer _render_transforms; // transform matrix for each visible instance
+    StorageBuffer _visible_instances_transforms; // transform matrix for each visible instance
     std::vector<mr::Matr4f> _transforms_data;
-    uint32_t _transforms_buffer_id;  // id in bindless descriptor set
-    uint32_t _render_transforms_buffer_id;  // id in bindless descriptor set
+    uint32_t _transforms_buffer_id = BindlessDescriptorSet::invalid_id;  // id in bindless descriptor set
+    uint32_t _render_transforms_buffer_id = BindlessDescriptorSet::invalid_id;  // id in bindless descriptor set
 
     StorageBuffer _bound_boxes;
-    uint32_t _bound_boxes_buffer_id;
+    uint32_t _bound_boxes_buffer_id = BindlessDescriptorSet::invalid_id;
     std::vector<AABBf> _bound_boxes_data;
 
     ConditionalBuffer _visibility; // u32 visibility mask for each draw call
     std::vector<uint32_t> _visibility_data;
 
+    // Now all counters are collected in one buffer - it simplifies zeroing and syncronization
+    // Note: here can be trouble with false sharing, but we don't know, is it actual for GPU atomics
     // TODO: Use VectorBuffer
     StorageBuffer _counters_buffer; // Buffer for different counters in compute shaders
-    uint32_t _counters_buffer_id = -1;
+    uint32_t _counters_buffer_id = BindlessDescriptorSet::invalid_id;
     std::atomic_uint32_t _current_counter_index = 0;
 
     mutable UniformBuffer _camera_uniform_buffer;
     mr::FPSCamera _camera;
-    uint32_t _camera_buffer_id;  // id in bindless descriptor set
+    uint32_t _camera_buffer_id = BindlessDescriptorSet::invalid_id;  // id in bindless descriptor set
 
     bool _is_buffers_dirty = true;
 
