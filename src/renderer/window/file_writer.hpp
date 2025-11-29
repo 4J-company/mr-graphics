@@ -2,6 +2,7 @@
 #define __MR_FILE_WRITER_HPP_
 
 #include "pch.hpp"
+#include "resources/command_unit/command_unit.hpp"
 #include "swapchain.hpp"
 #include "input_state.hpp"
 #include "resources/images/image.hpp"
@@ -25,6 +26,8 @@ inline namespace graphics {
     beman::inplace_vector<ImageAvailableSemaphoreT, images_number> _image_available_semaphore;
     // semaphores for waiting frame is ready before presentin
     beman::inplace_vector<vk::UniqueSemaphore, images_number> _render_finished_semaphore;
+
+    CommandUnit _images_command_unit;
 
     std::string _frame_filename = "frame";
 

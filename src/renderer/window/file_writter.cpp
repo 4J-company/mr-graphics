@@ -1,3 +1,4 @@
+#include <print>
 #include "file_writer.hpp"
 #include "render_context.hpp"
 #include "swapchain.hpp"
@@ -7,7 +8,9 @@
 #include <stb_image_write.h>
 #undef STB_IMAGE_WRITE_IMPLEMENTATION
 
-mr::FileWriter::FileWriter(const RenderContext &parent, Extent extent) : Presenter(parent, extent)
+mr::FileWriter::FileWriter(const RenderContext &parent, Extent extent)
+  : Presenter(parent, extent)
+  , _images_command_unit(parent.vulkan_state())
 {
   ASSERT(_parent != nullptr);
 
@@ -28,12 +31,11 @@ vk::RenderingAttachmentInfoKHR mr::FileWriter::target_image_info() noexcept
   _image_index = (_image_index + 1) % images_number;
 
   auto &image = _images[_image_index];
-  CommandUnit command_unit {_parent->vulkan_state()};
-  command_unit.begin();
-  image.switch_layout(command_unit, vk::ImageLayout::eColorAttachmentOptimal);
-  command_unit.end();
+  _images_command_unit.begin();
+  image.switch_layout(_images_command_unit, vk::ImageLayout::eColorAttachmentOptimal);
+  _images_command_unit.end();
 
-  UniqueFenceGuard(_parent->vulkan_state().device(), command_unit.submit(_parent->vulkan_state()));
+  UniqueFenceGuard(_parent->vulkan_state().device(), _images_command_unit.submit(_parent->vulkan_state()));
 
   auto &[sem, first_usage] = _image_available_semaphore[_image_index];
   _current_image_available_semaphore = first_usage ? VK_NULL_HANDLE : sem.get();
@@ -52,16 +54,16 @@ void mr::FileWriter::present() noexcept
   auto &image = _images[_image_index];
   const auto &state = _parent->vulkan_state();
 
-  auto &command_unit = _parent->transfer_command_unit();
-  command_unit.begin();
+  _images_command_unit.begin();
 
-  command_unit.add_signal_semaphore(_image_available_semaphore[_image_index].first.get());
-  command_unit.add_wait_semaphore(_render_finished_semaphore[_image_index].get(),
-                                  vk::PipelineStageFlagBits::eColorAttachmentOutput);
+  _images_command_unit.add_signal_semaphore(_image_available_semaphore[_image_index].first.get());
+  _images_command_unit.add_wait_semaphore(_render_finished_semaphore[_image_index].get(),
+                                          vk::PipelineStageFlagBits::eColorAttachmentOutput);
 
-  auto stage_buffer = image.read_to_host_buffer(command_unit);
+  auto stage_buffer = image.read_to_host_buffer(_images_command_unit);
 
-  UniqueFenceGuard(_parent->vulkan_state().device(), command_unit.submit(_parent->vulkan_state()));
+  _images_command_unit.end();
+  UniqueFenceGuard(_parent->vulkan_state().device(), _images_command_unit.submit(_parent->vulkan_state()));
 
   auto data = stage_buffer.copy();
   ASSERT(data.size() % 4 == 0);
