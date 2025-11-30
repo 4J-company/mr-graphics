@@ -46,8 +46,8 @@ struct MeshCullingData {
 };
 
 struct BoundBox {
-  vec4 minBB;
-  vec4 maxBB;
+  vec4 min;
+  vec4 max;
 };
 
 layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer MeshInstanceCullingDatasBuffer {
@@ -63,7 +63,7 @@ layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer Me
 layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer BoudBoxesBuffer {
   BoundBox[] data;
 } BoundBoxes[];
-#define bb(mesh_data) BoundBoxes[buffers_data.bound_boxes_buffer_id].data[mesh_data.bound_box_index]
+#define bound_box(mesh_data) BoundBoxes[buffers_data.bound_boxes_buffer_id].data[mesh_data.bound_box_index]
 
 layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) buffer CountersBuffer {
   uint data[];
@@ -77,6 +77,7 @@ layout(set = BINDLESS_SET, binding = UNIFORM_BUFFERS_BINDING) readonly uniform C
   float gamma;
   float speed;
   float sens;
+  vec4 frustum_planes[6];
 } CameraBufferArray[];
 #define camera_buffer CameraBufferArray[buffers_data.camera_buffer_id]
 
@@ -91,17 +92,27 @@ layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) writeonly buffer T
 } TransformsOutArray[];
 #define transforms_out TransformsOutArray[buffers_data.transforms_out_buffer_id].transforms
 
-bool is_point_visible(vec3 point)
+BoundBox apply_transform(BoundBox bb, mat4 transform)
 {
-  vec4 projected = camera_buffer.vp * vec4(point, 1);
-  if (projected.w <= 0.0) {
-    return false;
+  vec3 corners[8];
+
+  corners[0] = (transform * vec4(bb.min.x, bb.min.y, bb.min.z, 1)).xyz;
+  corners[1] = (transform * vec4(bb.max.x, bb.min.y, bb.min.z, 1)).xyz;
+  corners[2] = (transform * vec4(bb.max.x, bb.max.y, bb.min.z, 1)).xyz;
+  corners[3] = (transform * vec4(bb.min.x, bb.max.y, bb.min.z, 1)).xyz;
+  corners[4] = (transform * vec4(bb.min.x, bb.min.y, bb.max.z, 1)).xyz;
+  corners[5] = (transform * vec4(bb.max.x, bb.min.y, bb.max.z, 1)).xyz;
+  corners[6] = (transform * vec4(bb.max.x, bb.max.y, bb.max.z, 1)).xyz;
+  corners[7] = (transform * vec4(bb.min.x, bb.max.y, bb.max.z, 1)).xyz;
+
+  BoundBox res;
+  res.min = vec4(corners[0], 0);
+  res.max = vec4(corners[0], 0);
+  for (uint i = 1; i < 8; i++) {
+    res.min = vec4(max(res.min.xyz, corners[i]), 0);
+    res.max = vec4(max(res.max.xyz, corners[i]), 0);
   }
-  vec3 v = projected.xyz / projected.w;
-  return
-    v.x >= -1 && v.x <= 1 &&
-    v.y >= -1 && v.y <= 1 &&
-    v.z >= -1 && v.z <= 1; // TODO: maybe not correct formula for z
+  return res;
 }
 
 void main()
@@ -115,27 +126,39 @@ void main()
   MeshCullingData mesh_data = meshes_datas[instance_data.mesh_culling_data_index];
   uint transforms_start = mesh_data.mesh_draw_info.instance_offset;
 
-  vec3 minBB = bb(mesh_data).minBB.xyz;
-  vec3 maxBB = bb(mesh_data).maxBB.xyz;
   mat4 transfrom = transpose(transforms_in[instance_data.transform_index]);
+  BoundBox bb = apply_transform(bound_box(mesh_data), transfrom);
 
-  vec3 v[8];
-  v[0] = (transfrom * vec4(minBB.x, minBB.y, minBB.z, 1)).xyz;
-  v[1] = (transfrom * vec4(maxBB.x, minBB.y, minBB.z, 1)).xyz;
-  v[2] = (transfrom * vec4(maxBB.x, maxBB.y, minBB.z, 1)).xyz;
-  v[3] = (transfrom * vec4(minBB.x, maxBB.y, minBB.z, 1)).xyz;
-  v[4] = (transfrom * vec4(minBB.x, minBB.y, maxBB.z, 1)).xyz;
-  v[5] = (transfrom * vec4(maxBB.x, minBB.y, maxBB.z, 1)).xyz;
-  v[6] = (transfrom * vec4(maxBB.x, maxBB.y, maxBB.z, 1)).xyz;
-  v[7] = (transfrom * vec4(minBB.x, maxBB.y, maxBB.z, 1)).xyz;
+  for (int i = 0; i < 6; i++) {
+    vec4 plane = camera_buffer.frustum_planes[i];
+    vec3 positive = bb.min.xyz;
+    vec3 negative = bb.max.xyz;
+   
+    if (plane.x >= 0) {
+      positive.x = bb.max.x;
+      negative.x = bb.min.x;
+    }
+    if (plane.y >= 0) {
+      positive.y = bb.max.y;
+      negative.y = bb.min.y;
+    }
+    if (plane.z >= 0) {
+      positive.z = bb.max.z;
+      negative.z = bb.min.z;
+    }
 
-  for (int i = 0; i < 8; i++) {
-    if (is_point_visible(v[i])) {
-      // TODO(dk6): Use instead mvp here. Not, what at mesh vertex shader we also need
-      //            clear transform matrix too for calculation corect real world position for shading
-      uint instance_number = atomicAdd(intances_count(mesh_data.instance_counter_index), 1);
-      transforms_out[transforms_start + instance_number] = transforms_in[instance_data.transform_index];
-      break;
+    if (dot(plane.xyz, negative) + plane.w > 0) {
+      // If the nearest point is outside the plane,
+      //   the box is completely outside or intersects
+      continue;
+    }
+
+    if (dot(plane.xyz, positive) + plane.w < 0) {
+      // If the far point is beyond the plane, the box is completely outside
+      return;
     }
   }
+
+  uint instance_number = atomicAdd(intances_count(mesh_data.instance_counter_index), 1);
+  transforms_out[transforms_start + instance_number] = transforms_in[instance_data.transform_index];
 }

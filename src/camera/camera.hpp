@@ -12,6 +12,7 @@ inline namespace graphics {
     float gamma;
     float speed;
     float sens;
+    std::array<Vec4f, 6> frustum_planes;
   };
 
   class FPSCamera {
@@ -49,6 +50,8 @@ inline namespace graphics {
     constexpr void gamma(float gamma) noexcept { _gamma = gamma; }
     constexpr void speed(float speed) noexcept { _speed = speed; }
     constexpr void sensetivity(float sens) noexcept { _sensetivity = sens; }
+
+    std::array<Vec4f, 6> frustum_planes() const noexcept;
 
   private:
     mr::math::Camera<float> _cam;

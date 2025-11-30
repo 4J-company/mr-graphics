@@ -213,7 +213,13 @@ void mr::Scene::update_camera_buffer() noexcept
     .gamma = _camera.gamma(),
     .speed = _camera.speed(),
     .sens = _camera.sensetivity(),
+    .frustum_planes = _camera.frustum_planes(),
   };
 
+  for (auto &plane : _camera.frustum_planes()) {
+    std::cout << plane << std::endl;
+  }
+
+  // TODO(dk6): why it not passed command unit?
   _camera_uniform_buffer.write(std::span<mr::ShaderCameraData> {&cam_data, 1});
 }
