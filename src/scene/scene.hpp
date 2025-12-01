@@ -82,7 +82,7 @@ inline namespace graphics {
 
     StorageBuffer _transforms; // transform matrix for each instance
     // Must be same size as _transforms
-    StorageBuffer _render_transforms; // transform matrix for each visible instance
+    StorageBuffer _visible_instances_transforms; // transform matrix for each visible instance
     std::vector<mr::Matr4f> _transforms_data;
     uint32_t _transforms_buffer_id = BindlessDescriptorSet::invalid_id;  // id in bindless descriptor set
     uint32_t _render_transforms_buffer_id = BindlessDescriptorSet::invalid_id;  // id in bindless descriptor set

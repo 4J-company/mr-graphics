@@ -94,7 +94,7 @@ void mr::RenderContext::init_lights_render_data() {
 
     std::array set_layouts {
       _lights_render_data.lights_set_layout,
-      _bindless_set_layout_converted,
+      _converted_bindless_set_layout,
     };
 
     // TODO(dk6): here move instead inplace contruct, because without move this doesn't compile
@@ -120,7 +120,7 @@ void mr::RenderContext::init_bindless_rendering()
   ASSERT(set.has_value(), "Failed to allocate bindless descriptor set");
   _bindless_set = std::move(set.value());
 
-  _bindless_set_layout_converted = DescriptorSetLayoutHandle(_bindless_set_layout);
+  _converted_bindless_set_layout = DescriptorSetLayoutHandle(_bindless_set_layout);
 }
 
 void mr::RenderContext::init_profiling()
@@ -161,7 +161,7 @@ void mr::RenderContext::init_culling()
   }
 
   std::array set_layouts {
-    _bindless_set_layout_converted,
+    _converted_bindless_set_layout,
   };
 
   _instances_culling_shader = ResourceManager<Shader>::get().create("InstancesCullingShader",
@@ -184,7 +184,7 @@ void mr::RenderContext::init_bound_box_drawer()
   _bound_boxes_draw_shader = ResourceManager<Shader>::get().create("BoundBoxShader", *_state, "bound_box", defines);
 
   std::array set_layouts {
-    _bindless_set_layout_converted,
+    _converted_bindless_set_layout,
   };
   _bound_boxes_draw_pipeline =
     GraphicsPipeline(*this, GraphicsPipeline::Subpass::OpaqueGeometry, _bound_boxes_draw_shader, {}, set_layouts);
@@ -460,7 +460,6 @@ void mr::RenderContext::culling_geometry(const SceneHandle scene)
                                              {});
     // TODO(dk6): Maybe rework to run compute shaders once per frame
     for (auto &[pipeline, draw] : scene->_draws) {
-      // TODO(dk6): it can be trouble for sync it with GPU
       uint32_t instances_number = static_cast<uint32_t>(draw.instances_data_buffer_data.size());
       uint32_t culling_push_contants[] {
         draw.meshes_data_buffer_id,
@@ -594,7 +593,6 @@ void mr::RenderContext::render_geometry(const SceneHandle scene)
     _pre_model_layout_transition_command_unit.add_signal_semaphore(
         _pre_model_layout_transition_semaphore.get());
 
-    // TODO(dk6): think about sync
     _models_command_unit.add_wait_semaphore(
       _pre_model_layout_transition_semaphore.get(),
       vk::PipelineStageFlagBits::eVertexShader

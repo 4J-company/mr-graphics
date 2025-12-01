@@ -141,7 +141,7 @@ inline namespace graphics {
     // Bindless rednering data
     DescriptorAllocator _default_descriptor_allocator;
     BindlessDescriptorSetLayoutHandle _bindless_set_layout;
-    DescriptorSetLayoutHandle _bindless_set_layout_converted;
+    DescriptorSetLayoutHandle _converted_bindless_set_layout;
     BindlessDescriptorSet _bindless_set;
 
     DeviceHeapAllocator _vertex_buffers_heap;

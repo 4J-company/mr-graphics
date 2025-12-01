@@ -9,7 +9,7 @@ mr::Scene::Scene(RenderContext &render_context)
   , _transfers_semaphore(_parent->vulkan_state().device().createSemaphoreUnique({}).value)
   , _transforms(_parent->vulkan_state(), max_scene_instances * sizeof(mr::Matr4f))
   , _bound_boxes(_parent->vulkan_state(), max_scene_instances * sizeof(AABBf))
-  , _render_transforms(_parent->vulkan_state(), max_scene_instances * sizeof(mr::Matr4f))
+  , _visible_instances_transforms(_parent->vulkan_state(), max_scene_instances * sizeof(mr::Matr4f))
   , _visibility(_parent->vulkan_state(), max_scene_instances * sizeof(uint32_t))
   , _counters_buffer(_parent->vulkan_state(), max_scene_instances * sizeof(uint32_t),
                      vk::BufferUsageFlagBits::eStorageBuffer |
@@ -23,7 +23,7 @@ mr::Scene::Scene(RenderContext &render_context)
 
   _camera_buffer_id = render_context.bindless_set().register_resource(&_camera_uniform_buffer);
   _transforms_buffer_id = render_context.bindless_set().register_resource(&_transforms);
-  _render_transforms_buffer_id = render_context.bindless_set().register_resource(&_render_transforms);
+  _render_transforms_buffer_id = render_context.bindless_set().register_resource(&_visible_instances_transforms);
   _bound_boxes_buffer_id = render_context.bindless_set().register_resource(&_bound_boxes);
   _counters_buffer_id = render_context.bindless_set().register_resource(&_counters_buffer);
 }
@@ -39,7 +39,9 @@ mr::Scene::~Scene()
   //            method 'notify_render_context_deleted` and use it as destuctor and move Scene in "disabeld" state
   _parent->bindless_set().unregister_resource(&_camera_uniform_buffer);
   _parent->bindless_set().unregister_resource(&_transforms);
-  _parent->bindless_set().unregister_resource(&_render_transforms);
+  _parent->bindless_set().unregister_resource(&_visible_instances_transforms);
+  _parent->bindless_set().unregister_resource(&_counters_buffer);
+  _parent->bindless_set().unregister_resource(&_bound_boxes);
 }
 
 mr::DirectionalLightHandle mr::Scene::create_directional_light(const Norm3f &direction, const Vec3f &color) noexcept
@@ -153,6 +155,7 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
     _transfer_command_unit.add_signal_semaphore(_transfers_semaphore.get());
 
     // TODO(dk6): maybe save fence and wait before next transfer
+    // Don't use fence becase sync is provided by semaphores
     _transfer_command_unit.submit_without_fence(_parent->vulkan_state());
 
     _is_buffers_dirty = false;
@@ -226,6 +229,5 @@ void mr::Scene::update_camera_buffer() noexcept
     .frustum_planes = _camera.frustum_planes(),
   };
 
-  // TODO(dk6): why it not passed command unit?
   _camera_uniform_buffer.write(std::span<mr::ShaderCameraData> {&cam_data, 1});
 }
