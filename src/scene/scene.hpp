@@ -75,6 +75,8 @@ inline namespace graphics {
     boost::unordered_map<GraphicsPipelineHandle, MeshesWithSamePipeline> _draws;
 
     CommandUnit _transfer_command_unit;
+    vk::UniqueSemaphore _transfers_semaphore;
+    bool _was_transfer_in_this_frame = false;
 
     std::atomic_uint32_t _mesh_offset = 0;
 

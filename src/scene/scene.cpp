@@ -6,6 +6,7 @@ mr::Scene::Scene(RenderContext &render_context)
   : _parent(&render_context)
   , _camera_uniform_buffer(_parent->vulkan_state(), sizeof(ShaderCameraData))
   , _transfer_command_unit(_parent->vulkan_state())
+  , _transfers_semaphore(_parent->vulkan_state().device().createSemaphoreUnique({}).value)
   , _transforms(_parent->vulkan_state(), max_scene_instances * sizeof(mr::Matr4f))
   , _bound_boxes(_parent->vulkan_state(), max_scene_instances * sizeof(AABBf))
   , _render_transforms(_parent->vulkan_state(), max_scene_instances * sizeof(mr::Matr4f))
@@ -134,19 +135,27 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
 {
   ASSERT(_parent != nullptr);
 
-  vk::UniqueFence fence {};
-  FenceGuard guard { _parent->vulkan_state().device() };
+  _was_transfer_in_this_frame = false;
   if (_is_buffers_dirty) {
     _transfer_command_unit.begin();
+
     _transforms.write(_transfer_command_unit, std::span(_transforms_data));
     _bound_boxes.write(_transfer_command_unit, std::span(_bound_boxes_data));
     _visibility.write(_transfer_command_unit, std::span(_visibility_data));
+
+    for (auto &[_, draw] : _draws) {
+      draw.meshes_data_buffer.write(_transfer_command_unit, std::span(draw.meshes_data_buffer_data));
+      draw.instances_data_buffer.write(_transfer_command_unit, std::span(draw.instances_data_buffer_data));
+    }
+
     _transfer_command_unit.end();
 
-    fence = _transfer_command_unit.submit(_parent->vulkan_state());
+    _transfer_command_unit.add_signal_semaphore(_transfers_semaphore.get());
+
+    _transfer_command_unit.submit_without_fence(_parent->vulkan_state());
 
     _is_buffers_dirty = false;
-    guard.fence = fence.get();
+    _was_transfer_in_this_frame = true;
   }
 
   if (input_state_ref) {
@@ -215,10 +224,6 @@ void mr::Scene::update_camera_buffer() noexcept
     .sens = _camera.sensetivity(),
     .frustum_planes = _camera.frustum_planes(),
   };
-
-  for (auto &plane : _camera.frustum_planes()) {
-    std::cout << plane << std::endl;
-  }
 
   // TODO(dk6): why it not passed command unit?
   _camera_uniform_buffer.write(std::span<mr::ShaderCameraData> {&cam_data, 1});

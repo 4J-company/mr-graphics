@@ -23,6 +23,8 @@ mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent,
   , _pre_model_layout_transition_command_unit(*_state)
   , _pre_light_layout_transition_semaphore(_state->device().createSemaphoreUnique({}).value)
   , _pre_light_layout_transition_command_unit(*_state)
+  , _culling_command_unit(*_state)
+  , _culling_semaphore(_state->device().createSemaphoreUnique({}).value)
   , _extent(extent)
   , _depthbuffer(*_state, _extent)
   , _image_fence (_state->device().createFenceUnique({.flags = vk::FenceCreateFlagBits::eSignaled}).value)
@@ -407,14 +409,6 @@ void mr::RenderContext::render_models(const SceneHandle scene)
     _models_command_unit->pushConstants(pipeline->layout(), vk::ShaderStageFlagBits::eAllGraphics,
                                         0, sizeof(model_push_constant), model_push_constant);
 
-    // TODO(dk6): why is it here?
-    CommandUnit command_unit {scene->render_context().vulkan_state()};
-    command_unit.begin();
-    draw.meshes_data_buffer.write(command_unit, std::span(draw.meshes_data_buffer_data));
-    draw.instances_data_buffer.write(command_unit, std::span(draw.instances_data_buffer_data));
-    command_unit.end();
-    UniqueFenceGuard(_state->device(), command_unit.submit(*_state));
-
     uint32_t stride = sizeof(vk::DrawIndexedIndirectCommand);
     uint32_t max_draws_count = static_cast<uint32_t>(draw.meshes_data_buffer_data.size());
     _models_command_unit->drawIndexedIndirectCount(draw.draw_commands_buffer.buffer(), 0,
@@ -430,22 +424,24 @@ void mr::RenderContext::render_models(const SceneHandle scene)
 
 void mr::RenderContext::culling_geometry(const SceneHandle scene)
 {
-  _models_command_unit->resetQueryPool(_timestamps_query_pool.get(), enum_cast(Timestamp::CullingStart), 2);
+  _culling_command_unit.begin();
 
-  _models_command_unit->writeTimestamp(vk::PipelineStageFlagBits::eTopOfPipe,
+  _culling_command_unit->resetQueryPool(_timestamps_query_pool.get(), enum_cast(Timestamp::CullingStart), 2);
+
+  _culling_command_unit->writeTimestamp(vk::PipelineStageFlagBits::eTopOfPipe,
                                        _timestamps_query_pool.get(),
                                        enum_cast(Timestamp::CullingStart));
 
   // ===== Fill all counters by zeroes =====
   // TODO(dk6): validate size
-  _models_command_unit->fillBuffer(scene->_counters_buffer.buffer(), 0, scene->_counters_buffer.byte_size(), 0);
+  _culling_command_unit->fillBuffer(scene->_counters_buffer.buffer(), 0, scene->_counters_buffer.byte_size(), 0);
   vk::BufferMemoryBarrier set_count_to_zero_barrier {
     .dstAccessMask = vk::AccessFlagBits::eShaderRead,
     .buffer = scene->_counters_buffer.buffer(),
     .offset = 0,
     .size = scene->_counters_buffer.byte_size(),
   };
-  _models_command_unit->pipelineBarrier(
+  _culling_command_unit->pipelineBarrier(
     vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eComputeShader, {},
     {}, {set_count_to_zero_barrier}, {});
 
@@ -454,9 +450,9 @@ void mr::RenderContext::culling_geometry(const SceneHandle scene)
 
   // ===== Setup and call culling instances shader =====
   if (not is_render_option_enabled(_render_options, RenderOptions::DisableCulling)) {
-    _models_command_unit->bindPipeline(vk::PipelineBindPoint::eCompute, _instances_culling_pipeline.pipeline());
+    _culling_command_unit->bindPipeline(vk::PipelineBindPoint::eCompute, _instances_culling_pipeline.pipeline());
 
-    _models_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eCompute,
+    _culling_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eCompute,
                                              {_instances_culling_pipeline.layout()},
                                              bindless_set_number,
                                              culling_descriptor_sets,
@@ -478,32 +474,32 @@ void mr::RenderContext::culling_geometry(const SceneHandle scene)
         scene->camera_buffer_id(),
         scene->_bound_boxes_buffer_id,
       };
-      _models_command_unit->pushConstants(_instances_culling_pipeline.layout(), vk::ShaderStageFlagBits::eCompute,
+      _culling_command_unit->pushConstants(_instances_culling_pipeline.layout(), vk::ShaderStageFlagBits::eCompute,
                                           0, sizeof(culling_push_contants), culling_push_contants);
 
-      _models_command_unit->dispatch((instances_number + culling_work_gpoup_size - 1) / culling_work_gpoup_size, 1, 1);
-
-      vk::BufferMemoryBarrier instances_count_culling_barrier {
-        .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
-        // Write are also exists on next shader...
-        // Maybe it is correct to have different buffers for instances counters and draws counters
-        // But now it works
-        .dstAccessMask = vk::AccessFlagBits::eShaderRead,
-        .buffer = scene->_counters_buffer.buffer(),
-        .offset = 0,
-        .size = scene->_counters_buffer.byte_size(),
-      };
-
-      _models_command_unit->pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
-                                            vk::PipelineStageFlagBits::eComputeShader,
-                                            {}, {}, {instances_count_culling_barrier}, {});
+      _culling_command_unit->dispatch((instances_number + culling_work_gpoup_size - 1) / culling_work_gpoup_size, 1, 1);
     }
   }
 
-  // ===== Setup and call instances collect shader =====
-  _models_command_unit->bindPipeline(vk::PipelineBindPoint::eCompute, _instances_collect_pipeline.pipeline());
+  vk::BufferMemoryBarrier instances_count_culling_barrier {
+    .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
+    // Write are also exists on next shader...
+    // Maybe it is correct to have different buffers for instances counters and draws counters
+    // But now it works anyway)
+    .dstAccessMask = vk::AccessFlagBits::eShaderRead,
+    .buffer = scene->_counters_buffer.buffer(),
+    .offset = 0,
+    .size = scene->_counters_buffer.byte_size(),
+  };
 
-  _models_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eCompute,
+  _culling_command_unit->pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
+                                        vk::PipelineStageFlagBits::eComputeShader,
+                                        {}, {}, {instances_count_culling_barrier}, {});
+
+  // ===== Setup and call instances collect shader =====
+  _culling_command_unit->bindPipeline(vk::PipelineBindPoint::eCompute, _instances_collect_pipeline.pipeline());
+
+  _culling_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eCompute,
                                            {_instances_collect_pipeline.layout()},
                                            bindless_set_number,
                                            culling_descriptor_sets,
@@ -521,35 +517,24 @@ void mr::RenderContext::culling_geometry(const SceneHandle scene)
       draw.draw_counter_index,
     };
 
-    _models_command_unit->pushConstants(_instances_collect_pipeline.layout(), vk::ShaderStageFlagBits::eCompute,
+    _culling_command_unit->pushConstants(_instances_collect_pipeline.layout(), vk::ShaderStageFlagBits::eCompute,
                                         0, sizeof(culling_push_contants), culling_push_contants);
 
-    _models_command_unit->dispatch((max_draws_count + culling_work_gpoup_size - 1) / culling_work_gpoup_size, 1, 1);
-
-    vk::BufferMemoryBarrier draws_culling_barrier {
-      .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
-      .dstAccessMask = vk::AccessFlagBits::eIndirectCommandRead,
-      .buffer = draw.draw_commands_buffer.buffer(),
-      .offset = 0,
-      .size = draw.draw_commands_buffer.byte_size(),
-    };
-
-    vk::BufferMemoryBarrier draws_count_culling_barrier {
-      .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
-      .dstAccessMask = vk::AccessFlagBits::eIndirectCommandRead,
-      .buffer = scene->_counters_buffer.buffer(),
-      .offset = 0,
-      .size = scene->_counters_buffer.byte_size(),
-    };
-
-    _models_command_unit->pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
-                                          vk::PipelineStageFlagBits::eDrawIndirect,
-                                          {}, {}, {draws_culling_barrier, draws_count_culling_barrier}, {});
+    _culling_command_unit->dispatch((max_draws_count + culling_work_gpoup_size - 1) / culling_work_gpoup_size, 1, 1);
   }
 
-  _models_command_unit->writeTimestamp(vk::PipelineStageFlagBits::eComputeShader,
+  _culling_command_unit->writeTimestamp(vk::PipelineStageFlagBits::eComputeShader,
                                        _timestamps_query_pool.get(),
                                        enum_cast(Timestamp::CullingEnd));
+
+  _culling_command_unit.end();
+  if (scene->_was_transfer_in_this_frame) {
+    _culling_command_unit.add_wait_semaphore(scene->_transfers_semaphore.get(),
+                                             vk::PipelineStageFlagBits::eComputeShader);
+  }
+  _culling_command_unit.add_signal_semaphore(_culling_semaphore.get());
+  vk::SubmitInfo culling_submit_info = _culling_command_unit.submit_info();
+  _state->queue().submit(culling_submit_info);
 }
 
 void mr::RenderContext::render_bound_boxes(const SceneHandle scene)
@@ -591,6 +576,9 @@ void mr::RenderContext::render_bound_boxes(const SceneHandle scene)
 void mr::RenderContext::render_geometry(const SceneHandle scene)
 {
   ZoneScoped;
+
+  culling_geometry(scene);
+
   _models_command_unit.begin();
 
   TRACY_VK_ZONE_BEGIN() {
@@ -611,7 +599,10 @@ void mr::RenderContext::render_geometry(const SceneHandle scene)
       vk::PipelineStageFlagBits::eVertexShader
     );
 
-    culling_geometry(scene);
+    _models_command_unit.add_wait_semaphore(
+      _culling_semaphore.get(),
+      vk::PipelineStageFlagBits::eVertexShader
+    );
 
     auto gbufs_attachs = _gbuffers | std::views::transform([](const ColorAttachmentImage &gbuf) {
       return gbuf.attachment_info();
@@ -692,6 +683,7 @@ void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
 
   _models_command_unit.add_signal_semaphore(_models_render_finished_semaphore.get());
 
+  // TODO(dk6): maybe move before render_geometry?
   vk::SubmitInfo pre_model_layout_transition_submit_info =
     _pre_model_layout_transition_command_unit.submit_info();
   _state->queue().submit(pre_model_layout_transition_submit_info);

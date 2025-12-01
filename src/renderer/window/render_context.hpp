@@ -150,6 +150,8 @@ inline namespace graphics {
     VertexVectorBuffer _attributes_vertex_buffer;
     IndexHeapBuffer _index_buffer;
 
+    CommandUnit _culling_command_unit;
+    vk::UniqueSemaphore _culling_semaphore;
     ShaderHandle _instances_culling_shader;
     ComputePipeline _instances_culling_pipeline;
     ShaderHandle _instances_collect_shader;
