@@ -109,10 +109,62 @@ BoundBox apply_transform(BoundBox bb, mat4 transform)
   res.min = vec4(corners[0], 0);
   res.max = vec4(corners[0], 0);
   for (uint i = 1; i < 8; i++) {
-    res.min = vec4(max(res.min.xyz, corners[i]), 0);
+    res.min = vec4(min(res.min.xyz, corners[i]), 0);
     res.max = vec4(max(res.max.xyz, corners[i]), 0);
   }
   return res;
+}
+
+// *********************************
+// This part is for debug - bound boxes are more exact
+struct BoundSphere {
+  vec3 center;
+  float radius;
+};
+
+BoundSphere bb2bs(BoundBox bb)
+{
+  BoundSphere bs;
+  bs.center = (bb.max.xyz + bb.min.xyz) / 2;
+  bs.radius = length(bb.max.xyz - bb.min.xyz) / 2;
+  return bs;
+}
+
+bool is_bound_sphere_not_visible(vec4 plane, BoundSphere bs) {
+  return !(dot(plane, vec4(bs.center, 1)) > -bs.radius);
+}
+// *********************************
+
+bool is_bound_box_not_visible(vec4 plane, BoundBox bb)
+{
+  vec3 positive = bb.min.xyz;
+  vec3 negative = bb.max.xyz;
+
+  if (plane.x >= 0) {
+    positive.x = bb.max.x;
+    negative.x = bb.min.x;
+  }
+  if (plane.y >= 0) {
+    positive.y = bb.max.y;
+    negative.y = bb.min.y;
+  }
+  if (plane.z >= 0) {
+    positive.z = bb.max.z;
+    negative.z = bb.min.z;
+  }
+
+  if (dot(plane.xyz, negative) + plane.w > 0) {
+    // If the nearest point is outside the plane,
+    //   the box is completely outside or intersects
+    return false;
+  }
+
+  if (dot(plane.xyz, positive) + plane.w < 0) {
+    // If the far point is beyond the plane, the box is completely outside
+    return true;
+  }
+
+  return false;
 }
 
 void main()
@@ -131,30 +183,7 @@ void main()
 
   for (int i = 0; i < 6; i++) {
     vec4 plane = camera_buffer.frustum_planes[i];
-    vec3 positive = bb.min.xyz;
-    vec3 negative = bb.max.xyz;
-   
-    if (plane.x >= 0) {
-      positive.x = bb.max.x;
-      negative.x = bb.min.x;
-    }
-    if (plane.y >= 0) {
-      positive.y = bb.max.y;
-      negative.y = bb.min.y;
-    }
-    if (plane.z >= 0) {
-      positive.z = bb.max.z;
-      negative.z = bb.min.z;
-    }
-
-    if (dot(plane.xyz, negative) + plane.w > 0) {
-      // If the nearest point is outside the plane,
-      //   the box is completely outside or intersects
-      continue;
-    }
-
-    if (dot(plane.xyz, positive) + plane.w < 0) {
-      // If the far point is beyond the plane, the box is completely outside
+    if (is_bound_box_not_visible(plane, bb)) {
       return;
     }
   }
