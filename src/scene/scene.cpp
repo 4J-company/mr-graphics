@@ -152,6 +152,7 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
 
     _transfer_command_unit.add_signal_semaphore(_transfers_semaphore.get());
 
+    // TODO(dk6): maybe save fence and wait before next transfer
     _transfer_command_unit.submit_without_fence(_parent->vulkan_state());
 
     _is_buffers_dirty = false;

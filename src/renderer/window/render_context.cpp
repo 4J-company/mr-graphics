@@ -138,11 +138,13 @@ void mr::RenderContext::init_profiling()
 
   _models_tracy_gpu_context = TracyVkContext(_state->phys_device(), _state->device(),
                                              _state->queue(), _models_command_unit.command_buffer());
-  TracyVkContextName(_models_tracy_gpu_context, "models tracy context", 19);
+  char gpu_context_name[] = "models tracy context";
+  TracyVkContextName(_models_tracy_gpu_context, gpu_context_name, sizeof(gpu_context_name));
 
   _lights_tracy_gpu_context = TracyVkContext(_state->phys_device(), _state->device(),
                                              _state->queue(), _lights_command_unit.command_buffer());
-  TracyVkContextName(_lights_tracy_gpu_context, "lights tracy context", 19);
+  char light_content_name[] = "lights tracy context";
+  TracyVkContextName(_lights_tracy_gpu_context, light_content_name, sizeof(light_content_name));
 }
 
 void mr::RenderContext::init_culling()
@@ -152,7 +154,7 @@ void mr::RenderContext::init_culling()
     {"UNIFORM_BUFFERS_BINDING", std::to_string(uniform_buffer_binding)},
     {"STORAGE_BUFFERS_BINDING", std::to_string(storage_buffer_binding)},
     {"BINDLESS_SET", std::to_string(bindless_set_number)},
-    {"THREADS_NUM", std::to_string(culling_work_gpoup_size)},
+    {"THREADS_NUM", std::to_string(culling_work_group_size)},
   };
   if (is_render_option_enabled(_render_options, RenderOptions::DisableCulling)) {
     defines.insert({"DISABLE_CULLING", "ON"});
@@ -433,18 +435,17 @@ void mr::RenderContext::culling_geometry(const SceneHandle scene)
                                        enum_cast(Timestamp::CullingStart));
 
   // ===== Fill all counters by zeroes =====
-  // TODO(dk6): validate size
   _culling_command_unit->fillBuffer(scene->_counters_buffer.buffer(), 0, scene->_counters_buffer.byte_size(), 0);
   vk::BufferMemoryBarrier set_count_to_zero_barrier {
+    .srcAccessMask = vk::AccessFlagBits::eTransferWrite,
     .dstAccessMask = vk::AccessFlagBits::eShaderRead,
     .buffer = scene->_counters_buffer.buffer(),
     .offset = 0,
     .size = scene->_counters_buffer.byte_size(),
   };
   _culling_command_unit->pipelineBarrier(
-    vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eComputeShader, {},
+    vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eComputeShader, {},
     {}, {set_count_to_zero_barrier}, {});
-
 
   std::array culling_descriptor_sets {_bindless_set.set()};
 
@@ -477,7 +478,7 @@ void mr::RenderContext::culling_geometry(const SceneHandle scene)
       _culling_command_unit->pushConstants(_instances_culling_pipeline.layout(), vk::ShaderStageFlagBits::eCompute,
                                           0, sizeof(culling_push_contants), culling_push_contants);
 
-      _culling_command_unit->dispatch((instances_number + culling_work_gpoup_size - 1) / culling_work_gpoup_size, 1, 1);
+      _culling_command_unit->dispatch((instances_number + culling_work_group_size - 1) / culling_work_group_size, 1, 1);
     }
   }
 
@@ -520,7 +521,7 @@ void mr::RenderContext::culling_geometry(const SceneHandle scene)
     _culling_command_unit->pushConstants(_instances_collect_pipeline.layout(), vk::ShaderStageFlagBits::eCompute,
                                         0, sizeof(culling_push_contants), culling_push_contants);
 
-    _culling_command_unit->dispatch((max_draws_count + culling_work_gpoup_size - 1) / culling_work_gpoup_size, 1, 1);
+    _culling_command_unit->dispatch((max_draws_count + culling_work_group_size - 1) / culling_work_group_size, 1, 1);
   }
 
   _culling_command_unit->writeTimestamp(vk::PipelineStageFlagBits::eComputeShader,
@@ -760,6 +761,17 @@ void mr::RenderContext::calculate_stat(SceneHandle scene,
                                        timestamps.data(),
                                        sizeof(timestamps[0]), // stride
                                        query_res_flags);
+
+
+// TODO(dk6): maybe validate results for not wait
+// #ifndef QUERY_RES_WAIT
+//   bool timestamps_valid = true;
+//   for (const auto& ts : timestamps) {
+//     if (ts.second == 0) { // Not available
+//       return;
+//     }
+//   }
+// #endif
 
   _render_stat.culling_gpu_time_ms = (timestamps[enum_cast(Timestamp::CullingEnd)].first -
                                       timestamps[enum_cast(Timestamp::CullingStart)].first) * _timestamp_to_ms;

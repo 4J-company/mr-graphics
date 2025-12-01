@@ -1,4 +1,3 @@
-#include <print>
 #include "file_writer.hpp"
 #include "render_context.hpp"
 #include "swapchain.hpp"

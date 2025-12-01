@@ -56,7 +56,6 @@ mr::GraphicsPipeline::GraphicsPipeline(const RenderContext &render_context,
     .depthBiasConstantFactor = 0.0f,
     .depthBiasClamp = 0.0f,
     .depthBiasSlopeFactor = 0.0f,
-    // .lineWidth = not attributes.empty() ? 1.0f : 3.0f,
     .lineWidth = 1.0f,
   };
 
@@ -71,7 +70,6 @@ mr::GraphicsPipeline::GraphicsPipeline(const RenderContext &render_context,
 
   vk::PipelineDepthStencilStateCreateInfo depth_stencil_create_info {
     .depthTestEnable = true,
-    // .depthWriteEnable = not attributes.empty(),
     .depthWriteEnable = true,
     .depthCompareOp = vk::CompareOp::eLess,
     .depthBoundsTestEnable = false,

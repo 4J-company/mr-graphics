@@ -26,7 +26,7 @@ mr::Pipeline::Pipeline(const VulkanState &state,
     .setLayoutCount = static_cast<uint32_t>(vk_descriptor_layouts.size()),
     .pSetLayouts = vk_descriptor_layouts.data(),
     .pushConstantRangeCount = push_constant_range.has_value() ? 1u : 0u,
-    .pPushConstantRanges = &push_constant_range.value(),
+    .pPushConstantRanges = push_constant_range.has_value() ? &push_constant_range.value() : nullptr,
   };
 
   auto [res, layout] = state.device().createPipelineLayoutUnique(pipeline_layout_create_info);

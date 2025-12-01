@@ -77,7 +77,7 @@ std::optional<mr::CliOptions> mr::CliOptions::parse(int argc, const char **argv)
      "Enable drawing bound boxes of models for debug")
     ("stat-dir",
      po::value<std::string>()->default_value("render_stats"),
-     "Path to directory in which frame stats will be writed (default: ./render_stat.txt).")
+     "Path to directory in which frame stats will be written (default: render_stats).")
     ("models",
      po::value<std::vector<std::string>>()->multitoken(),
      "GLTF model files to render (can be specified anywhere in arguments)")

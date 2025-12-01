@@ -35,7 +35,6 @@ inline namespace graphics {
     double gpu_time_ms = 0;
     double gpu_fps = 0;
 
-    double culling_cpu_time_ms = 0;
     double render_cpu_time_ms = 0;
     double models_cpu_time_ms = 0;
     double shading_cpu_time_ms = 0;
@@ -73,7 +72,7 @@ inline namespace graphics {
     constexpr static inline uint32_t default_vertex_number = 10'000'000;
     constexpr static inline uint32_t default_index_number = default_vertex_number * 2;
 
-    constexpr static inline uint32_t culling_work_gpoup_size = 32;
+    constexpr static inline uint32_t culling_work_group_size = 32;
 
   private:
     // Timestamps

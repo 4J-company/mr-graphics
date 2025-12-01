@@ -46,13 +46,13 @@ inline namespace graphics {
       std::vector<MeshInstanceCullingData> instances_data_buffer_data;
       std::vector<MeshCullingData> meshes_data_buffer_data;
 
-      uint32_t instances_data_buffer_id = -1;
-      uint32_t meshes_data_buffer_id = -1;
-      uint32_t draw_commands_buffer_id = -1;
+      uint32_t instances_data_buffer_id = BindlessDescriptorSet::invalid_id;
+      uint32_t meshes_data_buffer_id = BindlessDescriptorSet::invalid_id;
+      uint32_t draw_commands_buffer_id = BindlessDescriptorSet::invalid_id;
 
       // It must have same elements as 'meshes_data_buffer'
       StorageBuffer meshes_render_info; // render data for each mesh
-      uint32_t meshes_render_info_id = -1;
+      uint32_t meshes_render_info_id = BindlessDescriptorSet::invalid_id;
     };
 
   private:
@@ -84,11 +84,11 @@ inline namespace graphics {
     // Must be same size as _transforms
     StorageBuffer _render_transforms; // transform matrix for each visible instance
     std::vector<mr::Matr4f> _transforms_data;
-    uint32_t _transforms_buffer_id;  // id in bindless descriptor set
-    uint32_t _render_transforms_buffer_id;  // id in bindless descriptor set
+    uint32_t _transforms_buffer_id = BindlessDescriptorSet::invalid_id;  // id in bindless descriptor set
+    uint32_t _render_transforms_buffer_id = BindlessDescriptorSet::invalid_id;  // id in bindless descriptor set
 
     StorageBuffer _bound_boxes;
-    uint32_t _bound_boxes_buffer_id;
+    uint32_t _bound_boxes_buffer_id = BindlessDescriptorSet::invalid_id;
     std::vector<AABBf> _bound_boxes_data;
 
     ConditionalBuffer _visibility; // u32 visibility mask for each draw call
@@ -96,12 +96,12 @@ inline namespace graphics {
 
     // TODO: Use VectorBuffer
     StorageBuffer _counters_buffer; // Buffer for different counters in compute shaders
-    uint32_t _counters_buffer_id = -1;
+    uint32_t _counters_buffer_id = BindlessDescriptorSet::invalid_id;
     std::atomic_uint32_t _current_counter_index = 0;
 
     mutable UniformBuffer _camera_uniform_buffer;
     mr::FPSCamera _camera;
-    uint32_t _camera_buffer_id;  // id in bindless descriptor set
+    uint32_t _camera_buffer_id = BindlessDescriptorSet::invalid_id;  // id in bindless descriptor set
 
     bool _is_buffers_dirty = true;
 

@@ -10,7 +10,7 @@ inline namespace graphics {
     constexpr static inline vk::PushConstantRange compute_pipeline_push_constants {
       .stageFlags = vk::ShaderStageFlagBits::eCompute,
       .offset = 0,
-      .size = 48,
+      .size = 64,
     };
 
   public:
