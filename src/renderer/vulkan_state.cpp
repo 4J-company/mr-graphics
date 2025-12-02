@@ -102,6 +102,7 @@ void mr::VulkanGlobalState::_create_phys_device()
     .descriptorIndexing = true,
     .descriptorBindingUniformBufferUpdateAfterBind = true,
     .descriptorBindingSampledImageUpdateAfterBind = true,
+    .descriptorBindingStorageImageUpdateAfterBind = true,
     .descriptorBindingStorageBufferUpdateAfterBind = true,
     .descriptorBindingPartiallyBound = true,
     .runtimeDescriptorArray = true,

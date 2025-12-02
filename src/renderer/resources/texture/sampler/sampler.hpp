@@ -10,7 +10,7 @@ inline namespace graphics {
     private:
       vk::UniqueSampler _sampler;
 
-      int _mip_level;
+      int _mip_levels_number;
       vk::Filter _filter;
       vk::SamplerAddressMode _address;
 

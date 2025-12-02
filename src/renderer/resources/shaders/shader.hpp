@@ -4,6 +4,7 @@
 #include "pch.hpp"
 
 #include "manager/resource.hpp"
+#include "renderer/resources/images/image.hpp"
 
 #include "vulkan_state.hpp"
 
@@ -26,7 +27,20 @@ inline namespace graphics {
     std::string _include_string;
 
   public:
-    using Resource = std::variant<const UniformBuffer *, const StorageBuffer *, const Texture *, const Image *, const ConditionalBuffer*>;
+    struct PyramidImageResource {
+      const PyramidImage *image;
+      uint32_t mip_level;
+    };
+
+    using Resource = std::variant<
+      const UniformBuffer *,
+      const StorageBuffer *,
+      const Texture *,
+      const ColorAttachmentImage *,
+      const StorageImage *,
+      const PyramidImageResource *,
+      const DepthImage *,
+      const ConditionalBuffer*>;
 
     // TODO: consider RT shaders from extensions;
     // TODO(dk6): remove this enum, use vk::ShaderStageFlagsBits instead
