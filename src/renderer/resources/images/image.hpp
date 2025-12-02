@@ -10,14 +10,15 @@ inline namespace graphics {
   class Image {
   protected:
     vk::Image _image;          // this is not Unique because it's handled by VMA
-    vk::ImageView _image_view; // this is not Unique to be destroyed before _image
+    vk::ImageView _image_view; // these are not Unique to be destroyed before _image
+
     VmaAllocation _allocation;
 
     vk::Extent3D _extent;
     size_t _size{};
     vk::Format _format;
     int _num_of_channels{};
-    uint _mip_level{};
+    uint _mip_levels_number{};
     vk::ImageLayout _layout;
     vk::ImageAspectFlags _aspect_flags;
     const VulkanState *_state = nullptr;
@@ -26,7 +27,8 @@ inline namespace graphics {
     Image() = default;
     Image(const VulkanState &state, Extent extent, vk::Format format,
           vk::ImageUsageFlags usage_flags, vk::ImageAspectFlags aspect_flags,
-          vk::MemoryPropertyFlags memory_properties, uint mip_level = 1);
+          vk::MemoryPropertyFlags memory_properties, uint mip_level = 1,
+          bool create_image_view = true);
     Image(const VulkanState &state, const mr::importer::ImageData &image,
           vk::ImageUsageFlags usage_flags, vk::ImageAspectFlags aspect_flags,
           vk::MemoryPropertyFlags memory_properties);
@@ -43,7 +45,7 @@ inline namespace graphics {
       std::swap(_size, other._size);
       std::swap(_format, other._format);
       std::swap(_num_of_channels, other._num_of_channels);
-      std::swap(_mip_level, other._mip_level);
+      std::swap(_mip_levels_number, other._mip_levels_number);
       std::swap(_layout, other._layout);
       std::swap(_aspect_flags, other._aspect_flags);
     }
@@ -58,7 +60,7 @@ inline namespace graphics {
       std::swap(_size, other._size);
       std::swap(_format, other._format);
       std::swap(_num_of_channels, other._num_of_channels);
-      std::swap(_mip_level, other._mip_level);
+      std::swap(_mip_levels_number, other._mip_levels_number);
       std::swap(_layout, other._layout);
       std::swap(_aspect_flags, other._aspect_flags);
 
@@ -83,7 +85,7 @@ inline namespace graphics {
     void write(CommandUnit &command_unit, std::span<T> src) { write(command_unit, std::as_bytes(src)); }
 
   protected:
-    void create_image_view();
+    vk::ImageView mr::Image::create_image_view(uint32_t mip_level, uint32_t mip_levels_count);
 
   public:
     vk::ImageView image_view() const noexcept { return _image_view; }
@@ -92,6 +94,7 @@ inline namespace graphics {
 
     const vk::Extent3D & extent() const noexcept { return _extent; }
     size_t size() const noexcept { return _size; }
+    uint32_t mip_levels_number() const noexcept { return _mip_levels_number; }
 
     static vk::Format find_supported_format(
       const VulkanState &state, const SmallVector<vk::Format> &candidates,
@@ -208,6 +211,21 @@ inline namespace graphics {
       ~StorageImage() override = default;
   };
 
+  // TODO(dk6): maybe integrate part of funcitonality in base class Image
+  class PyramidImage : public DeviceImage {
+  private:
+    SmallVector<vk::ImageView, 12> _image_views; // these are not Unique to be destroyed before _image
+
+  public:
+    PyramidImage(const VulkanState &state, Extent extent, vk::Format format, uint32_t mip_levels_number);
+    PyramidImage(PyramidImage&&) noexcept = default;
+    PyramidImage & operator=(PyramidImage&&) noexcept = default;
+    ~PyramidImage() override = default;
+
+    vk::ImageView get_level(uint32_t level) const noexcept;
+  };
+
+
   inline vk::Format get_swapchain_format(const VulkanState& state) {
     return vk::Format::eB8G8R8A8Unorm;
   }
@@ -221,6 +239,17 @@ inline namespace graphics {
         vk::FormatFeatureFlagBits::eDepthStencilAttachment
       );
     return format;
+  }
+
+  constexpr static inline uint32_t calculate_mips_levels_number(Extent extent)
+  {
+    uint32_t level = 1;
+    while (extent.width > 1 && extent.height > 1) {
+      extent.width /= 2;
+      extent.height = 2;
+      level++;
+    }
+    return level;
   }
 }
 } // namespace mr

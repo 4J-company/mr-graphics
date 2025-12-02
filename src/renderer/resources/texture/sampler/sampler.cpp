@@ -4,7 +4,7 @@ mr::Sampler::Sampler(const VulkanState &state, vk::Filter filter,
                      vk::SamplerAddressMode address, int mip_level)
     : _filter(filter)
     , _address(address)
-    , _mip_level(mip_level)
+    , _mip_levels_number(mip_level)
 {
   static auto props = state.phys_device().getProperties();
 
@@ -21,7 +21,7 @@ mr::Sampler::Sampler(const VulkanState &state, vk::Filter filter,
     .compareEnable = false,
     .compareOp = vk::CompareOp::eAlways,
     .minLod = 0.0f,
-    .maxLod = static_cast<float>(_mip_level),
+    .maxLod = static_cast<float>(_mip_levels_number),
     .borderColor = vk::BorderColor::eIntOpaqueBlack,
     .unnormalizedCoordinates = false,
   };
