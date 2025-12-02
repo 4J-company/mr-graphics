@@ -45,9 +45,11 @@ void main( void )
 {
   vec4 pos = subpassLoad(InPos);
   vec3 color = subpassLoad(InColorTrans).xyz;
-  vec3 norm = subpassLoad(InNIsShade).xyz;
+  vec4 norm_is_shade = subpassLoad(InNIsShade);
+  vec3 norm = norm_is_shade.xyz;
+  bool is_shade = norm_is_shade.w == 0;
 
-  if (norm == vec3(0)) {
+  if (is_shade) {
     OutColor = vec4(color, 1);
     return;
   }

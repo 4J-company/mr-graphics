@@ -94,6 +94,8 @@ inline namespace graphics {
     ConditionalBuffer _visibility; // u32 visibility mask for each draw call
     std::vector<uint32_t> _visibility_data;
 
+    // Now all counters are collected in one buffer - it simplifies zeroing and syncronization
+    // Note: here can be trouble with false sharing, but we don't know, is it actual for GPU atomics
     // TODO: Use VectorBuffer
     StorageBuffer _counters_buffer; // Buffer for different counters in compute shaders
     uint32_t _counters_buffer_id = BindlessDescriptorSet::invalid_id;

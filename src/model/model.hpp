@@ -40,8 +40,8 @@ inline namespace graphics {
       // First material handle, second mesh reference
       auto draws() const noexcept { return std::views::zip(_materials, _meshes); }
 
-      void transform(const Matr4f &transform) noexcept;
-      const Matr4f & transform() const noexcept { return _transform; }
+      void transform(Matr4f transform) noexcept;
+      Matr4f transform() const noexcept { return _transform; }
   };
 
   MR_DECLARE_HANDLE(Model);
