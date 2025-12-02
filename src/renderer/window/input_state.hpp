@@ -32,6 +32,9 @@ inline namespace graphics {
     Vec2d _prev_mouse_pos {};
     Vec2d _mouse_pos_delta {};
 
+    std::atomic<double> _mouse_scroll_offset = 0;
+    std::atomic<double> _prev_mouse_scroll_offset = 0;
+
     // I think mutex here is good - we have one writer, one reader,
     //  but reader works once per frame only for copy ~400 bytes, in other time it have no affect for writer
     // Expected, what update(), key_pressed() and key_tapped() call in one thread, key callback in other
@@ -47,6 +50,7 @@ inline namespace graphics {
 
     const Vec2d & mouse_pos() const noexcept { return _prev_mouse_pos; }
     const Vec2d & mouse_pos_delta() const noexcept { return _mouse_pos_delta; }
+    const double mouse_scroll() const noexcept { return _prev_mouse_scroll_offset; }
 
     InputState(InputState &&other) noexcept;
     InputState & operator=(InputState &&other) noexcept;
@@ -60,6 +64,9 @@ inline namespace graphics {
 
     using MouseCallbackT = std::function<void(const vkfw::Window &, double, double)>;
     MouseCallbackT get_mouse_callback() noexcept;
+
+    using MouseScrollCallback = std::function<void(const vkfw::Window &, double, double)>;
+    MouseScrollCallback get_mouse_scroll_callback() noexcept;
   };
 }
 }

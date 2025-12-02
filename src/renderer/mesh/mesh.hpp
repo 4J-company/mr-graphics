@@ -21,8 +21,6 @@ inline namespace graphics {
       uint32_t mesh_offset;
       uint32_t instance_offset;
       uint32_t material_ubo_id;
-      uint32_t camera_buffer_id;
-      uint32_t transforms_buffer_id;
     };
 
   private:
@@ -34,6 +32,9 @@ inline namespace graphics {
     uint32_t _mesh_offset = 0;     // offset to the *per mesh*     data buffer in the scene
     uint32_t _instance_offset = 0; // offset to the *per instance* data buffer in the scene
 
+    AABBf _bound_box;
+    std::vector<Matr4f> _base_transforms;
+
   public:
     Mesh() = default;
 
@@ -41,7 +42,9 @@ inline namespace graphics {
          std::vector<IndexBufferDescription> ibufs,
          size_t instance_count,
          size_t mesh_offset,
-         size_t instance_offset) noexcept;
+         size_t instance_offset,
+         const AABBf &bound_box,
+         std::vector<Matr4f> transforms) noexcept;
 
     // move semantics
     Mesh(Mesh &&other) noexcept { *this = std::move(other); }
@@ -53,6 +56,8 @@ inline namespace graphics {
       _instance_count = std::move(other._instance_count.load());
       _mesh_offset = std::move(other._mesh_offset);
       _instance_offset = std::move(other._instance_offset);
+      _bound_box = other._bound_box;
+      _base_transforms = std::move(other._base_transforms);
 
       return *this;
     }

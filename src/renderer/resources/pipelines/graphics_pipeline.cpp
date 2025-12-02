@@ -7,7 +7,8 @@ mr::GraphicsPipeline::GraphicsPipeline(const RenderContext &render_context,
                                        mr::ShaderHandle shader,
                                        std::span<const vk::VertexInputAttributeDescription> attributes,
                                        std::span<const DescriptorSetLayoutHandle> descriptor_layouts)
-  : Pipeline(render_context.vulkan_state(), shader, descriptor_layouts), _subpass(subpass)
+  : Pipeline(render_context.vulkan_state(), shader, descriptor_layouts, graphics_pipeline_push_constants)
+  , _subpass(subpass)
 {
   // dynamic states of pipeline (viewport)
   _dynamic_states.push_back(vk::DynamicState::eViewport);
@@ -17,11 +18,13 @@ mr::GraphicsPipeline::GraphicsPipeline(const RenderContext &render_context,
     .pDynamicStates = _dynamic_states.data()};
 
   std::array<vk::VertexInputBindingDescription, 2> binding_descriptions {};
-  binding_descriptions[0] = vk::VertexInputBindingDescription {
-    .binding = attributes[0].binding,
-    .stride = (uint32_t)format_byte_size(attributes[0].format),
-    .inputRate = vk::VertexInputRate::eVertex,
-  };
+  if (attributes.size() > 0) {
+    binding_descriptions[0] = vk::VertexInputBindingDescription {
+      .binding = attributes[0].binding,
+      .stride = (uint32_t)format_byte_size(attributes[0].format),
+      .inputRate = vk::VertexInputRate::eVertex,
+    };
+  }
   if (attributes.size() > 1) {
     binding_descriptions[1] = vk::VertexInputBindingDescription {
       .binding = attributes[1].binding,
@@ -36,7 +39,7 @@ mr::GraphicsPipeline::GraphicsPipeline(const RenderContext &render_context,
     .vertexAttributeDescriptionCount = static_cast<uint>(attributes.size()),
     .pVertexAttributeDescriptions = attributes.data()};
 
-  _topology = vk::PrimitiveTopology::eTriangleList;
+  _topology = not attributes.empty() ? vk::PrimitiveTopology::eTriangleList : vk::PrimitiveTopology::ePointList;
   vk::PipelineInputAssemblyStateCreateInfo input_assembly_create_info {
     .topology = _topology, .primitiveRestartEnable = false};
 

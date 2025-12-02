@@ -21,7 +21,7 @@ mr::graphics::Shader::Shader(const VulkanState &state, std::string_view filename
   std::iota(shd_types.begin(), shd_types.end(), 0);
 
   std::for_each(
-    std::execution::par, shd_types.begin(), shd_types.end(), [&](int shd_ind) {
+    std::execution::seq, shd_types.begin(), shd_types.end(), [&](int shd_ind) {
       auto stage = static_cast<Stage>(shd_ind);
       compile(stage);
       std::optional<std::vector<char>> source = load(stage);
@@ -72,13 +72,33 @@ void mr::graphics::Shader::compile(Shader::Stage stage) const noexcept
   std::filesystem::path src_path = _path;
   src_path.append("shader").replace_extension(stage_type);
 
-  if (!std::filesystem::exists(src_path)) return;
+  if (!std::filesystem::exists(src_path)) {
+    // Try again for extended extension
+    src_path += ".glsl";
+    if (!std::filesystem::exists(src_path)) {
+      return;
+    }
+  }
 
   std::filesystem::path dst_path = _path;
   dst_path.append(stage_type).replace_extension("spv");
 
-  auto argstr = ("glslc " + _define_string + _include_string + " -g " +
-                 src_path.string() + " -o " + dst_path.string());
+  constexpr auto get_full_stage_name = [](Shader::Stage stage) {
+    constexpr std::array shader_type_names {
+      "compute",
+      "vertex",
+      "tesscontrol",
+      "tesseval",
+      "geometry",
+      "fragment",
+    };
+    ASSERT(enum_cast(stage) < shader_type_names.size());
+    return shader_type_names[enum_cast(stage)];
+  };
+
+  // TODO(dk6): maybe instead -fshader-stage #pragma shader_stage() will be better, i don't know
+  auto argstr = std::format("glslc -fshader-stage={} {} {} -g {} -o {}",
+    get_full_stage_name(stage), _define_string, _include_string, src_path.string(), dst_path.string());
   std::system(argstr.c_str());
 }
 
@@ -105,17 +125,17 @@ std::optional<std::vector<char>> mr::graphics::Shader::load(Shader::Stage stage)
 
 bool mr::graphics::Shader::_validate_stage(Stage stage, bool present) const noexcept
 {
-  // TODO: add mesh & task stages
-  if (not present && (stage == Stage::Vertex || stage == Stage::Fragment)) {
-    return false;
-  }
-
   auto find_stage = [this](Stage stage) {
     return std::ranges::find(_stages,
                              get_stage_flags(stage),
                              &vk::PipelineShaderStageCreateInfo::stage) !=
            _stages.end();
   };
+
+  // TODO: add mesh & task stages
+  if (not present && (stage == Stage::Vertex || stage == Stage::Fragment)) {
+    return find_stage(Stage::Compute);
+  }
 
   if (present && stage == Stage::Evaluate) {
     return find_stage(Stage::Control);

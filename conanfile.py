@@ -29,9 +29,9 @@ class MrGraphicsRecipe(ConanFile):
 
         self.requires("glfw/3.4")
 
-        self.requires("mr-math/1.1.4")
+        self.requires("mr-math/1.1.5")
         self.requires("mr-utils/1.1.2")
-        self.requires("mr-importer/2.9.0")
+        self.requires("mr-importer/2.9.3")
 
         self.requires("stb/cci.20240531")
 

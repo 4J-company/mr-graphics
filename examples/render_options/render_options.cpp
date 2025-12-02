@@ -29,20 +29,20 @@ static std::optional<mr::math::Camera<float>> parse_camera(const std::string &s)
   );
 }
 
-static std::optional<mr::RenderOptions::Mode> parse_mode(std::string_view s)
+static std::optional<mr::CliOptions::Mode> parse_mode(std::string_view s)
 {
   if (s == "default") {
-    return mr::RenderOptions::Mode::Default;
+    return mr::CliOptions::Mode::Default;
   } else if (s == "frames") {
-    return mr::RenderOptions::Mode::Frames;
+    return mr::CliOptions::Mode::Frames;
   } else if (s == "bench") {
-    return mr::RenderOptions::Mode::Bench;
+    return mr::CliOptions::Mode::Bench;
   } else {
     return std::nullopt;
   }
 }
 
-std::optional<mr::RenderOptions> mr::RenderOptions::parse(int argc, const char **argv)
+std::optional<mr::CliOptions> mr::CliOptions::parse(int argc, const char **argv)
 {
   po::options_description desc("mr-cli - Model Renderer CLI");
   // TODO(dk6): maybe add ability to specify default values outside instead hardcode here
@@ -69,9 +69,15 @@ std::optional<mr::RenderOptions> mr::RenderOptions::parse(int argc, const char *
     ("disable-culling",
      po::bool_switch()->default_value(false),
      "Disable culling")
+    ("enable-vsync",
+     po::bool_switch()->default_value(false),
+     "Enable VSYNC")
+    ("enable-bound-boxes",
+     po::bool_switch()->default_value(false),
+     "Enable drawing bound boxes of models for debug")
     ("stat-dir",
      po::value<std::string>()->default_value("render_stats"),
-     "Path to directory in which frame stats will be writed (default: ./render_stat.txt).")
+     "Path to directory in which frame stats will be written (default: render_stats).")
     ("models",
      po::value<std::vector<std::string>>()->multitoken(),
      "GLTF model files to render (can be specified anywhere in arguments)")
@@ -111,11 +117,13 @@ std::optional<mr::RenderOptions> mr::RenderOptions::parse(int argc, const char *
     return std::nullopt;
   }
 
-  RenderOptions options;
+  CliOptions options;
 
   options.dst_dir = vm["dst-dir"].as<std::string>();
   options.frames_number = vm["frames-number"].as<int>();
   options.disable_culling = vm["disable-culling"].as<bool>();
+  options.enable_vsync = vm["enable-vsync"].as<bool>();
+  options.enable_bound_boxes = vm["enable-bound-boxes"].as<bool>();
   options.stat_dir = vm["stat-dir"].as<std::string>();
 
   auto mode_str = vm["mode"].as<std::string>();
@@ -165,7 +173,7 @@ std::optional<mr::RenderOptions> mr::RenderOptions::parse(int argc, const char *
   return options;
 }
 
-void mr::RenderOptions::print() const noexcept
+void mr::CliOptions::print() const noexcept
 {
   std::println("=== Configuration ===");
 

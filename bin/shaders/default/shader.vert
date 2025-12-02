@@ -8,6 +8,8 @@
 #define BINDLESS_SET 0
 #endif
 
+#include "types.h"
+
 layout(location = 0) in vec3 InPos;
 layout(location = 1) in vec4 InColor;
 layout(location = 2) in vec3 InNorm;
@@ -20,20 +22,14 @@ layout(location = 1) out vec4 normal;
 layout(location = 2) out vec2 texcoord;
 layout(location = 3) out flat uint materialid;
 
-struct DrawInfo {
-  uint mesh_offset;
-  uint instance_offset;
-  uint material_buffer_id;
+layout(push_constant) uniform DrawsIndosBufferId {
+  uint draw_infos_buffer;
   uint camera_buffer_id;
   uint transforms_buffer_id;
 };
 
-layout(push_constant) uniform DrawsIndosBufferId {
-  uint draw_infos_buffer;
-};
-
 layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer DrawIndoBuffers {
-  DrawInfo draws[];
+  MeshDrawInfo draws[];
 } DrawInfosArray[];
 #define draws DrawInfosArray[draw_infos_buffer].draws
 #define draw draws[gl_DrawID]
@@ -46,12 +42,12 @@ layout(set = BINDLESS_SET, binding = UNIFORM_BUFFERS_BINDING) readonly uniform C
   float speed;
   float sens;
 } CameraUboArray[];
-#define cam_ubo CameraUboArray[draw.camera_buffer_id]
+#define cam_ubo CameraUboArray[camera_buffer_id]
 
 layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer Transforms {
   mat4 transforms[];
 } SSBOArray[];
-#define transforms SSBOArray[draw.transforms_buffer_id].transforms
+#define transforms SSBOArray[transforms_buffer_id].transforms
 
 void main()
 {

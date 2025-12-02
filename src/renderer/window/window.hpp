@@ -13,6 +13,8 @@ inline namespace graphics {
     static inline std::once_flag _init_vkfw_flag;
     vkfw::UniqueWindow _window;
 
+    const bool _vsync_enabled = false;
+
     std::atomic_bool _should_update_swapchain = false;
     vk::UniqueSurfaceKHR _surface;
     Swapchain _swapchain;
@@ -22,13 +24,15 @@ inline namespace graphics {
 
     InputState _input_state;
 
+    bool _mouse_enabled = true;
+
     // semaphores for waiting swapchain image is ready before light pass
     InplaceVector<vk::UniqueSemaphore, Swapchain::max_images_number> _image_available_semaphore;
     // semaphores for waiting frame is ready before presentin
     InplaceVector<vk::UniqueSemaphore, Swapchain::max_images_number> _render_finished_semaphore;
 
   public:
-    Window(const RenderContext &parent, Extent extent = {800, 600});
+    Window(const RenderContext &parent, Extent extent = {800, 600}, bool enable_vsync = false);
 
     Window(Window &&other) noexcept = default;
     Window &operator=(Window &&other) noexcept = default;
