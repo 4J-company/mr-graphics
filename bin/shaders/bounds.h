@@ -33,6 +33,33 @@ BoundBox transform_bound_box(BoundBox bb, mat4 transform)
   return res;
 }
 
+vec4 get_bound_box_screen_rectangle(BoundBox bb, mat4 mvp)
+{
+  vec4 corners[8];
+  corners[0] = mvp * vec4(bb.min.x, bb.min.y, bb.min.z, 1);
+  corners[1] = mvp * vec4(bb.max.x, bb.min.y, bb.min.z, 1);
+  corners[2] = mvp * vec4(bb.max.x, bb.max.y, bb.min.z, 1);
+  corners[3] = mvp * vec4(bb.min.x, bb.max.y, bb.min.z, 1);
+  corners[4] = mvp * vec4(bb.min.x, bb.min.y, bb.max.z, 1);
+  corners[5] = mvp * vec4(bb.max.x, bb.min.y, bb.max.z, 1);
+  corners[6] = mvp * vec4(bb.max.x, bb.max.y, bb.max.z, 1);
+  corners[7] = mvp * vec4(bb.min.x, bb.max.y, bb.max.z, 1);
+  for (int i = 0; i < 8; i++) {
+    corners[i] /= corners[i].w;
+  }
+
+  vec4 result = vec4(corners[0].x, corners[0].y, corners[0].x, corners[0].y);
+  for (int i = 1; i < 8; i++) {
+    result.x = min(result.x, corners[i].x);
+    result.y = min(result.y, corners[i].y);
+    result.z = max(result.z, corners[i].x);
+    result.w = max(result.w, corners[i].y);
+  }
+  result.y = -result.y;
+  result.w = -result.w;
+  return result;
+}
+
 bool is_bound_box_not_visible(vec4 plane, BoundBox bb)
 {
   vec3 positive = bb.min.xyz;

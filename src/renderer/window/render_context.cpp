@@ -582,6 +582,7 @@ void mr::RenderContext::render_bound_boxes(const SceneHandle scene)
   uint32_t bound_boxes_push_contants[] {
     scene->camera_buffer_id(),
     _bound_boxes_buffer_id,
+    (uint32_t)scene->_draw_bound_rects,
   };
   _models_command_unit->pushConstants(_bound_boxes_draw_pipeline.layout(),
                                       vk::ShaderStageFlagBits::eAllGraphics,
