@@ -53,10 +53,6 @@ inline namespace graphics {
       state.queue().submit(submit_info(), fence.get());
       return std::move(fence);
     }
-
-    void submit_without_fence(const VulkanState &state) noexcept {
-      state.queue().submit(submit_info());
-    }
   };
 
   struct FenceGuard {

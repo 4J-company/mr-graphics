@@ -76,6 +76,7 @@ inline namespace graphics {
 
     CommandUnit _transfer_command_unit;
     vk::UniqueSemaphore _transfers_semaphore;
+    vk::UniqueFence _transfers_fence;
     bool _was_transfer_in_this_frame = false;
 
     std::atomic_uint32_t _mesh_offset = 0;

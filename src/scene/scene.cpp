@@ -139,6 +139,9 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
 
   _was_transfer_in_this_frame = false;
   if (_is_buffers_dirty) {
+    if (_transfers_fence) {
+      _parent->vulkan_state().device().waitForFences({_transfers_fence.get()}, vk::True, UINT64_MAX);
+    }
     _transfer_command_unit.begin();
 
     _transforms.write(_transfer_command_unit, std::span(_transforms_data));
@@ -154,9 +157,8 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
 
     _transfer_command_unit.add_signal_semaphore(_transfers_semaphore.get());
 
-    // TODO(dk6): maybe save fence and wait before next transfer
     // Don't use fence becase sync is provided by semaphores
-    _transfer_command_unit.submit_without_fence(_parent->vulkan_state());
+    _transfers_fence = _transfer_command_unit.submit(_parent->vulkan_state());
 
     _is_buffers_dirty = false;
     _was_transfer_in_this_frame = true;

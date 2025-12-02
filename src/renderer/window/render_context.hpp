@@ -156,11 +156,13 @@ inline namespace graphics {
     ShaderHandle _instances_collect_shader;
     ComputePipeline _instances_collect_pipeline;
 
+    // TODO(dk6): rework it to MarkerSystem
     ShaderHandle _bound_boxes_draw_shader;
     GraphicsPipeline _bound_boxes_draw_pipeline;
     StorageBuffer _bound_boxes_buffer;
     uint32_t _bound_boxes_buffer_id = -1;
     std::vector<BoundBoxRenderData> _bound_boxes_data;
+    std::atomic_bool _bound_boxes_data_dirty = false;
     std::atomic_bool _bound_boxes_draw_enabled = false;
 
   public:
@@ -217,7 +219,7 @@ inline namespace graphics {
     void init_bindless_rendering();
     void init_profiling();
     void init_culling();
-    void init_bound_box_drawer();
+    void init_bound_box_rendering();
 
     void render_geometry(const SceneHandle scene);
     void culling_geometry(const SceneHandle scene);
@@ -225,6 +227,7 @@ inline namespace graphics {
     void render_models(const SceneHandle scene);
     void render_lights(const SceneHandle scene, Presenter &presenter);
 
+    void update_bound_boxes_data();
     void update_camera_buffer(UniformBuffer &uniform_buffer);
 
     void calculate_stat(SceneHandle scene,

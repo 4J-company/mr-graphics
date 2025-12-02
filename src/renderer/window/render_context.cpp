@@ -43,7 +43,7 @@ mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent,
   init_lights_render_data();
   init_profiling();
   init_culling();
-  init_bound_box_drawer();
+  init_bound_box_rendering();
 }
 
 // TODO(dk6): maybe create lights_render_data.cpp file and move this function?
@@ -173,7 +173,7 @@ void mr::RenderContext::init_culling()
   _instances_collect_pipeline = ComputePipeline(*_state, _instances_collect_shader, set_layouts);
 }
 
-void mr::RenderContext::init_bound_box_drawer()
+void mr::RenderContext::init_bound_box_rendering()
 {
   boost::unordered_map<std::string, std::string> defines {
     {"TEXTURES_BINDING",        std::to_string(textures_binding)},
@@ -203,6 +203,7 @@ void mr::RenderContext::draw_bound_box(uint32_t transforms_buffer_id, uint32_t t
     .bound_boxes_buffer_id = bound_boxes_buffer_id,
     .bound_box_index = bound_box_index,
   });
+  _bound_boxes_data_dirty = true;
 }
 
 mr::RenderContext::~RenderContext()
@@ -537,6 +538,31 @@ void mr::RenderContext::culling_geometry(const SceneHandle scene)
   _state->queue().submit(culling_submit_info);
 }
 
+void mr::RenderContext::update_bound_boxes_data()
+{
+  if (not _bound_boxes_draw_enabled) {
+    return;
+  }
+
+  uint32_t bound_boxes_number = _bound_boxes_data.size();
+  if (_bound_boxes_data_dirty) {
+    _bound_boxes_buffer.write(_pre_model_layout_transition_command_unit, std::as_bytes(std::span(_bound_boxes_data)));
+    _bound_boxes_data_dirty = false;
+
+    vk::BufferMemoryBarrier bound_boxes_data_barrier {
+      .srcAccessMask = vk::AccessFlagBits::eTransferWrite,
+      .dstAccessMask = vk::AccessFlagBits::eShaderRead,
+      .buffer = _bound_boxes_buffer.buffer(),
+      .offset = 0,
+      .size = bound_boxes_number * sizeof(BoundBoxRenderData),
+    };
+
+    _pre_model_layout_transition_command_unit->pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
+                                                               vk::PipelineStageFlagBits::eGeometryShader,
+                                                               {}, {}, {bound_boxes_data_barrier}, {});
+  }
+}
+
 void mr::RenderContext::render_bound_boxes(const SceneHandle scene)
 {
   if (not _bound_boxes_draw_enabled) {
@@ -544,15 +570,6 @@ void mr::RenderContext::render_bound_boxes(const SceneHandle scene)
   }
 
   uint32_t bound_boxes_number = _bound_boxes_data.size();
-  static std::once_flag bound_box_flag;
-  std::call_once(bound_box_flag, [&] {
-    CommandUnit command_unit {scene->render_context().vulkan_state()};
-    command_unit.begin();
-    _bound_boxes_buffer.write(command_unit, std::as_bytes(std::span(_bound_boxes_data)));
-    command_unit.end();
-    UniqueFenceGuard(_state->device(), command_unit.submit(*_state));
-  });
-  // _bound_boxes_data.clear();
 
   _models_command_unit->bindPipeline(vk::PipelineBindPoint::eGraphics, _bound_boxes_draw_pipeline.pipeline());
 
@@ -562,13 +579,13 @@ void mr::RenderContext::render_bound_boxes(const SceneHandle scene)
                                            {_bindless_set.set()},
                                            {});
 
-  uint32_t markers_push_contants[] {
+  uint32_t bound_boxes_push_contants[] {
     scene->camera_buffer_id(),
     _bound_boxes_buffer_id,
   };
   _models_command_unit->pushConstants(_bound_boxes_draw_pipeline.layout(),
                                       vk::ShaderStageFlagBits::eAllGraphics,
-                                      0, sizeof(markers_push_contants), markers_push_contants);
+                                      0, sizeof(bound_boxes_push_contants), bound_boxes_push_contants);
 
   _models_command_unit->draw(1, bound_boxes_number, 0, 0);
 }
@@ -589,6 +606,9 @@ void mr::RenderContext::render_geometry(const SceneHandle scene)
       gbuf.switch_layout(_pre_model_layout_transition_command_unit, vk::ImageLayout::eColorAttachmentOptimal);
     }
     _depthbuffer.switch_layout(_pre_model_layout_transition_command_unit, vk::ImageLayout::eDepthStencilAttachmentOptimal);
+
+    update_bound_boxes_data();
+
     _pre_model_layout_transition_command_unit.end();
     _pre_model_layout_transition_command_unit.add_signal_semaphore(
         _pre_model_layout_transition_semaphore.get());
