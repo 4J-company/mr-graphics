@@ -61,6 +61,8 @@ inline namespace graphics {
   private:
     RenderContext *_parent = nullptr;
 
+    bool _draw_bound_rects = false;
+
     // For statistic
     std::atomic_uint64_t _vertexes_number;
     std::atomic_uint64_t _triangles_number;

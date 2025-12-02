@@ -33,6 +33,8 @@ mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent,
   , _positions_vertex_buffer(*_state, default_vertex_number * position_bytes_size)
   , _attributes_vertex_buffer(*_state, default_vertex_number * attributes_bytes_size)
   , _index_buffer(*_state, default_index_number * sizeof(uint32_t), sizeof(uint32_t))
+  , _depth_pyramid_extent(extent.width / 2, extent.height / 2)
+  , _depth_pyramid(*_state, _depth_pyramid_extent, vk::Format::eR32Sfloat, calculate_mips_levels_number(extent))
 {
   for (auto _ : std::views::iota(0, gbuffers_number)) {
     _gbuffers.emplace_back(*_state, _extent, vk::Format::eR32G32B32A32Sfloat);
@@ -108,9 +110,10 @@ void mr::RenderContext::init_bindless_rendering()
 {
   using BindingT = DescriptorSetLayout::BindingDescription;
   std::array bindings {
-    BindingT {0, vk::DescriptorType::eCombinedImageSampler},
-    BindingT {1, vk::DescriptorType::eUniformBuffer},
-    BindingT {2, vk::DescriptorType::eStorageBuffer},
+    BindingT {textures_binding, vk::DescriptorType::eCombinedImageSampler},
+    BindingT {uniform_buffer_binding, vk::DescriptorType::eUniformBuffer},
+    BindingT {storage_buffer_binding, vk::DescriptorType::eStorageBuffer},
+    BindingT {storage_images_binding, vk::DescriptorType::eStorageImage},
   };
 
   _bindless_set_layout = ResourceManager<BindlessDescriptorSetLayout>::get().create("BindlessSetLayout",
@@ -149,10 +152,15 @@ void mr::RenderContext::init_profiling()
 
 void mr::RenderContext::init_culling()
 {
+  // ---------------------------
+  // Frustum culling
+  // ---------------------------
+
   boost::unordered_map<std::string, std::string> defines {
     {"TEXTURES_BINDING",        std::to_string(textures_binding)},
     {"UNIFORM_BUFFERS_BINDING", std::to_string(uniform_buffer_binding)},
     {"STORAGE_BUFFERS_BINDING", std::to_string(storage_buffer_binding)},
+    {"STORAGE_IMAGES_BINDING", std::to_string(storage_images_binding)},
     {"BINDLESS_SET", std::to_string(bindless_set_number)},
     {"THREADS_NUM", std::to_string(culling_work_group_size)},
   };
@@ -171,6 +179,31 @@ void mr::RenderContext::init_culling()
   _instances_collect_shader = ResourceManager<Shader>::get().create("InstancesCollectShader",
     *_state, "culling/instances_collect", defines);
   _instances_collect_pipeline = ComputePipeline(*_state, _instances_collect_shader, set_layouts);
+
+
+  // ---------------------------
+  // Depth pyramid
+  // ---------------------------
+
+  _depth_pyramid_shader = ResourceManager<Shader>::get().create("DepthPyramidBuild",
+    *_state, "culling/depth_pyramid_build", defines);
+  _depth_pyramid_pipeline = ComputePipeline(*_state, _depth_pyramid_shader, set_layouts);
+
+  _depth_image_attacment_id = _bindless_set.register_resource(&_depthbuffer);
+  for (uint32_t mip = 0; mip < _depth_pyramid.mip_levels_number(); mip++) {
+    Shader::PyramidImageResource res {
+      .image = &_depth_pyramid,
+      .mip_level = mip,
+    };
+    _depth_pyramid_mips.emplace_back(_bindless_set.register_resource(&res));
+  }
+
+  // TODO(dk6): maybe move it in PyramidImage ctr
+  CommandUnit cmd(*_state);
+  cmd.begin();
+  _depth_pyramid.switch_layout(cmd, vk::ImageLayout::eGeneral);
+  cmd.end();
+  UniqueFenceGuard guard(_state->device(), cmd.submit(*_state));
 }
 
 void mr::RenderContext::init_bound_box_rendering()
@@ -474,7 +507,7 @@ void mr::RenderContext::culling_geometry(const SceneHandle scene)
     _culling_command_unit->pushConstants(_instances_culling_pipeline.layout(), vk::ShaderStageFlagBits::eCompute,
                                         0, sizeof(culling_push_contants), culling_push_contants);
 
-    _culling_command_unit->dispatch((instances_number + culling_work_group_size - 1) / culling_work_group_size, 1, 1);
+    _culling_command_unit->dispatch(calculate_work_groups_number(instances_number, culling_work_group_size), 1, 1);
   }
 
   vk::BufferMemoryBarrier instances_count_culling_barrier {
@@ -516,7 +549,7 @@ void mr::RenderContext::culling_geometry(const SceneHandle scene)
     _culling_command_unit->pushConstants(_instances_collect_pipeline.layout(), vk::ShaderStageFlagBits::eCompute,
                                         0, sizeof(culling_push_contants), culling_push_contants);
 
-    _culling_command_unit->dispatch((max_draws_count + culling_work_group_size - 1) / culling_work_group_size, 1, 1);
+    _culling_command_unit->dispatch(calculate_work_groups_number(max_draws_count, culling_work_group_size), 1, 1);
   }
 
   _culling_command_unit->writeTimestamp(vk::PipelineStageFlagBits::eComputeShader,
@@ -577,6 +610,7 @@ void mr::RenderContext::render_bound_boxes(const SceneHandle scene)
   uint32_t bound_boxes_push_contants[] {
     scene->camera_buffer_id(),
     _bound_boxes_buffer_id,
+    (uint32_t)scene->_draw_bound_rects,
   };
   _models_command_unit->pushConstants(_bound_boxes_draw_pipeline.layout(),
                                       vk::ShaderStageFlagBits::eAllGraphics,
@@ -658,15 +692,64 @@ void mr::RenderContext::render_geometry(const SceneHandle scene)
     render_models(scene);
 
     _models_command_unit->endRendering();
+
+    build_depth_pyramid();
   }
 
   TracyVkCollect(_models_tracy_gpu_context, _models_command_unit.command_buffer());
   _models_command_unit.end();
 }
 
+
+void mr::RenderContext::build_depth_pyramid()
+{
+  _models_command_unit->resetQueryPool(_timestamps_query_pool.get(), enum_cast(Timestamp::BuildDepthPyramidStart), 2);
+
+  _models_command_unit->writeTimestamp(vk::PipelineStageFlagBits::eComputeShader,
+                                       _timestamps_query_pool.get(),
+                                       enum_cast(Timestamp::BuildDepthPyramidStart));
+
+  _depthbuffer.switch_layout(_models_command_unit, vk::ImageLayout::eGeneral);
+
+  _models_command_unit->bindPipeline(vk::PipelineBindPoint::eCompute, _depth_pyramid_pipeline.pipeline());
+  _models_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eCompute,
+                                           {_depth_pyramid_pipeline.layout()},
+                                           bindless_set_number,
+                                           {_bindless_set.set()},
+                                           {});
+
+  auto dst_size = _depth_pyramid_extent;
+  for (uint32_t i = 0; dst_size.width > 0 && dst_size.height > 0; i++) {
+    uint32_t depth_pyramid_push_contants[] {
+      i == 0 ? _depth_image_attacment_id : _depth_pyramid_mips[i - 1], // src image
+      _depth_pyramid_mips[i], // dst image
+      dst_size.width,
+      dst_size.height,
+    };
+
+    _models_command_unit->pushConstants({_depth_pyramid_pipeline.layout()}, vk::ShaderStageFlagBits::eCompute,
+                                        0, sizeof(depth_pyramid_push_contants), depth_pyramid_push_contants);
+
+    uint32_t work_group_width = calculate_work_groups_number(dst_size.width, culling_work_group_size);
+    uint32_t work_group_height = calculate_work_groups_number(dst_size.height, culling_work_group_size);
+    _models_command_unit->dispatch(work_group_width, work_group_height, 1);
+
+    // just for pipeline barrier
+    _depth_pyramid.switch_layout(_models_command_unit, vk::ImageLayout::eGeneral, i, 1, true);
+
+    dst_size.width /= 2;
+    dst_size.height /= 2;
+  }
+
+  _models_command_unit->writeTimestamp(vk::PipelineStageFlagBits::eComputeShader,
+                                       _timestamps_query_pool.get(),
+                                       enum_cast(Timestamp::BuildDepthPyramidEnd));
+}
+
 void mr::RenderContext::resize(const mr::Extent &extent)
 {
   _extent = extent;
+  _depth_pyramid_extent = Extent(extent.width / 2, extent.height / 2);
 }
 
 void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
@@ -781,6 +864,9 @@ void mr::RenderContext::calculate_stat(SceneHandle scene,
                                       timestamps[enum_cast(Timestamp::CullingStart)].first) * _timestamp_to_ms;
   _render_stat.models_gpu_time_ms = (timestamps[enum_cast(Timestamp::ModelsEnd)].first -
                                      timestamps[enum_cast(Timestamp::ModelsStart)].first) * _timestamp_to_ms;
+  _render_stat.build_depth_pyramid_gpu_time_ms =
+    (timestamps[enum_cast(Timestamp::BuildDepthPyramidEnd)].first -
+     timestamps[enum_cast(Timestamp::BuildDepthPyramidStart)].first) * _timestamp_to_ms;
   _render_stat.shading_gpu_time_ms = (timestamps[enum_cast(Timestamp::ShadingEnd)].first -
                                       timestamps[enum_cast(Timestamp::ShadingStart)].first) * _timestamp_to_ms;
 
@@ -809,6 +895,7 @@ void mr::RenderStat::write_to_json(std::ostream &out) const noexcept
   std::println(out, "  \"gpu_time_ms\": {:.2f},", gpu_time_ms);
   std::println(out, "  \"cpu_rendering_time_ms\": {:.2f},", render_cpu_time_ms);
   std::println(out, "  \"culling_gpu_time_ms\": {:.3f},", culling_gpu_time_ms);
+  std::println(out, "  \"build_depth_pyramid_gpu_time_ms\": {:.3f},", build_depth_pyramid_gpu_time_ms);
   std::println(out, "  \"gpu_rendering_time_ms\": {:.2f},", render_gpu_time_ms);
   std::println(out, "  \"gpu_models_time_ms\": {:.2f},", models_gpu_time_ms);
   std::println(out, "  \"gpu_shading_time_ms\": {:.2f},", shading_gpu_time_ms);

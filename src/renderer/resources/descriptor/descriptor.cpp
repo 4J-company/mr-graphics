@@ -17,7 +17,10 @@ static vk::DescriptorType get_descriptor_type(const mr::graphics::Shader::Resour
     eUniformBuffer,        // for UniformBuffer
     eStorageBuffer,        // for StorageBuffer
     eCombinedImageSampler, // for Sampler
-    eInputAttachment,      // for TextureImage
+    eInputAttachment,      // for ColorAttachmentImage?
+    eStorageImage,         // for StorageImage
+    eStorageImage,         // for PyramidImage
+    eStorageImage,         // for DepthImage
     eStorageBuffer,        // for ConditionalBuffer
   };
 
@@ -149,18 +152,19 @@ void mr::DescriptorSet::update(
     info.imageView = texture->image().image_view();
     info.sampler = texture->sampler().sampler();
   };
-  auto write_geometry_buffer = [&](const Image *image, vk::DescriptorImageInfo &info) {
+  auto write_geometry_buffer = [&](const ColorAttachmentImage *image, vk::DescriptorImageInfo &info) {
     info.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
     info.imageView = image->image_view();
     info.sampler = nullptr;
   };
-  auto write_default = [](auto, auto) { ASSERT(false, "Unhandled attachment type"); std::unreachable(); };
+  auto write_default = [](auto res, auto) { ASSERT(false, "Unhandled attachment type", res); std::unreachable(); };
 
   std::array<bool, desciptor_set_max_bindings> used_bindings {}; // for validation
 
   for (const auto &[attachment_view, write_info] : std::views::zip(attachments, write_infos)) {
-    const graphics::Shader::Resource &attachment = attachment_view;
-    if (std::holds_alternative<const Texture *>(attachment) || std::holds_alternative<const Image *>(attachment)) {
+    const Shader::Resource &attachment = attachment_view;
+    if (std::holds_alternative<const Texture *>(attachment) ||
+        std::holds_alternative<const ColorAttachmentImage *>(attachment)) {
       write_info.emplace<vk::DescriptorImageInfo>();
     }
 
@@ -217,6 +221,7 @@ mr::DescriptorAllocator::DescriptorAllocator(const VulkanState &state)
     vk::DescriptorPoolSize {vk::DescriptorType::eSampledImage, 5},
     vk::DescriptorPoolSize {vk::DescriptorType::eInputAttachment, 10},
     vk::DescriptorPoolSize {vk::DescriptorType::eCombinedImageSampler, 10},
+    vk::DescriptorPoolSize {vk::DescriptorType::eStorageImage, 20},
     // vk::DescriptorPoolSize {vk::DescriptorType::eUniformBufferDynamic, 5},
     // vk::DescriptorPoolSize {vk::DescriptorType::eStorageBufferDynamic, 5},
   };
@@ -229,6 +234,7 @@ mr::DescriptorAllocator::DescriptorAllocator(const VulkanState &state)
     vk::DescriptorPoolSize {vk::DescriptorType::eUniformBuffer,        resource_max_number_per_binding},
     vk::DescriptorPoolSize {vk::DescriptorType::eStorageBuffer,        resource_max_number_per_binding},
     vk::DescriptorPoolSize {vk::DescriptorType::eCombinedImageSampler, resource_max_number_per_binding},
+    vk::DescriptorPoolSize {vk::DescriptorType::eStorageImage,         resource_max_number_per_binding},
   };
   auto bindless_pool = allocate_pool(bindless_default_sizes, true);
   ASSERT(bindless_pool.has_value(), "Error in allocating descriptor pool");
@@ -415,7 +421,14 @@ static std::uintptr_t get_resource_id(const T *res)
   return reinterpret_cast<std::uintptr_t>(res);
 }
 
-void mr::BindlessDescriptorSet::unregister_resource(const graphics::Shader::Resource &resource) noexcept
+static std::uintptr_t get_resource_id(const mr::graphics::Shader::PyramidImageResource *res)
+{
+  // TODO(dk6): This can be bad for hash collisions
+  //            Maybe it is better to require PyramidImageResource instance for each mip in calling code
+  return reinterpret_cast<std::uintptr_t>((VkImageView)res->image->get_level(res->mip_level));
+}
+
+void mr::BindlessDescriptorSet::unregister_resource(const Shader::Resource &resource) noexcept
 {
   auto tex = [&](const Texture *tex) -> uint32_t {
     return get_resource_id(tex);
@@ -426,11 +439,20 @@ void mr::BindlessDescriptorSet::unregister_resource(const graphics::Shader::Reso
   auto sbuf = [&](const StorageBuffer *buf) -> uint32_t {
     return get_resource_id(buf);
   };
+  auto simg = [&](const StorageImage *img) -> uint32_t {
+    return get_resource_id(img);
+  };
+  auto pimg = [&](const Shader::PyramidImageResource *img) -> uint32_t {
+    return get_resource_id(img);
+  };
+  auto dimg = [&](const DepthImage *img) -> uint32_t {
+    return get_resource_id(img);
+  };
   auto other = [](auto &&unknown_res) -> uint32_t {
     ASSERT(false, "Unsupported in BindlessSet resource type", unknown_res);
     return 0;
   };
-  auto resource_id = std::visit(Overloads {tex, ubuf, sbuf, other}, resource);
+  auto resource_id = std::visit(Overloads {tex, ubuf, sbuf, simg, pimg, dimg, other}, resource);
 
   uint32_t binding = _bindings_of_resources[resource_id];
   _resource_pools[binding].unregister(resource_id);
@@ -452,11 +474,23 @@ uint32_t mr::BindlessDescriptorSet::fill_resource(const mr::graphics::Shader::Re
     fill_storage_buffer(buf, resource_info.emplace<vk::DescriptorBufferInfo>());
     return get_resource_id(buf);
   };
+  auto simg = [&](const StorageImage *img) -> std::uintptr_t {
+    fill_storage_image(img, resource_info.emplace<vk::DescriptorImageInfo>());
+    return get_resource_id(img);
+  };
+  auto pimg = [&](const Shader::PyramidImageResource *img) -> std::uintptr_t {
+    fill_pyramid_image(img, resource_info.emplace<vk::DescriptorImageInfo>());
+    return get_resource_id(img);
+  };
+  auto dimg = [&](const DepthImage *img) -> std::uintptr_t {
+    fill_depth_image(img, resource_info.emplace<vk::DescriptorImageInfo>());
+    return get_resource_id(img);
+  };
   auto other = [](auto &&unknown_res) -> std::uintptr_t {
     ASSERT(false, "Unsupported in BindlessSet resource type", unknown_res);
     return {};
   };
-  auto resource_id = std::visit(Overloads {tex, ubuf, sbuf, other}, resource.res);
+  auto resource_id = std::visit(Overloads {tex, ubuf, sbuf, simg, pimg, dimg, other}, resource.res);
   _bindings_of_resources[resource_id] = resource.binding;
 
   uint32_t index = _resource_pools[resource.binding].get_id(resource_id);
@@ -499,6 +533,34 @@ void mr::BindlessDescriptorSet::fill_storage_buffer(const StorageBuffer *buffer,
     .buffer = buffer->buffer(),
     .offset = 0,
     .range = buffer->byte_size(),
+  };
+}
+
+void mr::BindlessDescriptorSet::fill_storage_image(const StorageImage *image,
+                                                   vk::DescriptorImageInfo &image_info) const noexcept
+{
+  image_info = vk::DescriptorImageInfo {
+    .imageView = image->image_view(),
+    .imageLayout = vk::ImageLayout::eGeneral,
+  };
+}
+
+void mr::BindlessDescriptorSet::fill_pyramid_image(const Shader::PyramidImageResource *image,
+                                                   vk::DescriptorImageInfo &image_info) const noexcept
+{
+  image_info = vk::DescriptorImageInfo {
+    .imageView = image->image->get_level(image->mip_level),
+    .imageLayout = vk::ImageLayout::eGeneral,
+  };
+}
+
+void mr::BindlessDescriptorSet::fill_depth_image(const DepthImage *image,
+                                                 vk::DescriptorImageInfo &image_info) const noexcept
+{
+  image_info = vk::DescriptorImageInfo {
+    .imageView = image->image_view(),
+    // .imageLayout = vk::ImageLayout::eDepthStencilReadOnlyOptimal,
+    .imageLayout = vk::ImageLayout::eGeneral,
   };
 }
 
