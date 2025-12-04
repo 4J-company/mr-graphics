@@ -8,11 +8,14 @@ layout(set = 2, binding = 8, r32f) uniform readonly image2D OutImage;
 
 layout(push_constant) uniform PushContants {
   uint out_level;
-  uint in_width;
-  uint in_heigth;
+  uvec2 in_size;
 } data;
 
 void main()
 {
-  uvec2 coord = gl_GlobalInvocationID.xy;
+  ivec2 coord = ivec2(gl_GlobalInvocationID.xy);
+  vec2 avg_coord = (vec2(coord) + vec2(0.5)) / vec2(data.in_size);
+  vec4 depth_avg = textureGather(ImImage, avg_coor);
+  float depth = min(min(depth_avg.x, depth_avg.y), min(depth_avg.z, depth_avg.w));
+  imageStore(OutImage, coord / 2, vec4(depth));
 }

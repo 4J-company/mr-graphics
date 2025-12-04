@@ -156,6 +156,11 @@ inline namespace graphics {
     ShaderHandle _instances_collect_shader;
     ComputePipeline _instances_collect_pipeline;
 
+    Extent _depth_pyramid_extent;
+    PyramidImage _depth_pyramid;
+    ComputePipeline _depth_pyramid_pipeline;
+    ShaderHandle _depth_pyramid_shader;
+
     // TODO(dk6): rework it to MarkerSystem
     ShaderHandle _bound_boxes_draw_shader;
     GraphicsPipeline _bound_boxes_draw_pipeline;
@@ -220,9 +225,11 @@ inline namespace graphics {
     void init_profiling();
     void init_culling();
     void init_bound_box_rendering();
+    void init_depth_pyramid();
 
     void render_geometry(const SceneHandle scene);
     void culling_geometry(const SceneHandle scene);
+    void build_depth_pyramid();
     void render_bound_boxes(const SceneHandle scene);
     void render_models(const SceneHandle scene);
     void render_lights(const SceneHandle scene, Presenter &presenter);
@@ -235,6 +242,11 @@ inline namespace graphics {
                         ClockT::time_point render_finish_time,
                         ClockT::duration models_time,
                         ClockT::duration shading_time);
+
+    constexpr static inline uint32_t calculate_work_groups_number(uint32_t threads_number, uint32_t group_size)
+    {
+      return (threads_number + group_size - 1) / group_size;
+    }
   };
 }
 } // namespace mr

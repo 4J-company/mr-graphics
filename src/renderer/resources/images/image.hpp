@@ -70,6 +70,7 @@ inline namespace graphics {
     virtual ~Image();
 
     void switch_layout(CommandUnit &command_unit, vk::ImageLayout new_layout);
+    void switch_layout(CommandUnit &command_unit, vk::ImageLayout new_layout, uint32_t mip_level, uint32_t mip_counts);
 
     // Copy data from to host visible buffer
     HostBuffer read_to_host_buffer(CommandUnit &command_unit) noexcept;
@@ -85,7 +86,7 @@ inline namespace graphics {
     void write(CommandUnit &command_unit, std::span<T> src) { write(command_unit, std::as_bytes(src)); }
 
   protected:
-    vk::ImageView mr::Image::create_image_view(uint32_t mip_level, uint32_t mip_levels_count);
+    vk::ImageView create_image_view(uint32_t mip_level, uint32_t mip_levels_count);
 
   public:
     vk::ImageView image_view() const noexcept { return _image_view; }
@@ -143,7 +144,7 @@ inline namespace graphics {
     public:
       DeviceImage(const VulkanState &state, Extent extent, vk::Format format,
                   vk::ImageUsageFlags usage_flags, vk::ImageAspectFlags aspect_flags,
-                  uint mip_level = 1);
+                  uint mip_level = 1, bool create_image_view = true);
       DeviceImage(const VulkanState &state, const mr::importer::ImageData &image, vk::ImageUsageFlags usage_flags, vk::ImageAspectFlags aspect_flags);
       DeviceImage(DeviceImage&&) noexcept = default;
       DeviceImage & operator=(DeviceImage&&) noexcept = default;

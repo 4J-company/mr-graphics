@@ -93,15 +93,22 @@ mr::Image::~Image() {
   _state->device().destroyImageView(_image_view);
 }
 
-void mr::Image::switch_layout(CommandUnit &command_unit, vk::ImageLayout new_layout) {
+void mr::Image::switch_layout(CommandUnit &command_unit, vk::ImageLayout new_layout)
+{
+  switch_layout(command_unit, new_layout, 0, _mip_levels_number);
+}
+
+void mr::Image::switch_layout(CommandUnit &command_unit, vk::ImageLayout new_layout,
+                              uint32_t mip_level, uint32_t mip_counts)
+{
   if (new_layout == _layout) {
     return;
   }
 
   vk::ImageSubresourceRange range {
     .aspectMask = _aspect_flags,
-    .baseMipLevel = 0,
-    .levelCount = _mip_levels_number,
+    .baseMipLevel = mip_level,
+    .levelCount = mip_counts,
     .baseArrayLayer = 0,
     .layerCount = 1,
   };
@@ -286,9 +293,9 @@ mr::HostImage::HostImage(const VulkanState &state, Extent extent, vk::Format for
 // ---- DeviceImage ----
 mr::DeviceImage::DeviceImage(const VulkanState &state, Extent extent, vk::Format format,
                             vk::ImageUsageFlags usage_flags, vk::ImageAspectFlags aspect_flags,
-                            uint mip_level)
+                            uint mip_level, bool create_image_view)
   : Image(state, extent, format, usage_flags, aspect_flags,
-          vk::MemoryPropertyFlagBits::eDeviceLocal, mip_level)
+          vk::MemoryPropertyFlagBits::eDeviceLocal, mip_level, create_image_view)
 {}
 
 mr::DeviceImage::DeviceImage(const VulkanState &state, const mr::importer::ImageData &image, vk::ImageUsageFlags usage_flags, vk::ImageAspectFlags aspect_flags)

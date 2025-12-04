@@ -108,7 +108,7 @@ inline namespace graphics {
     class ResourcePoolData {
       struct ResourceStat {
         // if mutex will be removed this variable must be atomic
-        uint32_t id = -1;
+        uint32_t id = invalid_id;
         uint32_t usage_count = 0;
       };
 
@@ -116,7 +116,7 @@ inline namespace graphics {
       std::atomic_uint32_t current_id = 0;
       InplaceVector<uint32_t, resource_max_number_per_binding> free_ids;
       boost::unordered_map<std::uintptr_t, ResourceStat> usage;
-      // Mutex may be bottle neck, it require profiling. Now it used for simple hanlde consistency
+      // Mutex may be bottle neck, they require profiling. Now it used for simple hanlde consistency
       // of two data sctuctures (vector and map)
       std::mutex mutex;
       uint32_t max_number;
@@ -184,6 +184,8 @@ inline namespace graphics {
                              vk::DescriptorBufferInfo &buffer_info) const noexcept;
     void fill_storage_buffer(const StorageBuffer *buffer,
                              vk::DescriptorBufferInfo &buffer_info) const noexcept;
+    void fill_storage_image(const Shader::StorageImageResource *image,
+                            vk::DescriptorImageInfo &image_info) const noexcept;
     uint32_t fill_resource(const Shader::ResourceView &resource,
                            ResourceInfo &resource_info,
                            vk::WriteDescriptorSet &write_info) noexcept;

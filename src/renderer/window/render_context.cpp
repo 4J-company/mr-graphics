@@ -33,6 +33,7 @@ mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent,
   , _positions_vertex_buffer(*_state, default_vertex_number * position_bytes_size)
   , _attributes_vertex_buffer(*_state, default_vertex_number * attributes_bytes_size)
   , _index_buffer(*_state, default_index_number * sizeof(uint32_t), sizeof(uint32_t))
+  , _depth_pyramid_extent(extent.width / 2, extent.height / 2)
   , _depth_pyramid(*_state, extent, vk::Format::eR32Sfloat, calculate_mips_levels_number(extent))
 {
   for (auto _ : std::views::iota(0, gbuffers_number)) {
@@ -112,6 +113,7 @@ void mr::RenderContext::init_bindless_rendering()
     BindingT {0, vk::DescriptorType::eCombinedImageSampler},
     BindingT {1, vk::DescriptorType::eUniformBuffer},
     BindingT {2, vk::DescriptorType::eStorageBuffer},
+    BindingT {3, vk::DescriptorType::eStorageImage},
   };
 
   _bindless_set_layout = ResourceManager<BindlessDescriptorSetLayout>::get().create("BindlessSetLayout",
@@ -194,6 +196,26 @@ void mr::RenderContext::init_bound_box_rendering()
   _bound_boxes_buffer = StorageBuffer(*_state, sizeof(BoundBoxRenderData) * 10000);
   _bound_boxes_buffer_id = _bindless_set.register_resource(&_bound_boxes_buffer);
 }
+
+void mr::RenderContext::init_depth_pyramid()
+{
+  boost::unordered_map<std::string, std::string> defines {
+    {"TEXTURES_BINDING",        std::to_string(textures_binding)},
+    {"UNIFORM_BUFFERS_BINDING", std::to_string(uniform_buffer_binding)},
+    {"STORAGE_BUFFERS_BINDING", std::to_string(storage_buffer_binding)},
+    {"BINDLESS_SET", std::to_string(bindless_set_number)},
+    {"THREADS_NUM", std::to_string(culling_work_group_size)},
+  };
+  _depth_pyramid_shader = ResourceManager<Shader>::get().create("DepthPyramidBuild",
+    *_state, "culling/depth_pyramid_build", defines);
+  std::array set_layouts { _converted_bindless_set_layout };
+  _depth_pyramid_pipeline = ComputePipeline(*_state, _depth_pyramid_shader, set_layouts);
+
+  // TODO(dk6): use dynamic buffer
+  _bound_boxes_buffer = StorageBuffer(*_state, sizeof(BoundBoxRenderData) * 10000);
+  _bound_boxes_buffer_id = _bindless_set.register_resource(&_bound_boxes_buffer);
+}
+
 
 void mr::RenderContext::draw_bound_box(uint32_t transforms_buffer_id, uint32_t transform_index,
                                        uint32_t bound_boxes_buffer_id, uint32_t bound_box_index) noexcept
@@ -479,7 +501,7 @@ void mr::RenderContext::culling_geometry(const SceneHandle scene)
       _culling_command_unit->pushConstants(_instances_culling_pipeline.layout(), vk::ShaderStageFlagBits::eCompute,
                                           0, sizeof(culling_push_contants), culling_push_contants);
 
-      _culling_command_unit->dispatch((instances_number + culling_work_group_size - 1) / culling_work_group_size, 1, 1);
+      _culling_command_unit->dispatch(calculate_work_groups_number(instances_number, culling_work_group_size), 1, 1);
     }
   }
 
@@ -522,7 +544,7 @@ void mr::RenderContext::culling_geometry(const SceneHandle scene)
     _culling_command_unit->pushConstants(_instances_collect_pipeline.layout(), vk::ShaderStageFlagBits::eCompute,
                                         0, sizeof(culling_push_contants), culling_push_contants);
 
-    _culling_command_unit->dispatch((max_draws_count + culling_work_group_size - 1) / culling_work_group_size, 1, 1);
+    _culling_command_unit->dispatch(calculate_work_groups_number(max_draws_count, culling_work_group_size), 1, 1);
   }
 
   _culling_command_unit->writeTimestamp(vk::PipelineStageFlagBits::eComputeShader,
@@ -664,11 +686,39 @@ void mr::RenderContext::render_geometry(const SceneHandle scene)
 
     render_models(scene);
 
+    build_depth_pyramid();
+
     _models_command_unit->endRendering();
   }
 
   TracyVkCollect(_models_tracy_gpu_context, _models_command_unit.command_buffer());
   _models_command_unit.end();
+}
+
+
+void mr::RenderContext::build_depth_pyramid()
+{
+  // It also includes pipeline barrier
+  // TODO(dk6): added optional argument for pipeline stages in pipeline barrier
+  _depthbuffer.switch_layout(_models_command_unit, vk::ImageLayout::eDepthStencilReadOnlyOptimal);
+
+  auto source_size = _extent;
+  for (uint32_t i = 0; source_size.width > 1 && source_size.height > 0; i++) {
+    uint32_t depth_pyramid_push_contants[] {
+      i + 1,
+      source_size.width,
+      source_size.height,
+    };
+
+    uint32_t work_group_width = calculate_work_groups_number(source_size.width, culling_work_group_size);
+    uint32_t work_group_height = calculate_work_groups_number(source_size.height, culling_work_group_size);
+    _models_command_unit->dispatch(work_group_width, work_group_height, 1);
+
+    _depth_pyramid.switch_layout(_models_command_unit, vk::ImageLayout::eShaderReadOnlyOptimal, i, 1);
+
+    source_size.width /= 2;
+    source_size.height /= 2;
+  }
 }
 
 void mr::RenderContext::resize(const mr::Extent &extent)

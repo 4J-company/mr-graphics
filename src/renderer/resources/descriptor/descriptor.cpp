@@ -17,7 +17,9 @@ static vk::DescriptorType get_descriptor_type(const mr::graphics::Shader::Resour
     eUniformBuffer,        // for UniformBuffer
     eStorageBuffer,        // for StorageBuffer
     eCombinedImageSampler, // for Sampler
-    eInputAttachment,      // for TextureImage
+    eInputAttachment,      // for ColorAttachmentImage?
+    eStorageImage,         // for StorageImage
+    eStorageImage,         // for PyramidImage
     eStorageBuffer,        // for ConditionalBuffer
   };
 
@@ -160,7 +162,8 @@ void mr::DescriptorSet::update(
 
   for (const auto &[attachment_view, write_info] : std::views::zip(attachments, write_infos)) {
     const Shader::Resource &attachment = attachment_view;
-    if (std::holds_alternative<const Texture *>(attachment) || std::holds_alternative<const Image *>(attachment)) {
+    if (std::holds_alternative<const Texture *>(attachment) ||
+        std::holds_alternative<const ColorAttachmentImage *>(attachment)) {
       write_info.emplace<vk::DescriptorImageInfo>();
     }
 
@@ -426,11 +429,14 @@ void mr::BindlessDescriptorSet::unregister_resource(const Shader::Resource &reso
   auto sbuf = [&](const StorageBuffer *buf) -> uint32_t {
     return get_resource_id(buf);
   };
+  auto simg = [&](const Shader::StorageImageResource *img) -> uint32_t {
+    return get_resource_id(img);
+  };
   auto other = [](auto &&unknown_res) -> uint32_t {
     ASSERT(false, "Unsupported in BindlessSet resource type", unknown_res);
     return 0;
   };
-  auto resource_id = std::visit(Overloads {tex, ubuf, sbuf, other}, resource);
+  auto resource_id = std::visit(Overloads {tex, ubuf, sbuf, simg, other}, resource);
 
   uint32_t binding = _bindings_of_resources[resource_id];
   _resource_pools[binding].unregister(resource_id);
@@ -451,6 +457,10 @@ uint32_t mr::BindlessDescriptorSet::fill_resource(const Shader::ResourceView &re
   auto sbuf = [&](const StorageBuffer *buf) -> std::uintptr_t {
     fill_storage_buffer(buf, resource_info.emplace<vk::DescriptorBufferInfo>());
     return get_resource_id(buf);
+  };
+  auto simg = [&](const Shader::StorageImageResource *img) -> std::uintptr_t {
+    fill_storage_image(img, resource_info.emplace<vk::DescriptorImageInfo>());
+    return get_resource_id(img);
   };
   auto other = [](auto &&unknown_res) -> std::uintptr_t {
     ASSERT(false, "Unsupported in BindlessSet resource type", unknown_res);
@@ -499,6 +509,16 @@ void mr::BindlessDescriptorSet::fill_storage_buffer(const StorageBuffer *buffer,
     .buffer = buffer->buffer(),
     .offset = 0,
     .range = buffer->byte_size(),
+  };
+}
+
+void mr::BindlessDescriptorSet::fill_storage_image(const Shader::StorageImageResource *image,
+                                                   vk::DescriptorImageInfo &image_info) const noexcept
+{
+  image_info = vk::DescriptorImageInfo {
+    // .imageView = image->storage_image->image_view(image->mip_level),
+    .imageView = image->storage_image->image_view(),
+    .imageLayout = image->layout,
   };
 }
 
