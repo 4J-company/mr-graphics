@@ -213,9 +213,11 @@ inline namespace graphics {
   };
 
   // TODO(dk6): maybe integrate part of funcitonality in base class Image
+  // TODO(dk6): derive from StorageImage
   class PyramidImage : public DeviceImage {
   private:
-    SmallVector<vk::ImageView, 12> _image_views; // these are not Unique to be destroyed before _image
+    // 13 is up to 8Kx8K texture
+    SmallVector<vk::ImageView, 13> _image_views; // these are not Unique to be destroyed before _image
 
   public:
     PyramidImage(const VulkanState &state, Extent extent, vk::Format format, uint32_t mip_levels_number);

@@ -110,10 +110,11 @@ void mr::RenderContext::init_bindless_rendering()
 {
   using BindingT = DescriptorSetLayout::BindingDescription;
   std::array bindings {
-    BindingT {0, vk::DescriptorType::eCombinedImageSampler},
-    BindingT {1, vk::DescriptorType::eUniformBuffer},
-    BindingT {2, vk::DescriptorType::eStorageBuffer},
-    BindingT {3, vk::DescriptorType::eStorageImage},
+    BindingT {textures_binding, vk::DescriptorType::eCombinedImageSampler},
+    BindingT {uniform_buffer_binding, vk::DescriptorType::eUniformBuffer},
+    BindingT {storage_buffer_binding, vk::DescriptorType::eStorageBuffer},
+    BindingT {storage_images_binding, vk::DescriptorType::eStorageImage},
+    BindingT {input_attachments_binding, vk::DescriptorType::eInputAttachment},
   };
 
   _bindless_set_layout = ResourceManager<BindlessDescriptorSetLayout>::get().create("BindlessSetLayout",
@@ -197,12 +198,15 @@ void mr::RenderContext::init_bound_box_rendering()
   _bound_boxes_buffer_id = _bindless_set.register_resource(&_bound_boxes_buffer);
 }
 
+// TODO(dk6): move it to init_culling
 void mr::RenderContext::init_depth_pyramid()
 {
   boost::unordered_map<std::string, std::string> defines {
     {"TEXTURES_BINDING",        std::to_string(textures_binding)},
     {"UNIFORM_BUFFERS_BINDING", std::to_string(uniform_buffer_binding)},
     {"STORAGE_BUFFERS_BINDING", std::to_string(storage_buffer_binding)},
+    {"STORAGE_IMAGES_BINDING", std::to_string(storage_images_binding)},
+    {"INPUT_ATTACHMENTS", std::to_string(input_attachments_binding)},
     {"BINDLESS_SET", std::to_string(bindless_set_number)},
     {"THREADS_NUM", std::to_string(culling_work_group_size)},
   };
@@ -211,11 +215,15 @@ void mr::RenderContext::init_depth_pyramid()
   std::array set_layouts { _converted_bindless_set_layout };
   _depth_pyramid_pipeline = ComputePipeline(*_state, _depth_pyramid_shader, set_layouts);
 
-  // TODO(dk6): use dynamic buffer
-  _bound_boxes_buffer = StorageBuffer(*_state, sizeof(BoundBoxRenderData) * 10000);
-  _bound_boxes_buffer_id = _bindless_set.register_resource(&_bound_boxes_buffer);
+  _depth_image_attacment_id = _bindless_set.register_resource(&_depthbuffer);
+  for (uint32_t mip = 0; mip < _depth_pyramid.mip_levels_number(); mip++) {
+    Shader::PyramidImageResource res {
+      .image = &_depth_pyramid,
+      .mip_level = mip,
+    };
+    _depth_pyramid_mips.emplace_back(_bindless_set.register_resource(&res));
+  }
 }
-
 
 void mr::RenderContext::draw_bound_box(uint32_t transforms_buffer_id, uint32_t transform_index,
                                        uint32_t bound_boxes_buffer_id, uint32_t bound_box_index) noexcept

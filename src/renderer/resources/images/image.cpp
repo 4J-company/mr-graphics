@@ -406,7 +406,9 @@ vk::RenderingAttachmentInfoKHR mr::ColorAttachmentImage::attachment_info() const
 // ---- StorageImage ----
 mr::StorageImage::StorageImage(const VulkanState &state, Extent extent, vk::Format format, uint mip_level)
   : DeviceImage(state, extent, format, vk::ImageUsageFlagBits::eStorage, vk::ImageAspectFlagBits::eColor, mip_level)
-{}
+{
+  // switch_layout()
+}
 
 // ---- Depth pyramid image ----
 mr::PyramidImage::PyramidImage(const VulkanState &state, Extent extent, vk::Format format, uint32_t mip_levels_number)

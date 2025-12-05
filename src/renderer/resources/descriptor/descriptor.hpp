@@ -184,8 +184,12 @@ inline namespace graphics {
                              vk::DescriptorBufferInfo &buffer_info) const noexcept;
     void fill_storage_buffer(const StorageBuffer *buffer,
                              vk::DescriptorBufferInfo &buffer_info) const noexcept;
-    void fill_storage_image(const Shader::StorageImageResource *image,
+    void fill_storage_image(const StorageImage *image,
                             vk::DescriptorImageInfo &image_info) const noexcept;
+    void fill_pyramid_image(const Shader::PyramidImageResource *image,
+                            vk::DescriptorImageInfo &image_info) const noexcept;
+    void fill_depth_image(const DepthImage *image,
+                          vk::DescriptorImageInfo &image_info) const noexcept;
     uint32_t fill_resource(const Shader::ResourceView &resource,
                            ResourceInfo &resource_info,
                            vk::WriteDescriptorSet &write_info) noexcept;

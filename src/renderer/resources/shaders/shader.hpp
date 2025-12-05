@@ -27,13 +27,8 @@ inline namespace graphics {
     std::string _include_string;
 
   public:
-    struct StorageImageResource {
-      const StorageImage *image;
-      vk::ImageLayout layout;
-    };
-
     struct PyramidImageResource {
-      StorageImageResource storaga_image;
+      const PyramidImage *image;
       uint32_t mip_level;
     };
 
@@ -42,8 +37,9 @@ inline namespace graphics {
       const StorageBuffer *,
       const Texture *,
       const ColorAttachmentImage *,
+      const StorageImage *,
       const PyramidImageResource *,
-      const StorageImageResource *,
+      const DepthImage *,
       const ConditionalBuffer*>;
 
     // TODO: consider RT shaders from extensions;

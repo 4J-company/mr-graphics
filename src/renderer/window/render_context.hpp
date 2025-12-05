@@ -67,6 +67,8 @@ inline namespace graphics {
     constexpr static inline uint32_t textures_binding = 0;
     constexpr static inline uint32_t uniform_buffer_binding = 1;
     constexpr static inline uint32_t storage_buffer_binding = 2;
+    constexpr static inline uint32_t storage_images_binding = 3;
+    constexpr static inline uint32_t input_attachments_binding = 4;
     constexpr static inline uint32_t bindless_set_number = 0;
 
     constexpr static inline uint32_t default_vertex_number = 10'000'000;
@@ -158,6 +160,8 @@ inline namespace graphics {
 
     Extent _depth_pyramid_extent;
     PyramidImage _depth_pyramid;
+    SmallVector<uint32_t, 13> _depth_pyramid_mips;
+    uint32_t _depth_image_attacment_id = BindlessDescriptorSet::invalid_id;
     ComputePipeline _depth_pyramid_pipeline;
     ShaderHandle _depth_pyramid_shader;
 
