@@ -17,7 +17,6 @@ find_package(Tracy REQUIRED)
 
 CPMAddPackage("gh:Cvelth/vkfw#main")
 CPMAddPackage("gh:charles-lunarg/vk-bootstrap@1.4.321")
-CPMAddPackage("gh:bemanproject/inplace_vector#b81a3c7")
 CPMAddPackage("gh:GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator@3.3.0")
 
 if (${vkfw_ADDED})
@@ -42,7 +41,6 @@ set(DEPS_LIBRARIES
   libvkfw
   vk-bootstrap-lib
   stb::stb
-  beman.inplace_vector
   boost::boost
   TBB::tbb
   Tracy::TracyClient

@@ -14,7 +14,7 @@ inline namespace graphics {
   public:
     constexpr static uint32_t images_number = 3;
   private:
-    beman::inplace_vector<ColorAttachmentImage, images_number> _images;
+    InplaceVector<ColorAttachmentImage, images_number> _images;
 
     uint32_t _image_index = 0;
 
@@ -23,9 +23,9 @@ inline namespace graphics {
     // dummy queue submit
     using ImageAvailableSemaphoreT = std::pair<vk::UniqueSemaphore, bool>;
     // semaphores for waiting swapchain image is ready before light pass
-    beman::inplace_vector<ImageAvailableSemaphoreT, images_number> _image_available_semaphore;
+    InplaceVector<ImageAvailableSemaphoreT, images_number> _image_available_semaphore;
     // semaphores for waiting frame is ready before presentin
-    beman::inplace_vector<vk::UniqueSemaphore, images_number> _render_finished_semaphore;
+    InplaceVector<vk::UniqueSemaphore, images_number> _render_finished_semaphore;
 
     CommandUnit _images_command_unit;
 
