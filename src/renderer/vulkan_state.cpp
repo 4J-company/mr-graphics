@@ -87,10 +87,12 @@ void mr::VulkanGlobalState::_create_instance()
 void mr::VulkanGlobalState::_create_phys_device()
 {
   vk::PhysicalDeviceFeatures features {
-    .geometryShader = true,
-    .tessellationShader = true,
     .multiDrawIndirect = true,
-    .samplerAnisotropy = true,
+  };
+
+  vk::PhysicalDeviceMeshShaderFeaturesEXT features_mesh_shaders{
+    .taskShader = true,
+    .meshShader = true,
   };
 
   vk::PhysicalDeviceVulkan11Features features11 {
@@ -128,7 +130,7 @@ void mr::VulkanGlobalState::_create_phys_device()
     .set_required_features_14(features14)
     .add_required_extensions({
       VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-      VK_EXT_CONDITIONAL_RENDERING_EXTENSION_NAME,
+      VK_EXT_MESH_SHADER_EXTENSION_NAME,
     }).select();
 
   if (not phys_device) {

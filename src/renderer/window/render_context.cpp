@@ -418,6 +418,10 @@ void mr::RenderContext::render_models(const SceneHandle scene)
                                                    scene->_counters_buffer.buffer(),
                                                    draw.draw_counter_index * sizeof(uint32_t),
                                                    max_draws_count, stride);
+
+    // _state->dispatch_table().cmdDrawMeshTasksIndirectCountEXT(_models_command_unit.command_buffer(),
+    //     draw.draw_commands_buffer.buffer(), 0, scene->_counters_buffer.buffer(), draw.draw_counter_index * sizeof(uint32_t),
+    //     max_draws_count, stride);
   }
 
   _models_command_unit->writeTimestamp(vk::PipelineStageFlagBits::eBottomOfPipe,
