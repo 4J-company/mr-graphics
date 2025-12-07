@@ -133,6 +133,7 @@ inline namespace graphics {
     InplaceVector<vk::UniqueSemaphore, max_images_number> _render_finished_semaphore;
 
     vk::UniqueSemaphore _pre_model_layout_transition_semaphore;
+    vk::UniqueSemaphore _pre_model_layout_transition_semaphore_late;
     CommandUnit _pre_model_layout_transition_command_unit;
 
     vk::UniqueSemaphore _pre_light_layout_transition_semaphore;
@@ -158,6 +159,8 @@ inline namespace graphics {
 
     CommandUnit _culling_command_unit;
     vk::UniqueSemaphore _culling_semaphore;
+    vk::UniqueSemaphore _visible_models_rendering_semaphore;
+    vk::UniqueSemaphore _late_culling_semaphore;
     ShaderHandle _instances_culling_shader;
     ComputePipeline _instances_culling_pipeline;
     ShaderHandle _instances_collect_shader;
@@ -239,10 +242,13 @@ inline namespace graphics {
     void init_culling();
     void init_bound_box_rendering();
 
-    void render_geometry(const SceneHandle scene);
+    // TODO(dk6): move bound boxes rendering in separate function instead this flag
+    void render_geometry(const SceneHandle scene, bool is_late_pass);
     void culling_geometry(const SceneHandle scene);
+    void late_culling_geometry(const SceneHandle scene);
     void build_depth_pyramid();
     void render_bound_boxes(const SceneHandle scene);
+    // void render_models(const SceneHandle scene, vk::Semaphore signal_sem);
     void render_models(const SceneHandle scene);
     void render_lights(const SceneHandle scene, Presenter &presenter);
 
