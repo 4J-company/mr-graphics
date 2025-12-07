@@ -31,7 +31,7 @@ class MrGraphicsRecipe(ConanFile):
 
         self.requires("mr-math/1.1.5")
         self.requires("mr-utils/1.1.2")
-        self.requires("mr-importer/3.0.0")
+        self.requires("mr-importer/3.1.0")
 
         self.requires("stb/cci.20240531")
 

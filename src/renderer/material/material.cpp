@@ -20,7 +20,7 @@ mr::graphics::Material::Material(Scene &scene,
     , _shader(shader)
     , _scene(&scene)
 {
-  ASSERT(_shader.get() != nullptr, "Invalid shader passed to the material", _shader->name());
+  ASSERT(_shader.get() != nullptr, "Invalid shader passed to the material");
 
   std::ranges::copy(textures, _textures.begin());
 
@@ -121,7 +121,6 @@ mr::MaterialHandle mr::MaterialBuilder::build() noexcept
   const auto &state = _scene->render_context().vulkan_state();
   auto shdhandle = shdfindres ? shdfindres : shdmanager.create(shdname, state, _shader_filename, generate_shader_defines());
 
-
   return mtlmanager.create(unnamed,
     *_scene,
     shdhandle,
@@ -132,9 +131,9 @@ mr::MaterialHandle mr::MaterialBuilder::build() noexcept
   );
 }
 
-boost::unordered_map<std::string, std::string> mr::MaterialBuilder::generate_shader_defines() const noexcept
+mr::graphics::Shader::DefineMap mr::MaterialBuilder::generate_shader_defines() const noexcept
 {
-  boost::unordered_map<std::string, std::string> defines;
+  mr::graphics::Shader::DefineMap defines;
   for (size_t i = 0; i < enum_cast(MaterialParameter::EnumSize); i++) {
     if (_textures[i].has_value()) {
       defines[get_material_parameter_define(enum_cast<MaterialParameter>(i))] = std::to_string(i + 2);

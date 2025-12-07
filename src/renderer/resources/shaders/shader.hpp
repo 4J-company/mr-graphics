@@ -4,6 +4,7 @@
 #include "pch.hpp"
 
 #include "manager/resource.hpp"
+#include <boost/unordered/unordered_flat_map.hpp>
 
 #include "vulkan_state.hpp"
 
@@ -15,29 +16,10 @@ inline namespace graphics {
   class Image;
 
   class Shader : public ResourceBase<Shader> {
-  private:
-    static inline const size_t max_shader_modules = 6;
-
-    std::filesystem::path _path;
-    std::array<vk::UniqueShaderModule, max_shader_modules> _modules;
-    std::array<vk::PipelineShaderStageCreateInfo, max_shader_modules> _stages;
-    std::atomic<uint> _num_of_loaded_shaders;
-    std::string _define_string;
-    std::string _include_string;
-
   public:
-    using Resource = std::variant<const UniformBuffer *, const StorageBuffer *, const Texture *, const Image *, const ConditionalBuffer*>;
+    static inline constexpr size_t max_shader_modules = 8;
 
-    // TODO: consider RT shaders from extensions;
-    // TODO(dk6): remove this enum, use vk::ShaderStageFlagsBits instead
-    enum struct Stage {
-      Compute  = 0,
-      Vertex   = 1,
-      Control  = 2,
-      Evaluate = 3,
-      Geometry = 4,
-      Fragment = 5,
-    };
+    using Resource = std::variant<const UniformBuffer *, const StorageBuffer *, const Texture *, const Image *, const ConditionalBuffer*>;
 
     struct ResourceView {
       uint32_t binding;
@@ -46,95 +28,36 @@ inline namespace graphics {
       operator const Resource&() const { return res; }
     };
 
-    Shader() = default;
-
-    Shader(const VulkanState &state, std::string_view filename,
-           const boost::unordered_map<std::string, std::string> &define_map = {});
-
-    // move semantics
-    Shader(Shader &&other) noexcept
-        : _path(std::move(other._path))
-        , _modules(std::move(other._modules))
-        , _stages(std::move(other._stages))
-        , _num_of_loaded_shaders(other._num_of_loaded_shaders.load())
-    {
-    }
-
-    Shader &operator=(Shader &&other) noexcept
-    {
-      // do not need a self check
-
-      _path = std::move(other._path);
-      _modules = std::move(other._modules);
-      _stages = std::move(other._stages);
-      _num_of_loaded_shaders = other._num_of_loaded_shaders.load();
-      return *this;
-    }
-
-    // reload shader
-    void reload();
+    using DefineMap = boost::unordered_flat_map<std::string, std::string>;
+    template <typename T> using StageWiseVector = InplaceVector<T, max_shader_modules>;
 
   private:
-    // compile sources
-    void compile(Stage stage) const noexcept;
+    StageWiseVector<vk::UniqueShaderModule> _modules;
+    StageWiseVector<vk::PipelineShaderStageCreateInfo> _stages;
 
-    // load sources
-    std::optional<std::vector<char>> load(Stage stage) noexcept;
-
-    bool _validate_stage(Stage stage, bool present)  const noexcept;
+    // `hashid`s of 2 Shader objects are equal only
+    //     if both of them were created with equal parameters (path and defines)
+    uint32_t hashid;
 
   public:
-    const std::array<vk::PipelineShaderStageCreateInfo, max_shader_modules> & stages() const { return _stages; }
+    Shader() = default;
 
-    std::array<vk::PipelineShaderStageCreateInfo, max_shader_modules> & stages() { return _stages; }
+    Shader(const VulkanState &state, std::filesystem::path path, const DefineMap &define_map);
+    Shader(Shader &&other) noexcept = default;
+    Shader &operator=(Shader &&other) noexcept = default;
+    Shader(const Shader &other) noexcept = delete;
+    Shader &operator=(const Shader &other) noexcept = delete;
 
-    uint stage_number() const noexcept { return _num_of_loaded_shaders; }
+    Shader & from_glsl_directory(const VulkanState &state, std::filesystem::path glsl_directory, const DefineMap &define_map);
+    Shader & from_slang_file(const VulkanState &state, std::filesystem::path slang_file);
 
-    std::string name() const noexcept { return _path.stem(); }
+    decltype(auto) stages() const noexcept { return _stages; }
+    decltype(auto) stages() noexcept { return _stages; }
 
-    std::string id() const noexcept { return name() + ":" + _define_string; }
+    uint32_t id() const noexcept { return hashid; }
   };
 
   MR_DECLARE_HANDLE(Shader)
-
-  constexpr vk::ShaderStageFlagBits get_stage_flags(std::integral auto stage) noexcept
-  {
-    constexpr std::array stage_bits {
-      vk::ShaderStageFlagBits::eCompute,
-      vk::ShaderStageFlagBits::eVertex,
-      vk::ShaderStageFlagBits::eTessellationControl,
-      vk::ShaderStageFlagBits::eTessellationEvaluation,
-      vk::ShaderStageFlagBits::eGeometry,
-      vk::ShaderStageFlagBits::eFragment
-    };
-    ASSERT(stage < stage_bits.size());
-
-    return stage_bits[stage];
-  }
-
-  constexpr vk::ShaderStageFlagBits get_stage_flags(Shader::Stage stage) noexcept
-  {
-    return get_stage_flags(std::to_underlying(stage));
-  }
-
-  constexpr const char * get_stage_name(std::integral auto stage) noexcept
-  {
-    constexpr std::array shader_type_names {
-      "comp",
-      "vert",
-      "tesc",
-      "tese",
-      "geom",
-      "frag",
-    };
-    ASSERT(stage < shader_type_names.size());
-    return shader_type_names[stage];
-  }
-
-  constexpr const char * get_stage_name(Shader::Stage stage) noexcept
-  {
-    return get_stage_name(std::to_underlying(stage));
-  }
 }
 } // namespace mr
 

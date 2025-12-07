@@ -6,13 +6,13 @@ mr::ComputePipeline::ComputePipeline(const VulkanState &state,
                                      std::span<const DescriptorSetLayoutHandle> descriptor_layouts)
   : Pipeline(state, shader, descriptor_layouts, compute_pipeline_push_constants)
 {
-  ASSERT(shader->stage_number() == 1, "Compute shader have only one stage");
+  ASSERT(shader->stages().size() == 1, "Compute shader have only one stage");
   vk::ComputePipelineCreateInfo create_info {
     .stage = shader->stages().front(),
     .layout = _layout.get()
   };
 
   auto &&[res, pipeline] = state.device().createComputePipelineUnique({}, create_info);
-  ASSERT(res == vk::Result::eSuccess, "Error to create compute pipeline", shader->name());
+  ASSERT(res == vk::Result::eSuccess, "Error to create compute pipeline");
   _pipeline = std::move(pipeline);
 }

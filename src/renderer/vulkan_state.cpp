@@ -87,6 +87,7 @@ void mr::VulkanGlobalState::_create_instance()
 void mr::VulkanGlobalState::_create_phys_device()
 {
   vk::PhysicalDeviceFeatures features {
+    .geometryShader = true,
     .multiDrawIndirect = true,
   };
 

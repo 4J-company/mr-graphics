@@ -1,5 +1,7 @@
 #version 460
 
+#extension GL_GOOGLE_include_directive : enable
+
 layout(location = 0) out flat uint instance_index;
 
 void main()

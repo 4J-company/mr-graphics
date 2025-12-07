@@ -7,12 +7,12 @@ namespace mr {
   constexpr static uint32_t attributes_bytes_size = sizeof(mr::VertexAttributes);
 
   struct IndexBufferDescription {
-    VkDeviceSize offset;
+    vk::DeviceSize offset;
     uint32_t elements_count;
   };
 
   struct VertexBufferDescription {
-    VkDeviceSize offset;
+    vk::DeviceSize offset;
     uint32_t vertex_count;
   };
 

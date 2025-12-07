@@ -3,6 +3,7 @@
 
 // For uniforms array
 #extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_GOOGLE_include_directive : enable
 
 #ifndef BINDLESS_SET
 #define BINDLESS_SET 0
