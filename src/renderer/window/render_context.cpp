@@ -33,6 +33,7 @@ mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent,
   , _positions_vertex_buffer(*_state, default_vertex_number * position_bytes_size)
   , _attributes_vertex_buffer(*_state, default_vertex_number * attributes_bytes_size)
   , _index_buffer(*_state, default_index_number * sizeof(uint32_t), sizeof(uint32_t))
+  // , _depth_pyramid_extent(extent) // now copy in zero mip all data from depth
   , _depth_pyramid_extent(extent.width / 2, extent.height / 2)
   , _depth_pyramid(*_state, extent, vk::Format::eR32Sfloat, calculate_mips_levels_number(extent))
 {
@@ -223,6 +224,11 @@ void mr::RenderContext::init_depth_pyramid()
     };
     _depth_pyramid_mips.emplace_back(_bindless_set.register_resource(&res));
   }
+
+  _transfer_command_unit.begin();
+  _depth_pyramid.switch_layout(_transfer_command_unit, vk::ImageLayout::eGeneral);
+  _transfer_command_unit.end();
+  UniqueFenceGuard guard(_state->device(), _transfer_command_unit.submit(*_state));
 }
 
 void mr::RenderContext::draw_bound_box(uint32_t transforms_buffer_id, uint32_t transform_index,
@@ -706,14 +712,14 @@ void mr::RenderContext::render_geometry(const SceneHandle scene)
 
 void mr::RenderContext::build_depth_pyramid()
 {
-  // It also includes pipeline barrier
   // TODO(dk6): added optional argument for pipeline stages in pipeline barrier
+  // It also includes pipeline barrier
   _depthbuffer.switch_layout(_models_command_unit, vk::ImageLayout::eDepthStencilReadOnlyOptimal);
 
   auto source_size = _extent;
   for (uint32_t i = 0; source_size.width > 1 && source_size.height > 0; i++) {
     uint32_t depth_pyramid_push_contants[] {
-      i + 1,
+      i, // i is dst mip
       source_size.width,
       source_size.height,
     };
@@ -722,7 +728,8 @@ void mr::RenderContext::build_depth_pyramid()
     uint32_t work_group_height = calculate_work_groups_number(source_size.height, culling_work_group_size);
     _models_command_unit->dispatch(work_group_width, work_group_height, 1);
 
-    _depth_pyramid.switch_layout(_models_command_unit, vk::ImageLayout::eShaderReadOnlyOptimal, i, 1);
+    // just for pipeline
+    _depth_pyramid.switch_layout(_models_command_unit, vk::ImageLayout::eGeneral, i, 1);
 
     source_size.width /= 2;
     source_size.height /= 2;

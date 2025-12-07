@@ -101,9 +101,12 @@ void mr::Image::switch_layout(CommandUnit &command_unit, vk::ImageLayout new_lay
 void mr::Image::switch_layout(CommandUnit &command_unit, vk::ImageLayout new_layout,
                               uint32_t mip_level, uint32_t mip_counts)
 {
-  if (new_layout == _layout) {
-    return;
-  }
+  // TODO(dk6): Revert this - now i want reuse this function for set pipeline barrier without switch layout.
+  //            Refactor: add new function pipeline_barrier
+
+  // if (new_layout == _layout) {
+  //   return;
+  // }
 
   vk::ImageSubresourceRange range {
     .aspectMask = _aspect_flags,
@@ -116,8 +119,8 @@ void mr::Image::switch_layout(CommandUnit &command_unit, vk::ImageLayout new_lay
   vk::ImageMemoryBarrier barrier {
     .oldLayout = _layout,
     .newLayout = new_layout,
-    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+    .srcQueueFamilyIndex = vk::QueueFamilyIgnored,
+    .dstQueueFamilyIndex = vk::QueueFamilyIgnored,
     .image = _image,
     .subresourceRange = range
   };
@@ -404,16 +407,17 @@ vk::RenderingAttachmentInfoKHR mr::ColorAttachmentImage::attachment_info() const
 }
 
 // ---- StorageImage ----
-mr::StorageImage::StorageImage(const VulkanState &state, Extent extent, vk::Format format, uint mip_level)
-  : DeviceImage(state, extent, format, vk::ImageUsageFlagBits::eStorage, vk::ImageAspectFlagBits::eColor, mip_level)
+mr::StorageImage::StorageImage(const VulkanState &state, Extent extent, vk::Format format,
+                               uint mip_level, bool create_view)
+  : DeviceImage(state, extent, format, vk::ImageUsageFlagBits::eStorage, vk::ImageAspectFlagBits::eColor,
+                mip_level, create_view)
 {
   // switch_layout()
 }
 
 // ---- Depth pyramid image ----
 mr::PyramidImage::PyramidImage(const VulkanState &state, Extent extent, vk::Format format, uint32_t mip_levels_number)
-  : DeviceImage(state, extent, format, vk::ImageUsageFlagBits::eStorage, vk::ImageAspectFlagBits::eColor,
-                mip_levels_number, false)
+  : StorageImage(state, extent, format, mip_levels_number, false)
 {
   _image_views.reserve(_mip_levels_number);
   for (uint32_t level = 0; level < _mip_levels_number; level++) {
