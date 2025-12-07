@@ -19,11 +19,12 @@ inline namespace graphics {
     uint32_t width, height;
     std::optional<mr::math::Camera<float>> camera;
     bool disable_culling;
+    bool disable_occlusion_culling;
     bool enable_vsync;
     std::fs::path stat_dir;
     std::vector<std::fs::path> models;
     std::optional<std::string> bench_name;
-    std::optional<uint32_t> bench_models_number;
+    std::optional<uint32_t> bench_instances_number;
     bool enable_bound_boxes;
     bool print_stat;
 

@@ -72,6 +72,9 @@ std::optional<mr::CliOptions> mr::CliOptions::parse(int argc, const char **argv)
     ("disable-culling",
      po::bool_switch()->default_value(false),
      "Disable culling")
+    ("disable-occlusion-culling",
+     po::bool_switch()->default_value(false),
+     "Disable occlusion culling")
     ("enable-vsync",
      po::bool_switch()->default_value(false),
      "Enable VSYNC")
@@ -84,6 +87,9 @@ std::optional<mr::CliOptions> mr::CliOptions::parse(int argc, const char **argv)
     ("print-stat",
      po::bool_switch()->default_value(false),
      "Print stat in cout")
+    ("bench-instances-number",
+     po::value<uint32_t>()->default_value(1'000),
+     "Models instances number for bench")
     ("models",
      po::value<std::vector<std::string>>()->multitoken(),
      "GLTF model files to render (can be specified anywhere in arguments)")
@@ -128,6 +134,7 @@ std::optional<mr::CliOptions> mr::CliOptions::parse(int argc, const char **argv)
   options.dst_dir = vm["dst-dir"].as<std::string>();
   options.frames_number = vm["frames-number"].as<int>();
   options.disable_culling = vm["disable-culling"].as<bool>();
+  options.disable_occlusion_culling = vm["disable-occlusion-culling"].as<bool>();
   options.enable_vsync = vm["enable-vsync"].as<bool>();
   options.enable_bound_boxes = vm["enable-bound-boxes"].as<bool>();
   options.stat_dir = vm["stat-dir"].as<std::string>();
@@ -166,8 +173,8 @@ std::optional<mr::CliOptions> mr::CliOptions::parse(int argc, const char **argv)
     options.bench_name = vm["bench-name"].as<std::string>();
   }
 
-  if (vm.count("bench-models-number")) {
-    options.bench_models_number = vm["bench-models-number"].as<uint32_t>();
+  if (vm.count("bench-instances-number")) {
+    options.bench_instances_number = vm["bench-instances-number"].as<uint32_t>();
   }
 
   if (vm.count("models")) {

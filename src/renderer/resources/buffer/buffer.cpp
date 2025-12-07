@@ -319,7 +319,7 @@ mr::DeviceHeapAllocator::DeviceHeapAllocator(vk::DeviceSize start_byte_size, vk:
   : _size(0)
   , _alignment(alignment)
 {
-  ASSERT(std::bitset<64>(alignment).count() == 1);
+  ASSERT(std::has_single_bit(alignment) == 1);
   add_block(start_byte_size);
 }
 

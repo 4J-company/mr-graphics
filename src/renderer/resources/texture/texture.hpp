@@ -1,6 +1,7 @@
 #ifndef __MR_TEXTURE_HPP_
 #define __MR_TEXTURE_HPP_
 
+#include "resources/shaders/shader_resource.hpp"
 #include "resources/texture/sampler/sampler.hpp"
 
 #include "manager/resource.hpp"
@@ -8,20 +9,21 @@
 namespace mr {
 inline namespace graphics {
   class Texture : public ResourceBase<Texture> {
-    private:
-      TextureImage _image;
-      Sampler _sampler;
+  private:
+    TextureImage _image;
+    Sampler _sampler;
 
-    public:
-      Texture(Texture&&) = default;
-      Texture & operator=(Texture&&) = default;
+  public:
+    Texture(Texture&&) = default;
+    Texture & operator=(Texture&&) = default;
 
-      Texture(const VulkanState &state, const std::byte *data, Extent extent, vk::Format format) noexcept;
-      Texture(const VulkanState &state, const mr::importer::ImageData &image, const mr::importer::SamplerData &sampler) noexcept;
+    Texture(const VulkanState &state, const std::byte *data, Extent extent, vk::Format format) noexcept;
+    Texture(const VulkanState &state, const mr::importer::ImageData &image, const mr::importer::SamplerData &sampler) noexcept;
 
-      const TextureImage &image() const { return _image; }
+    const TextureImage & image() const { return _image; }
+    const Sampler & sampler() const { return _sampler; }
 
-      const Sampler &sampler() const { return _sampler; }
+    ShaderImageResource get_resource_description() const noexcept;
   };
 
   MR_DECLARE_HANDLE(Texture)

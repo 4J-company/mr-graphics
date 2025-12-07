@@ -1,8 +1,8 @@
 #include "resources/texture/texture.hpp"
 
 mr::Texture::Texture(const VulkanState &state, const std::byte *data, Extent extent, vk::Format format) noexcept
-  : _image (state, extent, format)
-  , _sampler (state, vk::Filter::eLinear, vk::SamplerAddressMode::eRepeat)
+  : _image(state, extent, format)
+  , _sampler(state, vk::Filter::eLinear, vk::SamplerMipmapMode::eLinear, vk::SamplerAddressMode::eRepeat)
 {
   CommandUnit command_unit {state};
   command_unit.begin();
@@ -19,8 +19,8 @@ mr::Texture::Texture(const VulkanState &state, const std::byte *data, Extent ext
 mr::Texture::Texture(const VulkanState &state,
   const mr::importer::ImageData &image,
   const mr::importer::SamplerData &sampler) noexcept
-  : _image (state, image)
-  , _sampler (state, sampler.mag, vk::SamplerAddressMode::eRepeat)
+  : _image(state, image)
+  , _sampler(state, sampler.mag, vk::SamplerMipmapMode::eLinear, vk::SamplerAddressMode::eRepeat)
 {
   CommandUnit command_unit {state};
   command_unit.begin();
@@ -32,4 +32,13 @@ mr::Texture::Texture(const VulkanState &state,
   command_unit.end();
 
   UniqueFenceGuard(state.device(), command_unit.submit(state));
+}
+
+mr::ShaderImageResource mr::Texture::get_resource_description() const noexcept
+{
+  return ShaderImageResource {
+    .image = &_image,
+    .sampler = &_sampler,
+    .layout = vk::ImageLayout::eShaderReadOnlyOptimal,
+  };
 }

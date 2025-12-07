@@ -68,20 +68,22 @@ void main()
   }
 
   MeshInstanceCullingData instance_data = instances_datas[id];
+  if (instance_data.visible_last_frame == 0) {
+    return; // rendering only previously visible objects
+  }
+
   MeshCullingData mesh_data = meshes_datas[instance_data.mesh_culling_data_index];
 
 #ifndef DISABLE_CULLING
   mat4 transfrom = transpose(transforms_in[instance_data.transform_index]);
   BoundBox bb = transform_bound_box(bound_box(mesh_data), transfrom);
 
-  for (int i = 0; i < 6; i++) {
-    vec4 plane = camera_buffer.frustum_planes[i];
-    if (is_bound_box_not_visible(plane, bb)) {
-      return;
-    }
+  if (!is_bound_box_frustum_visible(bb, camera_buffer.frustum_planes)) {
+    return;
   }
 #endif // not det DISABLE_CULLING
 
+  // After frustun culling tests we still here - object is visible
   uint instance_number = atomicAdd(intances_count(mesh_data.instance_counter_index), 1);
   transforms_out(mesh_data)[instance_number] = transforms_in[instance_data.transform_index];
 }

@@ -14,6 +14,7 @@ struct IndirectCommand {
 
 struct MeshInstanceCullingData {
   uint transform_index;
+  uint visible_last_frame;
   uint mesh_culling_data_index;
 };
 

@@ -37,6 +37,9 @@ int main(int argc, const char **argv)
   if (options.enable_vsync) {
     render_options |= mr::RenderOptions::EnableVsync;
   }
+  if (options.disable_occlusion_culling) {
+    render_options |= mr::RenderOptions::DisableOcclusionCulling;
+  }
 
   auto render_context = app.create_render_context(render_context_extent, render_options);
 
@@ -57,7 +60,7 @@ int main(int argc, const char **argv)
       return scene->create_model(model_path);
     }) | std::ranges::to<std::vector>();
 
-  uint32_t models_number = options.bench_models_number.value_or(1'000);
+  uint32_t models_number = options.bench_instances_number.value_or(1'000);
   for (uint32_t i = 0; i < models_number - models.size(); i++) {
     auto rnd = [](float min, float max) -> float {
       float v = float(rand()) / RAND_MAX; // between 0 and 1
@@ -69,7 +72,7 @@ int main(int argc, const char **argv)
 
     // This for 1000 kittens models
     float max_dist = 20;
-    auto scale = rnd(0.1, 5.3);
+    auto scale = rnd(0.7, 2.3);
 
     auto pos = mr::Vec4f(rnd(-max_dist, max_dist), rnd(-max_dist, max_dist), rnd(-max_dist, max_dist), 0);
     auto scale_vec = mr::Vec4f(scale, scale, scale, 1);

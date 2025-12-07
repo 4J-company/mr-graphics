@@ -30,6 +30,7 @@ inline namespace graphics {
     uint32_t frame_number = 0;
 
     double culling_gpu_time_ms = 0;
+    double late_culling_gpu_time_ms = 0;
     double build_depth_pyramid_gpu_time_ms = 0;
     double render_gpu_time_ms = 0;
     double models_gpu_time_ms = 0;
@@ -76,6 +77,9 @@ inline namespace graphics {
 
     constexpr static inline uint32_t culling_work_group_size = 32;
 
+    // It is enough for 64k x 64k screen size
+    constexpr static inline uint32_t depth_pyramid_max_levels = 16;
+
   private:
     // Timestamps
     enum struct Timestamp : uint32_t {
@@ -85,6 +89,8 @@ inline namespace graphics {
       ModelsEnd,
       BuildDepthPyramidStart,
       BuildDepthPyramidEnd,
+      LateCullingStart,
+      LateCullingEnd,
       ShadingStart,
       ShadingEnd,
       TimestampsNumber,
@@ -98,6 +104,13 @@ inline namespace graphics {
       uint32_t transform_index;
       uint32_t bound_boxes_buffer_id; // TODO: move to push contants
       uint32_t bound_box_index;
+    };
+
+    struct DepthPyramidMip {
+      ShaderPyramidImageLevelResource storage_image_resource;
+      ShaderPyramidImageLevelResource sampled_image_resource;
+      uint32_t descriptor_storage_image_id;
+      uint32_t descriptor_sampled_image_id;
     };
 
   private:
@@ -116,6 +129,7 @@ inline namespace graphics {
     TracyVkCtx _lights_tracy_gpu_context {};
 
     CommandUnit _models_command_unit;
+    CommandUnit _late_models_command_unit;
     CommandUnit _lights_command_unit;
     // RenderContext doesn't use transfer command unit, only gives it for buffers
     // Writting commands to it doesn't affect RenderContext internal state
@@ -124,6 +138,7 @@ inline namespace graphics {
     // TODO(dk6): use Framedata instead
     InplaceVector<ColorAttachmentImage, gbuffers_number> _gbuffers;
     DepthImage _depthbuffer;
+    ShaderImageResource _depthbuffer_resource;
 
     // semaphores for waiting swapchain image is ready before light pass
     InplaceVector<vk::UniqueSemaphore, max_images_number> _image_available_semaphore;
@@ -132,6 +147,8 @@ inline namespace graphics {
 
     vk::UniqueSemaphore _pre_model_layout_transition_semaphore;
     CommandUnit _pre_model_layout_transition_command_unit;
+    CommandUnit _pre_model_layout_transition_command_unit_late;
+    vk::UniqueSemaphore _pre_model_layout_transition_semaphore_late;
 
     vk::UniqueSemaphore _pre_light_layout_transition_semaphore;
     CommandUnit _pre_light_layout_transition_command_unit;
@@ -155,15 +172,26 @@ inline namespace graphics {
     IndexHeapBuffer _index_buffer;
 
     CommandUnit _culling_command_unit;
+    CommandUnit _late_culling_command_unit;
     vk::UniqueSemaphore _culling_semaphore;
+    vk::UniqueSemaphore _visible_models_rendering_semaphore;
+    vk::UniqueSemaphore _late_culling_semaphore;
     ShaderHandle _instances_culling_shader;
     ComputePipeline _instances_culling_pipeline;
     ShaderHandle _instances_collect_shader;
     ComputePipeline _instances_collect_pipeline;
+    ShaderHandle _late_instances_culling_shader;
+    ComputePipeline _late_instances_culling_pipeline;
 
     Extent _depth_pyramid_extent;
     PyramidImage _depth_pyramid;
-    SmallVector<uint32_t, 13> _depth_pyramid_mips;
+    ShaderImageResource _depth_pyramid_resource;
+    StorageBuffer _depth_pyramid_mips_scale_coefs_buffer;
+    uint32_t _depth_pyramid_mips_scale_coefs_buffer_id = BindlessDescriptorSet::invalid_id;
+    std::array<float, depth_pyramid_max_levels * 2> _depth_pyramid_mips_scale_coefs_buffer_data;
+    InplaceVector<DepthPyramidMip, depth_pyramid_max_levels> _depth_pyramid_mips;
+    uint32_t _depth_pyramid_image_id = BindlessDescriptorSet::invalid_id;
+    Sampler _depth_sampler;
     uint32_t _depth_image_attacment_id = BindlessDescriptorSet::invalid_id;
     ComputePipeline _depth_pyramid_pipeline;
     ShaderHandle _depth_pyramid_shader;
@@ -234,11 +262,13 @@ inline namespace graphics {
     void init_culling();
     void init_bound_box_rendering();
 
-    void render_geometry(const SceneHandle scene);
+    // TODO(dk6): move bound boxes rendering in separate function instead this flag
+    void render_geometry(const SceneHandle scene, bool is_late_pass);
     void culling_geometry(const SceneHandle scene);
+    void late_culling_geometry(const SceneHandle scene);
     void build_depth_pyramid();
     void render_bound_boxes(const SceneHandle scene);
-    void render_models(const SceneHandle scene);
+    void render_models(const SceneHandle scene, CommandUnit &cmd_unit);
     void render_lights(const SceneHandle scene, Presenter &presenter);
 
     void update_bound_boxes_data();

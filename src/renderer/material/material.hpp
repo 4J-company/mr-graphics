@@ -48,6 +48,7 @@ inline namespace graphics {
 
     // requires for deinitialization
     std::array<std::optional<mr::TextureHandle>, enum_cast(MaterialParameter::EnumSize)> _textures;
+    InplaceVector<ShaderImageResource, enum_cast(MaterialParameter::EnumSize)> _textures_resources;
 
     std::array<uint32_t, enum_cast(MaterialParameter::EnumSize)> _textures_ids;
     uint32_t _uniform_buffer_id = -1;

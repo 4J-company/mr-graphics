@@ -7,20 +7,24 @@
 namespace mr {
 inline namespace graphics {
   class Sampler {
-    private:
-      vk::UniqueSampler _sampler;
+  private:
+    vk::UniqueSampler _sampler;
 
-      int _mip_levels_number;
-      vk::Filter _filter;
-      vk::SamplerAddressMode _address;
+    int _mip_levels_number;
+    vk::Filter _filter;
+    vk::SamplerAddressMode _address;
+    vk::SamplerMipmapMode _mip_map_mode;
 
-    public:
-      Sampler() = default;
+  public:
+    Sampler() = default;
 
-      Sampler(const VulkanState &state, vk::Filter filter,
-              vk::SamplerAddressMode address, int mip_level = 1);
+    Sampler(const VulkanState &state, vk::Filter filter, vk::SamplerMipmapMode mip_map_mode,
+            vk::SamplerAddressMode address, int mip_level = 1);
 
-      const vk::Sampler sampler() const { return _sampler.get(); }
+    Sampler(const VulkanState &state, vk::Filter filter, vk::SamplerMipmapMode mip_map_mode,
+            vk::SamplerAddressMode address, vk::SamplerReductionMode reduction_mode, int mip_level = 1);
+
+    const vk::Sampler sampler() const { return _sampler.get(); }
   };
 }
 } // namespace mr

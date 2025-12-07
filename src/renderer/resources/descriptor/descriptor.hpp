@@ -2,7 +2,9 @@
 #define __MR_DESCRIPTOR_HPP_
 
 #include "pch.hpp"
-#include "resources/shaders/shader.hpp"
+#include "manager/resource.hpp"
+
+#include "resources/shaders/shader_resource.hpp"
 
 namespace mr {
 inline namespace graphics {
@@ -90,7 +92,7 @@ inline namespace graphics {
       : _set(set), _set_layout(std::move(layout)) {}
 
     void update(const VulkanState &state,
-                std::span<const Shader::ResourceView> attachments) noexcept;
+                std::span<const ShaderResourceView> attachments) noexcept;
 
     vk::DescriptorSet set() const noexcept { return _set; }
     const DescriptorSetLayoutHandle& layout_handle() const noexcept { return _set_layout; }
@@ -102,7 +104,7 @@ inline namespace graphics {
     friend class DescriptorAllocator;
 
   public:
-    static constexpr inline uint32_t invalid_id = -1;
+    static constexpr inline uint32_t invalid_id = static_cast<uint32_t>(-1);
 
   private:
     class ResourcePoolData {
@@ -116,8 +118,7 @@ inline namespace graphics {
       std::atomic_uint32_t current_id = 0;
       InplaceVector<uint32_t, resource_max_number_per_binding> free_ids;
       boost::unordered_map<std::uintptr_t, ResourceStat> usage;
-      // Mutex may be bottle neck, they require profiling. Now it used for simple hanlde consistency
-      // of two data sctuctures (vector and map)
+      // Mutex may be a bottleneck, profiling is required. Now it is used for simple handle consistency
       std::mutex mutex;
       uint32_t max_number;
 
@@ -163,14 +164,16 @@ inline namespace graphics {
                           vk::UniqueDescriptorSet set,
                           BindlessDescriptorSetLayoutHandle layout) noexcept;
 
-    uint32_t register_resource(const Shader::Resource &resource) noexcept;
-    uint32_t register_resource(const Shader::ResourceView &resource_view) noexcept;
+    uint32_t register_resource(const ShaderResource &resource) noexcept;
+    uint32_t register_resource(const ShaderResourceView &resource_view) noexcept;
     // If RVO here doesn't work it will be coping 120 bytes.
     // It is not a lot, but maybe this interface can be refactored
     InplaceVector<uint32_t, desciptor_set_max_bindings> register_resources(
-      std::span<const Shader::Resource> resources) noexcept;
+      std::span<const ShaderResource> resources) noexcept;
 
-    void unregister_resource(const Shader::Resource &resource) noexcept;
+    // This functions require same ShaderResource instance as in register_resource -
+    // this ibject must life during using resource
+    void unregister_resource(const ShaderResource &resource) noexcept;
 
     vk::DescriptorSet set() const noexcept { return _set.get(); }
     const BindlessDescriptorSetLayoutHandle & layout_handle() const noexcept { return _set_layout; }
@@ -178,23 +181,19 @@ inline namespace graphics {
     operator vk::DescriptorSet() const noexcept { return _set.get(); }
 
   private:
-    void fill_texture(const Texture *texture,
-                      vk::DescriptorImageInfo &image_info) const noexcept;
     void fill_uniform_buffer(const UniformBuffer *buffer,
                              vk::DescriptorBufferInfo &buffer_info) const noexcept;
     void fill_storage_buffer(const StorageBuffer *buffer,
                              vk::DescriptorBufferInfo &buffer_info) const noexcept;
-    void fill_storage_image(const StorageImage *image,
-                            vk::DescriptorImageInfo &image_info) const noexcept;
-    void fill_pyramid_image(const Shader::PyramidImageResource *image,
-                            vk::DescriptorImageInfo &image_info) const noexcept;
-    void fill_depth_image(const DepthImage *image,
-                          vk::DescriptorImageInfo &image_info) const noexcept;
-    uint32_t fill_resource(const Shader::ResourceView &resource,
+    void fill_image(const ShaderImageResource *image,
+                      vk::DescriptorImageInfo &image_info) const noexcept;
+    void fill_pyramid_image_level(const ShaderPyramidImageLevelResource *mip_level,
+                                  vk::DescriptorImageInfo &image_info) const noexcept;
+    uint32_t fill_resource(const ShaderResourceView &resource,
                            ResourceInfo &resource_info,
                            vk::WriteDescriptorSet &write_info) noexcept;
 
-    Shader::ResourceView try_convert_view_to_resource(const Shader::Resource &resource) const noexcept;
+    ShaderResourceView try_convert_view_to_resource(const ShaderResource &resource) const noexcept;
   };
 
   class DescriptorAllocator {
