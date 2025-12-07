@@ -21,6 +21,7 @@ inline namespace graphics {
   private:
     struct MeshInstanceCullingData {
       uint32_t transform_index;
+      uint32_t visible_last_frame;
       uint32_t mesh_culling_data_index;
     };
 

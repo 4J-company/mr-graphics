@@ -24,10 +24,7 @@ void main()
     return;
   }
 
-  // TODO(dk6): maybe use sampler for all mips
-  // vec2 avg_coord = (vec2(coord) + vec2(0.5)) / vec2(data.in_size);
-  // vec4 depth_avg = textureGather(SrcImage, avg_coord);
-
+  // TODO(dk6): Try use minmax sampler instead
   ivec2 read_coord = ivec2(coord) * 2;
   vec4 depth_avg = vec4(
     imageLoad(SrcImage, read_coord + ivec2(0, 0)).r,

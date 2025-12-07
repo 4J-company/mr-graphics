@@ -189,6 +189,13 @@ void mr::RenderContext::init_culling()
     *_state, "culling/depth_pyramid_build", defines);
   _depth_pyramid_pipeline = ComputePipeline(*_state, _depth_pyramid_shader, set_layouts);
 
+  // TODO(dk6): maybe move it in PyramidImage ctr
+  CommandUnit cmd(*_state);
+  cmd.begin();
+  _depth_pyramid.switch_layout(cmd, vk::ImageLayout::eGeneral);
+  cmd.end();
+  UniqueFenceGuard guard(_state->device(), cmd.submit(*_state));
+
   _depth_image_attacment_id = _bindless_set.register_resource(&_depthbuffer);
   for (uint32_t mip = 0; mip < _depth_pyramid.mip_levels_number(); mip++) {
     Shader::PyramidImageResource res {
@@ -198,12 +205,27 @@ void mr::RenderContext::init_culling()
     _depth_pyramid_mips.emplace_back(_bindless_set.register_resource(&res));
   }
 
-  // TODO(dk6): maybe move it in PyramidImage ctr
-  CommandUnit cmd(*_state);
-  cmd.begin();
-  _depth_pyramid.switch_layout(cmd, vk::ImageLayout::eGeneral);
-  cmd.end();
-  UniqueFenceGuard guard(_state->device(), cmd.submit(*_state));
+  struct DepthPyramidData {
+    uint32_t levels_number;
+    std::array<uint32_t, depth_pyramid_max_levels> levels_ids;
+  };
+  DepthPyramidData pyramid_shader_data {};
+  pyramid_shader_data.levels_number = _depth_pyramid.mip_levels_number();
+  for (uint32_t i = 0; i < _depth_pyramid.mip_levels_number(); i++) {
+    pyramid_shader_data.levels_ids[i] = _depth_pyramid_mips[i];
+  }
+  _depth_pyramid_shader_data = UniformBuffer(*_state,
+    std::span(reinterpret_cast<std::byte *>(&pyramid_shader_data), sizeof(pyramid_shader_data)));
+  _depth_pyramid_shader_data_buffer_id = _bindless_set.register_resource(&_depth_pyramid_shader_data);
+
+  // ---------------------------
+  // Late culling
+  // ---------------------------
+
+  defines["MAX_DEPTH_PYRAMID_LEVELS"] = std::to_string(depth_pyramid_max_levels);
+  _late_instances_culling_shader = ResourceManager<Shader>::get().create("LateInstancesCullingShader",
+    *_state, "culling/late_instances_culling", defines);
+  _late_instances_culling_pipeline = ComputePipeline(*_state, _late_instances_culling_shader, set_layouts);
 }
 
 void mr::RenderContext::init_bound_box_rendering()

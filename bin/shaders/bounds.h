@@ -33,17 +33,18 @@ BoundBox transform_bound_box(BoundBox bb, mat4 transform)
   return res;
 }
 
-vec4 get_bound_box_screen_rectangle(BoundBox bb, mat4 mvp)
+// Get bound box in world-space
+vec4 get_bound_box_screen_rectangle(BoundBox bb, mat4 proj)
 {
   vec4 corners[8];
-  corners[0] = mvp * vec4(bb.min.x, bb.min.y, bb.min.z, 1);
-  corners[1] = mvp * vec4(bb.max.x, bb.min.y, bb.min.z, 1);
-  corners[2] = mvp * vec4(bb.max.x, bb.max.y, bb.min.z, 1);
-  corners[3] = mvp * vec4(bb.min.x, bb.max.y, bb.min.z, 1);
-  corners[4] = mvp * vec4(bb.min.x, bb.min.y, bb.max.z, 1);
-  corners[5] = mvp * vec4(bb.max.x, bb.min.y, bb.max.z, 1);
-  corners[6] = mvp * vec4(bb.max.x, bb.max.y, bb.max.z, 1);
-  corners[7] = mvp * vec4(bb.min.x, bb.max.y, bb.max.z, 1);
+  corners[0] = proj * vec4(bb.min.x, bb.min.y, bb.min.z, 1);
+  corners[1] = proj * vec4(bb.max.x, bb.min.y, bb.min.z, 1);
+  corners[2] = proj * vec4(bb.max.x, bb.max.y, bb.min.z, 1);
+  corners[3] = proj * vec4(bb.min.x, bb.max.y, bb.min.z, 1);
+  corners[4] = proj * vec4(bb.min.x, bb.min.y, bb.max.z, 1);
+  corners[5] = proj * vec4(bb.max.x, bb.min.y, bb.max.z, 1);
+  corners[6] = proj * vec4(bb.max.x, bb.max.y, bb.max.z, 1);
+  corners[7] = proj * vec4(bb.min.x, bb.max.y, bb.max.z, 1);
   for (int i = 0; i < 8; i++) {
     corners[i] /= corners[i].w;
   }

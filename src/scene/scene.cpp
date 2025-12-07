@@ -122,6 +122,7 @@ mr::ModelHandle mr::Scene::create_model(std::fs::path filename) noexcept
     for (uint32_t instance = 0; instance < mesh._instance_count; instance++) {
       draw.instances_data_buffer_data.emplace_back(MeshInstanceCullingData {
         .transform_index = mesh._instance_offset + instance,
+        .visible_last_frame = 1, // all meshes visible firstly
         .mesh_culling_data_index = mesh_culling_data_index,
       });
     }

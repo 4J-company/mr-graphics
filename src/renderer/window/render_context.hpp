@@ -76,6 +76,9 @@ inline namespace graphics {
 
     constexpr static inline uint32_t culling_work_group_size = 32;
 
+    // It is enough for 64k x 64k screen size
+    constexpr static inline uint32_t depth_pyramid_max_levels = 16;
+
   private:
     // Timestamps
     enum struct Timestamp : uint32_t {
@@ -159,11 +162,15 @@ inline namespace graphics {
     ComputePipeline _instances_culling_pipeline;
     ShaderHandle _instances_collect_shader;
     ComputePipeline _instances_collect_pipeline;
+    ShaderHandle _late_instances_culling_shader;
+    ComputePipeline _late_instances_culling_pipeline;
 
     Extent _depth_pyramid_extent;
     PyramidImage _depth_pyramid;
-    SmallVector<uint32_t, 13> _depth_pyramid_mips;
+    InplaceVector<uint32_t, depth_pyramid_max_levels> _depth_pyramid_mips;
     uint32_t _depth_image_attacment_id = BindlessDescriptorSet::invalid_id;
+    UniformBuffer _depth_pyramid_shader_data;
+    uint32_t _depth_pyramid_shader_data_buffer_id = BindlessDescriptorSet::invalid_id;
     ComputePipeline _depth_pyramid_pipeline;
     ShaderHandle _depth_pyramid_shader;
 
