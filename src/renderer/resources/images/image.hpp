@@ -93,6 +93,7 @@ inline namespace graphics {
     vk::ImageView image_view() const noexcept { return _image_view; }
     vk::Image image() const noexcept { return _image; }
     vk::Format format() const noexcept { return _format; }
+    vk::ImageLayout current_layout() const noexcept { return _layout; }
 
     const vk::Extent3D & extent() const noexcept { return _extent; }
     size_t size() const noexcept { return _size; }
@@ -219,13 +220,13 @@ inline namespace graphics {
   class PyramidImage : public StorageImage {
   private:
     // 13 is up to 8Kx8K texture
-    SmallVector<vk::ImageView, 13> _image_views; // these are not Unique to be destroyed before _image
+    SmallVector<vk::ImageView, 13> _mip_image_views; // these are not Unique to be destroyed before _image
 
   public:
     PyramidImage(const VulkanState &state, Extent extent, vk::Format format, uint32_t mip_levels_number);
     PyramidImage(PyramidImage&&) noexcept = default;
     PyramidImage & operator=(PyramidImage&&) noexcept = default;
-    ~PyramidImage() override = default;
+    ~PyramidImage() override;
 
     vk::ImageView get_level(uint32_t level) const noexcept;
   };
@@ -248,10 +249,10 @@ inline namespace graphics {
 
   constexpr static inline uint32_t calculate_mips_levels_number(Extent extent)
   {
-    uint32_t level = 1;
-    while (extent.width > 1 && extent.height > 1) {
+    uint32_t level = 0;
+    while (extent.width > 0 && extent.height > 0) {
       extent.width /= 2;
-      extent.height = 2;
+      extent.height /= 2;
       level++;
     }
     return level;

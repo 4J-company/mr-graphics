@@ -7,14 +7,18 @@ layout(local_size_x = THREADS_NUM, local_size_y = THREADS_NUM, local_size_z = 1)
 layout(push_constant) uniform PushContants {
   uint src_image;
   uint dst_image;
+
   uvec2 dst_size;
+
+  uvec2 src_size;
+  uvec2 real_src_size;
 } data;
 
-// layout(set = BINDLESS_SET, binding = INPUT_ATTACHMENTS) uniform readonly InputAttachments[];
+
+layout(set = BINDLESS_SET, binding = TEXTURES_BINDING) uniform sampler2D SampledImages[];
 layout(set = BINDLESS_SET, binding = STORAGE_IMAGES_BINDING, r32f) uniform image2D StorageImages[];
 
-// #define SrcImage (data.dst_image == 0 ? InputAttachments[data.src_image] ? StorageImages[data.src_image])
-#define SrcImage StorageImages[data.src_image]
+#define SrcImage SampledImages[data.src_image]
 #define DstImage StorageImages[data.dst_image]
 
 void main()
@@ -24,17 +28,14 @@ void main()
     return;
   }
 
-  // TODO(dk6): maybe use sampler for all mips
-  // vec2 avg_coord = (vec2(coord) + vec2(0.5)) / vec2(data.in_size);
-  // vec4 depth_avg = textureGather(SrcImage, avg_coord);
+  // TODO(dk6): Maybe size of depth pyramid must me pow of 2 closest to screen size
+  vec2 tex_coord = (vec2(coord) + vec2(0.5)) / data.dst_size;
 
-  ivec2 read_coord = ivec2(coord) * 2;
-  vec4 depth_avg = vec4(
-    imageLoad(SrcImage, read_coord + ivec2(0, 0)).r,
-    imageLoad(SrcImage, read_coord + ivec2(0, 1)).r,
-    imageLoad(SrcImage, read_coord + ivec2(1, 0)).r,
-    imageLoad(SrcImage, read_coord + ivec2(1, 1)).r
-  );
-  float depth = min(min(depth_avg.x, depth_avg.y), min(depth_avg.z, depth_avg.w));
+  // Real size of texture can be bigger - for simple resize we have a size of the biggest monitor
+  tex_coord /= data.real_src_size;
+  tex_coord *= data.src_size;
+
+  // Using max sampler for texture
+  float depth = texture(SrcImage, tex_coord).r;
   imageStore(DstImage, ivec2(coord), vec4(depth));
 }

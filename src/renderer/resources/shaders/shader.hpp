@@ -13,6 +13,7 @@ inline namespace graphics {
   class UniformBuffer;
   class StorageBuffer;
   class Texture;
+  class Sampler;
   class Image;
 
   class Shader : public ResourceBase<Shader> {
@@ -27,21 +28,6 @@ inline namespace graphics {
     std::string _include_string;
 
   public:
-    struct PyramidImageResource {
-      const PyramidImage *image;
-      uint32_t mip_level;
-    };
-
-    using Resource = std::variant<
-      const UniformBuffer *,
-      const StorageBuffer *,
-      const Texture *,
-      const ColorAttachmentImage *,
-      const StorageImage *,
-      const PyramidImageResource *,
-      const DepthImage *,
-      const ConditionalBuffer*>;
-
     // TODO: consider RT shaders from extensions;
     // TODO(dk6): remove this enum, use vk::ShaderStageFlagsBits instead
     enum struct Stage {
@@ -51,13 +37,6 @@ inline namespace graphics {
       Evaluate = 3,
       Geometry = 4,
       Fragment = 5,
-    };
-
-    struct ResourceView {
-      uint32_t binding;
-      Resource res;
-
-      operator const Resource&() const { return res; }
     };
 
     Shader() = default;

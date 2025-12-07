@@ -10,22 +10,30 @@
 // Static functions
 // ============================================================================
 
-static vk::DescriptorType get_descriptor_type(const mr::graphics::Shader::Resource &attachment) noexcept
+static vk::DescriptorType get_descriptor_type(const mr::graphics::ShaderResource &attachment) noexcept
 {
   using enum vk::DescriptorType;
-  static std::array types {
-    eUniformBuffer,        // for UniformBuffer
-    eStorageBuffer,        // for StorageBuffer
-    eCombinedImageSampler, // for Sampler
-    eInputAttachment,      // for ColorAttachmentImage?
-    eStorageImage,         // for StorageImage
-    eStorageImage,         // for PyramidImage
-    eStorageImage,         // for DepthImage
-    eStorageBuffer,        // for ConditionalBuffer
-  };
 
-  ASSERT(attachment.index() < types.size());
-  return types[attachment.index()];
+  // TODO(dk6): instead indexes it is better to use `holds_alternative` here
+  switch (attachment.index()) {
+    case mr::graphics::shader_resource_uniform_buffer_index:
+      return eUniformBuffer;
+    case mr::graphics::shader_resource_storage_buffer_index:
+      return eStorageBuffer;
+    case mr::graphics::shader_resource_image_index: {
+      const auto *res = std::get<const mr::graphics::ShaderImageResource *>(attachment);
+      return res->sampler != nullptr ? eCombinedImageSampler : eStorageImage;
+    }
+    case mr::graphics::shader_resource_pyramid_image_level_index: {
+      const auto *res = std::get<const mr::graphics::ShaderPyramidImageLevelResource *>(attachment);
+      return res->sampler != nullptr ? eCombinedImageSampler : eStorageImage;
+    }
+    case mr::graphics::shader_resource_color_attachment_index:
+      return eInputAttachment;
+    default:
+      ASSERT(false, "invalid resource");
+      return static_cast<vk::DescriptorType>(0);
+  }
 }
 
 // ============================================================================
@@ -124,7 +132,7 @@ mr::BindlessDescriptorSetLayout::BindlessDescriptorSetLayout(const VulkanState &
 
 void mr::DescriptorSet::update(
   const VulkanState &state,
-  std::span<const mr::graphics::Shader::ResourceView> attachments) noexcept
+  std::span<const mr::graphics::ShaderResourceView> attachments) noexcept
 {
   ASSERT(attachments.size() <= desciptor_set_max_bindings,
     "Max binding value is desciptor_set_max_bindings and all bindings must be unique");
@@ -133,6 +141,7 @@ void mr::DescriptorSet::update(
     std::variant<vk::DescriptorBufferInfo, vk::DescriptorImageInfo>;
   InplaceVector<WriteInfo, desciptor_set_max_bindings> write_infos(attachments.size());
 
+  // TODO(dk6): Merge this code with code in BindlessDescriptorSet
   auto write_buffer = [&](const Buffer *buffer, vk::DescriptorBufferInfo &info) {
     info.buffer = buffer->buffer();
     info.range = buffer->byte_size();
@@ -147,32 +156,40 @@ void mr::DescriptorSet::update(
   auto write_storage_buffer = [&](const StorageBuffer *buffer, vk::DescriptorBufferInfo &info) {
     write_buffer(buffer, info);
   };
-  auto write_texture = [&](const Texture *texture, vk::DescriptorImageInfo &info) {
-    info.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-    info.imageView = texture->image().image_view();
-    info.sampler = texture->sampler().sampler();
+  auto write_image = [&](const ShaderImageResource *image, vk::DescriptorImageInfo &info) {
+    info.sampler = image->sampler != nullptr ? image->sampler->sampler() : nullptr;
+    info.imageView = image->image->image_view();
+    info.imageLayout = image->layout != vk::ImageLayout::eUndefined ? image->layout : image->image->current_layout();
   };
-  auto write_geometry_buffer = [&](const ColorAttachmentImage *image, vk::DescriptorImageInfo &info) {
-    info.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-    info.imageView = image->image_view();
+  auto write_pyramid_level = [&](const ShaderPyramidImageLevelResource *mip_level, vk::DescriptorImageInfo &info) {
+    info.sampler = mip_level->sampler != nullptr ? mip_level->sampler->sampler() : nullptr;
+    info.imageView = mip_level->image->get_level(mip_level->mip_level);
+    info.imageLayout = mip_level->layout != vk::ImageLayout::eUndefined
+                         ? mip_level->layout : mip_level->image->current_layout();
+  };
+  auto write_input_attachment = [&](const ColorAttachmentImage *image, vk::DescriptorImageInfo &info) {
     info.sampler = nullptr;
+    info.imageView = image->image_view();
+    info.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
   };
+
   auto write_default = [](auto res, auto) { ASSERT(false, "Unhandled attachment type", res); std::unreachable(); };
 
   std::array<bool, desciptor_set_max_bindings> used_bindings {}; // for validation
 
   for (const auto &[attachment_view, write_info] : std::views::zip(attachments, write_infos)) {
-    const Shader::Resource &attachment = attachment_view;
-    if (std::holds_alternative<const Texture *>(attachment) ||
+    const graphics::ShaderResource &attachment = attachment_view;
+    if (std::holds_alternative<const ShaderImageResource *>(attachment) ||
+        std::holds_alternative<const ShaderPyramidImageLevelResource *>(attachment) ||
         std::holds_alternative<const ColorAttachmentImage *>(attachment)) {
       write_info.emplace<vk::DescriptorImageInfo>();
     }
 
     std::visit(Overloads {write_uniform_buffer,
-                          write_storage_buffer,
                           write_conditional_buffer,
-                          write_texture,
-                          write_geometry_buffer,
+                          write_image,
+                          write_pyramid_level,
+                          write_input_attachment,
                           write_default},
                attachment,
                write_info);
@@ -358,8 +375,8 @@ mr::BindlessDescriptorSet::BindlessDescriptorSet(const VulkanState &state,
   _resource_pools.resize(desciptor_set_max_bindings);
 }
 
-mr::graphics::Shader::ResourceView
-mr::BindlessDescriptorSet::try_convert_view_to_resource(const mr::graphics::Shader::Resource &resource) const noexcept
+mr::graphics::ShaderResourceView
+mr::BindlessDescriptorSet::try_convert_view_to_resource(const mr::graphics::ShaderResource &resource) const noexcept
 {
   auto type = get_descriptor_type(resource);
   std::optional<uint32_t> binding = std::nullopt;
@@ -369,10 +386,10 @@ mr::BindlessDescriptorSet::try_convert_view_to_resource(const mr::graphics::Shad
     }
   }
   ASSERT(binding.has_value(), "You try register resource without passing binding, but its type is ambigious", type);
-  return mr::graphics::Shader::ResourceView(binding.value(), resource);
+  return mr::graphics::ShaderResourceView(binding.value(), resource);
 }
 
-uint32_t mr::BindlessDescriptorSet::register_resource(const mr::graphics::Shader::ResourceView &resource_view) noexcept
+uint32_t mr::BindlessDescriptorSet::register_resource(const mr::graphics::ShaderResourceView &resource_view) noexcept
 {
   // Validate attacmnets type
   const auto &binding = _set_layout->bindings()[resource_view.binding];
@@ -390,7 +407,7 @@ uint32_t mr::BindlessDescriptorSet::register_resource(const mr::graphics::Shader
   return id;
 }
 
-uint32_t mr::BindlessDescriptorSet::register_resource(const mr::graphics::Shader::Resource &resource) noexcept
+uint32_t mr::BindlessDescriptorSet::register_resource(const mr::graphics::ShaderResource &resource) noexcept
 {
   ResourceInfo res_info;
   vk::WriteDescriptorSet write_info;
@@ -401,7 +418,7 @@ uint32_t mr::BindlessDescriptorSet::register_resource(const mr::graphics::Shader
 }
 
 mr::InplaceVector<uint32_t, mr::desciptor_set_max_bindings>
-mr::BindlessDescriptorSet::register_resources(std::span<const mr::graphics::Shader::Resource> resources) noexcept
+mr::BindlessDescriptorSet::register_resources(std::span<const mr::graphics::ShaderResource> resources) noexcept
 {
   ASSERT(resources.size() <= desciptor_set_max_bindings,
     "Max binding value is desciptor_set_max_bindings and all bindings must be unique");
@@ -421,51 +438,34 @@ static std::uintptr_t get_resource_id(const T *res)
   return reinterpret_cast<std::uintptr_t>(res);
 }
 
-static std::uintptr_t get_resource_id(const mr::graphics::Shader::PyramidImageResource *res)
+void mr::BindlessDescriptorSet::unregister_resource(const mr::graphics::ShaderResource &resource) noexcept
 {
-  // TODO(dk6): This can be bad for hash collisions
-  //            Maybe it is better to require PyramidImageResource instance for each mip in calling code
-  return reinterpret_cast<std::uintptr_t>((VkImageView)res->image->get_level(res->mip_level));
-}
-
-void mr::BindlessDescriptorSet::unregister_resource(const Shader::Resource &resource) noexcept
-{
-  auto tex = [&](const Texture *tex) -> uint32_t {
-    return get_resource_id(tex);
-  };
   auto ubuf = [&](const UniformBuffer *buf) -> uint32_t {
     return get_resource_id(buf);
   };
   auto sbuf = [&](const StorageBuffer *buf) -> uint32_t {
     return get_resource_id(buf);
   };
-  auto simg = [&](const StorageImage *img) -> uint32_t {
-    return get_resource_id(img);
+  auto img = [&](const ShaderImageResource *image) -> uint32_t {
+    return get_resource_id(image);
   };
-  auto pimg = [&](const Shader::PyramidImageResource *img) -> uint32_t {
-    return get_resource_id(img);
-  };
-  auto dimg = [&](const DepthImage *img) -> uint32_t {
-    return get_resource_id(img);
+  auto pyrmip = [&](const ShaderPyramidImageLevelResource *mip_level) -> uint32_t {
+    return get_resource_id(mip_level);
   };
   auto other = [](auto &&unknown_res) -> uint32_t {
     ASSERT(false, "Unsupported in BindlessSet resource type", unknown_res);
     return 0;
   };
-  auto resource_id = std::visit(Overloads {tex, ubuf, sbuf, simg, pimg, dimg, other}, resource);
+  auto resource_id = std::visit(Overloads {ubuf, sbuf, img, pyrmip, other}, resource);
 
   uint32_t binding = _bindings_of_resources[resource_id];
   _resource_pools[binding].unregister(resource_id);
 }
 
-uint32_t mr::BindlessDescriptorSet::fill_resource(const mr::graphics::Shader::ResourceView &resource,
+uint32_t mr::BindlessDescriptorSet::fill_resource(const mr::graphics::ShaderResourceView &resource,
                                                   ResourceInfo &resource_info,
                                                   vk::WriteDescriptorSet &write_info) noexcept
 {
-  auto tex = [&](const Texture *tex) -> std::uintptr_t {
-    fill_texture(tex, resource_info.emplace<vk::DescriptorImageInfo>());
-    return get_resource_id(tex);
-  };
   auto ubuf = [&](const UniformBuffer *buf) -> std::uintptr_t {
     fill_uniform_buffer(buf, resource_info.emplace<vk::DescriptorBufferInfo>());
     return get_resource_id(buf);
@@ -474,23 +474,24 @@ uint32_t mr::BindlessDescriptorSet::fill_resource(const mr::graphics::Shader::Re
     fill_storage_buffer(buf, resource_info.emplace<vk::DescriptorBufferInfo>());
     return get_resource_id(buf);
   };
-  auto simg = [&](const StorageImage *img) -> std::uintptr_t {
-    fill_storage_image(img, resource_info.emplace<vk::DescriptorImageInfo>());
-    return get_resource_id(img);
+  auto img = [&](const ShaderImageResource *image) -> std::uintptr_t {
+    fill_image(image, resource_info.emplace<vk::DescriptorImageInfo>());
+    return get_resource_id(image);
   };
-  auto pimg = [&](const Shader::PyramidImageResource *img) -> std::uintptr_t {
-    fill_pyramid_image(img, resource_info.emplace<vk::DescriptorImageInfo>());
-    return get_resource_id(img);
+  auto pyrmip = [&](const ShaderPyramidImageLevelResource *mip_level) -> std::uintptr_t {
+    fill_pyramid_image_level(mip_level, resource_info.emplace<vk::DescriptorImageInfo>());
+    return get_resource_id(mip_level);
   };
-  auto dimg = [&](const DepthImage *img) -> std::uintptr_t {
-    fill_depth_image(img, resource_info.emplace<vk::DescriptorImageInfo>());
-    return get_resource_id(img);
+  auto inattach = [&](const ColorAttachmentImage *mip_level) -> std::uintptr_t {
+    ASSERT(false, "Input attachments can not be bindless");
+    return -1;
   };
+
   auto other = [](auto &&unknown_res) -> std::uintptr_t {
     ASSERT(false, "Unsupported in BindlessSet resource type", unknown_res);
-    return {};
+    return -1;
   };
-  auto resource_id = std::visit(Overloads {tex, ubuf, sbuf, simg, pimg, dimg, other}, resource.res);
+  auto resource_id = std::visit(Overloads {ubuf, sbuf, img, pyrmip, inattach, other}, resource.res);
   _bindings_of_resources[resource_id] = resource.binding;
 
   uint32_t index = _resource_pools[resource.binding].get_id(resource_id);
@@ -506,15 +507,6 @@ uint32_t mr::BindlessDescriptorSet::fill_resource(const mr::graphics::Shader::Re
   return index;
 }
 
-void mr::BindlessDescriptorSet::fill_texture(const Texture *texture,
-                                             vk::DescriptorImageInfo &image_info) const noexcept
-{
-  image_info = vk::DescriptorImageInfo {
-    .sampler = texture->sampler().sampler(),
-    .imageView = texture->image().image_view(),
-    .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
-  };
-}
 
 void mr::BindlessDescriptorSet::fill_uniform_buffer(const UniformBuffer *buffer,
                                                     vk::DescriptorBufferInfo &buffer_info) const noexcept
@@ -536,31 +528,24 @@ void mr::BindlessDescriptorSet::fill_storage_buffer(const StorageBuffer *buffer,
   };
 }
 
-void mr::BindlessDescriptorSet::fill_storage_image(const StorageImage *image,
-                                                   vk::DescriptorImageInfo &image_info) const noexcept
+void mr::BindlessDescriptorSet::fill_image(const ShaderImageResource *image,
+                                           vk::DescriptorImageInfo &image_info) const noexcept
 {
   image_info = vk::DescriptorImageInfo {
-    .imageView = image->image_view(),
-    .imageLayout = vk::ImageLayout::eGeneral,
+    .sampler = image->sampler != nullptr ? image->sampler->sampler() : nullptr,
+    .imageView = image->image->image_view(),
+    .imageLayout = image->layout != vk::ImageLayout::eUndefined ? image->layout : image->image->current_layout(),
   };
 }
 
-void mr::BindlessDescriptorSet::fill_pyramid_image(const Shader::PyramidImageResource *image,
-                                                   vk::DescriptorImageInfo &image_info) const noexcept
+void mr::BindlessDescriptorSet::fill_pyramid_image_level(const ShaderPyramidImageLevelResource *mip_level,
+                                                         vk::DescriptorImageInfo &image_info) const noexcept
 {
   image_info = vk::DescriptorImageInfo {
-    .imageView = image->image->get_level(image->mip_level),
-    .imageLayout = vk::ImageLayout::eGeneral,
-  };
-}
-
-void mr::BindlessDescriptorSet::fill_depth_image(const DepthImage *image,
-                                                 vk::DescriptorImageInfo &image_info) const noexcept
-{
-  image_info = vk::DescriptorImageInfo {
-    .imageView = image->image_view(),
-    // .imageLayout = vk::ImageLayout::eDepthStencilReadOnlyOptimal,
-    .imageLayout = vk::ImageLayout::eGeneral,
+    .sampler = mip_level->sampler != nullptr ? mip_level->sampler->sampler() : nullptr,
+    .imageView = mip_level->image->get_level(mip_level->mip_level),
+    .imageLayout = mip_level->layout != vk::ImageLayout::eUndefined
+                     ? mip_level->layout : mip_level->image->current_layout(),
   };
 }
 

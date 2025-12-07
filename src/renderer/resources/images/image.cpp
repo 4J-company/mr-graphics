@@ -153,7 +153,7 @@ void mr::Image::switch_layout(CommandUnit &command_unit, vk::ImageLayout new_lay
       barrier.srcAccessMask = vk::AccessFlagBits::eNoneKHR;
       break;
     case vk::ImageLayout::eGeneral:
-      barrier.srcAccessMask = {};
+      barrier.srcAccessMask = vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite;
       break;
     case vk::ImageLayout::eDepthStencilReadOnlyOptimal:
       barrier.srcAccessMask = vk::AccessFlagBits::eShaderRead;
@@ -186,8 +186,7 @@ void mr::Image::switch_layout(CommandUnit &command_unit, vk::ImageLayout new_lay
     barrier.dstAccessMask = vk::AccessFlagBits::eNoneKHR;
     break;
   case vk::ImageLayout::eGeneral:
-    // TODO(dk6): think about correct access mask
-    barrier.dstAccessMask = {};
+    barrier.srcAccessMask = vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite;
     break;
   case vk::ImageLayout::eDepthStencilReadOnlyOptimal:
     barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
@@ -375,7 +374,7 @@ mr::DepthImage::DepthImage(const VulkanState &state, Extent extent, uint mip_lev
       state,
       extent,
       get_depthbuffer_format(state),
-      vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eStorage,
+      vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled,
       vk::ImageAspectFlagBits::eDepth,
       mip_level
     )
@@ -421,24 +420,32 @@ vk::RenderingAttachmentInfoKHR mr::ColorAttachmentImage::attachment_info() const
 // ---- StorageImage ----
 mr::StorageImage::StorageImage(const VulkanState &state, Extent extent, vk::Format format,
                                uint mip_level, bool create_view)
-  : DeviceImage(state, extent, format, vk::ImageUsageFlagBits::eStorage, vk::ImageAspectFlagBits::eColor,
-                mip_level, create_view)
+  : DeviceImage(state, extent, format, vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled,
+                vk::ImageAspectFlagBits::eColor, mip_level, create_view)
 {
   // switch_layout()
 }
 
 // ---- Depth pyramid image ----
 mr::PyramidImage::PyramidImage(const VulkanState &state, Extent extent, vk::Format format, uint32_t mip_levels_number)
-  : StorageImage(state, extent, format, mip_levels_number, false)
+  : StorageImage(state, extent, format, mip_levels_number, true)
 {
-  _image_views.reserve(_mip_levels_number);
+  _mip_image_views.reserve(_mip_levels_number);
   for (uint32_t level = 0; level < _mip_levels_number; level++) {
-    _image_views.emplace_back(create_image_view(level, 1));
+    _mip_image_views.emplace_back(create_image_view(level, 1));
   }
 }
 
+// TODO(dk6): rename to 'level`
 vk::ImageView mr::PyramidImage::get_level(uint32_t level) const noexcept
 {
   ASSERT(level <= _mip_levels_number, "invalid mip level");
-  return _image_views[level];
+  return _mip_image_views[level];
+}
+
+mr::PyramidImage::~PyramidImage() {
+  for (auto mip_image_view : _mip_image_views) {
+    _state->device().destroyImageView(mip_image_view);
+  }
+  _mip_image_views.clear();
 }

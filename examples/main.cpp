@@ -29,10 +29,14 @@ int main(int argc, const char **argv)
   } else {
     render_context_extent = {options.width, options.height};
   }
+  render_context_extent = {options.width, options.height};
 
   mr::RenderOptions render_options = mr::RenderOptions::None;
   if (options.disable_culling) {
     render_options |= mr::RenderOptions::DisableCulling;
+  }
+  if (options.disable_occlusion_culling) {
+    render_options |= mr::RenderOptions::DisableOcclusionCulling;
   }
   if (options.enable_vsync) {
     render_options |= mr::RenderOptions::EnableVsync;
@@ -51,6 +55,7 @@ int main(int argc, const char **argv)
   scene->create_directional_light(mr::Norm3f(-1, 1, -1));
   scene->create_directional_light(mr::Norm3f(-1, 1, 1));
   scene->create_directional_light(mr::Norm3f(0.3, 1, 0.3));
+  scene->create_directional_light(mr::Norm3f(-1, -1, -1));
 
   for (const auto &model_path : options.models) {
     scene->create_model(model_path);

@@ -37,12 +37,12 @@ mr::graphics::Material::Material(Scene &scene,
                                          std::span {layouts});
   }
 
-  // TODO: also register storage and conditional buffers
   constexpr size_t max_textures_size = enum_cast(MaterialParameter::EnumSize);
-  InplaceVector<Shader::Resource, max_textures_size + 1> resources;
+  InplaceVector<ShaderResource, max_textures_size + 1> resources;
   for (auto &tex : textures) {
     if (tex.has_value()) {
-      resources.push_back(tex.value().get());
+      _textures_resources.push_back(tex.value()->get_resource_description());
+      resources.push_back(&_textures_resources.back());
     }
   }
   resources.push_back(&_ubo);
@@ -68,10 +68,8 @@ mr::graphics::Material::Material(Scene &scene,
 
 mr::graphics::Material::~Material()
 {
-  for (auto &tex : _textures) {
-    if (tex.has_value()) {
-      _scene->render_context().bindless_set().unregister_resource(tex.value().get());
-    }
+  for (auto &tex_res : _textures_resources) {
+    _scene->render_context().bindless_set().unregister_resource(&tex_res);
   }
   _scene->render_context().bindless_set().unregister_resource(&_ubo);
 }
