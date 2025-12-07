@@ -58,7 +58,7 @@ void main()
 
   mat4 transform = transpose(transforms[instance_index]);
   position = transform * vec4(InPos.xyz, 1.0);
-  normal = vec4(InNorm, 1);
+  normal = vec4(InNorm, 1); // TODO: Why it does not multiply on inv transform
 
   gl_Position = cam_ubo.vp * position;
   gl_Position = vec4(gl_Position.x, -gl_Position.y, gl_Position.z, gl_Position.w);

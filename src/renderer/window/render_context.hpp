@@ -88,6 +88,8 @@ inline namespace graphics {
       ModelsEnd,
       BuildDepthPyramidStart,
       BuildDepthPyramidEnd,
+      LateCullingStart,
+      LateCullingEnd,
       ShadingStart,
       ShadingEnd,
       TimestampsNumber,
@@ -118,6 +120,7 @@ inline namespace graphics {
     TracyVkCtx _lights_tracy_gpu_context {};
 
     CommandUnit _models_command_unit;
+    CommandUnit _late_models_command_unit;
     CommandUnit _lights_command_unit;
     // RenderContext doesn't use transfer command unit, only gives it for buffers
     // Writting commands to it doesn't affect RenderContext internal state
@@ -133,8 +136,9 @@ inline namespace graphics {
     InplaceVector<vk::UniqueSemaphore, max_images_number> _render_finished_semaphore;
 
     vk::UniqueSemaphore _pre_model_layout_transition_semaphore;
-    vk::UniqueSemaphore _pre_model_layout_transition_semaphore_late;
     CommandUnit _pre_model_layout_transition_command_unit;
+    CommandUnit _pre_model_layout_transition_command_unit_late;
+    vk::UniqueSemaphore _pre_model_layout_transition_semaphore_late;
 
     vk::UniqueSemaphore _pre_light_layout_transition_semaphore;
     CommandUnit _pre_light_layout_transition_command_unit;
@@ -158,6 +162,7 @@ inline namespace graphics {
     IndexHeapBuffer _index_buffer;
 
     CommandUnit _culling_command_unit;
+    CommandUnit _late_culling_command_unit;
     vk::UniqueSemaphore _culling_semaphore;
     vk::UniqueSemaphore _visible_models_rendering_semaphore;
     vk::UniqueSemaphore _late_culling_semaphore;
@@ -248,8 +253,7 @@ inline namespace graphics {
     void late_culling_geometry(const SceneHandle scene);
     void build_depth_pyramid();
     void render_bound_boxes(const SceneHandle scene);
-    // void render_models(const SceneHandle scene, vk::Semaphore signal_sem);
-    void render_models(const SceneHandle scene);
+    void render_models(const SceneHandle scene, CommandUnit &cmd_unit);
     void render_lights(const SceneHandle scene, Presenter &presenter);
 
     void update_bound_boxes_data();

@@ -25,7 +25,6 @@ layout(push_constant) uniform PushContants {
   uint bound_boxes_buffer_id;
 
   uint depth_pyramid_data_buffer_id;
-
   uvec2 depth_pyramid_size;
 } buffers_data;
 
@@ -129,8 +128,10 @@ void main()
   }
 
   // After all culling tests we still here - object is visible
-  uint instance_number = atomicAdd(intances_count(mesh_data.instance_counter_index), 1);
-  transforms_out[transforms_start + instance_number] = transforms_in[instance_data.transform_index];
-
   instances_datas[id].visible_last_frame = 1; // Save for next frame
+
+  if (instance_data.visible_last_frame == 0) {
+    uint instance_number = atomicAdd(intances_count(mesh_data.instance_counter_index), 1);
+    transforms_out[transforms_start + instance_number] = transforms_in[instance_data.transform_index];
+  }
 }

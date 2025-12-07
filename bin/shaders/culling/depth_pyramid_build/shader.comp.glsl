@@ -10,10 +10,8 @@ layout(push_constant) uniform PushContants {
   uvec2 dst_size;
 } data;
 
-// layout(set = BINDLESS_SET, binding = INPUT_ATTACHMENTS) uniform readonly InputAttachments[];
 layout(set = BINDLESS_SET, binding = STORAGE_IMAGES_BINDING, r32f) uniform image2D StorageImages[];
 
-// #define SrcImage (data.dst_image == 0 ? InputAttachments[data.src_image] ? StorageImages[data.src_image])
 #define SrcImage StorageImages[data.src_image]
 #define DstImage StorageImages[data.dst_image]
 

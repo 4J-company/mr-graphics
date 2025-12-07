@@ -33,6 +33,7 @@ BoundBox transform_bound_box(BoundBox bb, mat4 transform)
   return res;
 }
 
+// TODO(dk6): Search in internet more optimize way to do it
 // Get bound box in world-space
 vec4 get_bound_box_screen_rectangle(BoundBox bb, mat4 proj)
 {

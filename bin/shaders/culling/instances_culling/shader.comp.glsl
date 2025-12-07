@@ -87,6 +87,7 @@ void main()
     }
   }
 
+  // After frustun culling tests we still here - object is visible
   uint instance_number = atomicAdd(intances_count(mesh_data.instance_counter_index), 1);
   transforms_out[transforms_start + instance_number] = transforms_in[instance_data.transform_index];
 }
