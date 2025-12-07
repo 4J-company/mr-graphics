@@ -429,7 +429,7 @@ mr::StorageImage::StorageImage(const VulkanState &state, Extent extent, vk::Form
 
 // ---- Depth pyramid image ----
 mr::PyramidImage::PyramidImage(const VulkanState &state, Extent extent, vk::Format format, uint32_t mip_levels_number)
-  : StorageImage(state, extent, format, mip_levels_number, false)
+  : StorageImage(state, extent, format, mip_levels_number, true)
 {
   _image_views.reserve(_mip_levels_number);
   for (uint32_t level = 0; level < _mip_levels_number; level++) {

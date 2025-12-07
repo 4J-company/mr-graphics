@@ -62,11 +62,21 @@ mr::graphics::Model::Model(
   CommandUnit geometry_command_unit (state);
   geometry_command_unit.begin();
 
+  float max_x_coord = 0;
+  std::for_each(std::execution::seq, model_value.meshes.begin(), model_value.meshes.end(),
+    [&, this] (auto &mesh) {
+      max_x_coord = std::max(max_x_coord, mesh.aabb.max.x());
+    });
+
   using enum mr::MaterialParameter;
   static auto &manager = ResourceManager<Texture>::get();
   std::for_each(std::execution::seq, model_value.meshes.begin(), model_value.meshes.end(),
     [&, this] (auto &mesh) {
       ASSERT(mesh.material < model_value.materials.size(), "Failed to load material from GLTF file");
+
+      if (mesh.aabb.max.x() < max_x_coord * 0.99) {
+        return;
+      }
 
       const auto &material = model_value.materials[mesh.material];
       const auto &transform = mesh.transforms[0];

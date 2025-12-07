@@ -6,11 +6,6 @@ layout(local_size_x = THREADS_NUM, local_size_y = 1, local_size_z = 1) in;
 
 #include "culling/culling.h"
 
-struct DepthPyramid {
-  uint levels_number;
-  uint levels_ids[MAX_DEPTH_PYRAMID_LEVELS];
-};
-
 layout(push_constant) uniform PushContants {
   uint mesh_culling_data_buffer_id;
   uint instances_culling_data_buffer_id;
@@ -24,8 +19,11 @@ layout(push_constant) uniform PushContants {
   uint camera_buffer_id;
   uint bound_boxes_buffer_id;
 
+  uint mip_levels_number;
   uint depth_pyramid_data_buffer_id;
   uvec2 depth_pyramid_size;
+
+  uint depth_pyramid_image_id;
 } buffers_data;
 
 layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) buffer MeshInstanceCullingDatasBuffer {
@@ -71,13 +69,14 @@ layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) writeonly buffer T
 } TransformsOutArray[];
 #define transforms_out TransformsOutArray[buffers_data.transforms_out_buffer_id].transforms
 
-layout(set = BINDLESS_SET, binding = UNIFORM_BUFFERS_BINDING) readonly uniform DepthPyramidDataBuffer {
-  DepthPyramid data;
+layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer DepthPyramidDataBuffer {
+  uint mips[];
 } DepthPyramidData[];
-#define depth_pyramid_data DepthPyramidData[buffers_data.depth_pyramid_data_buffer_id].data
+#define depth_pyramid_mips DepthPyramidData[buffers_data.depth_pyramid_data_buffer_id].mips
 
 layout(set = BINDLESS_SET, binding = STORAGE_IMAGES_BINDING, r32f) uniform image2D StorageImages[];
-#define DepthLevel(level) StorageImages[depth_pyramid_data.levels_ids[level]]
+#define DepthLevel(level) StorageImages[depth_pyramid_mips[level]]
+#define DepthPyramid StorageImages[buffers_data.depth_pyramid_image_id]
 
 void main()
 {
@@ -104,32 +103,42 @@ void main()
   // Occlussion culling
   // -------------------------------------
 
-  vec4 rectangle = get_bound_box_screen_rectangle(bound_box(mesh_data), camera_buffer.vp);
+  // --- Get current depth of already visible objects ---
+  vec4 rectangle_screen = get_bound_box_screen_rectangle(bb, camera_buffer.vp);
+  vec4 rectangle;
   // TODO(dk6): maybe here correct '*= -1' y components
   // rectangle now in [-1; 1] screen coords, not in pixels - we must convert it to [0; w] and [0; h]
-  rectangle.x = ((rectangle.x + 1) / 2) * buffers_data.depth_pyramid_size.x;
-  rectangle.y = ((rectangle.y + 1) / 2) * buffers_data.depth_pyramid_size.y;
-  rectangle.z = ((rectangle.z + 1) / 2) * buffers_data.depth_pyramid_size.x;
-  rectangle.w = ((rectangle.w + 1) / 2) * buffers_data.depth_pyramid_size.y;
+  rectangle.x = ((rectangle_screen.x + 1) / 2) * buffers_data.depth_pyramid_size.x;
+  rectangle.y = ((rectangle_screen.y + 1) / 2) * buffers_data.depth_pyramid_size.y;
+  rectangle.z = ((rectangle_screen.z + 1) / 2) * buffers_data.depth_pyramid_size.x;
+  rectangle.w = ((rectangle_screen.w + 1) / 2) * buffers_data.depth_pyramid_size.y;
 
   float rectangle_width = rectangle.z - rectangle.x;
   float rectangle_height = rectangle.w - rectangle.y;
-  vec2 rectangle_center = (rectangle.xy + rectangle.zw) / 2;
-  vec3 bb_center = (bb.min.xyz + bb.max.xyz) / 2;
-
+  vec2 rectangle_center = vec2(rectangle.x + rectangle_width / 2, rectangle.y + rectangle_height / 2);
   int level = int(floor(log2(max(rectangle_width, rectangle_height))));
-  rectangle_center /= (level + 1);
+  // level = min(level, int(buffers_data.mip_levels_number) - 1);
+  vec2 level_rectangle_center = rectangle_center / pow(2, level);
   // TODO(dk6): maybe get 4 pixels? Also it is better to use sampler for average value
-  float old_depth = imageLoad(DepthLevel(level), ivec2(rectangle_center)).r;
-  float new_depth = (camera_buffer.vp * vec4(bb_center, 1)).z;
+  float old_depth = imageLoad(DepthLevel(level), ivec2(level_rectangle_center)).r;
 
-  if (new_depth > old_depth) {
+  // --- Get current depth closest to cam point of bound box ---
+  vec3 bb_center = (bb.min.xyz + bb.max.xyz) / 2;
+  vec3 dir_to_cam = normalize(camera_buffer.pos.xyz - bb_center);
+  float bb_size = length(bb.max.xyz - bb.min.xyz) / 2;
+  vec3 closest_bb_point = bb_center + dir_to_cam * bb_size;
+  vec4 projected = (camera_buffer.vp * vec4(closest_bb_point, 1));
+  float new_depth = projected.z / projected.w;
+
+  // --- Check visibility ---
+  bool visible = new_depth < old_depth;
+
+  instances_datas[id].visible_last_frame = visible ? 1 : 0;
+  if (!visible) {
     return;
   }
 
   // After all culling tests we still here - object is visible
-  instances_datas[id].visible_last_frame = 1; // Save for next frame
-
   if (instance_data.visible_last_frame == 0) {
     uint instance_number = atomicAdd(intances_count(mesh_data.instance_counter_index), 1);
     transforms_out[transforms_start + instance_number] = transforms_in[instance_data.transform_index];

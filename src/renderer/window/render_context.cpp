@@ -210,17 +210,10 @@ void mr::RenderContext::init_culling()
     _depth_pyramid_mips.emplace_back(_bindless_set.register_resource(&res));
   }
 
-  struct DepthPyramidData {
-    uint32_t levels_number;
-    std::array<uint32_t, depth_pyramid_max_levels> levels_ids;
-  };
-  DepthPyramidData pyramid_shader_data {};
-  pyramid_shader_data.levels_number = _depth_pyramid.mip_levels_number();
-  for (uint32_t i = 0; i < _depth_pyramid.mip_levels_number(); i++) {
-    pyramid_shader_data.levels_ids[i] = _depth_pyramid_mips[i];
-  }
-  _depth_pyramid_shader_data = UniformBuffer(*_state,
-    std::span(reinterpret_cast<std::byte *>(&pyramid_shader_data), sizeof(pyramid_shader_data)));
+  // But i also need sampler...
+  _depth_pyramid_image_id = _bindless_set.register_resource((StorageImage *)&_depth_pyramid);
+
+  _depth_pyramid_shader_data = StorageBuffer(*_state, std::span((_depth_pyramid_mips)));
   _depth_pyramid_shader_data_buffer_id = _bindless_set.register_resource(&_depth_pyramid_shader_data);
 
   // ---------------------------
@@ -534,6 +527,7 @@ void mr::RenderContext::culling_geometry(const SceneHandle scene)
 
         scene->camera_buffer_id(),
         scene->_bound_boxes_buffer_id,
+        _depth_pyramid_image_id,
       };
       _culling_command_unit->pushConstants(_instances_culling_pipeline.layout(), vk::ShaderStageFlagBits::eCompute,
                                           0, sizeof(culling_push_contants), culling_push_contants);
@@ -650,6 +644,7 @@ void mr::RenderContext::late_culling_geometry(const SceneHandle scene)
         scene->camera_buffer_id(),
         scene->_bound_boxes_buffer_id,
 
+        _depth_pyramid.mip_levels_number(),
         _depth_pyramid_shader_data_buffer_id,
         _depth_pyramid_extent.width,
         _depth_pyramid_extent.height,
@@ -812,6 +807,13 @@ void mr::RenderContext::render_geometry(const SceneHandle scene, bool is_late_pa
     }) | std::ranges::to<InplaceVector<vk::RenderingAttachmentInfoKHR, gbuffers_number>>();
     auto depth_attachment_info = _depthbuffer.attachment_info();
 
+    if (is_late_pass) {
+      for (auto &attach : gbufs_attachs) {
+        attach.loadOp = vk::AttachmentLoadOp::eLoad;
+      }
+      depth_attachment_info.loadOp = vk::AttachmentLoadOp::eLoad;
+    }
+
     vk::RenderingInfoKHR attachment_info {
       .renderArea = { 0, 0, _extent.width, _extent.height },
       .layerCount = 1,
@@ -855,6 +857,7 @@ void mr::RenderContext::render_geometry(const SceneHandle scene, bool is_late_pa
 
   auto finish_semaphore = is_late_pass ? _models_render_finished_semaphore.get()
                                        : _visible_models_rendering_semaphore.get();
+  // finish_semaphore = _models_render_finished_semaphore.get();
   cmd_unit.add_signal_semaphore(finish_semaphore);
 
   cmd_unit.end();

@@ -30,6 +30,7 @@ void main()
     imageLoad(SrcImage, read_coord + ivec2(1, 0)).r,
     imageLoad(SrcImage, read_coord + ivec2(1, 1)).r
   );
-  float depth = min(min(depth_avg.x, depth_avg.y), min(depth_avg.z, depth_avg.w));
+  // float depth = min(min(depth_avg.x, depth_avg.y), min(depth_avg.z, depth_avg.w));
+  float depth = max(max(depth_avg.x, depth_avg.y), max(depth_avg.z, depth_avg.w));
   imageStore(DstImage, ivec2(coord), vec4(depth));
 }

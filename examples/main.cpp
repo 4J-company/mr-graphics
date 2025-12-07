@@ -27,6 +27,7 @@ int main(int argc, const char **argv)
   } else {
     render_context_extent = {options.width, options.height};
   }
+  render_context_extent = {options.width, options.height};
 
   mr::RenderOptions render_options = mr::RenderOptions::None;
   if (options.disable_culling) {
@@ -52,7 +53,7 @@ int main(int argc, const char **argv)
 
   if (options.bench_name.has_value() && *options.bench_name == "kittens") {
     auto &kitten_path = options.models.front();
-    uint32_t kittens_number = 10;
+    uint32_t kittens_number = 1;
     float size = 1;
     for (uint32_t i = 0; i < kittens_number; i++) {
       auto model = scene->create_model(kitten_path);
@@ -89,6 +90,13 @@ int main(int argc, const char **argv)
     for (const auto &model_path : options.models) {
       scene->create_model(model_path);
     }
+    auto kitten = scene->create_model("kitten/kitten.gltf");
+
+    float scale = 0.1;
+    auto scale_vec = mr::Vec4f(scale, scale, scale, 1);
+    auto pos = mr::Vec4f(0, 2, 0, 0);
+    auto translate = (mr::Matr4f::identity() * mr::translate(pos)).transposed();
+    kitten->transform(translate * mr::scale(scale_vec));
   }
 
   if (options.camera.has_value()) {
