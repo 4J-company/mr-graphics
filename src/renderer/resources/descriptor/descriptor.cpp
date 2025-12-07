@@ -20,7 +20,7 @@ static vk::DescriptorType get_descriptor_type(const mr::graphics::Shader::Resour
     eInputAttachment,      // for ColorAttachmentImage?
     eStorageImage,         // for StorageImage
     eStorageImage,         // for PyramidImage
-    eInputAttachment,      // for DepthImage
+    eStorageImage,         // for DepthImage
     eStorageBuffer,        // for ConditionalBuffer
   };
 
@@ -152,12 +152,12 @@ void mr::DescriptorSet::update(
     info.imageView = texture->image().image_view();
     info.sampler = texture->sampler().sampler();
   };
-  auto write_geometry_buffer = [&](const Image *image, vk::DescriptorImageInfo &info) {
+  auto write_geometry_buffer = [&](const ColorAttachmentImage *image, vk::DescriptorImageInfo &info) {
     info.imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
     info.imageView = image->image_view();
     info.sampler = nullptr;
   };
-  auto write_default = [](auto, auto) { ASSERT(false, "Unhandled attachment type"); std::unreachable(); };
+  auto write_default = [](auto res, auto) { ASSERT(false, "Unhandled attachment type", res); std::unreachable(); };
 
   std::array<bool, desciptor_set_max_bindings> used_bindings {}; // for validation
 
@@ -221,6 +221,7 @@ mr::DescriptorAllocator::DescriptorAllocator(const VulkanState &state)
     vk::DescriptorPoolSize {vk::DescriptorType::eSampledImage, 5},
     vk::DescriptorPoolSize {vk::DescriptorType::eInputAttachment, 10},
     vk::DescriptorPoolSize {vk::DescriptorType::eCombinedImageSampler, 10},
+    vk::DescriptorPoolSize {vk::DescriptorType::eStorageImage, 20},
     // vk::DescriptorPoolSize {vk::DescriptorType::eUniformBufferDynamic, 5},
     // vk::DescriptorPoolSize {vk::DescriptorType::eStorageBufferDynamic, 5},
   };
@@ -233,6 +234,7 @@ mr::DescriptorAllocator::DescriptorAllocator(const VulkanState &state)
     vk::DescriptorPoolSize {vk::DescriptorType::eUniformBuffer,        resource_max_number_per_binding},
     vk::DescriptorPoolSize {vk::DescriptorType::eStorageBuffer,        resource_max_number_per_binding},
     vk::DescriptorPoolSize {vk::DescriptorType::eCombinedImageSampler, resource_max_number_per_binding},
+    vk::DescriptorPoolSize {vk::DescriptorType::eStorageImage,         resource_max_number_per_binding},
   };
   auto bindless_pool = allocate_pool(bindless_default_sizes, true);
   ASSERT(bindless_pool.has_value(), "Error in allocating descriptor pool");
@@ -419,6 +421,13 @@ static std::uintptr_t get_resource_id(const T *res)
   return reinterpret_cast<std::uintptr_t>(res);
 }
 
+static std::uintptr_t get_resource_id(const mr::graphics::Shader::PyramidImageResource *res)
+{
+  // TODO(dk6): This can be bad for hash collisions
+  //            Maybe it is better to require PyramidImageResource instance for each mip in calling code
+  return reinterpret_cast<std::uintptr_t>((VkImageView)res->image->get_level(res->mip_level));
+}
+
 void mr::BindlessDescriptorSet::unregister_resource(const Shader::Resource &resource) noexcept
 {
   auto tex = [&](const Texture *tex) -> uint32_t {
@@ -550,7 +559,8 @@ void mr::BindlessDescriptorSet::fill_depth_image(const DepthImage *image,
 {
   image_info = vk::DescriptorImageInfo {
     .imageView = image->image_view(),
-    .imageLayout = vk::ImageLayout::eDepthStencilReadOnlyOptimal,
+    // .imageLayout = vk::ImageLayout::eDepthStencilReadOnlyOptimal,
+    .imageLayout = vk::ImageLayout::eGeneral,
   };
 }
 

@@ -70,7 +70,8 @@ inline namespace graphics {
     virtual ~Image();
 
     void switch_layout(CommandUnit &command_unit, vk::ImageLayout new_layout);
-    void switch_layout(CommandUnit &command_unit, vk::ImageLayout new_layout, uint32_t mip_level, uint32_t mip_counts);
+    void switch_layout(CommandUnit &command_unit, vk::ImageLayout new_layout,
+                       uint32_t mip_level, uint32_t mip_counts, bool ignore_prev_layout = false);
 
     // Copy data from to host visible buffer
     HostBuffer read_to_host_buffer(CommandUnit &command_unit) noexcept;

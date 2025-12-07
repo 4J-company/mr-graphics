@@ -68,7 +68,6 @@ inline namespace graphics {
     constexpr static inline uint32_t uniform_buffer_binding = 1;
     constexpr static inline uint32_t storage_buffer_binding = 2;
     constexpr static inline uint32_t storage_images_binding = 3;
-    constexpr static inline uint32_t input_attachments_binding = 4;
     constexpr static inline uint32_t bindless_set_number = 0;
 
     constexpr static inline uint32_t default_vertex_number = 10'000'000;
@@ -229,7 +228,6 @@ inline namespace graphics {
     void init_profiling();
     void init_culling();
     void init_bound_box_rendering();
-    void init_depth_pyramid();
 
     void render_geometry(const SceneHandle scene);
     void culling_geometry(const SceneHandle scene);

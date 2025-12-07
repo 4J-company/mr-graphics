@@ -33,9 +33,8 @@ mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent,
   , _positions_vertex_buffer(*_state, default_vertex_number * position_bytes_size)
   , _attributes_vertex_buffer(*_state, default_vertex_number * attributes_bytes_size)
   , _index_buffer(*_state, default_index_number * sizeof(uint32_t), sizeof(uint32_t))
-  // , _depth_pyramid_extent(extent) // now copy in zero mip all data from depth
   , _depth_pyramid_extent(extent.width / 2, extent.height / 2)
-  , _depth_pyramid(*_state, extent, vk::Format::eR32Sfloat, calculate_mips_levels_number(extent))
+  , _depth_pyramid(*_state, _depth_pyramid_extent, vk::Format::eR32Sfloat, calculate_mips_levels_number(extent))
 {
   for (auto _ : std::views::iota(0, gbuffers_number)) {
     _gbuffers.emplace_back(*_state, _extent, vk::Format::eR32G32B32A32Sfloat);
@@ -115,7 +114,6 @@ void mr::RenderContext::init_bindless_rendering()
     BindingT {uniform_buffer_binding, vk::DescriptorType::eUniformBuffer},
     BindingT {storage_buffer_binding, vk::DescriptorType::eStorageBuffer},
     BindingT {storage_images_binding, vk::DescriptorType::eStorageImage},
-    BindingT {input_attachments_binding, vk::DescriptorType::eInputAttachment},
   };
 
   _bindless_set_layout = ResourceManager<BindlessDescriptorSetLayout>::get().create("BindlessSetLayout",
@@ -154,10 +152,15 @@ void mr::RenderContext::init_profiling()
 
 void mr::RenderContext::init_culling()
 {
+  // ---------------------------
+  // Frustum culling
+  // ---------------------------
+
   boost::unordered_map<std::string, std::string> defines {
     {"TEXTURES_BINDING",        std::to_string(textures_binding)},
     {"UNIFORM_BUFFERS_BINDING", std::to_string(uniform_buffer_binding)},
     {"STORAGE_BUFFERS_BINDING", std::to_string(storage_buffer_binding)},
+    {"STORAGE_IMAGES_BINDING", std::to_string(storage_images_binding)},
     {"BINDLESS_SET", std::to_string(bindless_set_number)},
     {"THREADS_NUM", std::to_string(culling_work_group_size)},
   };
@@ -176,6 +179,31 @@ void mr::RenderContext::init_culling()
   _instances_collect_shader = ResourceManager<Shader>::get().create("InstancesCollectShader",
     *_state, "culling/instances_collect", defines);
   _instances_collect_pipeline = ComputePipeline(*_state, _instances_collect_shader, set_layouts);
+
+
+  // ---------------------------
+  // Depth pyramid
+  // ---------------------------
+
+  _depth_pyramid_shader = ResourceManager<Shader>::get().create("DepthPyramidBuild",
+    *_state, "culling/depth_pyramid_build", defines);
+  _depth_pyramid_pipeline = ComputePipeline(*_state, _depth_pyramid_shader, set_layouts);
+
+  _depth_image_attacment_id = _bindless_set.register_resource(&_depthbuffer);
+  for (uint32_t mip = 0; mip < _depth_pyramid.mip_levels_number(); mip++) {
+    Shader::PyramidImageResource res {
+      .image = &_depth_pyramid,
+      .mip_level = mip,
+    };
+    _depth_pyramid_mips.emplace_back(_bindless_set.register_resource(&res));
+  }
+
+  // TODO(dk6): maybe move it in PyramidImage ctr
+  CommandUnit cmd(*_state);
+  cmd.begin();
+  _depth_pyramid.switch_layout(cmd, vk::ImageLayout::eGeneral);
+  cmd.end();
+  UniqueFenceGuard guard(_state->device(), cmd.submit(*_state));
 }
 
 void mr::RenderContext::init_bound_box_rendering()
@@ -197,38 +225,6 @@ void mr::RenderContext::init_bound_box_rendering()
   // TODO(dk6): use dynamic buffer
   _bound_boxes_buffer = StorageBuffer(*_state, sizeof(BoundBoxRenderData) * 10000);
   _bound_boxes_buffer_id = _bindless_set.register_resource(&_bound_boxes_buffer);
-}
-
-// TODO(dk6): move it to init_culling
-void mr::RenderContext::init_depth_pyramid()
-{
-  boost::unordered_map<std::string, std::string> defines {
-    {"TEXTURES_BINDING",        std::to_string(textures_binding)},
-    {"UNIFORM_BUFFERS_BINDING", std::to_string(uniform_buffer_binding)},
-    {"STORAGE_BUFFERS_BINDING", std::to_string(storage_buffer_binding)},
-    {"STORAGE_IMAGES_BINDING", std::to_string(storage_images_binding)},
-    {"INPUT_ATTACHMENTS", std::to_string(input_attachments_binding)},
-    {"BINDLESS_SET", std::to_string(bindless_set_number)},
-    {"THREADS_NUM", std::to_string(culling_work_group_size)},
-  };
-  _depth_pyramid_shader = ResourceManager<Shader>::get().create("DepthPyramidBuild",
-    *_state, "culling/depth_pyramid_build", defines);
-  std::array set_layouts { _converted_bindless_set_layout };
-  _depth_pyramid_pipeline = ComputePipeline(*_state, _depth_pyramid_shader, set_layouts);
-
-  _depth_image_attacment_id = _bindless_set.register_resource(&_depthbuffer);
-  for (uint32_t mip = 0; mip < _depth_pyramid.mip_levels_number(); mip++) {
-    Shader::PyramidImageResource res {
-      .image = &_depth_pyramid,
-      .mip_level = mip,
-    };
-    _depth_pyramid_mips.emplace_back(_bindless_set.register_resource(&res));
-  }
-
-  _transfer_command_unit.begin();
-  _depth_pyramid.switch_layout(_transfer_command_unit, vk::ImageLayout::eGeneral);
-  _transfer_command_unit.end();
-  UniqueFenceGuard guard(_state->device(), _transfer_command_unit.submit(*_state));
 }
 
 void mr::RenderContext::draw_bound_box(uint32_t transforms_buffer_id, uint32_t transform_index,
@@ -700,9 +696,9 @@ void mr::RenderContext::render_geometry(const SceneHandle scene)
 
     render_models(scene);
 
-    build_depth_pyramid();
-
     _models_command_unit->endRendering();
+
+    build_depth_pyramid();
   }
 
   TracyVkCollect(_models_tracy_gpu_context, _models_command_unit.command_buffer());
@@ -712,33 +708,43 @@ void mr::RenderContext::render_geometry(const SceneHandle scene)
 
 void mr::RenderContext::build_depth_pyramid()
 {
-  // TODO(dk6): added optional argument for pipeline stages in pipeline barrier
-  // It also includes pipeline barrier
-  _depthbuffer.switch_layout(_models_command_unit, vk::ImageLayout::eDepthStencilReadOnlyOptimal);
+  _depthbuffer.switch_layout(_models_command_unit, vk::ImageLayout::eGeneral);
 
-  auto source_size = _extent;
-  for (uint32_t i = 0; source_size.width > 1 && source_size.height > 0; i++) {
+  _models_command_unit->bindPipeline(vk::PipelineBindPoint::eCompute, _depth_pyramid_pipeline.pipeline());
+  _models_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eCompute,
+                                           {_depth_pyramid_pipeline.layout()},
+                                           bindless_set_number,
+                                           {_bindless_set.set()},
+                                           {});
+
+  auto dst_size = _depth_pyramid_extent;
+  for (uint32_t i = 0; dst_size.width > 0 && dst_size.height > 0; i++) {
     uint32_t depth_pyramid_push_contants[] {
-      i, // i is dst mip
-      source_size.width,
-      source_size.height,
+      i == 0 ? _depth_image_attacment_id : _depth_pyramid_mips[i - 1], // src image
+      _depth_pyramid_mips[i], // dst image
+      dst_size.width,
+      dst_size.height,
     };
 
-    uint32_t work_group_width = calculate_work_groups_number(source_size.width, culling_work_group_size);
-    uint32_t work_group_height = calculate_work_groups_number(source_size.height, culling_work_group_size);
+    _models_command_unit->pushConstants({_depth_pyramid_pipeline.layout()}, vk::ShaderStageFlagBits::eCompute,
+                                        0, sizeof(depth_pyramid_push_contants), depth_pyramid_push_contants);
+
+    uint32_t work_group_width = calculate_work_groups_number(dst_size.width, culling_work_group_size);
+    uint32_t work_group_height = calculate_work_groups_number(dst_size.height, culling_work_group_size);
     _models_command_unit->dispatch(work_group_width, work_group_height, 1);
 
-    // just for pipeline
-    _depth_pyramid.switch_layout(_models_command_unit, vk::ImageLayout::eGeneral, i, 1);
+    // just for pipeline barrier
+    _depth_pyramid.switch_layout(_models_command_unit, vk::ImageLayout::eGeneral, i, 1, true);
 
-    source_size.width /= 2;
-    source_size.height /= 2;
+    dst_size.width /= 2;
+    dst_size.height /= 2;
   }
 }
 
 void mr::RenderContext::resize(const mr::Extent &extent)
 {
   _extent = extent;
+  _depth_pyramid_extent = Extent(extent.width / 2, extent.height / 2);
 }
 
 void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)

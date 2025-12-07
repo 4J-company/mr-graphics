@@ -99,14 +99,13 @@ void mr::Image::switch_layout(CommandUnit &command_unit, vk::ImageLayout new_lay
 }
 
 void mr::Image::switch_layout(CommandUnit &command_unit, vk::ImageLayout new_layout,
-                              uint32_t mip_level, uint32_t mip_counts)
+                              uint32_t mip_level, uint32_t mip_counts, bool ignore_prev_layout)
 {
-  // TODO(dk6): Revert this - now i want reuse this function for set pipeline barrier without switch layout.
-  //            Refactor: add new function pipeline_barrier
-
-  // if (new_layout == _layout) {
-  //   return;
-  // }
+  // TODO(dk6): Now i want reuse this function for set pipeline barrier without switch layout.
+  //            Maybe we can refactor code and added new funciton for this instead
+  if (not ignore_prev_layout && new_layout == _layout) {
+    return;
+  }
 
   vk::ImageSubresourceRange range {
     .aspectMask = _aspect_flags,
@@ -153,6 +152,12 @@ void mr::Image::switch_layout(CommandUnit &command_unit, vk::ImageLayout new_lay
     case vk::ImageLayout::ePresentSrcKHR:
       barrier.srcAccessMask = vk::AccessFlagBits::eNoneKHR;
       break;
+    case vk::ImageLayout::eGeneral:
+      barrier.srcAccessMask = {};
+      break;
+    case vk::ImageLayout::eDepthStencilReadOnlyOptimal:
+      barrier.srcAccessMask = vk::AccessFlagBits::eShaderRead;
+      break;
     default:
       ASSERT(false, "Invalid source layout");
       break;
@@ -179,6 +184,13 @@ void mr::Image::switch_layout(CommandUnit &command_unit, vk::ImageLayout new_lay
     break;
   case vk::ImageLayout::ePresentSrcKHR:
     barrier.dstAccessMask = vk::AccessFlagBits::eNoneKHR;
+    break;
+  case vk::ImageLayout::eGeneral:
+    // TODO(dk6): think about correct access mask
+    barrier.dstAccessMask = {};
+    break;
+  case vk::ImageLayout::eDepthStencilReadOnlyOptimal:
+    barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
     break;
   default:
     ASSERT(false, "Invalid destination layout");
@@ -363,7 +375,7 @@ mr::DepthImage::DepthImage(const VulkanState &state, Extent extent, uint mip_lev
       state,
       extent,
       get_depthbuffer_format(state),
-      vk::ImageUsageFlagBits::eDepthStencilAttachment,
+      vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eStorage,
       vk::ImageAspectFlagBits::eDepth,
       mip_level
     )
