@@ -708,6 +708,12 @@ void mr::RenderContext::render_geometry(const SceneHandle scene)
 
 void mr::RenderContext::build_depth_pyramid()
 {
+  _models_command_unit->resetQueryPool(_timestamps_query_pool.get(), enum_cast(Timestamp::BuildDepthPyramidStart), 2);
+
+  _models_command_unit->writeTimestamp(vk::PipelineStageFlagBits::eComputeShader,
+                                       _timestamps_query_pool.get(),
+                                       enum_cast(Timestamp::BuildDepthPyramidStart));
+
   _depthbuffer.switch_layout(_models_command_unit, vk::ImageLayout::eGeneral);
 
   _models_command_unit->bindPipeline(vk::PipelineBindPoint::eCompute, _depth_pyramid_pipeline.pipeline());
@@ -739,6 +745,10 @@ void mr::RenderContext::build_depth_pyramid()
     dst_size.width /= 2;
     dst_size.height /= 2;
   }
+
+  _models_command_unit->writeTimestamp(vk::PipelineStageFlagBits::eComputeShader,
+                                       _timestamps_query_pool.get(),
+                                       enum_cast(Timestamp::BuildDepthPyramidEnd));
 }
 
 void mr::RenderContext::resize(const mr::Extent &extent)
@@ -868,6 +878,9 @@ void mr::RenderContext::calculate_stat(SceneHandle scene,
                                       timestamps[enum_cast(Timestamp::CullingStart)].first) * _timestamp_to_ms;
   _render_stat.models_gpu_time_ms = (timestamps[enum_cast(Timestamp::ModelsEnd)].first -
                                      timestamps[enum_cast(Timestamp::ModelsStart)].first) * _timestamp_to_ms;
+  _render_stat.build_depth_pyramid_gpu_time_ms =
+    (timestamps[enum_cast(Timestamp::BuildDepthPyramidEnd)].first -
+     timestamps[enum_cast(Timestamp::BuildDepthPyramidStart)].first) * _timestamp_to_ms;
   _render_stat.shading_gpu_time_ms = (timestamps[enum_cast(Timestamp::ShadingEnd)].first -
                                       timestamps[enum_cast(Timestamp::ShadingStart)].first) * _timestamp_to_ms;
 
@@ -896,6 +909,7 @@ void mr::RenderStat::write_to_json(std::ostream &out) const noexcept
   std::println(out, "  \"cpu_models_time_ms\": {:.2f},", models_cpu_time_ms);
   std::println(out, "  \"cpu_shading_time_ms\": {:.2f},", shading_cpu_time_ms);
   std::println(out, "  \"culling_gpu_time_ms\": {:.3f},", culling_gpu_time_ms);
+  std::println(out, "  \"build_depth_pyramid_gpu_time_ms\": {:.3f},", build_depth_pyramid_gpu_time_ms);
   std::println(out, "  \"gpu_rendering_time_ms\": {:.2f},", render_gpu_time_ms);
   std::println(out, "  \"gpu_models_time_ms\": {:.2f},", models_gpu_time_ms);
   std::println(out, "  \"gpu_shading_time_ms\": {:.2f},", shading_gpu_time_ms);

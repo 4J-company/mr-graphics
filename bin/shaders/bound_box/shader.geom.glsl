@@ -50,6 +50,9 @@ layout(set = BINDLESS_SET, binding = UNIFORM_BUFFERS_BINDING) readonly uniform C
 void render_bound_rectangle(BoundBox bb, mat4 mvp)
 {
   vec4 rectangle = get_bound_box_screen_rectangle(bb, mvp);
+  rectangle.y = -rectangle.y;
+  rectangle.w = -rectangle.w;
+
   vec2 A = rectangle.xy, B = rectangle.zw;
 
   vec2 bottom_left = vec2(min(A.x, B.x), min(A.y, B.y));

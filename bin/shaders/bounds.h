@@ -55,8 +55,6 @@ vec4 get_bound_box_screen_rectangle(BoundBox bb, mat4 mvp)
     result.z = max(result.z, corners[i].x);
     result.w = max(result.w, corners[i].y);
   }
-  result.y = -result.y;
-  result.w = -result.w;
   return result;
 }
 
