@@ -1,5 +1,7 @@
 #version 460
 
+#extension GL_GOOGLE_include_directive : enable
+
 layout(location = 0) out vec4 OutPos;
 layout(location = 1) out vec4 OutNIsShade;
 layout(location = 2) out vec4 OutMR;

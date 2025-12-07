@@ -89,7 +89,6 @@ void mr::VulkanGlobalState::_create_phys_device()
 {
   vk::PhysicalDeviceFeatures features {
     .geometryShader = true,
-    .tessellationShader = true,
     .multiDrawIndirect = true,
     .samplerAnisotropy = true,
   };

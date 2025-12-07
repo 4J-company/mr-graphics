@@ -4,6 +4,8 @@
 #include "pch.hpp"
 #include "resource.hpp"
 
+#include <boost/unordered/unordered_flat_map.hpp>
+
 namespace mr {
 inline namespace graphics {
   struct UnnamedTag {};
@@ -15,7 +17,7 @@ inline namespace graphics {
     static_assert(Resource<ResourceT>, "ResourceT does not satisfy Resource concept");
 
     using HandleT = Handle<ResourceT>;
-    using ResourceMapT = boost::unordered_map<std::string, std::weak_ptr<ResourceT>>;
+    using ResourceMapT = boost::unordered_flat_map<std::string, std::weak_ptr<ResourceT>>;
 
     // tmp singleton
     static ResourceManager & get() noexcept

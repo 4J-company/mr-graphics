@@ -96,7 +96,7 @@ void mr::RenderContext::init_lights_render_data() {
 
   _lights_render_data.lights_descriptor_set.update(*_state, std::span(shader_resources.data(), gbuffers_number));
 
-  boost::unordered_map<std::string, std::string> defines {
+  mr::graphics::Shader::DefineMap defines {
     {"TEXTURES_BINDING",        std::to_string(textures_binding)},
     {"UNIFORM_BUFFERS_BINDING", std::to_string(uniform_buffer_binding)},
     {"STORAGE_BUFFERS_BINDING", std::to_string(storage_buffer_binding)},
@@ -169,8 +169,7 @@ void mr::RenderContext::init_culling()
   // Frustum culling
   // ---------------------------
 
-  boost::unordered_map<std::string, std::string> defines {
-    // TODO(dk6): rename to sampled_images
+  mr::graphics::Shader::DefineMap defines {
     {"TEXTURES_BINDING",        std::to_string(textures_binding)},
     {"UNIFORM_BUFFERS_BINDING", std::to_string(uniform_buffer_binding)},
     {"STORAGE_BUFFERS_BINDING", std::to_string(storage_buffer_binding)},
@@ -260,7 +259,7 @@ void mr::RenderContext::init_culling()
 
 void mr::RenderContext::init_bound_box_rendering()
 {
-  boost::unordered_map<std::string, std::string> defines {
+  mr::graphics::Shader::DefineMap defines {
     {"TEXTURES_BINDING",        std::to_string(textures_binding)},
     {"UNIFORM_BUFFERS_BINDING", std::to_string(uniform_buffer_binding)},
     {"STORAGE_BUFFERS_BINDING", std::to_string(storage_buffer_binding)},
