@@ -186,6 +186,8 @@ inline namespace graphics {
                              vk::DescriptorBufferInfo &buffer_info) const noexcept;
     void fill_storage_image(const StorageImage *image,
                             vk::DescriptorImageInfo &image_info) const noexcept;
+    void fill_sampled_storage_image(const Shader::SamplerStorageImage *image,
+                                    vk::DescriptorImageInfo &image_info) const noexcept;
     void fill_pyramid_image(const Shader::PyramidImageResource *image,
                             vk::DescriptorImageInfo &image_info) const noexcept;
     void fill_depth_image(const DepthImage *image,

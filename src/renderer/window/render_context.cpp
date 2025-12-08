@@ -40,7 +40,8 @@ mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent,
   , _attributes_vertex_buffer(*_state, default_vertex_number * attributes_bytes_size)
   , _index_buffer(*_state, default_index_number * sizeof(uint32_t), sizeof(uint32_t))
   , _depth_pyramid_extent(extent.width / 2, extent.height / 2)
-  , _depth_pyramid(*_state, _depth_pyramid_extent, vk::Format::eR32Sfloat, calculate_mips_levels_number(extent))
+  , _depth_pyramid(*_state, _depth_pyramid_extent, vk::Format::eR32Sfloat,
+                   calculate_mips_levels_number(_depth_pyramid_extent))
 {
   for (auto _ : std::views::iota(0, gbuffers_number)) {
     _gbuffers.emplace_back(*_state, _extent, vk::Format::eR32G32B32A32Sfloat);
@@ -211,7 +212,13 @@ void mr::RenderContext::init_culling()
   }
 
   // But i also need sampler...
-  _depth_pyramid_image_id = _bindless_set.register_resource((StorageImage *)&_depth_pyramid);
+  _depth_pyramid_sampler = Sampler(*_state, vk::Filter::eLinear, vk::SamplerAddressMode::eClampToEdge,
+                                   _depth_pyramid.mip_levels_number());
+  Shader::SamplerStorageImage depth_pyramid_res {
+    .storage_image = &_depth_pyramid,
+    .sampler = &_depth_pyramid_sampler,
+  };
+  _depth_pyramid_image_id = _bindless_set.register_resource(&depth_pyramid_res);
 
   _depth_pyramid_shader_data = StorageBuffer(*_state, std::span((_depth_pyramid_mips)));
   _depth_pyramid_shader_data_buffer_id = _bindless_set.register_resource(&_depth_pyramid_shader_data);

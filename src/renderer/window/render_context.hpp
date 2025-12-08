@@ -177,6 +177,7 @@ inline namespace graphics {
     PyramidImage _depth_pyramid;
     InplaceVector<uint32_t, depth_pyramid_max_levels> _depth_pyramid_mips;
     uint32_t _depth_pyramid_image_id = BindlessDescriptorSet::invalid_id;
+    Sampler _depth_pyramid_sampler;
     uint32_t _depth_image_attacment_id = BindlessDescriptorSet::invalid_id;
     StorageBuffer _depth_pyramid_shader_data;
     uint32_t _depth_pyramid_shader_data_buffer_id = BindlessDescriptorSet::invalid_id;

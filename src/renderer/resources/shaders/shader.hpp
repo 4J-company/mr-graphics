@@ -13,6 +13,7 @@ inline namespace graphics {
   class UniformBuffer;
   class StorageBuffer;
   class Texture;
+  class Sampler;
   class Image;
 
   class Shader : public ResourceBase<Shader> {
@@ -32,12 +33,19 @@ inline namespace graphics {
       uint32_t mip_level;
     };
 
+    // TODO(dk6): It must be reworked. Maybe added to image std::optional<Sampler> field?
+    struct SamplerStorageImage {
+      const StorageImage *storage_image;
+      const Sampler *sampler;
+    };
+
     using Resource = std::variant<
       const UniformBuffer *,
       const StorageBuffer *,
       const Texture *,
       const ColorAttachmentImage *,
       const StorageImage *,
+      const SamplerStorageImage *,
       const PyramidImageResource *,
       const DepthImage *,
       const ConditionalBuffer*>;

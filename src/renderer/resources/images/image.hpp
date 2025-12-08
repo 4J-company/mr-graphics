@@ -248,10 +248,10 @@ inline namespace graphics {
 
   constexpr static inline uint32_t calculate_mips_levels_number(Extent extent)
   {
-    uint32_t level = 1;
-    while (extent.width > 1 && extent.height > 1) {
+    uint32_t level = 0;
+    while (extent.width > 0 && extent.height > 0) {
       extent.width /= 2;
-      extent.height = 2;
+      extent.height /= 2;
       level++;
     }
     return level;

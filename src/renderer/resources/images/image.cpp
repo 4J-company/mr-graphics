@@ -421,8 +421,8 @@ vk::RenderingAttachmentInfoKHR mr::ColorAttachmentImage::attachment_info() const
 // ---- StorageImage ----
 mr::StorageImage::StorageImage(const VulkanState &state, Extent extent, vk::Format format,
                                uint mip_level, bool create_view)
-  : DeviceImage(state, extent, format, vk::ImageUsageFlagBits::eStorage, vk::ImageAspectFlagBits::eColor,
-                mip_level, create_view)
+  : DeviceImage(state, extent, format, vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled,
+                vk::ImageAspectFlagBits::eColor, mip_level, create_view)
 {
   // switch_layout()
 }

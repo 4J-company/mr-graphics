@@ -76,7 +76,9 @@ layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer De
 
 layout(set = BINDLESS_SET, binding = STORAGE_IMAGES_BINDING, r32f) uniform image2D StorageImages[];
 #define DepthLevel(level) StorageImages[depth_pyramid_mips[level]]
-#define DepthPyramid StorageImages[buffers_data.depth_pyramid_image_id]
+
+layout(set = BINDLESS_SET, binding = TEXTURES_BINDING) uniform sampler2D SampledStorageImages[];
+#define DepthPyramid SampledStorageImages[buffers_data.depth_pyramid_image_id]
 
 void main()
 {
@@ -118,9 +120,10 @@ void main()
   vec2 rectangle_center = vec2(rectangle.x + rectangle_width / 2, rectangle.y + rectangle_height / 2);
   int level = int(floor(log2(max(rectangle_width, rectangle_height))));
   // level = min(level, int(buffers_data.mip_levels_number) - 1);
-  vec2 level_rectangle_center = rectangle_center / pow(2, level);
-  // TODO(dk6): maybe get 4 pixels? Also it is better to use sampler for average value
-  float old_depth = imageLoad(DepthLevel(level), ivec2(level_rectangle_center)).r;
+
+  // vec2 level_rectangle_center = rectangle_center / pow(2, level);
+  // float old_depth = imageLoad(DepthLevel(level), ivec2(level_rectangle_center)).r;
+  float old_depth = textureLod(DepthPyramid, ivec2(rectangle_center), level).r;
 
   // --- Get current depth closest to cam point of bound box ---
   vec3 bb_center = (bb.min.xyz + bb.max.xyz) / 2;
