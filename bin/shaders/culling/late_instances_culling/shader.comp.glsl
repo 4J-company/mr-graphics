@@ -118,11 +118,12 @@ void main()
   float rectangle_width = rectangle.z - rectangle.x;
   float rectangle_height = rectangle.w - rectangle.y;
   vec2 rectangle_center = vec2(rectangle.x + rectangle_width / 2, rectangle.y + rectangle_height / 2);
-  int level = int(floor(log2(max(rectangle_width, rectangle_height))));
+  float level = floor(log2(max(rectangle_width, rectangle_height)));
   // level = min(level, int(buffers_data.mip_levels_number) - 1);
 
-  // vec2 level_rectangle_center = rectangle_center / pow(2, level);
-  // float old_depth = imageLoad(DepthLevel(level), ivec2(level_rectangle_center)).r;
+  // int ilevel = int(level);
+  // vec2 level_rectangle_center = rectangle_center / pow(2, ilevel);
+  // float old_depth = imageLoad(DepthLevel(ilevel), ivec2(level_rectangle_center)).r;
   float old_depth = textureLod(DepthPyramid, ivec2(rectangle_center), level).r;
 
   // --- Get current depth closest to cam point of bound box ---
@@ -134,7 +135,11 @@ void main()
   float new_depth = projected.z / projected.w;
 
   // --- Check visibility ---
-  bool visible = new_depth < old_depth;
+  float bias = 0.001;
+  // TODO(dk6): it is better to more correct build closest_point - make it always between camera
+  new_depth = min(new_depth, 0.9999);
+  // TODO(dk6): sometimes old_depth readed as 1.00 -> maybe replace max -> min in building depth pyramid
+  bool visible = new_depth < old_depth + bias;
 
   instances_datas[id].visible_last_frame = visible ? 1 : 0;
   if (!visible) {
