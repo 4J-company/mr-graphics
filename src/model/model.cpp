@@ -74,9 +74,9 @@ mr::graphics::Model::Model(
     [&, this] (auto &mesh) {
       ASSERT(mesh.material < model_value.materials.size(), "Failed to load material from GLTF file");
 
-      if (mesh.aabb.max.x() < max_x_coord * 0.99) {
-        return;
-      }
+      // if (mesh.aabb.max.x() < max_x_coord * 0.99) {
+      //   return;
+      // }
 
       const auto &material = model_value.materials[mesh.material];
       const auto &transform = mesh.transforms[0];

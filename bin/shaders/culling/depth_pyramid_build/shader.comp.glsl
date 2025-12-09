@@ -22,6 +22,9 @@ void main()
     return;
   }
 
+  // TODO(dk6): maybe size of depth pyramid must me pow of 2 less closest to screen size
+  //  !!!! It real important
+
   // TODO(dk6): Try use minmax sampler instead
   ivec2 read_coord = ivec2(coord) * 2;
   vec4 depth_avg = vec4(

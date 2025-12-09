@@ -129,19 +129,21 @@ void main()
 
   // rectangle now in [-1; 1] screen coords, not in pixels - we must convert it to [0; w] and [0; h]
   vec4 rectangle;
-  rectangle.x = ((rectangle_screen.x + 1) / 2) * buffers_data.depth_pyramid_size.x;
-  rectangle.y = ((rectangle_screen.y + 1) / 2) * buffers_data.depth_pyramid_size.y;
-  rectangle.z = ((rectangle_screen.z + 1) / 2) * buffers_data.depth_pyramid_size.x;
-  rectangle.w = ((rectangle_screen.w + 1) / 2) * buffers_data.depth_pyramid_size.y;
-
-  // rectangle.y = buffers_data.depth_pyramid_size.y - rectangle.w;
-  // rectangle.w = buffers_data.depth_pyramid_size.y - rectangle.y;
+  // rectangle.x = ((rectangle_screen.x + 1) / 2) * buffers_data.depth_pyramid_size.x;
+  // rectangle.y = ((rectangle_screen.y + 1) / 2) * buffers_data.depth_pyramid_size.y;
+  // rectangle.z = ((rectangle_screen.z + 1) / 2) * buffers_data.depth_pyramid_size.x;
+  // rectangle.w = ((rectangle_screen.w + 1) / 2) * buffers_data.depth_pyramid_size.y;
+  rectangle.x = ((rectangle_screen.x + 1) / 2);
+  rectangle.y = ((rectangle_screen.y + 1) / 2);
+  rectangle.z = ((rectangle_screen.z + 1) / 2);
+  rectangle.w = ((rectangle_screen.w + 1) / 2);
 
   float rectangle_width = rectangle.z - rectangle.x;
   float rectangle_height = rectangle.w - rectangle.y;
   vec2 rectangle_center = vec2(rectangle.x + rectangle_width / 2, rectangle.y + rectangle_height / 2);
   float level = floor(log2(max(rectangle_width, rectangle_height)));
 
+  // TODO(dk6): check specification of textureLod
   float old_depth = textureLod(DepthPyramid, rectangle_center, level).r;
 
   // --- Get current depth closest to cam point of bound box ---
@@ -157,6 +159,7 @@ void main()
 
   // --- Check visibility ---
   float bias = 0.001;
+  bias = 0;
   // new_depth = min(new_depth, 0.9999);
   bool visible = new_depth < old_depth + bias;
 
