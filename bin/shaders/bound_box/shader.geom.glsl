@@ -49,9 +49,8 @@ layout(set = BINDLESS_SET, binding = UNIFORM_BUFFERS_BINDING) readonly uniform C
 
 void render_bound_rectangle(BoundBox bb, mat4 proj)
 {
-  vec4 rectangle = get_bound_box_screen_rectangle(bb, proj);
-  rectangle.y = -rectangle.y;
-  rectangle.w = -rectangle.w;
+  BoundBox sbb = get_bound_box_screen_rectangle(bb, proj);
+  vec4 rectangle = vec4(sbb.min.x, -sbb.min.y, sbb.max.x, -sbb.max.y);
 
   vec2 A = rectangle.xy, B = rectangle.zw;
 
@@ -109,7 +108,6 @@ void main()
   v[5] = vec3(bb.max.x, bb.min.y, bb.max.z);
   v[6] = vec3(bb.max.x, bb.max.y, bb.max.z);
   v[7] = vec3(bb.min.x, bb.max.y, bb.max.z);
-
 
   // Bottom (4 edges)
   gl_Position = proj * vec4(v[0], 1.0);

@@ -121,7 +121,9 @@ void main()
   // -------------------------------------
 
   // --- Get current depth of already visible objects ---
-  vec4 rectangle_screen = get_bound_box_screen_rectangle(bb, camera_buffer.vp);
+  BoundBox sbb = get_bound_box_screen_rectangle(bb, camera_buffer.vp);
+  vec4 rectangle_screen = vec4(sbb.min.x, sbb.min.y, sbb.max.x, sbb.max.y);
+
   // Flip over Ox
   float tmp = -rectangle_screen.y;
   rectangle_screen.y = -rectangle_screen.w;
@@ -147,15 +149,16 @@ void main()
   float old_depth = textureLod(DepthPyramid, rectangle_center, level).r;
 
   // --- Get current depth closest to cam point of bound box ---
-  vec3 bb_center = (bb.min.xyz + bb.max.xyz) / 2;
-  vec3 dir_to_cam = camera_buffer.pos.xyz - bb_center;
-  float dist_to_cam = length(dir_to_cam);
-  dir_to_cam = normalize(dir_to_cam);
-  float bb_size = length(bb.max.xyz - bb.min.xyz) / 2;
-  float optimal_len = min(bb_size, dist_to_cam * 0.99);
-  vec3 closest_bb_point = bb_center + dir_to_cam * optimal_len;
-  vec4 projected = (camera_buffer.vp * vec4(closest_bb_point, 1));
-  float new_depth = projected.z / projected.w;
+  // vec3 bb_center = (bb.min.xyz + bb.max.xyz) / 2;
+  // vec3 dir_to_cam = camera_buffer.pos.xyz - bb_center;
+  // float dist_to_cam = length(dir_to_cam);
+  // dir_to_cam = normalize(dir_to_cam);
+  // float bb_size = length(bb.max.xyz - bb.min.xyz) / 2;
+  // float optimal_len = min(bb_size, dist_to_cam * 0.99);
+  // vec3 closest_bb_point = bb_center + dir_to_cam * optimal_len;
+  // vec4 projected = (camera_buffer.vp * vec4(closest_bb_point, 1));
+  // float new_depth = projected.z / projected.w;
+  float new_depth = sbb.min.z;
 
   // --- Check visibility ---
   float bias = 0.001;

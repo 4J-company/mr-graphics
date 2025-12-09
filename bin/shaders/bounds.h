@@ -35,7 +35,7 @@ BoundBox transform_bound_box(BoundBox bb, mat4 transform)
 
 // TODO(dk6): Search in internet more optimize way to do it
 // Get bound box in world-space
-vec4 get_bound_box_screen_rectangle(BoundBox bb, mat4 proj)
+BoundBox get_bound_box_screen_rectangle(BoundBox bb, mat4 proj)
 {
   vec4 corners[8];
   corners[0] = proj * vec4(bb.min.x, bb.min.y, bb.min.z, 1);
@@ -50,14 +50,19 @@ vec4 get_bound_box_screen_rectangle(BoundBox bb, mat4 proj)
     corners[i] /= corners[i].w;
   }
 
-  vec4 result = vec4(corners[0].x, corners[0].y, corners[0].x, corners[0].y);
+  BoundBox sbb;
+  sbb.min = vec4(corners[0].xyz, 1);
+  sbb.max = vec4(corners[0].xyz, 1);
   for (int i = 1; i < 8; i++) {
-    result.x = min(result.x, corners[i].x);
-    result.y = min(result.y, corners[i].y);
-    result.z = max(result.z, corners[i].x);
-    result.w = max(result.w, corners[i].y);
+    sbb.min.x = min(sbb.min.x, corners[i].x);
+    sbb.min.y = min(sbb.min.y, corners[i].y);
+    sbb.min.z = min(sbb.min.z, corners[i].z);
+
+    sbb.max.x = max(sbb.max.x, corners[i].x);
+    sbb.max.y = max(sbb.max.y, corners[i].y);
+    sbb.max.z = max(sbb.max.z, corners[i].z);
   }
-  return result;
+  return sbb;
 }
 
 bool is_bound_box_not_visible(vec4 plane, BoundBox bb)

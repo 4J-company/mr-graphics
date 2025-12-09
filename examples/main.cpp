@@ -50,6 +50,7 @@ int main(int argc, const char **argv)
   scene->create_directional_light(mr::Norm3f(-1, 1, -1));
   scene->create_directional_light(mr::Norm3f(-1, 1, 1));
   scene->create_directional_light(mr::Norm3f(0.3, 1, 0.3));
+  scene->create_directional_light(mr::Norm3f(-1, -1, -1));
 
   if (options.bench_name.has_value() && *options.bench_name == "kittens") {
     auto &kitten_path = options.models.front();
