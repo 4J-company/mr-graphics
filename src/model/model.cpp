@@ -67,6 +67,14 @@ mr::graphics::Model::Model(
     [&, this] (auto &mesh) {
       max_x_coord = std::max(max_x_coord, mesh.aabb.max.x());
     });
+  std::array<std::string, 10> meshes_to_erase {
+    "Pawn_Body_Shared",
+    "Pawn_Top_Shared",
+    "King_Shared",
+    "Queen_Shared",
+    "Bishop_Shared",
+    // "Chessboard"
+  };
 
   using enum mr::MaterialParameter;
   static auto &manager = ResourceManager<Texture>::get();
@@ -74,9 +82,30 @@ mr::graphics::Model::Model(
     [&, this] (auto &mesh) {
       ASSERT(mesh.material < model_value.materials.size(), "Failed to load material from GLTF file");
 
-      if (mesh.aabb.max.x() < max_x_coord * 0.99) {
-        return;
-      }
+      // if (mesh.aabb.max.x() < max_x_coord * 0.99) {
+      //   return;
+      // }
+
+      // if (std::find(meshes_to_erase.begin(), meshes_to_erase.end(), mesh.name) != meshes_to_erase.end()) {
+      //   return;
+      // }
+
+      // for (int i = 0; i < mesh.transforms.size(); i++) {
+      //   auto x = mesh.transforms[i][0][3];
+      //   auto z = mesh.transforms[i][2][3];
+      //   if (x > 0 || z < 0) {
+      //     mesh.transforms.erase(mesh.transforms.begin() + i);
+      //     i--;
+      //   }
+      // }
+      // if (mesh.transforms.size() == 0) {
+      //   return;
+      // }
+
+      // if (mesh.name == "Chessboard") {
+      //   // y component
+      //   mesh.transforms[0][1]._set_ind(3, mesh.transforms[0][1][3] - 1);
+      // }
 
       const auto &material = model_value.materials[mesh.material];
       const auto &transform = mesh.transforms[0];
@@ -84,6 +113,8 @@ mr::graphics::Model::Model(
       const size_t instance_count = mesh.transforms.size();
       const size_t instance_offset = scene._transforms_data.size();
       const size_t mesh_offset = scene._mesh_offset++;
+
+      std::println("{}: [{}; {})", mesh.name, instance_offset, instance_offset + instance_count);
 
       std::array vbufs_data {
         std::as_bytes(std::span(mesh.positions)),

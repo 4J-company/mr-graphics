@@ -1059,6 +1059,8 @@ void mr::RenderContext::calculate_stat(SceneHandle scene,
   _render_stat.build_depth_pyramid_gpu_time_ms =
     (timestamps[enum_cast(Timestamp::BuildDepthPyramidEnd)].first -
      timestamps[enum_cast(Timestamp::BuildDepthPyramidStart)].first) * _timestamp_to_ms;
+  _render_stat.late_culling_gpu_time_ms = (timestamps[enum_cast(Timestamp::LateCullingEnd)].first -
+                                           timestamps[enum_cast(Timestamp::LateCullingStart)].first) * _timestamp_to_ms;
   _render_stat.shading_gpu_time_ms = (timestamps[enum_cast(Timestamp::ShadingEnd)].first -
                                       timestamps[enum_cast(Timestamp::ShadingStart)].first) * _timestamp_to_ms;
 
@@ -1088,6 +1090,7 @@ void mr::RenderStat::write_to_json(std::ostream &out) const noexcept
   std::println(out, "  \"cpu_shading_time_ms\": {:.2f},", shading_cpu_time_ms);
   std::println(out, "  \"culling_gpu_time_ms\": {:.3f},", culling_gpu_time_ms);
   std::println(out, "  \"build_depth_pyramid_gpu_time_ms\": {:.3f},", build_depth_pyramid_gpu_time_ms);
+  std::println(out, "  \"late_culling_gpu_time_ms\": {:.3f},", late_culling_gpu_time_ms);
   std::println(out, "  \"gpu_rendering_time_ms\": {:.2f},", render_gpu_time_ms);
   std::println(out, "  \"gpu_models_time_ms\": {:.2f},", models_gpu_time_ms);
   std::println(out, "  \"gpu_shading_time_ms\": {:.2f},", shading_gpu_time_ms);

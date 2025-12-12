@@ -28,6 +28,7 @@ inline namespace graphics {
 
   struct RenderStat {
     double culling_gpu_time_ms = 0;
+    double late_culling_gpu_time_ms = 0;
     double build_depth_pyramid_gpu_time_ms = 0;
     double render_gpu_time_ms = 0;
     double models_gpu_time_ms = 0;

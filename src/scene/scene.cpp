@@ -168,9 +168,9 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
   if (input_state_ref) {
     const auto &input_state = input_state_ref->get();
 
-    float min_speed = 0.05;
+    float min_speed = 0.005;
     float max_speed = 5;
-    float speed_delta_coef = 0.05;
+    float speed_delta_coef = 0.005;
     float new_speed = _camera.speed() + input_state.mouse_scroll() * speed_delta_coef;
     if (new_speed >= min_speed && new_speed <= max_speed) {
       _camera.speed(new_speed);

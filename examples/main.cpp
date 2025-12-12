@@ -54,7 +54,7 @@ int main(int argc, const char **argv)
 
   if (options.bench_name.has_value() && *options.bench_name == "kittens") {
     auto &kitten_path = options.models.front();
-    uint32_t kittens_number = 1;
+    uint32_t kittens_number = 1000;
     float size = 1;
     for (uint32_t i = 0; i < kittens_number; i++) {
       auto model = scene->create_model(kitten_path);
@@ -65,8 +65,8 @@ int main(int argc, const char **argv)
         return v * (max - min) + min;
       };
 
-      // float max_dist = 20;
-      float max_dist = 1;
+      float max_dist = 20;
+      // float max_dist = 1;
       auto pos = mr::Vec4f(rnd(-max_dist, max_dist), rnd(-max_dist, max_dist), rnd(-max_dist, max_dist), 0);
       // auto scale = rnd(0.1, 5.3);
       auto scale = rnd(0.5, 1.5);
@@ -95,7 +95,7 @@ int main(int argc, const char **argv)
 
     float scale = 0.1;
     auto scale_vec = mr::Vec4f(scale, scale, scale, 1);
-    auto pos = mr::Vec4f(0, 1, 0, 0);
+    auto pos = mr::Vec4f(0, 0, 0, 0);
     auto translate = (mr::Matr4f::identity() * mr::translate(pos)).transposed();
     kitten->transform(translate * mr::scale(scale_vec));
   }

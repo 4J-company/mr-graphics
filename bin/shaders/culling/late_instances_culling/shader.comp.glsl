@@ -129,12 +129,8 @@ void main()
   rectangle_screen.y = -rectangle_screen.w;
   rectangle_screen.w = tmp;
 
-  // rectangle now in [-1; 1] screen coords, not in pixels - we must convert it to [0; w] and [0; h]
+  // rectangle now in [-1; 1] screen coords, convert to [0; 1] texture coords
   vec4 rectangle;
-  // rectangle.x = ((rectangle_screen.x + 1) / 2) * buffers_data.depth_pyramid_size.x;
-  // rectangle.y = ((rectangle_screen.y + 1) / 2) * buffers_data.depth_pyramid_size.y;
-  // rectangle.z = ((rectangle_screen.z + 1) / 2) * buffers_data.depth_pyramid_size.x;
-  // rectangle.w = ((rectangle_screen.w + 1) / 2) * buffers_data.depth_pyramid_size.y;
   rectangle.x = ((rectangle_screen.x + 1) / 2);
   rectangle.y = ((rectangle_screen.y + 1) / 2);
   rectangle.z = ((rectangle_screen.z + 1) / 2);
@@ -148,8 +144,6 @@ void main()
     rectangle_height * buffers_data.depth_pyramid_size.y
   )));
   level = max(level, 0);
-
-  // TODO(dk6): check specification of textureLod
   float old_depth = textureLod(DepthPyramid, rectangle_center, level).r;
 
   // --- Get current depth closest to cam point of bound box ---
@@ -158,6 +152,7 @@ void main()
   vec3 dir_to_cam = camera_buffer.pos.xyz - bb_center;
   float bb_size = length(bb.max.xyz - bb.min.xyz) / 2;
   vec3 closest_bb_point = bb_center + dir_to_cam * bb_size;
+  // closest_bb_point = bb_center;
 
   vec4 projected = (camera_buffer.vp * vec4(closest_bb_point, 1));
   float new_depth = projected.z / projected.w;

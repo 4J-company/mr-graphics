@@ -28,8 +28,8 @@ void mr::Application::start_render_loop(RenderContext &render_context, SceneHand
         window->update_state();
         scene->update(std::optional(std::reference_wrapper(window->input_state())));
         render_context.render(scene, *window);
-        // render_context.stat().write_to_json(std::cout);
-        // std::println();
+        render_context.stat().write_to_json(std::cout);
+        std::println();
       }
     }
   };
