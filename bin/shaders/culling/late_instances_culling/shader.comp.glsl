@@ -143,7 +143,10 @@ void main()
   float rectangle_width = rectangle.z - rectangle.x;
   float rectangle_height = rectangle.w - rectangle.y;
   vec2 rectangle_center = vec2(rectangle.x + rectangle_width / 2, rectangle.y + rectangle_height / 2);
-  float level = floor(log2(max(rectangle_width, rectangle_height)));
+  float level = floor(log2(max(
+    rectangle_width * buffers_data.depth_pyramid_size.x,
+    rectangle_height * buffers_data.depth_pyramid_size.y
+  )));
   level = max(level, 0);
 
   // TODO(dk6): check specification of textureLod
