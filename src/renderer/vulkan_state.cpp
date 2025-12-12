@@ -106,6 +106,7 @@ void mr::VulkanGlobalState::_create_phys_device()
     .descriptorBindingStorageBufferUpdateAfterBind = true,
     .descriptorBindingPartiallyBound = true,
     .runtimeDescriptorArray = true,
+    .samplerFilterMinmax = true,
     .bufferDeviceAddress = true,
   };
 

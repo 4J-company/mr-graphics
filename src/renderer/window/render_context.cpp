@@ -211,7 +211,8 @@ void mr::RenderContext::init_culling()
     _depth_pyramid_mips.emplace_back(_bindless_set.register_resource(&res));
   }
 
-  _depth_pyramid_sampler = Sampler(*_state, vk::Filter::eLinear, vk::SamplerAddressMode::eClampToEdge,
+  _depth_pyramid_sampler = Sampler(*_state, vk::Filter::eLinear, vk::SamplerMipmapMode::eNearest,
+                                    vk::SamplerAddressMode::eClampToEdge, vk::SamplerReductionMode::eMax,
                                    _depth_pyramid.mip_levels_number());
   Shader::SamplerStorageImage depth_pyramid_res {
     .storage_image = &_depth_pyramid,
