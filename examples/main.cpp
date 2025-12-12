@@ -95,7 +95,7 @@ int main(int argc, const char **argv)
 
     float scale = 0.1;
     auto scale_vec = mr::Vec4f(scale, scale, scale, 1);
-    auto pos = mr::Vec4f(0, 2, 0, 0);
+    auto pos = mr::Vec4f(0, 1, 0, 0);
     auto translate = (mr::Matr4f::identity() * mr::translate(pos)).transposed();
     kitten->transform(translate * mr::scale(scale_vec));
   }
