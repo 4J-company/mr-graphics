@@ -383,11 +383,11 @@ void mr::RenderContext::render_models(const SceneHandle scene)
                                        _timestamps_query_pool.get(),
                                        enum_cast(Timestamp::ModelsStart));
 
-  std::array vertex_buffers {
+  std::array<vk::Buffer, 2> vertex_buffers {
     _positions_vertex_buffer.buffer(),
     _attributes_vertex_buffer.buffer(),
   };
-  std::array vertex_buffers_offsets {0ul, 0ul};
+  std::array<vk::DeviceSize, vertex_buffers.size()> vertex_buffers_offsets {0, 0};
   _models_command_unit->bindVertexBuffers(0, vertex_buffers, vertex_buffers_offsets);
 
   _models_command_unit->bindIndexBuffer(_index_buffer.buffer(), 0, vk::IndexType::eUint32);

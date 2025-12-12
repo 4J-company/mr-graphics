@@ -121,7 +121,7 @@ mr::BindlessDescriptorSetLayout::BindlessDescriptorSetLayout(const VulkanState &
 
 void mr::DescriptorSet::update(
   const VulkanState &state,
-  std::span<const Shader::ResourceView> attachments) noexcept
+  std::span<const mr::graphics::Shader::ResourceView> attachments) noexcept
 {
   ASSERT(attachments.size() <= desciptor_set_max_bindings,
     "Max binding value is desciptor_set_max_bindings and all bindings must be unique");
@@ -175,12 +175,12 @@ void mr::DescriptorSet::update(
 
     // Validate attachments types
     const auto &binding = _set_layout->bindings()[attachment_view.binding];
-    ASSERT(binding.has_value(), "Binding {} doesn't appear in SetLayout create info",
+    ASSERT(binding.has_value(), "Binding doesn't appear in SetLayout create info",
       attachment_view.binding);
     ASSERT(binding.value() == get_descriptor_type(attachment),
-      "Type of binding {} differ type of this binding in SetLayout create info",
+      "Type of binding differ type of this binding in SetLayout create info",
       attachment_view.binding);
-    ASSERT(used_bindings[attachment_view.binding] == false, "binding {} appears at least twice",
+    ASSERT(!used_bindings[attachment_view.binding], "binding appears at least twice",
       attachment_view.binding);
     used_bindings[attachment_view.binding] = true;
   }
@@ -353,7 +353,7 @@ mr::BindlessDescriptorSet::BindlessDescriptorSet(const VulkanState &state,
 }
 
 mr::graphics::Shader::ResourceView
-mr::BindlessDescriptorSet::try_convert_view_to_resource(const Shader::Resource &resource) const noexcept
+mr::BindlessDescriptorSet::try_convert_view_to_resource(const mr::graphics::Shader::Resource &resource) const noexcept
 {
   auto type = get_descriptor_type(resource);
   std::optional<uint32_t> binding = std::nullopt;
@@ -363,10 +363,10 @@ mr::BindlessDescriptorSet::try_convert_view_to_resource(const Shader::Resource &
     }
   }
   ASSERT(binding.has_value(), "You try register resource without passing binding, but its type is ambigious", type);
-  return Shader::ResourceView(binding.value(), resource);
+  return mr::graphics::Shader::ResourceView(binding.value(), resource);
 }
 
-uint32_t mr::BindlessDescriptorSet::register_resource(const Shader::ResourceView &resource_view) noexcept
+uint32_t mr::BindlessDescriptorSet::register_resource(const mr::graphics::Shader::ResourceView &resource_view) noexcept
 {
   // Validate attacmnets type
   const auto &binding = _set_layout->bindings()[resource_view.binding];
@@ -384,7 +384,7 @@ uint32_t mr::BindlessDescriptorSet::register_resource(const Shader::ResourceView
   return id;
 }
 
-uint32_t mr::BindlessDescriptorSet::register_resource(const Shader::Resource &resource) noexcept
+uint32_t mr::BindlessDescriptorSet::register_resource(const mr::graphics::Shader::Resource &resource) noexcept
 {
   ResourceInfo res_info;
   vk::WriteDescriptorSet write_info;
@@ -395,7 +395,7 @@ uint32_t mr::BindlessDescriptorSet::register_resource(const Shader::Resource &re
 }
 
 mr::InplaceVector<uint32_t, mr::desciptor_set_max_bindings>
-mr::BindlessDescriptorSet::register_resources(std::span<const Shader::Resource> resources) noexcept
+mr::BindlessDescriptorSet::register_resources(std::span<const mr::graphics::Shader::Resource> resources) noexcept
 {
   ASSERT(resources.size() <= desciptor_set_max_bindings,
     "Max binding value is desciptor_set_max_bindings and all bindings must be unique");
@@ -415,7 +415,7 @@ static std::uintptr_t get_resource_id(const T *res)
   return reinterpret_cast<std::uintptr_t>(res);
 }
 
-void mr::BindlessDescriptorSet::unregister_resource(const Shader::Resource &resource) noexcept
+void mr::BindlessDescriptorSet::unregister_resource(const mr::graphics::Shader::Resource &resource) noexcept
 {
   auto tex = [&](const Texture *tex) -> uint32_t {
     return get_resource_id(tex);
@@ -436,7 +436,7 @@ void mr::BindlessDescriptorSet::unregister_resource(const Shader::Resource &reso
   _resource_pools[binding].unregister(resource_id);
 }
 
-uint32_t mr::BindlessDescriptorSet::fill_resource(const Shader::ResourceView &resource,
+uint32_t mr::BindlessDescriptorSet::fill_resource(const mr::graphics::Shader::ResourceView &resource,
                                                   ResourceInfo &resource_info,
                                                   vk::WriteDescriptorSet &write_info) noexcept
 {

@@ -150,7 +150,7 @@ mr::GraphicsPipeline::GraphicsPipeline(const RenderContext &render_context,
 
   vk::StructureChain chain {
     vk::GraphicsPipelineCreateInfo {
-      .stageCount = _shader->stages().size(),
+      .stageCount = (uint32_t)_shader->stages().size(),
       .pStages = _shader->stages().data(),
       .pVertexInputState = &vertex_input_create_info,
       .pInputAssemblyState = &input_assembly_create_info,
