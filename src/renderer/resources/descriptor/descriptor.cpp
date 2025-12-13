@@ -125,7 +125,7 @@ mr::BindlessDescriptorSetLayout::BindlessDescriptorSetLayout(const VulkanState &
 
 void mr::DescriptorSet::update(
   const VulkanState &state,
-  std::span<const Shader::ResourceView> attachments) noexcept
+  std::span<const mr::graphics::Shader::ResourceView> attachments) noexcept
 {
   ASSERT(attachments.size() <= desciptor_set_max_bindings,
     "Max binding value is desciptor_set_max_bindings and all bindings must be unique");
@@ -163,7 +163,7 @@ void mr::DescriptorSet::update(
   std::array<bool, desciptor_set_max_bindings> used_bindings {}; // for validation
 
   for (const auto &[attachment_view, write_info] : std::views::zip(attachments, write_infos)) {
-    const Shader::Resource &attachment = attachment_view;
+    const graphics::Shader::Resource &attachment = attachment_view;
     if (std::holds_alternative<const Texture *>(attachment) ||
         std::holds_alternative<const ColorAttachmentImage *>(attachment)) {
       write_info.emplace<vk::DescriptorImageInfo>();
@@ -180,12 +180,12 @@ void mr::DescriptorSet::update(
 
     // Validate attachments types
     const auto &binding = _set_layout->bindings()[attachment_view.binding];
-    ASSERT(binding.has_value(), "Binding {} doesn't appear in SetLayout create info",
+    ASSERT(binding.has_value(), "Binding doesn't appear in SetLayout create info",
       attachment_view.binding);
     ASSERT(binding.value() == get_descriptor_type(attachment),
-      "Type of binding {} differ type of this binding in SetLayout create info",
+      "Type of binding differ type of this binding in SetLayout create info",
       attachment_view.binding);
-    ASSERT(used_bindings[attachment_view.binding] == false, "binding {} appears at least twice",
+    ASSERT(!used_bindings[attachment_view.binding], "binding appears at least twice",
       attachment_view.binding);
     used_bindings[attachment_view.binding] = true;
   }
@@ -360,7 +360,7 @@ mr::BindlessDescriptorSet::BindlessDescriptorSet(const VulkanState &state,
 }
 
 mr::graphics::Shader::ResourceView
-mr::BindlessDescriptorSet::try_convert_view_to_resource(const Shader::Resource &resource) const noexcept
+mr::BindlessDescriptorSet::try_convert_view_to_resource(const mr::graphics::Shader::Resource &resource) const noexcept
 {
   auto type = get_descriptor_type(resource);
   std::optional<uint32_t> binding = std::nullopt;
@@ -370,10 +370,10 @@ mr::BindlessDescriptorSet::try_convert_view_to_resource(const Shader::Resource &
     }
   }
   ASSERT(binding.has_value(), "You try register resource without passing binding, but its type is ambigious", type);
-  return Shader::ResourceView(binding.value(), resource);
+  return mr::graphics::Shader::ResourceView(binding.value(), resource);
 }
 
-uint32_t mr::BindlessDescriptorSet::register_resource(const Shader::ResourceView &resource_view) noexcept
+uint32_t mr::BindlessDescriptorSet::register_resource(const mr::graphics::Shader::ResourceView &resource_view) noexcept
 {
   // Validate attacmnets type
   const auto &binding = _set_layout->bindings()[resource_view.binding];
@@ -391,7 +391,7 @@ uint32_t mr::BindlessDescriptorSet::register_resource(const Shader::ResourceView
   return id;
 }
 
-uint32_t mr::BindlessDescriptorSet::register_resource(const Shader::Resource &resource) noexcept
+uint32_t mr::BindlessDescriptorSet::register_resource(const mr::graphics::Shader::Resource &resource) noexcept
 {
   ResourceInfo res_info;
   vk::WriteDescriptorSet write_info;
@@ -402,7 +402,7 @@ uint32_t mr::BindlessDescriptorSet::register_resource(const Shader::Resource &re
 }
 
 mr::InplaceVector<uint32_t, mr::desciptor_set_max_bindings>
-mr::BindlessDescriptorSet::register_resources(std::span<const Shader::Resource> resources) noexcept
+mr::BindlessDescriptorSet::register_resources(std::span<const mr::graphics::Shader::Resource> resources) noexcept
 {
   ASSERT(resources.size() <= desciptor_set_max_bindings,
     "Max binding value is desciptor_set_max_bindings and all bindings must be unique");
@@ -429,7 +429,7 @@ static std::uintptr_t get_resource_id(const mr::graphics::Shader::PyramidImageRe
   return reinterpret_cast<std::uintptr_t>((VkImageView)res->image->get_level(res->mip_level));
 }
 
-void mr::BindlessDescriptorSet::unregister_resource(const Shader::Resource &resource) noexcept
+void mr::BindlessDescriptorSet::unregister_resource(const mr::graphics::Shader::Resource &resource) noexcept
 {
   auto tex = [&](const Texture *tex) -> uint32_t {
     return get_resource_id(tex);
@@ -443,10 +443,10 @@ void mr::BindlessDescriptorSet::unregister_resource(const Shader::Resource &reso
   auto simg = [&](const StorageImage *img) -> uint32_t {
     return get_resource_id(img);
   };
-  auto ssimg = [&](const Shader::SamplerStorageImage *img) -> uint32_t {
+  auto ssimg = [&](const graphics::Shader::SamplerStorageImage *img) -> uint32_t {
     return get_resource_id(img);
   };
-  auto pimg = [&](const Shader::PyramidImageResource *img) -> uint32_t {
+  auto pimg = [&](const graphics::Shader::PyramidImageResource *img) -> uint32_t {
     return get_resource_id(img);
   };
   auto dimg = [&](const DepthImage *img) -> uint32_t {
@@ -462,7 +462,7 @@ void mr::BindlessDescriptorSet::unregister_resource(const Shader::Resource &reso
   _resource_pools[binding].unregister(resource_id);
 }
 
-uint32_t mr::BindlessDescriptorSet::fill_resource(const Shader::ResourceView &resource,
+uint32_t mr::BindlessDescriptorSet::fill_resource(const mr::graphics::Shader::ResourceView &resource,
                                                   ResourceInfo &resource_info,
                                                   vk::WriteDescriptorSet &write_info) noexcept
 {
@@ -482,11 +482,11 @@ uint32_t mr::BindlessDescriptorSet::fill_resource(const Shader::ResourceView &re
     fill_storage_image(img, resource_info.emplace<vk::DescriptorImageInfo>());
     return get_resource_id(img);
   };
-  auto ssimg = [&](const Shader::SamplerStorageImage *img) -> std::uintptr_t {
+  auto ssimg = [&](const graphics::Shader::SamplerStorageImage *img) -> std::uintptr_t {
     fill_sampled_storage_image(img, resource_info.emplace<vk::DescriptorImageInfo>());
     return get_resource_id(img);
   };
-  auto pimg = [&](const Shader::PyramidImageResource *img) -> std::uintptr_t {
+  auto pimg = [&](const graphics::Shader::PyramidImageResource *img) -> std::uintptr_t {
     fill_pyramid_image(img, resource_info.emplace<vk::DescriptorImageInfo>());
     return get_resource_id(img);
   };
@@ -553,8 +553,9 @@ void mr::BindlessDescriptorSet::fill_storage_image(const StorageImage *image,
   };
 }
 
-void mr::BindlessDescriptorSet::fill_sampled_storage_image(const Shader::SamplerStorageImage *image,
-                                                           vk::DescriptorImageInfo &image_info) const noexcept
+void mr::BindlessDescriptorSet::fill_sampled_storage_image(
+  const graphics::Shader::SamplerStorageImage *image,
+  vk::DescriptorImageInfo &image_info) const noexcept
 {
   image_info = vk::DescriptorImageInfo {
     .sampler = image->sampler->sampler(),
@@ -564,7 +565,7 @@ void mr::BindlessDescriptorSet::fill_sampled_storage_image(const Shader::Sampler
 }
 
 
-void mr::BindlessDescriptorSet::fill_pyramid_image(const Shader::PyramidImageResource *image,
+void mr::BindlessDescriptorSet::fill_pyramid_image(const graphics::Shader::PyramidImageResource *image,
                                                    vk::DescriptorImageInfo &image_info) const noexcept
 {
   image_info = vk::DescriptorImageInfo {

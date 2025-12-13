@@ -112,7 +112,7 @@ inline namespace graphics {
 
     uint stage_number() const noexcept { return _num_of_loaded_shaders; }
 
-    std::string name() const noexcept { return _path.stem(); }
+    std::string name() const noexcept { return _path.stem().string(); }
 
     std::string id() const noexcept { return name() + ":" + _define_string; }
   };

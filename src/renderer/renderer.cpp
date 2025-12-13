@@ -53,7 +53,7 @@ void mr::Application::render_frames(RenderContext &render_context,
 
   std::fs::create_directory(dst_dir);
 
-  auto base_filename = std::format("{}/{}", dst_dir.c_str(), filename_prefix);
+  auto base_filename = std::format("{}/{}", dst_dir.string().c_str(), filename_prefix);
   file_writer->filename(base_filename);
   for (uint32_t i = 0; i < frames; i++) {
     if (frames > 1) {

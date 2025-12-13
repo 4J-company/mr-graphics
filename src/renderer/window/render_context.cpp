@@ -443,11 +443,11 @@ void mr::RenderContext::render_models(const SceneHandle scene, CommandUnit &cmd_
                                        _timestamps_query_pool.get(),
                                        enum_cast(Timestamp::ModelsStart));
 
-  std::array vertex_buffers {
+  std::array<vk::Buffer, 2> vertex_buffers {
     _positions_vertex_buffer.buffer(),
     _attributes_vertex_buffer.buffer(),
   };
-  std::array vertex_buffers_offsets {0ul, 0ul};
+  std::array vertex_buffers_offsets {(vk::DeviceSize) 0ul, (vk::DeviceSize) 0ul};
   cmd_unit->bindVertexBuffers(0, vertex_buffers, vertex_buffers_offsets);
 
   cmd_unit->bindIndexBuffer(_index_buffer.buffer(), 0, vk::IndexType::eUint32);
