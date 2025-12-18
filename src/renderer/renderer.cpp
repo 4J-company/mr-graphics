@@ -19,8 +19,8 @@ mr::Application::create_render_context(Extent extent, RenderOptions options)
   return std::make_unique<RenderContext>(&_state, extent, options);
 }
 
-void mr::Application::start_render_loop(RenderContext &render_context, SceneHandle scene,
-                                        WindowHandle window, bool print_stat) const noexcept
+void mr::Application::start_render_loop(RenderContext &render_context, SceneHandle scene, WindowHandle window,
+                                        std::optional<std::reference_wrapper<std::ostream>> stat_log_stream) const noexcept
 {
   std::jthread render_thread {
     [&](std::stop_token stop_token) {
@@ -29,9 +29,9 @@ void mr::Application::start_render_loop(RenderContext &render_context, SceneHand
         scene->update(std::optional(std::reference_wrapper(window->input_state())));
         render_context.render(scene, *window);
 
-        if (print_stat) {
-          render_context.stat().write_to_json(std::cout);
-          std::println();
+        if (stat_log_stream.has_value()) {
+          render_context.stat().write_to_json(stat_log_stream.value().get());
+          // std::println(stat_log_stream.value().get());
         }
       }
     }

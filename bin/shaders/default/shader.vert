@@ -25,7 +25,6 @@ layout(location = 3) out flat uint materialid;
 layout(push_constant) uniform DrawsIndosBufferId {
   uint draw_infos_buffer;
   uint camera_buffer_id;
-  uint transforms_buffer_id;
 };
 
 layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer DrawIndoBuffers {
@@ -47,16 +46,14 @@ layout(set = BINDLESS_SET, binding = UNIFORM_BUFFERS_BINDING) readonly uniform C
 layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer Transforms {
   mat4 transforms[];
 } SSBOArray[];
-#define transforms SSBOArray[transforms_buffer_id].transforms
+#define transforms SSBOArray[draw.transforms_buffer_id].transforms
 
 void main()
 {
-  uint instance_index = draw.instance_offset + gl_InstanceIndex;
-
   texcoord = InTexCoord;
   materialid = draw.material_buffer_id;
 
-  mat4 transform = transpose(transforms[instance_index]);
+  mat4 transform = transpose(transforms[gl_InstanceIndex]);
   position = transform * vec4(InPos.xyz, 1.0);
   normal = InNorm;
 

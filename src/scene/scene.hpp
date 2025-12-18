@@ -55,8 +55,8 @@ inline namespace graphics {
       uint32_t meshes_render_info_id = BindlessDescriptorSet::invalid_id;
     };
 
-  private:
-    static inline constexpr int max_scene_instances = 64000;
+  public:
+    static inline constexpr int max_scene_instances = 1'000'000;
 
   private:
     RenderContext *_parent = nullptr;
@@ -73,6 +73,7 @@ inline namespace graphics {
 
     SmallVector<ModelHandle> _models;
     boost::unordered_map<GraphicsPipelineHandle, MeshesWithSamePipeline> _draws;
+    boost::unordered_map<const Mesh *, uint32_t> _meshes_id;
 
     CommandUnit _transfer_command_unit;
     vk::UniqueSemaphore _transfers_semaphore;
@@ -82,11 +83,8 @@ inline namespace graphics {
     std::atomic_uint32_t _mesh_offset = 0;
 
     StorageBuffer _transforms; // transform matrix for each instance
-    // Must be same size as _transforms
-    StorageBuffer _visible_instances_transforms; // transform matrix for each visible instance
     std::vector<mr::Matr4f> _transforms_data;
     uint32_t _transforms_buffer_id = BindlessDescriptorSet::invalid_id;  // id in bindless descriptor set
-    uint32_t _render_transforms_buffer_id = BindlessDescriptorSet::invalid_id;  // id in bindless descriptor set
 
     StorageBuffer _bound_boxes;
     uint32_t _bound_boxes_buffer_id = BindlessDescriptorSet::invalid_id;
@@ -117,6 +115,11 @@ inline namespace graphics {
                                                     const Vec3f &color = Vec3f(1.0)) noexcept;
 
     ModelHandle create_model(std::fs::path filename) noexcept;
+
+    // Model must be added by `create_model` function
+    // Returns instance number
+    uint32_t add_model_instance(ModelHandle model, Matr4f transform) noexcept;
+    void update_model_transform(ModelHandle model, Matr4f transform, uint32_t instance = 0) noexcept;
 
     template <std::derived_from<Light> L>
     void remove(Handle<L> light)
