@@ -5,6 +5,7 @@ struct MeshDrawInfo {
   uint mesh_offset;
   uint instance_offset;
   uint material_buffer_id;
+  uint transforms_buffer_id;
 };
 
 #endif // _TYPES_H_

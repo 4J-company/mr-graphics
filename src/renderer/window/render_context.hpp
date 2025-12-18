@@ -27,6 +27,8 @@ inline namespace graphics {
   class Window;
 
   struct RenderStat {
+    uint32_t frame_number = 0;
+
     double culling_gpu_time_ms = 0;
     double render_gpu_time_ms = 0;
     double models_gpu_time_ms = 0;
@@ -35,9 +37,7 @@ inline namespace graphics {
     double gpu_time_ms = 0;
     double gpu_fps = 0;
 
-    double render_cpu_time_ms = 0;
-    double models_cpu_time_ms = 0;
-    double shading_cpu_time_ms = 0;
+    double render_cpu_time_ms = 0; // time of rendering
 
     double cpu_time_ms = 0; // time between calls of render
     double cpu_fps = 0;
@@ -106,6 +106,7 @@ inline namespace graphics {
     ClockT::time_point _prev_start_time {};
     uint64_t _prev_first_timestamp = 0;
     double _timestamp_to_ms = 0;
+    uint32_t _frame_number = 0;
 
     TracyVkCtx _models_tracy_gpu_context {};
     TracyVkCtx _lights_tracy_gpu_context {};
@@ -186,6 +187,7 @@ inline namespace graphics {
     const VulkanState & vulkan_state() const noexcept { return *_state; }
     const Extent & extent() const noexcept { return _extent; }
     const RenderStat & stat() const noexcept { return _render_stat; }
+    RenderOptions options() const noexcept { return _render_options; }
     CommandUnit & transfer_command_unit() const noexcept { return _transfer_command_unit; }
 
     void enable_bound_boxes() noexcept { _bound_boxes_draw_enabled = true; }
@@ -230,11 +232,7 @@ inline namespace graphics {
     void update_bound_boxes_data();
     void update_camera_buffer(UniformBuffer &uniform_buffer);
 
-    void calculate_stat(SceneHandle scene,
-                        ClockT::time_point render_start_time,
-                        ClockT::time_point render_finish_time,
-                        ClockT::duration models_time,
-                        ClockT::duration shading_time);
+    void calculate_stat(SceneHandle scene, ClockT::time_point render_start_time, ClockT::time_point render_finish_time);
   };
 }
 } // namespace mr

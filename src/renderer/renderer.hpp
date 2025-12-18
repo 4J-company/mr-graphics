@@ -18,25 +18,25 @@
 namespace mr {
 inline namespace graphics {
   class Application {
-    private:
-      VulkanGlobalState _state;
+  private:
+    VulkanGlobalState _state;
 
-    public:
-      Application(bool init_vkfw = true);
-      ~Application();
+  public:
+    Application(bool init_vkfw = true);
+    ~Application();
 
-      [[nodiscard]] std::unique_ptr<RenderContext>
-      create_render_context(Extent extent, RenderOptions options = RenderOptions::None);
+    [[nodiscard]] std::unique_ptr<RenderContext>
+    create_render_context(Extent extent, RenderOptions options = RenderOptions::None);
 
-      void start_render_loop(RenderContext &render_context, SceneHandle scene,
-                             WindowHandle window, bool print_stat = false) const noexcept;
+    void start_render_loop(RenderContext &render_context, SceneHandle scene, WindowHandle window,
+                           std::optional<std::reference_wrapper<std::ostream>> stat_log_stream = std::nullopt) const noexcept;
 
-      void render_frames(RenderContext &render_context,
-                         SceneHandle scene,
-                         FileWriterHandle file_writer,
-                         std::fs::path dst_dir = "",
-                         std::string_view filename_prefix = "frame",
-                         uint32_t frames = 1) const noexcept;
+    void render_frames(RenderContext &render_context,
+                       SceneHandle scene,
+                       FileWriterHandle file_writer,
+                       std::fs::path dst_dir = "",
+                       std::string_view filename_prefix = "frame",
+                       uint32_t frames = 1) const noexcept;
   };
 }
 } // namespace mr

@@ -14,7 +14,6 @@ layout(push_constant) uniform PushContants {
   uint counters_buffer_id;
 
   uint transforms_in_buffer_id;
-  uint transforms_out_buffer_id;
 
   uint camera_buffer_id;
   uint bound_boxes_buffer_id;
@@ -56,11 +55,10 @@ layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer Tr
 } TransformsInArray[];
 #define transforms_in TransformsInArray[buffers_data.transforms_in_buffer_id].transforms
 
-// Require be same size as transforms_in
 layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) writeonly buffer TransformsOut {
   mat4 transforms[];
 } TransformsOutArray[];
-#define transforms_out TransformsOutArray[buffers_data.transforms_out_buffer_id].transforms
+#define transforms_out(mesh_data) TransformsOutArray[mesh_data.mesh_draw_info.transforms_buffer_id].transforms
 
 void main()
 {
@@ -71,8 +69,8 @@ void main()
 
   MeshInstanceCullingData instance_data = instances_datas[id];
   MeshCullingData mesh_data = meshes_datas[instance_data.mesh_culling_data_index];
-  uint transforms_start = mesh_data.mesh_draw_info.instance_offset;
 
+#ifndef DISABLE_CULLING
   mat4 transfrom = transpose(transforms_in[instance_data.transform_index]);
   BoundBox bb = transform_bound_box(bound_box(mesh_data), transfrom);
 
@@ -82,7 +80,8 @@ void main()
       return;
     }
   }
+#endif // not det DISABLE_CULLING
 
   uint instance_number = atomicAdd(intances_count(mesh_data.instance_counter_index), 1);
-  transforms_out[transforms_start + instance_number] = transforms_in[instance_data.transform_index];
+  transforms_out(mesh_data)[instance_number] = transforms_in[instance_data.transform_index];
 }

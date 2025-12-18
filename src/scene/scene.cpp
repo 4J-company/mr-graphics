@@ -9,7 +9,6 @@ mr::Scene::Scene(RenderContext &render_context)
   , _transfers_semaphore(_parent->vulkan_state().device().createSemaphoreUnique({}).value)
   , _transforms(_parent->vulkan_state(), max_scene_instances * sizeof(mr::Matr4f))
   , _bound_boxes(_parent->vulkan_state(), max_scene_instances * sizeof(AABBf))
-  , _visible_instances_transforms(_parent->vulkan_state(), max_scene_instances * sizeof(mr::Matr4f))
   , _visibility(_parent->vulkan_state(), max_scene_instances * sizeof(uint32_t))
   , _counters_buffer(_parent->vulkan_state(), max_scene_instances * sizeof(uint32_t),
                      vk::BufferUsageFlagBits::eStorageBuffer |
@@ -23,7 +22,6 @@ mr::Scene::Scene(RenderContext &render_context)
 
   _camera_buffer_id = render_context.bindless_set().register_resource(&_camera_uniform_buffer);
   _transforms_buffer_id = render_context.bindless_set().register_resource(&_transforms);
-  _render_transforms_buffer_id = render_context.bindless_set().register_resource(&_visible_instances_transforms);
   _bound_boxes_buffer_id = render_context.bindless_set().register_resource(&_bound_boxes);
   _counters_buffer_id = render_context.bindless_set().register_resource(&_counters_buffer);
 }
@@ -39,7 +37,6 @@ mr::Scene::~Scene()
   //            method 'notify_render_context_deleted` and use it as destuctor and move Scene in "disabeld" state
   _parent->bindless_set().unregister_resource(&_camera_uniform_buffer);
   _parent->bindless_set().unregister_resource(&_transforms);
-  _parent->bindless_set().unregister_resource(&_visible_instances_transforms);
   _parent->bindless_set().unregister_resource(&_counters_buffer);
   _parent->bindless_set().unregister_resource(&_bound_boxes);
 }
@@ -64,7 +61,7 @@ mr::ModelHandle mr::Scene::create_model(std::fs::path filename) noexcept
   auto model_handle = ResourceManager<Model>::get().create(mr::unnamed, *this, filename);
 
   _models.push_back(model_handle);
-  for (const auto &[material, mesh] : model_handle->draws()) {
+  for (const auto &[material, model_mesh] : model_handle->draws()) {
     auto [draw_it, is_new_pipeline] = _draws.insert({material->pipeline(), {}});
     auto &draw = draw_it->second;
     if (is_new_pipeline) {
@@ -91,22 +88,21 @@ mr::ModelHandle mr::Scene::create_model(std::fs::path filename) noexcept
       draw.meshes_render_info = StorageBuffer(_parent->vulkan_state(), sizeof(Mesh::RenderInfo) * max_scene_instances);
       draw.meshes_render_info_id = _parent->bindless_set().register_resource(&draw.meshes_render_info);
     }
+    const auto &mesh = model_mesh.mesh;
     draw.meshes.emplace_back(&mesh);
 
-    // TODO: here can be trouble in multithreading
     uint32_t bound_box_index = static_cast<uint32_t>(_bound_boxes_data.size());
     _bound_boxes_data.emplace_back(mesh._bound_box);
-    for (uint32_t i = 0; i < mesh._instance_count; i++) {
-      _parent->draw_bound_box(_transforms_buffer_id, mesh._instance_offset + i,
-                              _bound_boxes_buffer_id, bound_box_index);
-    }
+    model_mesh.mesh_bound_box_id = bound_box_index;
 
     uint32_t mesh_culling_data_index = static_cast<uint32_t>(draw.meshes_data_buffer_data.size());
+    model_mesh.mesh_scene_id = mesh_culling_data_index;
+    uint32_t lod_index = 0;
     draw.meshes_data_buffer_data.emplace_back(MeshCullingData {
       .draw_command = vk::DrawIndexedIndirectCommand {
-        .indexCount = mesh.element_count(),
+        .indexCount = mesh._ibufs[lod_index].elements_count,
         .instanceCount = mesh.num_of_instances(),
-        .firstIndex = static_cast<uint32_t>(mesh._ibufs[0].offset / sizeof(uint32_t)),
+        .firstIndex = static_cast<uint32_t>(mesh._ibufs[lod_index].offset / sizeof(uint32_t)),
         .vertexOffset = static_cast<int32_t>(mesh._vbufs[0].offset / position_bytes_size),
         .firstInstance = 0,
       },
@@ -114,23 +110,64 @@ mr::ModelHandle mr::Scene::create_model(std::fs::path filename) noexcept
         .mesh_offset = mesh._mesh_offset,
         .instance_offset = mesh._instance_offset,
         .material_ubo_id = material->material_ubo_id(),
+        .transfroms_buffer_id = model_mesh.transforms_buffer_id,
       },
       .instance_counter_index = _current_counter_index++,
       .bound_box_index = bound_box_index,
     });
-
-    for (uint32_t instance = 0; instance < mesh._instance_count; instance++) {
-      draw.instances_data_buffer_data.emplace_back(MeshInstanceCullingData {
-        .transform_index = mesh._instance_offset + instance,
-        .mesh_culling_data_index = mesh_culling_data_index,
-      });
-    }
-
-    _triangles_number += mesh.element_count() / 3;
-    _vertexes_number += mesh._vbufs[0].vertex_count;
   }
 
+  add_model_instance(model_handle, Matr4f::identity());
+
   return model_handle;
+}
+
+uint32_t mr::Scene::add_model_instance(ModelHandle model, Matr4f transform) noexcept {
+  uint32_t index = model->_transforms_data.size();
+  model->_transforms_data.emplace_back(transform);
+  // Not it will works incorrect in multithreading
+  uint32_t offset_in_transforms = _transforms_data.size();
+  model->_offsets_of_instances.emplace_back(offset_in_transforms);
+
+  for (const auto &[material, model_mesh] : model->draws()) {
+    const auto &mesh = model_mesh.mesh;
+    auto &draw = _draws[material->pipeline()];
+    for (uint32_t instance = 0; instance < model_mesh.instances_number; instance++) {
+      uint32_t instance_id = _transforms_data.size();
+      _transforms_data.emplace_back(transform * model_mesh.transforms[instance]);
+
+      draw.instances_data_buffer_data.emplace_back(MeshInstanceCullingData {
+        .transform_index = instance_id,
+        .mesh_culling_data_index = model_mesh.mesh_scene_id,
+      });
+
+      _parent->draw_bound_box(_transforms_buffer_id, instance_id,
+                              _bound_boxes_buffer_id, model_mesh.mesh_bound_box_id);
+    }
+
+    draw.meshes_data_buffer_data[model_mesh.mesh_scene_id].draw_command.instanceCount += model_mesh.transforms.size();
+
+    _triangles_number += (mesh.element_count() / 3) * model_mesh.instances_number;
+    _vertexes_number += (mesh._vbufs[0].vertex_count) * model_mesh.instances_number;
+  }
+  _is_buffers_dirty = true;
+
+  return index;
+}
+
+void mr::Scene::update_model_transform(ModelHandle model,
+                                       Matr4f transform, uint32_t instance) noexcept {
+  uint32_t offset_in_transforms = model->_offsets_of_instances[instance];
+  model->_transforms_data[instance] = transform;
+
+  for (const auto &[material, model_mesh] : model->draws()) {
+    const auto &mesh = model_mesh.mesh;
+    auto &draw = _draws[material->pipeline()];
+    for (uint32_t instance = 0; instance < model_mesh.instances_number; instance++) {
+      _transforms_data[offset_in_transforms++] = transform * model_mesh.transforms[instance];
+    }
+  }
+  _is_buffers_dirty = true;
 }
 
 void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
@@ -159,7 +196,6 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
 
     // Don't use fence becase sync is provided by semaphores
     _transfers_fence = _transfer_command_unit.submit(_parent->vulkan_state());
-
     _is_buffers_dirty = false;
     _was_transfer_in_this_frame = true;
   }
@@ -212,6 +248,10 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
     }
     if (input_state.key_tapped(vkfw::Key::e3)) {
       _camera.cam() = mr::math::Camera<float>({100}, {-1}, {0, 1, 0});
+      _camera.cam().projection() = mr::math::Camera<float>::Projection(45_deg);
+    }
+    if (input_state.key_tapped(vkfw::Key::e4)) {
+      _camera.cam() = mr::math::Camera<float>({500}, {-1}, {0, 1, 0});
       _camera.cam().projection() = mr::math::Camera<float>::Projection(45_deg);
     }
   }

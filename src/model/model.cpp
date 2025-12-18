@@ -90,22 +90,20 @@ mr::graphics::Model::Model(
         });
       }
 
+      // TODO(dk6): maybe erase this
       scene._visibility_data.emplace_back(1);
-      scene._transforms_data.insert(
-        scene._transforms_data.end(),
-        mesh.transforms.begin(),
-        mesh.transforms.end()
-      );
 
-      _meshes.emplace_back(
-        std::move(vbufs),
-        std::move(ibufs),
-        instance_count,
-        mesh_offset,
-        instance_offset,
-        mesh.aabb,
-        std::move(mesh.transforms)
-      );
+      auto &mesh_descr = _meshes.emplace_back(MeshInstances {
+        .mesh = graphics::Mesh(std::move(vbufs), std::move(ibufs),
+                                          instance_count, mesh_offset, instance_offset,
+                                          mesh.aabb),
+        .instances_number = static_cast<uint32_t>(instance_count),
+        .transforms = std::move(mesh.transforms),
+        // TODO(dk6): use dynamic buffer
+        .transforms_buffer = StorageBuffer(state, sizeof(Matr4f) * Scene::max_scene_instances),
+      });
+      mesh_descr.transforms_buffer_id =
+        scene.render_context().bindless_set().register_resource(&mesh_descr.transforms_buffer);
 
       mr::MaterialBuilder builder(scene, "default");
 
@@ -131,15 +129,8 @@ mr::graphics::Model::Model(
   MR_INFO("Loading model {} finished\n", filename.string());
 }
 
-void mr::graphics::Model::transform(Matr4f transform) noexcept
+mr::Matr4f mr::graphics::Model::transform(uint32_t instance) const noexcept
 {
-  _transform = transform;
-
-  for (auto &mesh : _meshes) {
-    for (uint32_t instance = 0; instance < mesh._instance_count; instance++) {
-      _scene->_transforms_data[mesh._instance_offset + instance] = mesh._base_transforms[instance] * transform;
-    }
-  }
-  _scene->_is_buffers_dirty = true;
+  ASSERT(instance < _transforms_data.size());
+  return _transforms_data[instance];
 }
-

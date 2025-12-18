@@ -130,6 +130,7 @@ void mr::Window::present() noexcept
   _swapchain._images[image_index].switch_layout(command_unit, vk::ImageLayout::ePresentSrcKHR);
   command_unit.end();
 
+  // TODO(dk6): use semaphore instead fence
   UniqueFenceGuard(_parent->vulkan_state().device(), command_unit.submit(_parent->vulkan_state()));
 
   std::array sems = {_render_finished_semaphore[image_index].get()};

@@ -52,15 +52,20 @@ int main(int argc, const char **argv)
   scene->create_directional_light(mr::Norm3f(-1, 1, 1));
   scene->create_directional_light(mr::Norm3f(0.3, 1, 0.3));
 
-  uint32_t models_number = options.bench_models_number.value_or(1000);
-  for (uint32_t i = 0; i < models_number; i++) {
-    auto model = scene->create_model(options.models[i % options.models.size()]);
+  auto models = options.models | std::views::transform(
+    [&](const auto model_path) {
+      return scene->create_model(model_path);
+    }) | std::ranges::to<std::vector>();
 
+  uint32_t models_number = options.bench_models_number.value_or(1'000);
+  for (uint32_t i = 0; i < models_number - models.size(); i++) {
     auto rnd = [](float min, float max) -> float {
       float v = float(rand()) / RAND_MAX; // between 0 and 1
       // [0, 1] -> [min, max]:
       return v * (max - min) + min;
     };
+
+    auto model = models[i % models.size()];
 
     // This for 1000 kittens models
     float max_dist = 20;
@@ -80,7 +85,8 @@ int main(int argc, const char **argv)
 
     std::cout << transform << std::endl;
     std::cout << "\n\n";
-    model->transform(transform);
+
+    scene->add_model_instance(model, transform);
   }
 
   if (options.camera.has_value()) {
@@ -88,6 +94,11 @@ int main(int argc, const char **argv)
   }
 
   auto window = render_context->create_window({options.width, options.height});
-  app.start_render_loop(*render_context, scene, window, options.print_stat);
+  if (options.print_stat) {
+    std::ofstream stat_file("stats.json");
+    app.start_render_loop(*render_context, scene, window, stat_file);
+  } else {
+    app.start_render_loop(*render_context, scene, window);
+  }
 }
 
