@@ -405,8 +405,6 @@ void mr::RenderContext::render_models(const SceneHandle scene)
     uint32_t model_push_constant[] {
       draw.meshes_render_info_id,
       scene->camera_buffer_id(),
-      is_render_option_enabled(_render_options, RenderOptions::DisableCulling)
-        ? scene->_transforms_buffer_id : scene->_render_transforms_buffer_id,
     };
 
     _models_command_unit->pushConstants(pipeline->layout(), vk::ShaderStageFlagBits::eAllGraphics,
@@ -451,35 +449,32 @@ void mr::RenderContext::culling_geometry(const SceneHandle scene)
   std::array culling_descriptor_sets {_bindless_set.set()};
 
   // ===== Setup and call culling instances shader =====
-  if (not is_render_option_enabled(_render_options, RenderOptions::DisableCulling)) {
-    _culling_command_unit->bindPipeline(vk::PipelineBindPoint::eCompute, _instances_culling_pipeline.pipeline());
+  _culling_command_unit->bindPipeline(vk::PipelineBindPoint::eCompute, _instances_culling_pipeline.pipeline());
 
-    _culling_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eCompute,
-                                             {_instances_culling_pipeline.layout()},
-                                             bindless_set_number,
-                                             culling_descriptor_sets,
-                                             {});
-    // TODO(dk6): Maybe rework to run compute shaders once per frame
-    for (auto &[pipeline, draw] : scene->_draws) {
-      uint32_t instances_number = static_cast<uint32_t>(draw.instances_data_buffer_data.size());
-      uint32_t culling_push_contants[] {
-        draw.meshes_data_buffer_id,
-        draw.instances_data_buffer_id,
-        instances_number,
+  _culling_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eCompute,
+                                           {_instances_culling_pipeline.layout()},
+                                           bindless_set_number,
+                                           culling_descriptor_sets,
+                                           {});
+  // TODO(dk6): Maybe rework to run compute shaders once per frame
+  for (auto &[pipeline, draw] : scene->_draws) {
+    uint32_t instances_number = static_cast<uint32_t>(draw.instances_data_buffer_data.size());
+    uint32_t culling_push_contants[] {
+      draw.meshes_data_buffer_id,
+      draw.instances_data_buffer_id,
+      instances_number,
 
-        scene->_counters_buffer_id,
+      scene->_counters_buffer_id,
 
-        scene->_transforms_buffer_id,
-        scene->_render_transforms_buffer_id,
+      scene->_transforms_buffer_id,
 
-        scene->camera_buffer_id(),
-        scene->_bound_boxes_buffer_id,
-      };
-      _culling_command_unit->pushConstants(_instances_culling_pipeline.layout(), vk::ShaderStageFlagBits::eCompute,
-                                          0, sizeof(culling_push_contants), culling_push_contants);
+      scene->camera_buffer_id(),
+      scene->_bound_boxes_buffer_id,
+    };
+    _culling_command_unit->pushConstants(_instances_culling_pipeline.layout(), vk::ShaderStageFlagBits::eCompute,
+                                        0, sizeof(culling_push_contants), culling_push_contants);
 
-      _culling_command_unit->dispatch((instances_number + culling_work_group_size - 1) / culling_work_group_size, 1, 1);
-    }
+    _culling_command_unit->dispatch((instances_number + culling_work_group_size - 1) / culling_work_group_size, 1, 1);
   }
 
   vk::BufferMemoryBarrier instances_count_culling_barrier {
@@ -696,9 +691,7 @@ void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
   // Model rendering pass
   // --------------------------------------------------------------------------
 
-  auto cpu_models_start_time = ClockT::now();
   render_geometry(scene);
-  auto cpu_models_time = ClockT::now() - cpu_models_start_time;
 
   _models_command_unit.add_signal_semaphore(_models_render_finished_semaphore.get());
 
@@ -714,9 +707,7 @@ void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
   // Lights shading pass
   // --------------------------------------------------------------------------
 
-  auto cpu_shading_start_time = ClockT::now();
   render_lights(scene, presenter);
-  auto cpu_shading_time = ClockT::now() - cpu_shading_start_time;
 
   _lights_command_unit.add_wait_semaphore(_models_render_finished_semaphore.get(),
                                           vk::PipelineStageFlagBits::eColorAttachmentOutput);
@@ -741,14 +732,12 @@ void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
 
   FrameMarkEnd(frame_name);
 
-  calculate_stat(scene, render_start_time, ClockT::now(), cpu_models_time, cpu_shading_time);
+  calculate_stat(scene, render_start_time, ClockT::now());
 }
 
 void mr::RenderContext::calculate_stat(SceneHandle scene,
                                        ClockT::time_point render_start_time,
-                                       ClockT::time_point render_finish_time,
-                                       ClockT::duration models_time,
-                                       ClockT::duration shading_time)
+                                       ClockT::time_point render_finish_time)
 {
   auto get_ms = [](ClockT::duration time) -> double {
     using namespace std::chrono;
@@ -759,9 +748,6 @@ void mr::RenderContext::calculate_stat(SceneHandle scene,
   _render_stat.cpu_fps = 1000 / _render_stat.cpu_time_ms;
 
   _prev_start_time = render_start_time;
-
-  _render_stat.models_cpu_time_ms = get_ms(models_time);
-  _render_stat.shading_cpu_time_ms = get_ms(models_time);
 
 // #define QUERY_RES_WAIT
 #ifdef QUERY_RES_WAIT
@@ -809,19 +795,19 @@ void mr::RenderContext::calculate_stat(SceneHandle scene,
 
   _render_stat.triangles_number = scene->_triangles_number.load();
   _render_stat.vertexes_number = scene->_vertexes_number.load();
+  _render_stat.frame_number = _frame_number++;
 }
 
 void mr::RenderStat::write_to_json(std::ostream &out) const noexcept
 {
   double triangles_per_second = triangles_number / (gpu_time_ms / 1000);
   std::println(out, "{{");
+  std::println(out, "  \"frame_number\": {},", frame_number);
   std::println(out, "  \"cpu_fps\": {:.2f},", cpu_fps);
   std::println(out, "  \"cpu_time_ms\": {:.2f},", cpu_time_ms);
   std::println(out, "  \"gpu_fps\": {:.2f},", gpu_fps);
   std::println(out, "  \"gpu_time_ms\": {:.2f},", gpu_time_ms);
   std::println(out, "  \"cpu_rendering_time_ms\": {:.2f},", render_cpu_time_ms);
-  std::println(out, "  \"cpu_models_time_ms\": {:.2f},", models_cpu_time_ms);
-  std::println(out, "  \"cpu_shading_time_ms\": {:.2f},", shading_cpu_time_ms);
   std::println(out, "  \"culling_gpu_time_ms\": {:.3f},", culling_gpu_time_ms);
   std::println(out, "  \"gpu_rendering_time_ms\": {:.2f},", render_gpu_time_ms);
   std::println(out, "  \"gpu_models_time_ms\": {:.2f},", models_gpu_time_ms);

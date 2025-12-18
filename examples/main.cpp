@@ -62,7 +62,7 @@ int main(int argc, const char **argv)
 
   if (options.mode == mr::CliOptions::Mode::Default) {
     auto window = render_context->create_window({options.width, options.height});
-    app.start_render_loop(*render_context, scene, window, options.print_stat);
+    app.start_render_loop(*render_context, scene, window);
   } else if (options.mode == mr::CliOptions::Mode::Frames) {
     auto file_writer = render_context->create_file_writer({options.width, options.height});
     app.render_frames(*render_context, scene, file_writer,
