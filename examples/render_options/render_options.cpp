@@ -175,14 +175,14 @@ void mr::RenderOptions::print() const noexcept
                            : "invalid");
 
   if (mode == Mode::Frames) {
-    std::println("Destination directory: {}", dst_dir.c_str());
+    std::println("Destination directory: {}", dst_dir.string().c_str());
   }
   if (mode != Mode::Default) {
     std::println("Frames number: {}", frames_number);
   }
   std::println("Resolution: {}x{}", width, height);
   std::println("Culling: {}", disable_culling ? "DISABLED" : "ENABLED");
-  std::println("Statistics directory: {}", stat_dir.c_str());
+  std::println("Statistics directory: {}", stat_dir.string().c_str());
 
   if (camera) {
     std::println("camera:");
@@ -194,7 +194,7 @@ void mr::RenderOptions::print() const noexcept
 
   std::println("Model files ({}):", models.size());
   for (const auto& path : models) {
-    std::println("  - {}", path.c_str());
+    std::println("  - {}", path.string().c_str());
   }
 }
 

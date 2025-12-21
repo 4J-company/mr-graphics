@@ -11,7 +11,7 @@ inline namespace graphics {
   public:
     constexpr static uint32_t images_number = 3;
   private:
-    beman::inplace_vector<ColorAttachmentImage, images_number> _images;
+    InplaceVector<ColorAttachmentImage, images_number> _images;
 
     uint32_t _image_index = 0;
 

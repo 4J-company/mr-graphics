@@ -1,4 +1,6 @@
 #include <system.hpp>
+#include <cmath>
+
 #include "scene/scene.hpp"
 #include "renderer/window/render_context.hpp"
 #include "render_options/render_options.hpp"
@@ -54,7 +56,7 @@ int main(int argc, const char **argv)
       render_context->render(scene, *presenter);
 
       auto &stat = render_context->stat();
-      std::ofstream log_file(std::format("{}/frame{}_stat.json", options.stat_dir.c_str(), i));
+      std::ofstream log_file(std::format("{}/frame{}_stat.json", options.stat_dir.string().c_str(), i));
       stat.write_to_json(log_file);
     }
   }
