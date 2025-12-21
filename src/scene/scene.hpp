@@ -28,7 +28,7 @@ inline namespace graphics {
 
       StorageBuffer meshes_render_info; // render data for each mesh
       std::vector<Mesh::RenderInfo> meshes_render_info_data;
-      uint32_t meshes_render_info_id = -1;
+      uint32_t meshes_render_info_id = static_cast<uint32_t>(-1);
     };
 
   private:

@@ -43,7 +43,7 @@ inline namespace graphics {
 
     constexpr const VertexBuffer & vertex_buffer() const noexcept { return _lights_render_data->screen_vbuf; }
     constexpr const IndexBuffer & index_buffer() const noexcept { return _lights_render_data->screen_ibuf; }
-    constexpr const uint32_t screen_index_number() const noexcept { return _lights_render_data->screen_ibuf.element_count(); }
+    const uint32_t screen_index_number() const noexcept { return _lights_render_data->screen_ibuf.element_count(); }
     constexpr const DescriptorSet & lights_descriptor_set() const noexcept { return _lights_render_data->lights_descriptor_set; }
 
   public:
