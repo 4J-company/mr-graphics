@@ -52,32 +52,42 @@ int main(int argc, const char **argv)
   scene->create_directional_light(mr::Norm3f(-1, 1, 1));
   scene->create_directional_light(mr::Norm3f(0.3, 1, 0.3));
 
-  for (const auto &model_path : options.models) {
-    scene->create_model(model_path);
+  uint32_t models_number = options.bench_models_number.value_or(1000);
+  for (uint32_t i = 0; i < models_number; i++) {
+    auto model = scene->create_model(options.models[i % options.models.size()]);
+
+    auto rnd = [](float min, float max) -> float {
+      float v = float(rand()) / RAND_MAX; // between 0 and 1
+      // [0, 1] -> [min, max]:
+      return v * (max - min) + min;
+    };
+
+    // This for 1000 kittens models
+    float max_dist = 20;
+    auto scale = rnd(0.1, 5.3);
+
+    auto pos = mr::Vec4f(rnd(-max_dist, max_dist), rnd(-max_dist, max_dist), rnd(-max_dist, max_dist), 0);
+    auto scale_vec = mr::Vec4f(scale, scale, scale, 1);
+    auto rot_axis_opt = mr::Vec3f(rnd(-1, 1), rnd(-1, 1), rnd(-1, 1)).normalized();
+    while (not rot_axis_opt) {
+      rot_axis_opt = mr::Vec3f(rnd(-1, 1), rnd(-1, 1), rnd(-1, 1)).normalized();
+    }
+    auto rot_axis = *rot_axis_opt;
+    auto rot_angle = mr::Radiansf(rnd(0, 2 * M_PI));
+
+    auto translate = (mr::Matr4f::identity() * mr::translate(pos)).transposed();
+    auto transform = (translate * mr::scale(scale_vec)) * mr::rotate(rot_axis, rot_angle);
+
+    std::cout << transform << std::endl;
+    std::cout << "\n\n";
+    model->transform(transform);
   }
 
   if (options.camera.has_value()) {
     scene->camera().cam() = options.camera.value();
   }
 
-  if (options.mode == mr::CliOptions::Mode::Default) {
-    auto window = render_context->create_window({options.width, options.height});
-    app.start_render_loop(*render_context, scene, window, options.print_stat);
-  } else if (options.mode == mr::CliOptions::Mode::Frames) {
-    auto file_writer = render_context->create_file_writer({options.width, options.height});
-    app.render_frames(*render_context, scene, file_writer,
-                      options.dst_dir, "frame", options.frames_number);
-  } else if (options.mode == mr::CliOptions::Mode::Bench) {
-    std::fs::create_directory(options.stat_dir);
-    auto presenter = render_context->create_dummy_presenter({options.width, options.height});
-    for (uint32_t i = 0; i < options.frames_number; i++) {
-      scene->update();
-      render_context->render(scene, *presenter);
-
-      auto &stat = render_context->stat();
-      std::ofstream log_file(std::format("{}/frame{}_stat.json", options.stat_dir.string().c_str(), i));
-      stat.write_to_json(log_file);
-    }
-  }
+  auto window = render_context->create_window({options.width, options.height});
+  app.start_render_loop(*render_context, scene, window, options.print_stat);
 }
 

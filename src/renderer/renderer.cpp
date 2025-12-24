@@ -13,13 +13,14 @@ mr::Application::Application(bool init_vkfw) : _state(init_vkfw)
 // destructor
 mr::Application::~Application() {}
 
-[[nodiscard]] std::unique_ptr<mr::RenderContext> mr::Application::create_render_context(Extent extent)
+[[nodiscard]] std::unique_ptr<mr::RenderContext>
+mr::Application::create_render_context(Extent extent, RenderOptions options)
 {
-  return std::make_unique<RenderContext>(&_state, extent);
+  return std::make_unique<RenderContext>(&_state, extent, options);
 }
 
 void mr::Application::start_render_loop(RenderContext &render_context, SceneHandle scene,
-                                                                       WindowHandle window) const noexcept
+                                        WindowHandle window, bool print_stat) const noexcept
 {
   std::jthread render_thread {
     [&](std::stop_token stop_token) {
@@ -27,6 +28,11 @@ void mr::Application::start_render_loop(RenderContext &render_context, SceneHand
         window->update_state();
         scene->update(std::optional(std::reference_wrapper(window->input_state())));
         render_context.render(scene, *window);
+
+        if (print_stat) {
+          render_context.stat().write_to_json(std::cout);
+          std::println();
+        }
       }
     }
   };

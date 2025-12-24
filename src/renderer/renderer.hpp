@@ -11,6 +11,7 @@
 #include "window/window.hpp"
 #include "window/file_writer.hpp"
 #include "scene/scene.hpp"
+#include "window/render_context.hpp"
 
 #include "mesh/mesh.hpp"
 
@@ -24,10 +25,11 @@ inline namespace graphics {
       Application(bool init_vkfw = true);
       ~Application();
 
-      [[nodiscard]] std::unique_ptr<RenderContext> create_render_context(Extent extent);
+      [[nodiscard]] std::unique_ptr<RenderContext>
+      create_render_context(Extent extent, RenderOptions options = RenderOptions::None);
 
       void start_render_loop(RenderContext &render_context, SceneHandle scene,
-                                                            WindowHandle window) const noexcept;
+                             WindowHandle window, bool print_stat = false) const noexcept;
 
       void render_frames(RenderContext &render_context,
                          SceneHandle scene,

@@ -73,7 +73,7 @@ mr::graphics::Model::Model(
 
       const size_t instance_count = mesh.transforms.size();
       const size_t instance_offset = scene._transforms_data.size();
-      const size_t mesh_offset = scene._bounds_data.size();
+      const size_t mesh_offset = scene._mesh_offset++;
 
       std::array vbufs_data {
         std::as_bytes(std::span(mesh.positions)),
@@ -90,7 +90,6 @@ mr::graphics::Model::Model(
         });
       }
 
-      scene._bounds_data.emplace_back();
       scene._visibility_data.emplace_back(1);
       scene._transforms_data.insert(
         scene._transforms_data.end(),
@@ -103,7 +102,9 @@ mr::graphics::Model::Model(
         std::move(ibufs),
         instance_count,
         mesh_offset,
-        instance_offset
+        instance_offset,
+        mesh.aabb,
+        std::move(mesh.transforms)
       );
 
       mr::MaterialBuilder builder(scene, "default");
@@ -114,7 +115,6 @@ mr::graphics::Model::Model(
         builder.add_texture(importer2graphics(texture.type), texture);
       }
       builder.add_storage_buffer(&scene._transforms);
-      builder.add_storage_buffer(&scene._bounds);
       builder.add_conditional_buffer(&scene._visibility);
 
       _builders.push_back(std::move(builder));
@@ -130,3 +130,16 @@ mr::graphics::Model::Model(
 
   MR_INFO("Loading model {} finished\n", filename.string());
 }
+
+void mr::graphics::Model::transform(Matr4f transform) noexcept
+{
+  _transform = transform;
+
+  for (auto &mesh : _meshes) {
+    for (uint32_t instance = 0; instance < mesh._instance_count; instance++) {
+      _scene->_transforms_data[mesh._instance_offset + instance] = mesh._base_transforms[instance] * transform;
+    }
+  }
+  _scene->_is_buffers_dirty = true;
+}
+

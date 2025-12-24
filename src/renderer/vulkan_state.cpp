@@ -98,6 +98,7 @@ void mr::VulkanGlobalState::_create_phys_device()
   };
 
   vk::PhysicalDeviceVulkan12Features features12 {
+    .drawIndirectCount = true,
     .descriptorIndexing = true,
     .descriptorBindingUniformBufferUpdateAfterBind = true,
     .descriptorBindingSampledImageUpdateAfterBind = true,

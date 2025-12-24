@@ -24,6 +24,8 @@ void mr::InputState::update() noexcept
 
   _mouse_pos_delta = mouse_pos_copy - _prev_mouse_pos;
   _prev_mouse_pos = mouse_pos_copy;
+
+  _prev_mouse_scroll_offset = _mouse_scroll_offset.exchange(0);
 }
 
 bool mr::InputState::key_pressed(vkfw::Key key) const noexcept
@@ -55,6 +57,14 @@ mr::InputState::KeyCallbackT mr::InputState::get_key_callback() noexcept
         _writer_key_tapped[idx] = true;
     }
     _writer_key_pressed[idx] = true;
+  };
+}
+
+
+mr::InputState::MouseScrollCallback mr::InputState::get_mouse_scroll_callback() noexcept
+{
+  return [this](const vkfw::Window &window, double xoff, double yoff) {
+    _mouse_scroll_offset += yoff;
   };
 }
 
@@ -91,6 +101,8 @@ mr::InputState & mr::InputState::operator=(InputState &&other) noexcept
   _mouse_pos = other._mouse_pos;
   _prev_mouse_pos = other._prev_mouse_pos;
   _mouse_pos_delta = other._mouse_pos_delta;
+
+  _prev_mouse_scroll_offset = other._prev_mouse_scroll_offset.load();
 
   return *this;
 }
