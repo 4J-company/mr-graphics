@@ -73,7 +73,7 @@ int main(int argc, const char **argv)
       rot_axis_opt = mr::Vec3f(rnd(-1, 1), rnd(-1, 1), rnd(-1, 1)).normalized();
     }
     auto rot_axis = *rot_axis_opt;
-    auto rot_angle = mr::Radiansf(rnd(0, 2 * M_PI));
+    auto rot_angle = mr::Radiansf(rnd(0, 2 * std::numbers::pi));
 
     auto translate = (mr::Matr4f::identity() * mr::translate(pos)).transposed();
     auto transform = (translate * mr::scale(scale_vec)) * mr::rotate(rot_axis, rot_angle);
