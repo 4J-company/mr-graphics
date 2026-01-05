@@ -138,6 +138,7 @@ uint32_t mr::Scene::add_model_instance(ModelHandle model, Matr4f transform) noex
 
       draw.instances_data_buffer_data.emplace_back(MeshInstanceCullingData {
         .transform_index = instance_id,
+        .visible_last_frame = 1, // all meshes are visible at first
         .mesh_culling_data_index = model_mesh.mesh_scene_id,
       });
 
@@ -203,9 +204,9 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
   if (input_state_ref) {
     const auto &input_state = input_state_ref->get();
 
-    float min_speed = 0.05;
+    float min_speed = 0.005;
     float max_speed = 5;
-    float speed_delta_coef = 0.05;
+    float speed_delta_coef = 0.005;
     float new_speed = _camera.speed() + input_state.mouse_scroll() * speed_delta_coef;
     if (new_speed >= min_speed && new_speed <= max_speed) {
       _camera.speed(new_speed);
@@ -238,6 +239,11 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
     if (input_state.key_pressed(vkfw::Key::eLeftShift)) {
       _camera.move(_camera.cam().up());
     }
+    if (input_state.key_pressed(vkfw::Key::eP)) {
+      std::cout << "camera_pos, camera_dir, camera_up:\n"
+        << _camera.cam().position() << ", " << _camera.cam().direction() << _camera.cam().up() << std::endl;
+    }
+
     if (input_state.key_tapped(vkfw::Key::e1)) {
       _camera.cam() = mr::math::Camera<float>({1}, {-1}, {0, 1, 0});
       _camera.cam().projection() = mr::math::Camera<float>::Projection(45_deg);
@@ -252,7 +258,14 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
     }
     if (input_state.key_tapped(vkfw::Key::e4)) {
       _camera.cam() = mr::math::Camera<float>({500}, {-1}, {0, 1, 0});
+    }
+    if (input_state.key_tapped(vkfw::Key::e5)) {
+      auto cam_pos = _camera.cam().position();
+      _camera.cam() = mr::math::Camera<float>(cam_pos, -cam_pos.normalized().value(), {0, 1, 0});
       _camera.cam().projection() = mr::math::Camera<float>::Projection(45_deg);
+    }
+    if (input_state.key_tapped(vkfw::Key::eB)) {
+      _draw_bound_rects = !_draw_bound_rects;
     }
   }
 

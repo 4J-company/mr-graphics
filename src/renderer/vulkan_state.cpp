@@ -59,7 +59,8 @@ void mr::VulkanGlobalState::_create_instance()
     builder.enable_extension(glfw_extensions[i]);
   }
 
-// #ifndef NDEBUG
+// Now windows doesn't compile in debug mode - canan tracy packet compilation fails
+#if !(defined NDEBUG || defined _WIN32)
   const auto sys_info = vkb::SystemInfo::get_system_info().value();
   if (sys_info.debug_utils_available) {
     builder.enable_extension(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
@@ -75,7 +76,7 @@ void mr::VulkanGlobalState::_create_instance()
       VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
       VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT)
     .set_debug_callback(debug_callback);
-// #endif
+#endif
 
   const auto instance = builder.build();
   if (not instance) {
@@ -102,9 +103,11 @@ void mr::VulkanGlobalState::_create_phys_device()
     .descriptorIndexing = true,
     .descriptorBindingUniformBufferUpdateAfterBind = true,
     .descriptorBindingSampledImageUpdateAfterBind = true,
+    .descriptorBindingStorageImageUpdateAfterBind = true,
     .descriptorBindingStorageBufferUpdateAfterBind = true,
     .descriptorBindingPartiallyBound = true,
     .runtimeDescriptorArray = true,
+    .samplerFilterMinmax = true,
     .bufferDeviceAddress = true,
   };
 

@@ -11,6 +11,7 @@ struct BoundSphere {
   float radius;
 };
 
+// Get bound box in world-space
 BoundBox transform_bound_box(BoundBox bb, mat4 transform)
 {
   vec3 corners[8];
@@ -29,6 +30,32 @@ BoundBox transform_bound_box(BoundBox bb, mat4 transform)
   for (uint i = 1; i < 8; i++) {
     res.min = vec4(min(res.min.xyz, corners[i]), 0);
     res.max = vec4(max(res.max.xyz, corners[i]), 0);
+  }
+  return res;
+}
+
+// TODO(dk6): Search in internet more optimize way to do it
+vec4 get_bound_box_screen_rectangle(BoundBox bb, mat4 proj)
+{
+  vec4 corners[8];
+  corners[0] = proj * vec4(bb.min.x, bb.min.y, bb.min.z, 1);
+  corners[1] = proj * vec4(bb.max.x, bb.min.y, bb.min.z, 1);
+  corners[2] = proj * vec4(bb.max.x, bb.max.y, bb.min.z, 1);
+  corners[3] = proj * vec4(bb.min.x, bb.max.y, bb.min.z, 1);
+  corners[4] = proj * vec4(bb.min.x, bb.min.y, bb.max.z, 1);
+  corners[5] = proj * vec4(bb.max.x, bb.min.y, bb.max.z, 1);
+  corners[6] = proj * vec4(bb.max.x, bb.max.y, bb.max.z, 1);
+  corners[7] = proj * vec4(bb.min.x, bb.max.y, bb.max.z, 1);
+  for (int i = 0; i < 8; i++) {
+    corners[i] /= corners[i].w;
+  }
+
+  vec4 res = vec4(corners[0].xy, corners[0].xy);
+  for (int i = 1; i < 8; i++) {
+    res.x = min(res.x, corners[i].x);
+    res.y = min(res.y, corners[i].y);
+    res.z = max(res.z, corners[i].x);
+    res.w = max(res.w, corners[i].y);
   }
   return res;
 }
@@ -64,6 +91,20 @@ bool is_bound_box_not_visible(vec4 plane, BoundBox bb)
 
   return false;
 }
+
+bool is_bound_box_frustum_visible(BoundBox bb, in vec4 frustum_planes[6])
+{
+  for (int i = 0; i < 6; i++) {
+    if (is_bound_box_not_visible(frustum_planes[i], bb)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// -----------------------------------------
+// Bound sphere base functionality
+// -----------------------------------------
 
 BoundSphere bb2bs(BoundBox bb)
 {

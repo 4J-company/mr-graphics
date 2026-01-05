@@ -75,6 +75,8 @@ mr::graphics::Model::Model(
       const size_t instance_offset = scene._transforms_data.size();
       const size_t mesh_offset = scene._mesh_offset++;
 
+      MR_DEBUG("{}: [{}; {})", mesh.name, instance_offset, instance_offset + instance_count);
+
       std::array vbufs_data {
         std::as_bytes(std::span(mesh.positions)),
         std::as_bytes(std::span(mesh.attributes))

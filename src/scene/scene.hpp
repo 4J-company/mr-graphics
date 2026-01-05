@@ -21,6 +21,7 @@ inline namespace graphics {
   private:
     struct MeshInstanceCullingData {
       uint32_t transform_index;
+      uint32_t visible_last_frame;
       uint32_t mesh_culling_data_index;
     };
 
@@ -60,6 +61,8 @@ inline namespace graphics {
 
   private:
     RenderContext *_parent = nullptr;
+
+    bool _draw_bound_rects = false;
 
     // For statistic
     std::atomic_uint64_t _vertexes_number;

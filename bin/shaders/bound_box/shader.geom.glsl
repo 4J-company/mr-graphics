@@ -12,6 +12,7 @@ layout(location = 0) in flat uint instance_indexes[];
 layout(push_constant) uniform PushContants {
   uint camera_buffer_id;
   uint bound_boxes_data;
+  uint render_bound_rects;
 } draw;
 
 struct DrawData {
@@ -29,7 +30,7 @@ layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer Dr
 layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer BoudBoxesBuffer {
   BoundBox[] data;
 } BoundBoxes[];
-#define bb BoundBoxes[bb_data.bound_boxes_buffer_id].data[bb_data.bound_box_index]
+#define bound_box BoundBoxes[bb_data.bound_boxes_buffer_id].data[bb_data.bound_box_index]
 
 layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer Transforms {
   mat4 transforms[];
@@ -46,7 +47,52 @@ layout(set = BINDLESS_SET, binding = UNIFORM_BUFFERS_BINDING) readonly uniform C
 } CameraUboArray[];
 #define cam_ubo CameraUboArray[draw.camera_buffer_id]
 
-void main()
+void render_bound_rectangle(BoundBox bb, mat4 proj)
+{
+  vec4 rectangle = get_bound_box_screen_rectangle(bb, proj);
+
+  // Flip over Ox
+  float tmp = -rectangle.y;
+  rectangle.y = -rectangle.w;
+  rectangle.w = tmp;
+
+  vec2 A = rectangle.xy, B = rectangle.zw;
+
+  vec2 bottom_left = vec2(min(A.x, B.x), min(A.y, B.y));
+  vec2 bottom_right = vec2(max(A.x, B.x), min(A.y, B.y));
+  vec2 top_left = vec2(min(A.x, B.x), max(A.y, B.y));
+  vec2 top_right = vec2(max(A.x, B.x), max(A.y, B.y));
+
+  gl_Position = vec4(bottom_left, 0.0, 1.0);
+  EmitVertex();
+  gl_Position = vec4(bottom_right, 0.0, 1.0);
+  EmitVertex();
+  gl_Position = vec4(top_right, 0.0, 1.0);
+  EmitVertex();
+  gl_Position = vec4(top_left, 0.0, 1.0);
+  EmitVertex();
+  gl_Position = vec4(bottom_left, 0.0, 1.0);
+  EmitVertex();
+  EndPrimitive();
+
+  // diagonals
+  bool render_diagonals = false;
+  if (render_diagonals) {
+    gl_Position = vec4(bottom_left, 0.0, 1.0);
+    EmitVertex();
+    gl_Position = vec4(top_right, 0.0, 1.0);
+    EmitVertex();
+    EndPrimitive();
+
+    gl_Position = vec4(bottom_right, 0.0, 1.0);
+    EmitVertex();
+    gl_Position = vec4(top_left, 0.0, 1.0);
+    EmitVertex();
+    EndPrimitive();
+  }
+}
+
+void render_bound_box(BoundBox bb, mat4 proj)
 {
   // bounding box vertexes
   vec3 v[8];
@@ -59,104 +105,114 @@ void main()
   v[6] = vec3(bb.max.x, bb.max.y, bb.max.z);
   v[7] = vec3(bb.min.x, bb.max.y, bb.max.z);
 
-  mat4 mvp = cam_ubo.vp * transpose(transform);
-
   // Bottom (4 edges)
-  gl_Position = mvp * vec4(v[0], 1.0);
+  gl_Position = proj * vec4(v[0], 1.0);
   gl_Position.y *= -1;
   EmitVertex();
-  gl_Position = mvp * vec4(v[1], 1.0);
-  gl_Position.y *= -1;
-  EmitVertex();
-  EndPrimitive();
-
-  gl_Position = mvp * vec4(v[1], 1.0);
-  gl_Position.y *= -1;
-  EmitVertex();
-  gl_Position = mvp * vec4(v[2], 1.0);
+  gl_Position = proj * vec4(v[1], 1.0);
   gl_Position.y *= -1;
   EmitVertex();
   EndPrimitive();
 
-  gl_Position = mvp * vec4(v[2], 1.0);
+  gl_Position = proj * vec4(v[1], 1.0);
   gl_Position.y *= -1;
   EmitVertex();
-  gl_Position = mvp * vec4(v[3], 1.0);
+  gl_Position = proj * vec4(v[2], 1.0);
   gl_Position.y *= -1;
   EmitVertex();
   EndPrimitive();
 
-  gl_Position = mvp * vec4(v[3], 1.0);
+  gl_Position = proj * vec4(v[2], 1.0);
   gl_Position.y *= -1;
   EmitVertex();
-  gl_Position = mvp * vec4(v[0], 1.0);
+  gl_Position = proj * vec4(v[3], 1.0);
+  gl_Position.y *= -1;
+  EmitVertex();
+  EndPrimitive();
+
+  gl_Position = proj * vec4(v[3], 1.0);
+  gl_Position.y *= -1;
+  EmitVertex();
+  gl_Position = proj * vec4(v[0], 1.0);
   gl_Position.y *= -1;
   EmitVertex();
   EndPrimitive();
 
   // Top (4 edges)
-  gl_Position = mvp * vec4(v[4], 1.0);
+  gl_Position = proj * vec4(v[4], 1.0);
   gl_Position.y *= -1;
   EmitVertex();
-  gl_Position = mvp * vec4(v[5], 1.0);
-  gl_Position.y *= -1;
-  EmitVertex();
-  EndPrimitive();
-
-  gl_Position = mvp * vec4(v[5], 1.0);
-  gl_Position.y *= -1;
-  EmitVertex();
-  gl_Position = mvp * vec4(v[6], 1.0);
+  gl_Position = proj * vec4(v[5], 1.0);
   gl_Position.y *= -1;
   EmitVertex();
   EndPrimitive();
 
-  gl_Position = mvp * vec4(v[6], 1.0);
+  gl_Position = proj * vec4(v[5], 1.0);
   gl_Position.y *= -1;
   EmitVertex();
-  gl_Position = mvp * vec4(v[7], 1.0);
+  gl_Position = proj * vec4(v[6], 1.0);
   gl_Position.y *= -1;
   EmitVertex();
   EndPrimitive();
 
-  gl_Position = mvp * vec4(v[7], 1.0);
+  gl_Position = proj * vec4(v[6], 1.0);
   gl_Position.y *= -1;
   EmitVertex();
-  gl_Position = mvp * vec4(v[4], 1.0);
+  gl_Position = proj * vec4(v[7], 1.0);
+  gl_Position.y *= -1;
+  EmitVertex();
+  EndPrimitive();
+
+  gl_Position = proj * vec4(v[7], 1.0);
+  gl_Position.y *= -1;
+  EmitVertex();
+  gl_Position = proj * vec4(v[4], 1.0);
   gl_Position.y *= -1;
   EmitVertex();
   EndPrimitive();
 
   // Вертикальные рёбра (4 ребра)
-  gl_Position = mvp * vec4(v[0], 1.0);
+  gl_Position = proj * vec4(v[0], 1.0);
   gl_Position.y *= -1;
   EmitVertex();
-  gl_Position = mvp * vec4(v[4], 1.0);
-  gl_Position.y *= -1;
-  EmitVertex();
-  EndPrimitive();
-
-  gl_Position = mvp * vec4(v[1], 1.0);
-  gl_Position.y *= -1;
-  EmitVertex();
-  gl_Position = mvp * vec4(v[5], 1.0);
+  gl_Position = proj * vec4(v[4], 1.0);
   gl_Position.y *= -1;
   EmitVertex();
   EndPrimitive();
 
-  gl_Position = mvp * vec4(v[2], 1.0);
+  gl_Position = proj * vec4(v[1], 1.0);
   gl_Position.y *= -1;
   EmitVertex();
-  gl_Position = mvp * vec4(v[6], 1.0);
+  gl_Position = proj * vec4(v[5], 1.0);
   gl_Position.y *= -1;
   EmitVertex();
   EndPrimitive();
 
-  gl_Position = mvp * vec4(v[3], 1.0);
+  gl_Position = proj * vec4(v[2], 1.0);
   gl_Position.y *= -1;
   EmitVertex();
-  gl_Position = mvp * vec4(v[7], 1.0);
+  gl_Position = proj * vec4(v[6], 1.0);
   gl_Position.y *= -1;
   EmitVertex();
   EndPrimitive();
+
+  gl_Position = proj * vec4(v[3], 1.0);
+  gl_Position.y *= -1;
+  EmitVertex();
+  gl_Position = proj * vec4(v[7], 1.0);
+  gl_Position.y *= -1;
+  EmitVertex();
+  EndPrimitive();
+}
+
+void main()
+{
+  mat4 proj = cam_ubo.vp;
+  BoundBox bb = transform_bound_box(bound_box, transpose(transform));
+
+  if (bool(draw.render_bound_rects)) {
+    render_bound_rectangle(bb, proj);
+  } else {
+    render_bound_box(bb, proj);
+  }
 }

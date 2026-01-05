@@ -14,20 +14,22 @@ static size_t calculate_image_size(mr::Extent extent, vk::Format format)
 
 mr::Image::Image(const VulkanState &state, Extent extent, vk::Format format,
                  vk::ImageUsageFlags usage_flags, vk::ImageAspectFlags aspect_flags,
-                 vk::MemoryPropertyFlags memory_properties, uint mip_level)
+                 vk::MemoryPropertyFlags memory_properties, uint mip_level, bool is_create_image_view)
   : _state(&state)
-  , _mip_level(mip_level)
+  , _mip_levels_number(mip_level)
   , _extent{extent.width, extent.height, 1}
   , _size{calculate_image_size(extent, format)}
   , _format(format)
   , _layout(vk::ImageLayout::eUndefined)
   , _aspect_flags(aspect_flags)
 {
+  ASSERT(mip_level > 0, "mip level number must be 1 or grater");
+
   vk::ImageCreateInfo image_create_info {
     .imageType = vk::ImageType::e2D,
     .format = _format,
     .extent = _extent,
-    .mipLevels = _mip_level,
+    .mipLevels = _mip_levels_number,
     .arrayLayers = 1,
     .samples = vk::SampleCountFlagBits::e1,
     .tiling = vk::ImageTiling::eOptimal,
@@ -69,7 +71,9 @@ mr::Image::Image(const VulkanState &state, Extent extent, vk::Format format,
     ASSERT(result == VK_SUCCESS, "Failed to create a vk::Image", result, extent.width, extent.height, (int)format);
   }
 
-  create_image_view();
+  if (is_create_image_view) {
+    _image_view = create_image_view(0, _mip_levels_number);
+  }
 }
 
 mr::Image::Image(const VulkanState &state, const mr::importer::ImageData &image,
@@ -89,15 +93,24 @@ mr::Image::~Image() {
   _state->device().destroyImageView(_image_view);
 }
 
-void mr::Image::switch_layout(CommandUnit &command_unit, vk::ImageLayout new_layout) {
-  if (new_layout == _layout) {
+void mr::Image::switch_layout(CommandUnit &command_unit, vk::ImageLayout new_layout)
+{
+  switch_layout(command_unit, new_layout, 0, _mip_levels_number);
+}
+
+void mr::Image::switch_layout(CommandUnit &command_unit, vk::ImageLayout new_layout,
+                              uint32_t mip_level, uint32_t mip_counts, bool ignore_prev_layout)
+{
+  // TODO(dk6): Now i want reuse this function for set pipeline barrier without switch layout.
+  //            Maybe we can refactor code and added new funciton for this instead
+  if (not ignore_prev_layout && new_layout == _layout) {
     return;
   }
 
   vk::ImageSubresourceRange range {
     .aspectMask = _aspect_flags,
-    .baseMipLevel = 0,
-    .levelCount = _mip_level,
+    .baseMipLevel = mip_level,
+    .levelCount = mip_counts,
     .baseArrayLayer = 0,
     .layerCount = 1,
   };
@@ -105,8 +118,8 @@ void mr::Image::switch_layout(CommandUnit &command_unit, vk::ImageLayout new_lay
   vk::ImageMemoryBarrier barrier {
     .oldLayout = _layout,
     .newLayout = new_layout,
-    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+    .srcQueueFamilyIndex = vk::QueueFamilyIgnored,
+    .dstQueueFamilyIndex = vk::QueueFamilyIgnored,
     .image = _image,
     .subresourceRange = range
   };
@@ -139,6 +152,12 @@ void mr::Image::switch_layout(CommandUnit &command_unit, vk::ImageLayout new_lay
     case vk::ImageLayout::ePresentSrcKHR:
       barrier.srcAccessMask = vk::AccessFlagBits::eNoneKHR;
       break;
+    case vk::ImageLayout::eGeneral:
+      barrier.srcAccessMask = vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite;
+      break;
+    case vk::ImageLayout::eDepthStencilReadOnlyOptimal:
+      barrier.srcAccessMask = vk::AccessFlagBits::eShaderRead;
+      break;
     default:
       ASSERT(false, "Invalid source layout");
       break;
@@ -166,6 +185,12 @@ void mr::Image::switch_layout(CommandUnit &command_unit, vk::ImageLayout new_lay
   case vk::ImageLayout::ePresentSrcKHR:
     barrier.dstAccessMask = vk::AccessFlagBits::eNoneKHR;
     break;
+  case vk::ImageLayout::eGeneral:
+    barrier.srcAccessMask = vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite;
+    break;
+  case vk::ImageLayout::eDepthStencilReadOnlyOptimal:
+    barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
+    break;
   default:
     ASSERT(false, "Invalid destination layout");
     break;
@@ -186,7 +211,7 @@ void mr::Image::write(CommandUnit &command_unit, std::span<const std::byte> src)
 
   vk::ImageSubresourceLayers range {
     .aspectMask = _aspect_flags,
-      .mipLevel = _mip_level - 1,
+      .mipLevel = _mip_levels_number - 1,
       .baseArrayLayer = 0,
       .layerCount = 1,
   };
@@ -202,11 +227,11 @@ void mr::Image::write(CommandUnit &command_unit, std::span<const std::byte> src)
   command_unit->copyBufferToImage(command_unit.staging_buffers().back().buffer(), _image, _layout, {region});
 }
 
-void mr::Image::create_image_view() {
+vk::ImageView mr::Image::create_image_view(uint32_t mip_level, uint32_t mip_levels_count) {
   vk::ImageSubresourceRange range {
     .aspectMask = _aspect_flags,
-    .baseMipLevel = 0,
-    .levelCount = _mip_level,
+    .baseMipLevel = mip_level,
+    .levelCount = mip_levels_count,
     .baseArrayLayer = 0,
     .layerCount = 1,
   };
@@ -222,7 +247,7 @@ void mr::Image::create_image_view() {
     .subresourceRange = range
   };
 
-  _image_view = _state->device().createImageView(create_info).value;
+  return _state->device().createImageView(create_info).value;
 }
 
 vk::Format mr::Image::find_supported_format(
@@ -250,7 +275,7 @@ mr::HostBuffer mr::Image::read_to_host_buffer(CommandUnit &command_unit) noexcep
 {
   vk::ImageSubresourceLayers range {
     .aspectMask = _aspect_flags,
-    .mipLevel = _mip_level - 1,
+    .mipLevel = _mip_levels_number - 1,
     .baseArrayLayer = 0,
     .layerCount = 1,
   };
@@ -282,9 +307,9 @@ mr::HostImage::HostImage(const VulkanState &state, Extent extent, vk::Format for
 // ---- DeviceImage ----
 mr::DeviceImage::DeviceImage(const VulkanState &state, Extent extent, vk::Format format,
                             vk::ImageUsageFlags usage_flags, vk::ImageAspectFlags aspect_flags,
-                            uint mip_level)
+                            uint mip_level, bool create_image_view)
   : Image(state, extent, format, usage_flags, aspect_flags,
-          vk::MemoryPropertyFlagBits::eDeviceLocal, mip_level)
+          vk::MemoryPropertyFlagBits::eDeviceLocal, mip_level, create_image_view)
 {}
 
 mr::DeviceImage::DeviceImage(const VulkanState &state, const mr::importer::ImageData &image, vk::ImageUsageFlags usage_flags, vk::ImageAspectFlags aspect_flags)
@@ -300,10 +325,10 @@ mr::SwapchainImage::SwapchainImage(const VulkanState &state, Extent extent, vk::
   _extent = vk::Extent3D{.width = extent.width, .height= extent.height, .depth = 1};
   _size = calculate_image_size(extent, format);
   _format = format;
-  _mip_level = 1;
+  _mip_levels_number = 1;
   _aspect_flags = vk::ImageAspectFlagBits::eColor;
   _layout = vk::ImageLayout::eUndefined;
-  create_image_view();
+  _image_view = create_image_view(0, _mip_levels_number);
 }
 
 mr::SwapchainImage::SwapchainImage(
@@ -318,7 +343,7 @@ mr::SwapchainImage::SwapchainImage(
   _extent = vk::Extent3D{.width = extent.width, .height= extent.height, .depth = 1};
   _size = calculate_image_size(extent, format);
   _format = format;
-  _mip_level = 1;
+  _mip_levels_number = 1;
   _aspect_flags = vk::ImageAspectFlagBits::eColor;
   _layout = vk::ImageLayout::eUndefined;
   _image_view = view;
@@ -349,7 +374,7 @@ mr::DepthImage::DepthImage(const VulkanState &state, Extent extent, uint mip_lev
       state,
       extent,
       get_depthbuffer_format(state),
-      vk::ImageUsageFlagBits::eDepthStencilAttachment,
+      vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled,
       vk::ImageAspectFlagBits::eDepth,
       mip_level
     )
@@ -393,6 +418,34 @@ vk::RenderingAttachmentInfoKHR mr::ColorAttachmentImage::attachment_info() const
 }
 
 // ---- StorageImage ----
-mr::StorageImage::StorageImage(const VulkanState &state, Extent extent, vk::Format format, uint mip_level)
-  : DeviceImage(state, extent, format, vk::ImageUsageFlagBits::eStorage, vk::ImageAspectFlagBits::eColor, mip_level)
-{}
+mr::StorageImage::StorageImage(const VulkanState &state, Extent extent, vk::Format format,
+                               uint mip_level, bool create_view)
+  : DeviceImage(state, extent, format, vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled,
+                vk::ImageAspectFlagBits::eColor, mip_level, create_view)
+{
+  // switch_layout()
+}
+
+// ---- Depth pyramid image ----
+mr::PyramidImage::PyramidImage(const VulkanState &state, Extent extent, vk::Format format, uint32_t mip_levels_number)
+  : StorageImage(state, extent, format, mip_levels_number, true)
+{
+  _mip_image_views.reserve(_mip_levels_number);
+  for (uint32_t level = 0; level < _mip_levels_number; level++) {
+    _mip_image_views.emplace_back(create_image_view(level, 1));
+  }
+}
+
+// TODO(dk6): rename to 'level`
+vk::ImageView mr::PyramidImage::get_level(uint32_t level) const noexcept
+{
+  ASSERT(level <= _mip_levels_number, "invalid mip level");
+  return _mip_image_views[level];
+}
+
+mr::PyramidImage::~PyramidImage() {
+  for (auto mip_image_view : _mip_image_views) {
+    _state->device().destroyImageView(mip_image_view);
+  }
+  _mip_image_views.clear();
+}

@@ -18,13 +18,19 @@ mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent,
   : _state(std::make_shared<VulkanState>(global_state))
   , _render_options(options)
   , _models_command_unit(*_state)
+  , _late_models_command_unit(*_state)
   , _lights_command_unit(*_state)
   , _pre_model_layout_transition_semaphore(_state->device().createSemaphoreUnique({}).value)
   , _pre_model_layout_transition_command_unit(*_state)
+  , _pre_model_layout_transition_command_unit_late(*_state)
+  , _pre_model_layout_transition_semaphore_late(_state->device().createSemaphoreUnique({}).value)
   , _pre_light_layout_transition_semaphore(_state->device().createSemaphoreUnique({}).value)
   , _pre_light_layout_transition_command_unit(*_state)
   , _culling_command_unit(*_state)
+  , _late_culling_command_unit(*_state)
   , _culling_semaphore(_state->device().createSemaphoreUnique({}).value)
+  , _late_culling_semaphore(_state->device().createSemaphoreUnique({}).value)
+  , _visible_models_rendering_semaphore(_state->device().createSemaphoreUnique({}).value)
   , _extent(extent)
   , _depthbuffer(*_state, _extent)
   , _image_fence (_state->device().createFenceUnique({.flags = vk::FenceCreateFlagBits::eSignaled}).value)
@@ -33,7 +39,16 @@ mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent,
   , _positions_vertex_buffer(*_state, default_vertex_number * position_bytes_size)
   , _attributes_vertex_buffer(*_state, default_vertex_number * attributes_bytes_size)
   , _index_buffer(*_state, default_index_number * sizeof(uint32_t), sizeof(uint32_t))
+  , _depth_pyramid_extent(extent.width / 2, extent.height / 2)
+  , _depth_pyramid(*_state, _depth_pyramid_extent, vk::Format::eR32Sfloat,
+                   calculate_mips_levels_number(_depth_pyramid_extent))
 {
+  if (is_render_option_enabled(_render_options, RenderOptions::DisableCulling) &&
+      not is_render_option_enabled(_render_options, RenderOptions::DisableOcclusionCulling)) {
+    _render_options |= RenderOptions::DisableOcclusionCulling;
+    MR_WARNING("Disabling frustum culling also disable occlusion culling");
+  }
+
   for (auto _ : std::views::iota(0, gbuffers_number)) {
     _gbuffers.emplace_back(*_state, _extent, vk::Format::eR32G32B32A32Sfloat);
   }
@@ -74,9 +89,9 @@ void mr::RenderContext::init_lights_render_data() {
   _lights_render_data.lights_descriptor_set = std::move(light_set.value());
 
   // Set 0 is shared for all lights type
-  std::array<Shader::ResourceView, gbuffers_number> shader_resources;
+  std::array<ShaderResourceView, gbuffers_number> shader_resources;
   for (int i = 0; i < gbuffers_number; i++) {
-    shader_resources[i] = Shader::ResourceView(i, &_gbuffers[i]);
+    shader_resources[i] = ShaderResourceView(i, &_gbuffers[i]);
   }
 
   _lights_render_data.lights_descriptor_set.update(*_state, std::span(shader_resources.data(), gbuffers_number));
@@ -108,9 +123,10 @@ void mr::RenderContext::init_bindless_rendering()
 {
   using BindingT = DescriptorSetLayout::BindingDescription;
   std::array bindings {
-    BindingT {0, vk::DescriptorType::eCombinedImageSampler},
-    BindingT {1, vk::DescriptorType::eUniformBuffer},
-    BindingT {2, vk::DescriptorType::eStorageBuffer},
+    BindingT {textures_binding, vk::DescriptorType::eCombinedImageSampler},
+    BindingT {uniform_buffer_binding, vk::DescriptorType::eUniformBuffer},
+    BindingT {storage_buffer_binding, vk::DescriptorType::eStorageBuffer},
+    BindingT {storage_images_binding, vk::DescriptorType::eStorageImage},
   };
 
   _bindless_set_layout = ResourceManager<BindlessDescriptorSetLayout>::get().create("BindlessSetLayout",
@@ -149,10 +165,16 @@ void mr::RenderContext::init_profiling()
 
 void mr::RenderContext::init_culling()
 {
+  // ---------------------------
+  // Frustum culling
+  // ---------------------------
+
   boost::unordered_map<std::string, std::string> defines {
+    // TODO(dk6): rename to sampled_images
     {"TEXTURES_BINDING",        std::to_string(textures_binding)},
     {"UNIFORM_BUFFERS_BINDING", std::to_string(uniform_buffer_binding)},
     {"STORAGE_BUFFERS_BINDING", std::to_string(storage_buffer_binding)},
+    {"STORAGE_IMAGES_BINDING", std::to_string(storage_images_binding)},
     {"BINDLESS_SET", std::to_string(bindless_set_number)},
     {"THREADS_NUM", std::to_string(culling_work_group_size)},
   };
@@ -171,6 +193,69 @@ void mr::RenderContext::init_culling()
   _instances_collect_shader = ResourceManager<Shader>::get().create("InstancesCollectShader",
     *_state, "culling/instances_collect", defines);
   _instances_collect_pipeline = ComputePipeline(*_state, _instances_collect_shader, set_layouts);
+
+  // ---------------------------
+  // Depth pyramid
+  // ---------------------------
+
+  _depth_pyramid_shader = ResourceManager<Shader>::get().create("DepthPyramidBuild",
+    *_state, "culling/depth_pyramid_build", defines);
+  _depth_pyramid_pipeline = ComputePipeline(*_state, _depth_pyramid_shader, set_layouts);
+
+  _depth_sampler = Sampler(*_state, vk::Filter::eLinear, vk::SamplerMipmapMode::eNearest,
+                                    vk::SamplerAddressMode::eClampToEdge, vk::SamplerReductionMode::eMax,
+                                   _depth_pyramid.mip_levels_number());
+
+  // This resource don't unregister in destructor becase bindless set die with them
+  _depthbuffer_resource = ShaderImageResource {
+    .image = &_depthbuffer,
+    .sampler = &_depth_sampler,
+    .layout = vk::ImageLayout::eShaderReadOnlyOptimal,
+  };
+  _depth_image_attacment_id = _bindless_set.register_resource(&_depthbuffer_resource);
+
+  for (uint32_t mip = 0; mip < _depth_pyramid.mip_levels_number(); mip++) {
+    DepthPyramidMip &pyramid_mip = _depth_pyramid_mips.emplace_back();
+
+    pyramid_mip.sampled_image_resource = ShaderPyramidImageLevelResource {
+      .image = &_depth_pyramid,
+      .mip_level = mip,
+      .sampler = &_depth_sampler,
+      .layout = vk::ImageLayout::eShaderReadOnlyOptimal
+    };
+    pyramid_mip.descriptor_sampled_image_id = _bindless_set.register_resource(&pyramid_mip.sampled_image_resource);
+
+    pyramid_mip.storage_image_resource = ShaderPyramidImageLevelResource {
+      .image = &_depth_pyramid,
+      .mip_level = mip,
+      .sampler = nullptr,
+      .layout = vk::ImageLayout::eGeneral,
+    };
+    pyramid_mip.descriptor_storage_image_id = _bindless_set.register_resource(&pyramid_mip.storage_image_resource);
+  }
+
+  // ---------------------------
+  // Occlusion culling
+  // ---------------------------
+
+  _depth_pyramid_resource = ShaderImageResource {
+    .image = &_depth_pyramid,
+    .sampler = &_depth_sampler,
+    .layout = vk::ImageLayout::eShaderReadOnlyOptimal,
+  };
+  _depth_pyramid_image_id = _bindless_set.register_resource(&_depth_pyramid_resource);
+
+  _depth_pyramid_mips_scale_coefs_buffer = StorageBuffer(*_state, sizeof(float) * depth_pyramid_max_levels * 2);
+  _depth_pyramid_mips_scale_coefs_buffer_id = _bindless_set.register_resource(&_depth_pyramid_mips_scale_coefs_buffer);
+
+  // ---------------------------
+  // Late culling
+  // ---------------------------
+
+  defines["MAX_DEPTH_PYRAMID_LEVELS"] = std::to_string(depth_pyramid_max_levels);
+  _late_instances_culling_shader = ResourceManager<Shader>::get().create("LateInstancesCullingShader",
+    *_state, "culling/late_instances_culling", defines);
+  _late_instances_culling_pipeline = ComputePipeline(*_state, _late_instances_culling_shader, set_layouts);
 }
 
 void mr::RenderContext::init_bound_box_rendering()
@@ -377,26 +462,26 @@ void mr::RenderContext::render_lights(const SceneHandle scene, Presenter &presen
   _lights_command_unit.end();
 }
 
-void mr::RenderContext::render_models(const SceneHandle scene)
+void mr::RenderContext::render_models(const SceneHandle scene, CommandUnit &cmd_unit)
 {
-  _models_command_unit->writeTimestamp(vk::PipelineStageFlagBits::eDrawIndirect,
+  cmd_unit->writeTimestamp(vk::PipelineStageFlagBits::eDrawIndirect,
                                        _timestamps_query_pool.get(),
                                        enum_cast(Timestamp::ModelsStart));
 
-  std::array vertex_buffers {
+  std::array<vk::Buffer, 2> vertex_buffers {
     _positions_vertex_buffer.buffer(),
     _attributes_vertex_buffer.buffer(),
   };
   std::array<vk::DeviceSize, vertex_buffers.size()> vertex_buffers_offsets {0, 0};
-  _models_command_unit->bindVertexBuffers(0, vertex_buffers, vertex_buffers_offsets);
+  cmd_unit->bindVertexBuffers(0, vertex_buffers, vertex_buffers_offsets);
 
-  _models_command_unit->bindIndexBuffer(_index_buffer.buffer(), 0, vk::IndexType::eUint32);
+  cmd_unit->bindIndexBuffer(_index_buffer.buffer(), 0, vk::IndexType::eUint32);
 
   for (auto &[pipeline, draw] : scene->_draws) {
-    _models_command_unit->bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline->pipeline());
+    cmd_unit->bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline->pipeline());
 
     std::array sets {_bindless_set.set()};
-    _models_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+    cmd_unit->bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
                                              {pipeline->layout()},
                                              bindless_set_number,
                                              sets,
@@ -407,18 +492,18 @@ void mr::RenderContext::render_models(const SceneHandle scene)
       scene->camera_buffer_id(),
     };
 
-    _models_command_unit->pushConstants(pipeline->layout(), vk::ShaderStageFlagBits::eAllGraphics,
+    cmd_unit->pushConstants(pipeline->layout(), vk::ShaderStageFlagBits::eAllGraphics,
                                         0, sizeof(model_push_constant), model_push_constant);
 
     uint32_t stride = sizeof(vk::DrawIndexedIndirectCommand);
     uint32_t max_draws_count = static_cast<uint32_t>(draw.meshes_data_buffer_data.size());
-    _models_command_unit->drawIndexedIndirectCount(draw.draw_commands_buffer.buffer(), 0,
+    cmd_unit->drawIndexedIndirectCount(draw.draw_commands_buffer.buffer(), 0,
                                                    scene->_counters_buffer.buffer(),
                                                    draw.draw_counter_index * sizeof(uint32_t),
                                                    max_draws_count, stride);
   }
 
-  _models_command_unit->writeTimestamp(vk::PipelineStageFlagBits::eBottomOfPipe,
+  cmd_unit->writeTimestamp(vk::PipelineStageFlagBits::eBottomOfPipe,
                                        _timestamps_query_pool.get(),
                                        enum_cast(Timestamp::ModelsEnd));
 }
@@ -474,7 +559,7 @@ void mr::RenderContext::culling_geometry(const SceneHandle scene)
     _culling_command_unit->pushConstants(_instances_culling_pipeline.layout(), vk::ShaderStageFlagBits::eCompute,
                                         0, sizeof(culling_push_contants), culling_push_contants);
 
-    _culling_command_unit->dispatch((instances_number + culling_work_group_size - 1) / culling_work_group_size, 1, 1);
+    _culling_command_unit->dispatch(calculate_work_groups_number(instances_number, culling_work_group_size), 1, 1);
   }
 
   vk::BufferMemoryBarrier instances_count_culling_barrier {
@@ -516,7 +601,7 @@ void mr::RenderContext::culling_geometry(const SceneHandle scene)
     _culling_command_unit->pushConstants(_instances_collect_pipeline.layout(), vk::ShaderStageFlagBits::eCompute,
                                         0, sizeof(culling_push_contants), culling_push_contants);
 
-    _culling_command_unit->dispatch((max_draws_count + culling_work_group_size - 1) / culling_work_group_size, 1, 1);
+    _culling_command_unit->dispatch(calculate_work_groups_number(max_draws_count, culling_work_group_size), 1, 1);
   }
 
   _culling_command_unit->writeTimestamp(vk::PipelineStageFlagBits::eComputeShader,
@@ -532,6 +617,133 @@ void mr::RenderContext::culling_geometry(const SceneHandle scene)
   vk::SubmitInfo culling_submit_info = _culling_command_unit.submit_info();
   _state->queue().submit(culling_submit_info);
 }
+
+void mr::RenderContext::late_culling_geometry(const SceneHandle scene)
+{
+  _late_culling_command_unit.begin();
+
+  _depth_pyramid_mips_scale_coefs_buffer.write(
+    _late_culling_command_unit, std::span(_depth_pyramid_mips_scale_coefs_buffer_data));
+
+  // TODO(dk6): add barrier for _depth_pyramid_mips_scale_coefs_buffer
+
+  build_depth_pyramid();
+
+  _late_culling_command_unit->resetQueryPool(_timestamps_query_pool.get(), enum_cast(Timestamp::LateCullingStart), 2);
+
+  _late_culling_command_unit->writeTimestamp(vk::PipelineStageFlagBits::eTopOfPipe,
+                                       _timestamps_query_pool.get(),
+                                       enum_cast(Timestamp::LateCullingStart));
+
+  // ===== Fill all counters by zeroes =====
+  _late_culling_command_unit->fillBuffer(scene->_counters_buffer.buffer(), 0, scene->_counters_buffer.byte_size(), 0);
+  vk::BufferMemoryBarrier set_count_to_zero_barrier {
+    .srcAccessMask = vk::AccessFlagBits::eTransferWrite,
+    .dstAccessMask = vk::AccessFlagBits::eShaderRead,
+    .buffer = scene->_counters_buffer.buffer(),
+    .offset = 0,
+    .size = scene->_counters_buffer.byte_size(),
+  };
+  _late_culling_command_unit->pipelineBarrier(
+    vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eComputeShader, {},
+    {}, {set_count_to_zero_barrier}, {});
+
+  std::array culling_descriptor_sets {_bindless_set.set()};
+
+  // ===== Setup and call culling instances shader =====
+  if (not is_render_option_enabled(_render_options, RenderOptions::DisableCulling)) {
+    _late_culling_command_unit->bindPipeline(vk::PipelineBindPoint::eCompute, _late_instances_culling_pipeline.pipeline());
+
+    _late_culling_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eCompute,
+                                             {_late_instances_culling_pipeline.layout()},
+                                             bindless_set_number,
+                                             culling_descriptor_sets,
+                                             {});
+    // TODO(dk6): Maybe rework to run compute shaders once per frame
+    for (auto &[pipeline, draw] : scene->_draws) {
+      uint32_t instances_number = static_cast<uint32_t>(draw.instances_data_buffer_data.size());
+      uint32_t culling_push_contants[] {
+        draw.meshes_data_buffer_id,
+        draw.instances_data_buffer_id,
+        instances_number,
+
+        scene->_counters_buffer_id,
+
+        scene->_transforms_buffer_id,
+
+        scene->camera_buffer_id(),
+        scene->_bound_boxes_buffer_id,
+
+        _depth_pyramid.mip_levels_number(),
+        _depth_pyramid_extent.width,
+        _depth_pyramid_extent.height,
+
+        _depth_pyramid_image_id,
+        _depth_pyramid_mips_scale_coefs_buffer_id,
+      };
+      _late_culling_command_unit->pushConstants(_late_instances_culling_pipeline.layout(), vk::ShaderStageFlagBits::eCompute,
+                                                0, sizeof(culling_push_contants), culling_push_contants);
+
+      _late_culling_command_unit->dispatch(calculate_work_groups_number(instances_number, culling_work_group_size), 1, 1);
+    }
+  }
+
+  vk::BufferMemoryBarrier instances_count_culling_barrier {
+    .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
+    // Write are also exists on next shader...
+    // Maybe it is correct to have different buffers for instances counters and draws counters
+    // But now it works anyway)
+    .dstAccessMask = vk::AccessFlagBits::eShaderRead,
+    .buffer = scene->_counters_buffer.buffer(),
+    .offset = 0,
+    .size = scene->_counters_buffer.byte_size(),
+  };
+
+  _late_culling_command_unit->pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
+                                        vk::PipelineStageFlagBits::eComputeShader,
+                                        {}, {}, {instances_count_culling_barrier}, {});
+
+  // ===== Setup and call instances collect shader =====
+  _late_culling_command_unit->bindPipeline(vk::PipelineBindPoint::eCompute, _instances_collect_pipeline.pipeline());
+
+  _late_culling_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eCompute,
+                                           {_instances_collect_pipeline.layout()},
+                                           bindless_set_number,
+                                           culling_descriptor_sets,
+                                           {});
+
+  for (auto &[pipeline, draw] : scene->_draws) {
+    uint32_t max_draws_count = static_cast<uint32_t>(draw.meshes_data_buffer_data.size());
+    uint32_t culling_push_contants[] {
+      max_draws_count,
+      draw.meshes_data_buffer_id,
+      draw.draw_commands_buffer_id,
+      draw.meshes_render_info_id,
+
+      scene->_counters_buffer_id,
+      draw.draw_counter_index,
+    };
+
+    _late_culling_command_unit->pushConstants(_instances_collect_pipeline.layout(), vk::ShaderStageFlagBits::eCompute,
+                                        0, sizeof(culling_push_contants), culling_push_contants);
+
+    _late_culling_command_unit->dispatch(calculate_work_groups_number(max_draws_count, culling_work_group_size), 1, 1);
+  }
+
+  _late_culling_command_unit->writeTimestamp(vk::PipelineStageFlagBits::eComputeShader,
+                                       _timestamps_query_pool.get(),
+                                       enum_cast(Timestamp::LateCullingEnd));
+
+  _late_culling_command_unit.end();
+
+  _late_culling_command_unit.add_wait_semaphore(_visible_models_rendering_semaphore.get(),
+                                           vk::PipelineStageFlagBits::eComputeShader);
+  _late_culling_command_unit.add_signal_semaphore(_late_culling_semaphore.get());
+
+  vk::SubmitInfo culling_submit_info = _late_culling_command_unit.submit_info();
+  _state->queue().submit(culling_submit_info);
+}
+
 
 void mr::RenderContext::update_bound_boxes_data()
 {
@@ -577,6 +789,7 @@ void mr::RenderContext::render_bound_boxes(const SceneHandle scene)
   uint32_t bound_boxes_push_contants[] {
     scene->camera_buffer_id(),
     _bound_boxes_buffer_id,
+    (uint32_t)scene->_draw_bound_rects,
   };
   _models_command_unit->pushConstants(_bound_boxes_draw_pipeline.layout(),
                                       vk::ShaderStageFlagBits::eAllGraphics,
@@ -585,43 +798,53 @@ void mr::RenderContext::render_bound_boxes(const SceneHandle scene)
   _models_command_unit->draw(1, bound_boxes_number, 0, 0);
 }
 
-void mr::RenderContext::render_geometry(const SceneHandle scene)
+void mr::RenderContext::render_geometry(const SceneHandle scene, bool is_late_pass)
 {
   ZoneScoped;
 
-  culling_geometry(scene);
+  CommandUnit &cmd_unit = is_late_pass ? _late_models_command_unit : _models_command_unit;
+  CommandUnit &trans_cmd_unit = is_late_pass ? _pre_model_layout_transition_command_unit_late
+                                             : _pre_model_layout_transition_command_unit;
 
-  _models_command_unit.begin();
+  cmd_unit.begin();
 
   TRACY_VK_ZONE_BEGIN() {
-    TracyVkZone(_models_tracy_gpu_context, _models_command_unit.command_buffer(), "Models pass GPU");
+    TracyVkZone(_models_tracy_gpu_context, cmd_unit.command_buffer(), "Models pass GPU");
 
-    _pre_model_layout_transition_command_unit.begin();
-    for (auto &gbuf : _gbuffers) {
-      gbuf.switch_layout(_pre_model_layout_transition_command_unit, vk::ImageLayout::eColorAttachmentOptimal);
+    trans_cmd_unit.begin();
+    if (not is_late_pass) {
+      for (auto &gbuf : _gbuffers) {
+        gbuf.switch_layout(trans_cmd_unit, vk::ImageLayout::eColorAttachmentOptimal);
+      }
     }
-    _depthbuffer.switch_layout(_pre_model_layout_transition_command_unit, vk::ImageLayout::eDepthStencilAttachmentOptimal);
+    _depthbuffer.switch_layout(trans_cmd_unit, vk::ImageLayout::eDepthStencilAttachmentOptimal);
 
-    update_bound_boxes_data();
+    // TODO(dk6): Maybe made another funciton for it
+    if (not is_late_pass) {
+      update_bound_boxes_data();
+    }
 
-    _pre_model_layout_transition_command_unit.end();
-    _pre_model_layout_transition_command_unit.add_signal_semaphore(
-        _pre_model_layout_transition_semaphore.get());
+    auto trans_sem = is_late_pass ? _pre_model_layout_transition_semaphore_late.get()
+                                  : _pre_model_layout_transition_semaphore.get();
+    trans_cmd_unit.end();
+    trans_cmd_unit.add_signal_semaphore(trans_sem);
 
-    _models_command_unit.add_wait_semaphore(
-      _pre_model_layout_transition_semaphore.get(),
-      vk::PipelineStageFlagBits::eVertexShader
-    );
+    cmd_unit.add_wait_semaphore(trans_sem, vk::PipelineStageFlagBits::eVertexShader);
 
-    _models_command_unit.add_wait_semaphore(
-      _culling_semaphore.get(),
-      vk::PipelineStageFlagBits::eVertexShader
-    );
+    auto culling_sem = is_late_pass ? _late_culling_semaphore.get() : _culling_semaphore.get();
+    cmd_unit.add_wait_semaphore(culling_sem, vk::PipelineStageFlagBits::eVertexShader);
 
     auto gbufs_attachs = _gbuffers | std::views::transform([](const ColorAttachmentImage &gbuf) {
       return gbuf.attachment_info();
     }) | std::ranges::to<InplaceVector<vk::RenderingAttachmentInfoKHR, gbuffers_number>>();
     auto depth_attachment_info = _depthbuffer.attachment_info();
+
+    if (is_late_pass) {
+      for (auto &attach : gbufs_attachs) {
+        attach.loadOp = vk::AttachmentLoadOp::eLoad;
+      }
+      depth_attachment_info.loadOp = vk::AttachmentLoadOp::eLoad;
+    }
 
     vk::RenderingInfoKHR attachment_info {
       .renderArea = { 0, 0, _extent.width, _extent.height },
@@ -632,9 +855,9 @@ void mr::RenderContext::render_geometry(const SceneHandle scene)
       // .pStencilAttachment = &depth_attachment_info,
     };
 
-    _models_command_unit->resetQueryPool(_timestamps_query_pool.get(), enum_cast(Timestamp::ModelsStart), 2);
+    cmd_unit->resetQueryPool(_timestamps_query_pool.get(), enum_cast(Timestamp::ModelsStart), 2);
 
-    _models_command_unit->beginRendering(&attachment_info);
+    cmd_unit->beginRendering(&attachment_info);
 
     vk::Viewport viewport {
       .x = 0, .y = 0,
@@ -642,7 +865,7 @@ void mr::RenderContext::render_geometry(const SceneHandle scene)
       .height = static_cast<float>(_extent.height),
       .minDepth = 0, .maxDepth = 1,
     };
-    _models_command_unit->setViewport(0, viewport);
+    cmd_unit->setViewport(0, viewport);
 
     vk::Rect2D scissors {
       .offset = {0, 0},
@@ -651,22 +874,117 @@ void mr::RenderContext::render_geometry(const SceneHandle scene)
         static_cast<uint32_t>(_extent.height),
       },
     };
-    _models_command_unit->setScissor(0, scissors);
+    cmd_unit->setScissor(0, scissors);
 
-    render_bound_boxes(scene);
+    if (not is_late_pass) {
+      render_bound_boxes(scene);
+    }
 
-    render_models(scene);
+    render_models(scene, cmd_unit);
 
-    _models_command_unit->endRendering();
+    cmd_unit->endRendering();
   }
 
-  TracyVkCollect(_models_tracy_gpu_context, _models_command_unit.command_buffer());
-  _models_command_unit.end();
+  TracyVkCollect(_models_tracy_gpu_context, cmd_unit.command_buffer());
+
+  auto finish_semaphore =
+    is_render_option_enabled(_render_options, RenderOptions::DisableOcclusionCulling) || is_late_pass
+      ? _models_render_finished_semaphore.get()
+      : _visible_models_rendering_semaphore.get();
+  cmd_unit.add_signal_semaphore(finish_semaphore);
+
+  cmd_unit.end();
+
+  vk::SubmitInfo pre_model_layout_transition_submit_info =
+    trans_cmd_unit.submit_info();
+  _state->queue().submit(pre_model_layout_transition_submit_info);
+
+  vk::SubmitInfo models_submit_info = cmd_unit.submit_info();
+  _state->queue().submit(models_submit_info);
+}
+
+void mr::RenderContext::build_depth_pyramid()
+{
+  _late_culling_command_unit->resetQueryPool(_timestamps_query_pool.get(), enum_cast(Timestamp::BuildDepthPyramidStart), 2);
+
+  _late_culling_command_unit->writeTimestamp(vk::PipelineStageFlagBits::eComputeShader,
+                                             _timestamps_query_pool.get(),
+                                             enum_cast(Timestamp::BuildDepthPyramidStart));
+
+  _depthbuffer.switch_layout(_late_culling_command_unit, vk::ImageLayout::eShaderReadOnlyOptimal);
+
+  _late_culling_command_unit->bindPipeline(vk::PipelineBindPoint::eCompute, _depth_pyramid_pipeline.pipeline());
+  _late_culling_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eCompute,
+                                           {_depth_pyramid_pipeline.layout()},
+                                           bindless_set_number,
+                                           {_bindless_set.set()},
+                                           {});
+
+  auto dst_size = _depth_pyramid_extent;
+  auto src_size = _extent;
+  auto real_src_size = _depthbuffer.extent();
+  for (uint32_t i = 0; dst_size.width > 0 && dst_size.height > 0; i++) {
+    // just for pipeline barrier
+    _depth_pyramid.switch_layout(_late_culling_command_unit, vk::ImageLayout::eGeneral, i, 1, true);
+    // TODO(dk6): added switch layout for read mip
+
+    uint32_t depth_pyramid_push_contants[] {
+      i == 0 ? _depth_image_attacment_id : _depth_pyramid_mips[i - 1].descriptor_sampled_image_id, // src image
+      _depth_pyramid_mips[i].descriptor_storage_image_id, // dst image
+      dst_size.width,
+      dst_size.height,
+
+      // TODO(dk6): use already calcaulted coef from resize
+      src_size.width,
+      src_size.height,
+
+      real_src_size.width,
+      real_src_size.height,
+    };
+
+    _late_culling_command_unit->pushConstants({_depth_pyramid_pipeline.layout()}, vk::ShaderStageFlagBits::eCompute,
+                                              0, sizeof(depth_pyramid_push_contants), depth_pyramid_push_contants);
+
+    uint32_t work_group_width = calculate_work_groups_number(dst_size.width, culling_work_group_size);
+    uint32_t work_group_height = calculate_work_groups_number(dst_size.height, culling_work_group_size);
+    _late_culling_command_unit->dispatch(work_group_width, work_group_height, 1);
+
+    dst_size.width /= 2;
+    dst_size.height /= 2;
+    src_size.width /= 2;
+    src_size.height /= 2;
+    real_src_size.width /= 2;
+    real_src_size.height /= 2;
+  }
+
+  _late_culling_command_unit->writeTimestamp(vk::PipelineStageFlagBits::eComputeShader,
+                                       _timestamps_query_pool.get(),
+                                       enum_cast(Timestamp::BuildDepthPyramidEnd));
 }
 
 void mr::RenderContext::resize(const mr::Extent &extent)
 {
   _extent = extent;
+  _depth_pyramid_extent = Extent(extent.width / 2, extent.height / 2);
+
+  // Calculate scale coefs for depth pyramid
+  std::array<float, depth_pyramid_max_levels * 2> scales;
+  std::ranges::fill(scales, 0.0f);
+
+  auto real = _depth_pyramid.extent();
+  auto ext = _depth_pyramid_extent;
+
+  uint32_t i = 0;
+  while (ext.width != 0 && ext.height != 0) {
+    _depth_pyramid_mips_scale_coefs_buffer_data[i + 0] = static_cast<float>(ext.width) / real.width;
+    _depth_pyramid_mips_scale_coefs_buffer_data[i + 1] = static_cast<float>(ext.height) / real.height;
+
+    ext.width /= 2;
+    ext.height /= 2;
+    real.width /= 2;
+    real.height /= 2;
+    i += 2;
+  }
 }
 
 void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
@@ -687,21 +1005,31 @@ void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
   // NOTE: Camera UBO is already updated and this resize will only affect next frame
   scene->_camera.cam().projection().resize((float)_extent.width / _extent.height);
 
-  // --------------------------------------------------------------------------
-  // Model rendering pass
-  // --------------------------------------------------------------------------
+  // ------------------------------------------------
+  // Frusum culling of previously visible objects
+  // ------------------------------------------------
 
-  render_geometry(scene);
+  culling_geometry(scene);
 
-  _models_command_unit.add_signal_semaphore(_models_render_finished_semaphore.get());
+  // ------------------------------------------------
+  // Rendering of previously visible objects
+  // ------------------------------------------------
 
-  // TODO(dk6): maybe move before render_geometry?
-  vk::SubmitInfo pre_model_layout_transition_submit_info =
-    _pre_model_layout_transition_command_unit.submit_info();
-  _state->queue().submit(pre_model_layout_transition_submit_info);
+  render_geometry(scene, false);
 
-  vk::SubmitInfo models_submit_info = _models_command_unit.submit_info();
-  _state->queue().submit(models_submit_info);
+  if (not is_render_option_enabled(_render_options, RenderOptions::DisableOcclusionCulling)) {
+    // ------------------------------------------------
+    // Late frusum culling and occlusion culling
+    // ------------------------------------------------
+
+    late_culling_geometry(scene);
+
+    // ------------------------------------------------
+    // Rendering previously invisible models
+    // ------------------------------------------------
+
+    render_geometry(scene, true);
+  }
 
   // --------------------------------------------------------------------------
   // Lights shading pass
@@ -781,6 +1109,11 @@ void mr::RenderContext::calculate_stat(SceneHandle scene,
                                       timestamps[enum_cast(Timestamp::CullingStart)].first) * _timestamp_to_ms;
   _render_stat.models_gpu_time_ms = (timestamps[enum_cast(Timestamp::ModelsEnd)].first -
                                      timestamps[enum_cast(Timestamp::ModelsStart)].first) * _timestamp_to_ms;
+  _render_stat.build_depth_pyramid_gpu_time_ms =
+    (timestamps[enum_cast(Timestamp::BuildDepthPyramidEnd)].first -
+     timestamps[enum_cast(Timestamp::BuildDepthPyramidStart)].first) * _timestamp_to_ms;
+  _render_stat.late_culling_gpu_time_ms = (timestamps[enum_cast(Timestamp::LateCullingEnd)].first -
+                                           timestamps[enum_cast(Timestamp::LateCullingStart)].first) * _timestamp_to_ms;
   _render_stat.shading_gpu_time_ms = (timestamps[enum_cast(Timestamp::ShadingEnd)].first -
                                       timestamps[enum_cast(Timestamp::ShadingStart)].first) * _timestamp_to_ms;
 
@@ -809,6 +1142,8 @@ void mr::RenderStat::write_to_json(std::ostream &out) const noexcept
   std::println(out, "  \"gpu_time_ms\": {:.2f},", gpu_time_ms);
   std::println(out, "  \"cpu_rendering_time_ms\": {:.2f},", render_cpu_time_ms);
   std::println(out, "  \"culling_gpu_time_ms\": {:.3f},", culling_gpu_time_ms);
+  std::println(out, "  \"build_depth_pyramid_gpu_time_ms\": {:.3f},", build_depth_pyramid_gpu_time_ms);
+  std::println(out, "  \"late_culling_gpu_time_ms\": {:.3f},", late_culling_gpu_time_ms);
   std::println(out, "  \"gpu_rendering_time_ms\": {:.2f},", render_gpu_time_ms);
   std::println(out, "  \"gpu_models_time_ms\": {:.2f},", models_gpu_time_ms);
   std::println(out, "  \"gpu_shading_time_ms\": {:.2f},", shading_gpu_time_ms);
