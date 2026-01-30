@@ -19,6 +19,11 @@ inline namespace graphics {
 
     uint32_t _uniform_buffer_id = -1;
 
+    bool _is_shadow_enabled = true;
+    DepthImage _shadow_map;
+    uint32_t _shadow_map_id;
+    Matr4f _shadow_matr = Matr4f::identity();
+
   public:
     DirectionalLight(Scene &scene,
                      const Norm3f &direction = Norm3f(1, 1, 1), const Vec3f &color = Vec3f(1.0));
@@ -31,6 +36,11 @@ inline namespace graphics {
 
     const Norm3f & direction() const noexcept { return _direction; }
     void direction(const Norm3f &dir) noexcept { _direction = dir; _updated = true; }
+
+    void prepare_shadows(CommandUnit &cmd_unit) noexcept;
+
+    void enable_shadow() noexcept { _is_shadow_enabled = true; }
+    void disable_shadow() noexcept { _is_shadow_enabled = false; }
 
   private:
     void _update_ubo() const noexcept;

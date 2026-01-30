@@ -10,13 +10,12 @@ layout(push_constant) uniform PushContants {
   uint mesh_culling_data_buffer_id;
   uint instances_culling_data_buffer_id;
   uint instances_number;
-
   uint counters_buffer_id;
-
   uint transforms_in_buffer_id;
 
-  uint camera_buffer_id;
-  uint bound_boxes_buffer_id;
+  // TODO(dk6): for culling in feature:
+  // uint light_buffer_id;
+  // uint bound_boxes_buffer_id;
 } buffers_data;
 
 layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer MeshInstanceCullingDatasBuffer {
@@ -39,17 +38,6 @@ layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) buffer CountersBuf
 } Counters[];
 #define intances_count(index) Counters[buffers_data.counters_buffer_id].data[index]
 
-layout(set = BINDLESS_SET, binding = UNIFORM_BUFFERS_BINDING) readonly uniform CameraBuffer {
-  mat4 vp;
-  vec4 pos;
-  float fov;
-  float gamma;
-  float speed;
-  float sens;
-  vec4 frustum_planes[6];
-} CameraBufferArray[];
-#define camera_buffer CameraBufferArray[buffers_data.camera_buffer_id]
-
 layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer TransformsIn {
   mat4 transforms[];
 } TransformsInArray[];
@@ -68,22 +56,7 @@ void main()
   }
 
   MeshInstanceCullingData instance_data = instances_datas[id];
-
-  // TODO(dk6): Put it under !DISABLE_CULLING
-  if (instance_data.visible_last_frame == 0) {
-    return; // rendering only previously visible objects
-  }
-
   MeshCullingData mesh_data = meshes_datas[instance_data.mesh_culling_data_index];
-
-#ifndef DISABLE_CULLING
-  mat4 transfrom = transpose(transforms_in[instance_data.transform_index]);
-  BoundBox bb = transform_bound_box(bound_box(mesh_data), transfrom);
-
-  if (!is_bound_box_frustum_visible(bb, camera_buffer.frustum_planes)) {
-    return;
-  }
-#endif // not det DISABLE_CULLING
 
   // After frustun culling tests we still here - object is visible
   uint instance_number = atomicAdd(intances_count(mesh_data.instance_counter_index), 1);

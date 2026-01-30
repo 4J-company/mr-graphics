@@ -111,6 +111,7 @@ mr::ModelHandle mr::Scene::create_model(std::fs::path filename) noexcept
         .instance_offset = mesh._instance_offset,
         .material_ubo_id = material->material_ubo_id(),
         .transfroms_buffer_id = model_mesh.transforms_buffer_id,
+        // transforms buffer size
       },
       .instance_counter_index = _current_counter_index++,
       .bound_box_index = bound_box_index,

@@ -5,6 +5,7 @@
 mr::graphics::DirectionalLight::DirectionalLight(Scene &scene, const Norm3f &direction, const Vec3f &color)
   : Light(scene, color, sizeof(ShaderUniformBuffer))
   , _direction(direction)
+  , _shadow_map(scene.render_context().vulkan_state(), {1024, 1024})
 {
   _uniform_buffer_id = scene.render_context().bindless_set().register_resource(&_uniform_buffer);
 }
@@ -45,6 +46,30 @@ void mr::graphics::DirectionalLight::shade(CommandUnit &unit) const noexcept
 
   // TODO(dk6): use instansing here
   unit->drawIndexed(index_buffer().element_count(), 1, 0, 0, 0);
+}
+
+void mr::graphics::DirectionalLight::prepare_shadows(CommandUnit &cmd_unit) noexcept
+{
+  // Now we rendering shadow map without any culling
+  // Also we must think about occlusion culling - we must save previous frame visability information for each ligth
+  // separately - ok, it is easy
+  // We must store render commands and transforms matrices in different buffers or do all sequencialy with a lot of
+  // syncranization...
+  // I think we must merge out transforms buffer in one big - it will not be easy, but without this handling a lot of
+  // small buffers will be very big trouble
+  // I read code again - paralization of computation and rendering is very difficult, i now we temporary reuse
+  // general buffers
+
+  // Algorithm:
+  // 1. Wait when previous (main for user camera or other light) rendering will be done using barriers and semaphore
+  // 2. Use simple shader to split transforms by buffer (now without culling)
+  // 3. Use depth only geometry shader for filling shadow map
+  // 4. Easy part - use shadow map in light shader
+
+  // Don't know where implement this... RenderContext? Or here? I think render context is more correct place...
+  // Now in RenderContext, but later i will refactor it
+
+  // We have light's render data... Maybe this is time to convert it in class instead data storage?
 }
 
 void mr::graphics::DirectionalLight::_update_ubo() const noexcept
