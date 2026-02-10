@@ -47,6 +47,15 @@ inline namespace graphics {
     uint64_t vertexes_number = 0;
     uint64_t triangles_number = 0;
 
+    // This field fills if EnableCullingStat option is enabled
+    uint32_t total_objects_number = 0;
+    uint32_t outside_frustum_objects_number = 0;
+    uint32_t occluded_objects_number = 0;
+    uint32_t visible_objects_number = 0; // extra information
+    uint32_t really_visible_objects_number = 0;
+    uint32_t not_occluded_in_frustum_objects = 0; // extra information
+    double occlusion_culling_accuracy = 0;
+
     void write_to_json(std::ostream &out) const noexcept;
   };
 
@@ -65,6 +74,14 @@ inline namespace graphics {
       ColorTrans = 5
     };
 
+    enum RenderBoundsState : uint32_t {
+      Disable,
+      BoundBoxes,
+      BoundRectangles,
+      // BoundSpheres // TODO
+      StatesNumber,
+    };
+
     // Bindings numbers in bindless descriptor set
     constexpr static inline uint32_t textures_binding = 0;
     constexpr static inline uint32_t uniform_buffer_binding = 1;
@@ -76,6 +93,8 @@ inline namespace graphics {
     constexpr static inline uint32_t default_index_number = default_vertex_number * 2;
 
     constexpr static inline uint32_t culling_work_group_size = 32;
+    constexpr static inline uint32_t scan_blocks_local_size_x = 256;
+    constexpr static inline uint32_t scan_block_size = scan_blocks_local_size_x * 2;
 
     // It is enough for 64k x 64k screen size
     constexpr static inline uint32_t depth_pyramid_max_levels = 16;
@@ -103,6 +122,7 @@ inline namespace graphics {
       uint32_t transforms_buffer_id;
       uint32_t transform_index;
       uint32_t bound_boxes_buffer_id; // TODO: move to push contants
+      uint32_t bound_spheres_buffer_id; // TODO: move to push contants
       uint32_t bound_box_index;
     };
 
@@ -113,13 +133,19 @@ inline namespace graphics {
       uint32_t descriptor_sampled_image_id;
     };
 
+    struct CullingStats {
+      uint32_t total_objects_number = 0;
+      uint32_t outside_frustum_objects_number = 0;
+      uint32_t occluded_objects_number = 0;
+    };
+
   private:
     std::shared_ptr<VulkanState> _state;
     Extent _extent;
     RenderOptions _render_options;
 
     vk::UniqueQueryPool _timestamps_query_pool {};
-    RenderStat _render_stat;
+    RenderStat _render_stat, _prev_render_stat;
     ClockT::time_point _prev_start_time {};
     uint64_t _prev_first_timestamp = 0;
     double _timestamp_to_ms = 0;
@@ -180,8 +206,39 @@ inline namespace graphics {
     ComputePipeline _instances_culling_pipeline;
     ShaderHandle _instances_collect_shader;
     ComputePipeline _instances_collect_pipeline;
+    ShaderHandle _instances_collect_mark_shader;
+    ComputePipeline _instances_collect_mark_pipeline;
+    ShaderHandle _instances_collect_scan_blocks_shader;
+    ComputePipeline _instances_collect_scan_blocks_pipeline;
+    ShaderHandle _instances_collect_add_offsets_shader;
+    ComputePipeline _instances_collect_add_offsets_pipeline;
     ShaderHandle _late_instances_culling_shader;
     ComputePipeline _late_instances_culling_pipeline;
+
+    // --- Collecting world coordinates and instances id ---
+    vk::UniqueSemaphore _gbuffers_data_copy_ready_semaphore;
+    CommandUnit _position_instance_copy_cmd_unit;
+    vk::UniqueFence _position_instance_copy_fence;
+    HostBuffer _position_instance_id_stage_buffer;
+    std::vector<std::byte> _position_instance_id_data;
+
+    // --- This used if EnableCullingStats option is enabled ---
+    StorageBuffer _culling_stat_buffer;
+    uint32_t _culling_stat_buffer_id = BindlessDescriptorSet::invalid_id;
+    HostBuffer _culling_stat_stage_buffer;
+
+    // --- This used if EnableCullingVisualization option is enabled ---
+    std::atomic_bool _save_culling_visualization = false;
+    std::atomic_bool _clear_culling_visualization = false;
+    ShaderHandle _copy_visibility_states_shader;
+    ComputePipeline _copy_visibility_states_pipeline;
+    ShaderHandle _copy_on_screen_shader;
+    ComputePipeline _copy_on_screen_pipeline;
+    Sampler _read_from_gbuf_sampler;
+    ShaderImageResource _read_from_gbuf_resource;
+    uint32_t _sampled_gbuffer_id;
+    ShaderHandle _clear_on_screen_state_shader;
+    ComputePipeline _clear_on_screen_state_pipeline;
 
     Extent _depth_pyramid_extent;
     PyramidImage _depth_pyramid;
@@ -203,7 +260,7 @@ inline namespace graphics {
     uint32_t _bound_boxes_buffer_id = -1;
     std::vector<BoundBoxRenderData> _bound_boxes_data;
     std::atomic_bool _bound_boxes_data_dirty = false;
-    std::atomic_bool _bound_boxes_draw_enabled = false;
+    RenderBoundsState _render_bounds_state = RenderBoundsState::Disable;
 
   public:
     RenderContext(RenderContext &&other) noexcept = default;
@@ -226,11 +283,16 @@ inline namespace graphics {
     const VulkanState & vulkan_state() const noexcept { return *_state; }
     const Extent & extent() const noexcept { return _extent; }
     const RenderStat & stat() const noexcept { return _render_stat; }
+    const RenderStat & prev_stat() const noexcept { return _prev_render_stat; }
     RenderOptions options() const noexcept { return _render_options; }
     CommandUnit & transfer_command_unit() const noexcept { return _transfer_command_unit; }
 
-    void enable_bound_boxes() noexcept { _bound_boxes_draw_enabled = true; }
-    void disable_bound_boxes() noexcept { _bound_boxes_draw_enabled = false; }
+    void render_bounds_state(RenderBoundsState state) noexcept { _render_bounds_state = state; }
+    RenderBoundsState render_bounds_state() const noexcept { return _render_bounds_state; }
+
+    // Works only if EnableCullingVisualiztion option is enabled
+    void save_visibility() noexcept { _save_culling_visualization = true; }
+    void clear_visibility() noexcept { _clear_culling_visualization = true; }
 
     IndexHeapBuffer & index_buffer() noexcept { return _index_buffer; }
     VertexBuffersArray add_vertex_buffers(CommandUnit &command_unit, std::span<const std::span<const std::byte>> vbufs_data) noexcept;
@@ -253,7 +315,10 @@ inline namespace graphics {
     const DescriptorAllocator & desciptor_allocator() const noexcept { return _default_descriptor_allocator; }
 
     void draw_bound_box(uint32_t transforms_buffer_id, uint32_t transform_index,
-                        uint32_t bound_boxes_buffer_id, uint32_t bound_box_index) noexcept;
+                        uint32_t bound_boxes_buffer_id, uint32_t bound_spheres_buffer_id,
+                        uint32_t bound_box_index) noexcept;
+
+    std::optional<Vec4f> get_position_id_pixel(uint32_t x, uint32_t y) const noexcept;
 
   private:
     void init_lights_render_data();
@@ -273,8 +338,19 @@ inline namespace graphics {
 
     void update_bound_boxes_data();
     void update_camera_buffer(UniformBuffer &uniform_buffer);
+    void run_collect_exclusive_scan(CommandUnit &command_unit,
+                                    std::span<const vk::DescriptorSet> culling_descriptor_sets,
+                                    uint32_t max_draws_count,
+                                    uint32_t draw_visibility_buffer_id,
+                                    uint32_t draw_prefix_buffer_id,
+                                    const StorageBuffer &draw_prefix_buffer,
+                                    const std::array<uint32_t, 3> &scan_aux_buffer_ids,
+                                    const std::array<StorageBuffer, 3> &scan_aux_buffers);
 
-    void calculate_stat(SceneHandle scene, ClockT::time_point render_start_time, ClockT::time_point render_finish_time);
+    void calculate_stat(SceneHandle scene,
+                        ClockT::time_point render_start_time,
+                        ClockT::time_point render_finish_time) noexcept;
+    void calculate_prev_stat(SceneHandle scene) noexcept;
 
     constexpr static inline uint32_t calculate_work_groups_number(uint32_t threads_number, uint32_t group_size)
     {

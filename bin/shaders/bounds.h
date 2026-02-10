@@ -11,6 +11,12 @@ struct BoundSphere {
   float radius;
 };
 
+// TODO(dk6): use this and store bounds together
+struct Bounds {
+  BoundSphere sphere;
+  BoundBox box;
+};
+
 // Get bound box in world-space
 BoundBox transform_bound_box(BoundBox bb, mat4 transform)
 {
@@ -31,6 +37,19 @@ BoundBox transform_bound_box(BoundBox bb, mat4 transform)
     res.min = vec4(min(res.min.xyz, corners[i]), 0);
     res.max = vec4(max(res.max.xyz, corners[i]), 0);
   }
+  return res;
+}
+
+// Get bound box in world-space
+BoundSphere transform_bound_sphere(BoundSphere bs, mat4 transform)
+{
+  BoundSphere res;
+  res.center = (transform * vec4(bs.center, 1.0)).xyz;
+  float scale_x = length(transform[0].xyz);
+  float scale_y = length(transform[1].xyz);
+  float scale_z = length(transform[2].xyz);
+  float scale_max = max(scale_x, max(scale_y, scale_z));
+  res.radius = bs.radius * scale_max;
   return res;
 }
 
@@ -59,6 +78,63 @@ vec4 get_bound_box_screen_rectangle(BoundBox bb, mat4 proj)
   }
   return res;
 }
+
+// Copied from niagara src
+// 2D Polyhedral Bounds of a Clipped, Perspective-Projected 3D Sphere. Michael Mara, Morgan McGuire. 2013
+bool get_bound_sphere_screen_rectangle2(vec3 c, float r, float znear, float P00, float P11, out vec4 aabb)
+{
+	if (c.z < r + znear) {
+		return false;
+  }
+	vec3 cr = c * r;
+	float czr2 = c.z * c.z - r * r;
+
+	float vx = sqrt(c.x * c.x + czr2);
+	float minx = (vx * c.x - cr.z) / (vx * c.z + cr.x);
+	float maxx = (vx * c.x + cr.z) / (vx * c.z - cr.x);
+
+	float vy = sqrt(c.y * c.y + czr2);
+	float miny = (vy * c.y - cr.z) / (vy * c.z + cr.y);
+	float maxy = (vy * c.y + cr.z) / (vy * c.z - cr.y);
+
+	aabb = vec4(minx * P00, miny * P11, maxx * P00, maxy * P11);
+	aabb = aabb.xwzy * vec4(0.5f, -0.5f, 0.5f, -0.5f) + vec4(0.5f); // clip space -> uv space
+
+	return true;
+}
+
+bool get_bound_sphere_screen_rectangle(vec3 c, float r, float znear, float P00, float P11, out vec4 aabb)
+{
+  float depth = -c.z; // inverse view space - in opengl we watch at negative Oz
+  // Check near plane clips with sphere
+  if (depth < r + znear) {
+    return false;
+  }
+
+  float czr2 = depth * depth - r * r;
+  if (czr2 <= 0.0) {
+    return false;  // Is this important?
+  }
+
+  float vx = sqrt(c.x * c.x + czr2);
+  float vy = sqrt(c.y * c.y + czr2);
+
+  // Calculate bounds
+  float minx = (vx * c.x - depth * r) / (vx * depth + c.x * r);
+  float maxx = (vx * c.x + depth * r) / (vx * depth - c.x * r);
+
+  float miny = (vy * c.y - depth * r) / (vy * depth + c.y * r);
+  float maxy = (vy * c.y + depth * r) / (vy * depth - c.y * r);
+
+  // Apply projection
+  aabb = vec4(minx * P00, miny * P11, maxx * P00, maxy * P11);
+
+  // Clip space [-1,1] → UV space [0,1] (with reversing Y and flipping over Ox)
+  aabb = aabb.xwzy * vec4(0.5, -0.5, 0.5, -0.5) + vec4(0.5);
+
+  return true;
+}
+
 
 bool is_bound_box_not_visible(vec4 plane, BoundBox bb)
 {

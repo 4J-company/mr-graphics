@@ -7,12 +7,14 @@ mr::graphics::Mesh::Mesh(VertexBuffersArray vbufs,
                          size_t instance_count,
                          size_t mesh_offset,
                          size_t instance_offset,
-                         const AABBf &bound_box) noexcept
+                         const AABBf &bound_box,
+                         const BoundingSphere &bound_sphere) noexcept
   : _vbufs(std::move(vbufs))
   , _ibufs(std::move(ibufs))
   , _instance_count(instance_count)
   , _mesh_offset(mesh_offset)
   , _instance_offset(instance_offset)
   , _bound_box(bound_box)
+  , _bound_sphere(bound_sphere)
 {
 }

@@ -29,10 +29,12 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 #include <variant>
 #include <vector>
 
 #include <boost/unordered_map.hpp>
+#include <boost/unordered_set.hpp>
 #include <boost/container/small_vector.hpp>
 
 #include <tbb/concurrent_unordered_map.h>
@@ -71,6 +73,8 @@ namespace mr {
 
   template <typename T, size_t N = 16>
   using SmallVector = boost::container::small_vector<T, N>;
+
+  using importer::BoundingSphere;
 } // namespace mr
 
 using namespace std::literals;
