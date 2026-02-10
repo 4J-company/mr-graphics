@@ -181,6 +181,9 @@ void mr::RenderContext::init_culling()
   if (is_render_option_enabled(_render_options, RenderOptions::DisableCulling)) {
     defines.insert({"DISABLE_CULLING", "ON"});
   }
+  if (is_render_option_enabled(_render_options, RenderOptions::EnableCullingStats)) {
+    defines.insert({"COLLECT_CULLING_STAT", "ON"});
+  }
 
   std::array set_layouts {
     _converted_bindless_set_layout,
@@ -256,6 +259,16 @@ void mr::RenderContext::init_culling()
   _late_instances_culling_shader = ResourceManager<Shader>::get().create("LateInstancesCullingShader",
     *_state, "culling/late_instances_culling", defines);
   _late_instances_culling_pipeline = ComputePipeline(*_state, _late_instances_culling_shader, set_layouts);
+
+  // ---------------------------
+  // Stats
+  // ---------------------------
+
+  if (is_render_option_enabled(_render_options, RenderOptions::EnableCullingStats)) {
+    _culling_stat_buffer = StorageBuffer(*_state, sizeof(CullingStats));
+    _culling_stat_buffer_id = _bindless_set.register_resource(&_culling_stat_buffer);
+    _culling_stat_stage_buffer = HostBuffer(*_state, sizeof(CullingStats), vk::BufferUsageFlagBits::eTransferDst);
+  }
 }
 
 void mr::RenderContext::init_bound_box_rendering()
@@ -596,10 +609,13 @@ void mr::RenderContext::culling_geometry(const SceneHandle scene)
 
       scene->_counters_buffer_id,
       draw.draw_counter_index,
+
+      // if EnableCullingStats option not enabled this number is not initializated and must not be used
+      _culling_stat_buffer_id,
     };
 
     _culling_command_unit->pushConstants(_instances_collect_pipeline.layout(), vk::ShaderStageFlagBits::eCompute,
-                                        0, sizeof(culling_push_contants), culling_push_contants);
+                                         0, sizeof(culling_push_contants), culling_push_contants);
 
     _culling_command_unit->dispatch(calculate_work_groups_number(max_draws_count, culling_work_group_size), 1, 1);
   }
@@ -648,6 +664,20 @@ void mr::RenderContext::late_culling_geometry(const SceneHandle scene)
     vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eComputeShader, {},
     {}, {set_count_to_zero_barrier}, {});
 
+  if (is_render_option_enabled(_render_options, RenderOptions::EnableCullingStats)) {
+    _late_culling_command_unit->fillBuffer(_culling_stat_buffer.buffer(), 0, _culling_stat_buffer.byte_size(), 0);
+    vk::BufferMemoryBarrier set_culling_stat_to_zero_barrier {
+      .srcAccessMask = vk::AccessFlagBits::eTransferWrite,
+      .dstAccessMask = vk::AccessFlagBits::eShaderRead,
+      .buffer = _culling_stat_buffer.buffer(),
+      .offset = 0,
+      .size = _culling_stat_buffer.byte_size(),
+    };
+    _late_culling_command_unit->pipelineBarrier(
+      vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eComputeShader, {},
+      {}, {set_culling_stat_to_zero_barrier}, {});
+  }
+
   std::array culling_descriptor_sets {_bindless_set.set()};
 
   // ===== Setup and call culling instances shader =====
@@ -680,6 +710,9 @@ void mr::RenderContext::late_culling_geometry(const SceneHandle scene)
 
         _depth_pyramid_image_id,
         _depth_pyramid_mips_scale_coefs_buffer_id,
+
+        // if EnableCullingStats option not enabled this number is not initializated and must not be used
+        _culling_stat_buffer_id,
       };
       _late_culling_command_unit->pushConstants(_late_instances_culling_pipeline.layout(), vk::ShaderStageFlagBits::eCompute,
                                                 0, sizeof(culling_push_contants), culling_push_contants);
@@ -728,6 +761,20 @@ void mr::RenderContext::late_culling_geometry(const SceneHandle scene)
                                         0, sizeof(culling_push_contants), culling_push_contants);
 
     _late_culling_command_unit->dispatch(calculate_work_groups_number(max_draws_count, culling_work_group_size), 1, 1);
+  }
+
+  if (is_render_option_enabled(_render_options, RenderOptions::EnableCullingStats)) {
+    vk::BufferMemoryBarrier options_fill_barrier {
+      .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
+      .dstAccessMask = vk::AccessFlagBits::eTransferRead,
+      .buffer = _culling_stat_buffer.buffer(),
+      .offset = 0,
+      .size = _culling_stat_buffer.byte_size(),
+    };
+    _late_culling_command_unit->pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
+                                                vk::PipelineStageFlagBits::eTransfer,
+                                                {}, {}, {options_fill_barrier}, {});
+    bufcopy(_late_culling_command_unit, BufferRegion(_culling_stat_buffer), BufferRegion(_culling_stat_stage_buffer));
   }
 
   _late_culling_command_unit->writeTimestamp(vk::PipelineStageFlagBits::eComputeShader,
@@ -1129,6 +1176,14 @@ void mr::RenderContext::calculate_stat(SceneHandle scene,
   _render_stat.triangles_number = scene->_triangles_number.load();
   _render_stat.vertexes_number = scene->_vertexes_number.load();
   _render_stat.frame_number = _frame_number++;
+
+  if (is_render_option_enabled(_render_options, RenderOptions::EnableCullingStats)) {
+    auto data = _culling_stat_stage_buffer.copy();
+    const CullingStats *stat = reinterpret_cast<const CullingStats *>(data.data());
+    _render_stat.visible_objects_number = stat->visible_objects_cnt;
+    _render_stat.occluded_objects_number = stat->occluded_objects_cnt;
+    _render_stat.total_objects_number = stat->total_objects_cnt;
+  }
 }
 
 void mr::RenderStat::write_to_json(std::ostream &out) const noexcept
@@ -1150,6 +1205,12 @@ void mr::RenderStat::write_to_json(std::ostream &out) const noexcept
   std::println(out, "  \"triangles_per_second\": {:.3f},", triangles_per_second);
   std::println(out, "  \"triangles_per_second_millions\": {:.3f},", triangles_per_second * 1e-6);
   std::println(out, "  \"triangles_number\": {},", triangles_number);
-  std::println(out, "  \"vertexes_number\": {}", vertexes_number);
+  std::println(out, "  \"vertexes_number\": {},", vertexes_number);
+
+  // These all value can be 0
+  std::println(out, "  \"visible_objects_number\": {},", visible_objects_number);
+  std::println(out, "  \"occluded_objects_number\": {},", occluded_objects_number);
+  std::println(out, "  \"total_objects_number\": {}", total_objects_number);
+
   std::println(out, "}}");
 }

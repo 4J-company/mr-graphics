@@ -47,6 +47,11 @@ inline namespace graphics {
     uint64_t vertexes_number = 0;
     uint64_t triangles_number = 0;
 
+    // This field fills if EnableCullingStat option is enabled
+    uint32_t total_objects_number = 0;
+    uint32_t visible_objects_number = 0;
+    uint32_t occluded_objects_number = 0;
+
     void write_to_json(std::ostream &out) const noexcept;
   };
 
@@ -111,6 +116,12 @@ inline namespace graphics {
       ShaderPyramidImageLevelResource sampled_image_resource;
       uint32_t descriptor_storage_image_id;
       uint32_t descriptor_sampled_image_id;
+    };
+
+    struct CullingStats {
+      uint32_t visible_objects_cnt;
+      uint32_t occluded_objects_cnt;
+      uint32_t total_objects_cnt;
     };
 
   private:
@@ -182,6 +193,11 @@ inline namespace graphics {
     ComputePipeline _instances_collect_pipeline;
     ShaderHandle _late_instances_culling_shader;
     ComputePipeline _late_instances_culling_pipeline;
+
+    // This used if EnableCullingStats optin is enabled
+    StorageBuffer _culling_stat_buffer;
+    uint32_t _culling_stat_buffer_id = BindlessDescriptorSet::invalid_id;
+    HostBuffer _culling_stat_stage_buffer;
 
     Extent _depth_pyramid_extent;
     PyramidImage _depth_pyramid;

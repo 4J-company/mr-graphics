@@ -25,6 +25,10 @@ layout(push_constant) uniform PushContants {
   uint depth_pyramid_image_id;
 
   uint depth_pyramid_mips_scales_buffer_id;
+
+#ifdef COLLECT_CULLING_STAT
+  uint culling_stat_buffer_id;
+#endif // COLLECT_CULLING_STAT
 } buffers_data;
 
 layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) buffer MeshInstanceCullingDatasBuffer {
@@ -77,6 +81,13 @@ layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer De
 
 layout(set = BINDLESS_SET, binding = TEXTURES_BINDING) uniform sampler2D SampledStorageImages[];
 #define DepthPyramid SampledStorageImages[buffers_data.depth_pyramid_image_id]
+
+#ifdef COLLECT_CULLING_STAT
+layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) buffer CullingStatsBuffer {
+  CullingStats stat;
+} CullingStatsBuffers[];
+#define culling_stat CullingStatsBuffers[buffers_data.culling_stat_buffer_id].stat
+#endif // COLLECT_CULLING_STAT
 
 void main()
 {
@@ -156,6 +167,9 @@ void main()
 
   if (!visible || was_visible) {
     // If object was visible it has been already rendered in first pass
+#ifdef COLLECT_CULLING_STAT
+    atomicAdd(culling_stat.occluded_objects_cnt, 1);
+#endif // COLLECT_CULLING_STAT
     return;
   }
 

@@ -26,4 +26,13 @@ struct MeshCullingData {
   uint bound_box_index;
 };
 
+#ifdef COLLECT_CULLING_STAT
+struct CullingStats {
+  uint visible_objects_cnt;
+  uint occluded_objects_cnt;
+  uint total_objects_cnt;
+};
+#endif // COLLECT_CULLING_STAT
+
+
 #endif // _CULLING_H__
