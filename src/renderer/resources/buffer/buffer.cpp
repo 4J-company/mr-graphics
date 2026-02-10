@@ -113,22 +113,24 @@ mr::HostBuffer & mr::HostBuffer::write(std::span<const std::byte> src)
   return *this;
 }
 
-// ----------------------------------------------------------------------------
-// Data mapper
-// ----------------------------------------------------------------------------
-
-mr::HostBuffer::MappedData & mr::HostBuffer::MappedData::operator=(MappedData &&other) noexcept
+mr::HostBuffer & mr::HostBuffer::operator=(HostBuffer &&other) noexcept
 {
-  std::swap(_buf, other._buf);
-  std::swap(_data, other._data);
+  // Call move operator= for base class
+  Buffer &me = *this;
+  Buffer &he = other;
+  me = std::move(he);
+
+  _mapped_data._buf = this;
+  _mapped_data._data = other._mapped_data._data;
+  other._mapped_data._buf = nullptr;
+  other._mapped_data._data = nullptr;
+
   return *this;
 }
 
-mr::HostBuffer::MappedData::MappedData(MappedData &&other) noexcept
-{
-  std::swap(_buf, other._buf);
-  std::swap(_data, other._data);
-}
+// ----------------------------------------------------------------------------
+// Data mapper
+// ----------------------------------------------------------------------------
 
 void * mr::HostBuffer::MappedData::map() noexcept
 {

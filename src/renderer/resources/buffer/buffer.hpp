@@ -53,6 +53,8 @@ inline namespace graphics {
   class HostBuffer : public Buffer {
   private:
     class MappedData {
+      friend class HostBuffer;
+
     private:
       HostBuffer *_buf = nullptr;
       void *_data = nullptr;
@@ -61,11 +63,7 @@ inline namespace graphics {
       MappedData(HostBuffer &buf) : _buf(&buf) {}
       ~MappedData() { if (mapped()) { unmap(); } }
 
-      MappedData & operator=(MappedData &&other) noexcept;
-      MappedData(MappedData &&other) noexcept;
-
-      MappedData & operator=(const MappedData &other) = delete;
-      MappedData(const MappedData &other) = delete;
+      MappedData() noexcept = default;
 
       void * map() noexcept;
       void unmap() noexcept;
@@ -77,10 +75,12 @@ inline namespace graphics {
 
   public:
     HostBuffer() noexcept : Buffer(), _mapped_data(*this) {}
-    HostBuffer(HostBuffer &&) noexcept = default;
-    HostBuffer &operator=(HostBuffer &&) noexcept = default;
+
+    HostBuffer(HostBuffer &&other) noexcept { *this = std::move(other); };
+    HostBuffer & operator=(HostBuffer &&other) noexcept;
+
     HostBuffer(const HostBuffer&) noexcept = delete;
-    HostBuffer& operator=(const HostBuffer&) noexcept = delete;
+    HostBuffer & operator=(const HostBuffer&) noexcept = delete;
 
     HostBuffer(
       const VulkanState &state, std::size_t size,

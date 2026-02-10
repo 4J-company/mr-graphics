@@ -265,7 +265,7 @@ void mr::RenderContext::init_culling()
   // ---------------------------
 
   if (is_render_option_enabled(_render_options, RenderOptions::EnableCullingStats)) {
-    _culling_stat_buffer = StorageBuffer(*_state, sizeof(CullingStats));
+    _culling_stat_buffer = StorageBuffer(*_state, sizeof(CullingStats), vk::BufferUsageFlagBits::eTransferSrc);
     _culling_stat_buffer_id = _bindless_set.register_resource(&_culling_stat_buffer);
     _culling_stat_stage_buffer = HostBuffer(*_state, sizeof(CullingStats), vk::BufferUsageFlagBits::eTransferDst);
   }
