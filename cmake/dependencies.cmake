@@ -17,7 +17,7 @@ find_package(Tracy REQUIRED)
 
 CPMAddPackage("gh:Cvelth/vkfw#main")
 CPMAddPackage("gh:charles-lunarg/vk-bootstrap@1.4.321")
-CPMAddPackage("gh:bemanproject/inplace_vector#b81a3c7")
+CPMAddPackage("gh:bemanproject/inplace_vector#72e9bab")
 CPMAddPackage("gh:GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator@3.3.0")
 
 if (${vkfw_ADDED})

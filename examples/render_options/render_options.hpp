@@ -18,6 +18,7 @@ inline namespace graphics {
     std::fs::path dst_dir;
     uint32_t width, height;
     std::optional<mr::math::Camera<float>> camera;
+    std::optional<mr::math::Camera<float>::Projection> projection;
     bool disable_culling;
     bool disable_occlusion_culling;
     bool enable_vsync;
@@ -27,6 +28,10 @@ inline namespace graphics {
     std::optional<uint32_t> bench_instances_number;
     bool enable_bound_boxes;
     bool print_stat;
+    bool enable_culling_stat;
+    bool enable_culling_visualization;
+    bool read_gbuf;
+    bool hash_coloring;
 
     static std::optional<CliOptions> parse(int argc, const char **argv);
 

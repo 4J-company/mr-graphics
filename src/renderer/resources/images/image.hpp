@@ -75,6 +75,7 @@ inline namespace graphics {
 
     // Copy data from to host visible buffer
     HostBuffer read_to_host_buffer(CommandUnit &command_unit) noexcept;
+    void read_to_host_buffer(CommandUnit &command_unit, HostBuffer &stage_buffer) noexcept;
 
     // TODO(dk6): implement this
     // std::vector<std::byte> read() { return read_to_buffer().read(); }

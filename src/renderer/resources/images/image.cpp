@@ -273,6 +273,16 @@ vk::Format mr::Image::find_supported_format(
 
 mr::HostBuffer mr::Image::read_to_host_buffer(CommandUnit &command_unit) noexcept
 {
+  auto stage_buffer = HostBuffer(*_state, _size, vk::BufferUsageFlagBits::eTransferDst,
+                                 vk::MemoryPropertyFlagBits::eHostCached);
+  return stage_buffer;
+}
+
+void mr::Image::read_to_host_buffer(CommandUnit &command_unit, HostBuffer &stage_buffer) noexcept
+{
+  ASSERT(stage_buffer.byte_size() == _size);
+  ASSERT(&stage_buffer.state() == _state);
+
   vk::ImageSubresourceLayers range {
     .aspectMask = _aspect_flags,
     .mipLevel = _mip_levels_number - 1,
@@ -288,12 +298,15 @@ mr::HostBuffer mr::Image::read_to_host_buffer(CommandUnit &command_unit) noexcep
     .imageExtent = _extent,
   };
 
-  auto stage_buffer = HostBuffer(*_state, _size, vk::BufferUsageFlagBits::eTransferDst);
-
   switch_layout(command_unit, vk::ImageLayout::eTransferSrcOptimal);
   command_unit->copyImageToBuffer(_image, _layout, stage_buffer.buffer(), {region});
 
-  return stage_buffer;
+  vk::MemoryBarrier barrier {
+    .srcAccessMask = vk::AccessFlagBits::eTransferWrite,
+    .dstAccessMask = vk::AccessFlagBits::eHostRead,
+  };
+  command_unit->pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eHost,
+                                {}, {barrier}, {}, {});
 }
 
 // ---- HostImage ----
@@ -402,7 +415,7 @@ vk::RenderingAttachmentInfoKHR mr::DepthImage::attachment_info() const
 // ---- ColorAttachmentImage ----
 mr::ColorAttachmentImage::ColorAttachmentImage(const VulkanState &state, Extent extent, vk::Format format, uint mip_level)
   : DeviceImage(state, extent, format,
-    vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eInputAttachment | vk::ImageUsageFlagBits::eTransferSrc,
+    vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eInputAttachment | vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eSampled,
     vk::ImageAspectFlagBits::eColor, mip_level)
 {}
 

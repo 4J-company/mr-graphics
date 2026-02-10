@@ -29,6 +29,7 @@ int main(int argc, const char **argv)
   } else {
     render_context_extent = {options.width, options.height};
   }
+  std::println("render context extent: {}x{}", render_context_extent.width, render_context_extent.height);
   render_context_extent = {options.width, options.height};
 
   mr::RenderOptions render_options = mr::RenderOptions::None;
@@ -41,33 +42,53 @@ int main(int argc, const char **argv)
   if (options.enable_vsync) {
     render_options |= mr::RenderOptions::EnableVsync;
   }
+  if (options.enable_culling_stat) {
+    render_options |= mr::RenderOptions::EnableCullingStats;
+  }
+  if (options.enable_culling_visualization) {
+    render_options |= mr::RenderOptions::EnableCullingVisualiztion;
+  }
+  if (options.read_gbuf) {
+    render_options |= mr::RenderOptions::CollectPosInstanceId;
+  }
+  if (options.hash_coloring) {
+    render_options |= mr::RenderOptions::HashColoring;
+  }
 
   auto render_context = app.create_render_context(render_context_extent, render_options);
 
   if (options.enable_bound_boxes) {
-    render_context->enable_bound_boxes();
-  } else {
-    render_context->disable_bound_boxes();
+    render_context->render_bounds_state(mr::RenderContext::RenderBoundsState::BoundBoxes);
   }
 
   auto scene = render_context->create_scene();
   scene->create_directional_light(mr::Norm3f(1, 1, -1));
-  scene->create_directional_light(mr::Norm3f(-1, 1, -1));
-  scene->create_directional_light(mr::Norm3f(-1, 1, 1));
-  scene->create_directional_light(mr::Norm3f(0.3, 1, 0.3));
-  scene->create_directional_light(mr::Norm3f(-1, -1, -1));
+  if (!options.hash_coloring) {
+    scene->create_directional_light(mr::Norm3f(-1, 1, -1));
+    scene->create_directional_light(mr::Norm3f(-1, 1, 1));
+    scene->create_directional_light(mr::Norm3f(0.3, 1, 0.3));
+    scene->create_directional_light(mr::Norm3f(-1, -1, -1));
+  }
 
   for (const auto &model_path : options.models) {
     scene->create_model(model_path);
   }
 
   if (options.camera.has_value()) {
-    scene->camera().cam() = options.camera.value();
+    scene->camera().cam().set(options.camera->position(), options.camera->direction(), options.camera->up());
+  }
+  if (options.projection.has_value()) {
+    scene->camera().cam().projection() = *options.projection;
   }
 
   if (options.mode == mr::CliOptions::Mode::Default) {
     auto window = render_context->create_window({options.width, options.height});
-    app.start_render_loop(*render_context, scene, window);
+    if (options.print_stat) {
+      std::ofstream stat_file("stats.json");
+      app.start_render_loop(*render_context, scene, window, stat_file);
+    } else {
+      app.start_render_loop(*render_context, scene, window);
+    }
   } else if (options.mode == mr::CliOptions::Mode::Frames) {
     auto file_writer = render_context->create_file_writer({options.width, options.height});
     app.render_frames(*render_context, scene, file_writer,

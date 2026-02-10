@@ -22,11 +22,20 @@ static std::optional<mr::math::Camera<float>> parse_camera(const std::string &s)
         &data[2][0], &data[2][1], &data[2][2]) != 9) {
     return std::nullopt;
   }
+
   return mr::math::Camera<float>(
     mr::Vec3f(data[0][0], data[0][1], data[0][2]),
-    mr::Vec3f(data[1][0], data[1][1], data[1][2]).normalize(),
-    mr::Vec3f(data[2][0], data[2][1], data[2][2]).normalize()
-  );
+    mr::Norm3f(data[1][0], data[1][1], data[1][2]),
+    mr::Norm3f(data[2][0], data[2][1], data[2][2]));
+}
+
+static std::optional<mr::math::Camera<float>::Projection> parse_projection(const std::string &s)
+{
+  float near, far;
+  if (sscanf(s.c_str(), "[ %f , %f ]", &near, &far) != 2) {
+    return std::nullopt;
+  }
+  return mr::math::Camera<float>::Projection(45_deg, near, far);
 }
 
 static std::optional<mr::CliOptions::Mode> parse_mode(std::string_view s)
@@ -62,7 +71,10 @@ std::optional<mr::CliOptions> mr::CliOptions::parse(int argc, const char **argv)
      "Resolution in format WIDTHxHEIGHT (default: 1920x1080)")
     ("camera",
      po::value<std::string>(),
-     "Camera parameters as ((pos_x,pos_y,pos_z), (target_x,target_y,target_z), (up_x,up_y,up_z))")
+     "Camera parameters as '((pos_x,pos_y,pos_z), (dir_x, dir_y, dir_z), (up_x,up_y,up_z))'")
+    ("proj",
+     po::value<std::string>(),
+     "Camera projection in format '[near, far]'")
     ("bench-name",
      po::value<std::string>(),
      "Name of benchmark")
@@ -93,6 +105,18 @@ std::optional<mr::CliOptions> mr::CliOptions::parse(int argc, const char **argv)
     ("models",
      po::value<std::vector<std::string>>()->multitoken(),
      "GLTF model files to render (can be specified anywhere in arguments)")
+    ("enable-culling-stat",
+     po::bool_switch()->default_value(false),
+     "Collect statistics of culling")
+    ("enable-culling-visualization",
+     po::bool_switch()->default_value(false),
+     "Stash invisible objects on '0' key")
+    ("read-gbuf",
+     po::bool_switch()->default_value(false),
+     "Read first gbuffer with positions and instance ids")
+    ("hash-coloring",
+     po::bool_switch()->default_value(false),
+     "Use hash coloring for objects")
   ;
 
   po::positional_options_description pos_desc;
@@ -139,6 +163,10 @@ std::optional<mr::CliOptions> mr::CliOptions::parse(int argc, const char **argv)
   options.enable_bound_boxes = vm["enable-bound-boxes"].as<bool>();
   options.stat_dir = vm["stat-dir"].as<std::string>();
   options.print_stat = vm["print-stat"].as<bool>();
+  options.enable_culling_stat = vm["enable-culling-stat"].as<bool>();
+  options.enable_culling_visualization = vm["enable-culling-visualization"].as<bool>();
+  options.read_gbuf = vm["read-gbuf"].as<bool>();
+  options.hash_coloring = vm["hash-coloring"].as<bool>();
 
   auto mode_str = vm["mode"].as<std::string>();
   auto mode_opt = parse_mode(mode_str);
@@ -167,6 +195,17 @@ std::optional<mr::CliOptions> mr::CliOptions::parse(int argc, const char **argv)
       return std::nullopt;
     }
     options.camera = *camera_opt;
+  }
+
+  if (vm.count("proj")) {
+    std::string proj_str = vm["proj"].as<std::string>();
+    auto proj_opt = parse_projection(proj_str);
+    if (!proj_opt) {
+      std::println(std::cerr, "Error: Invalid camera format: {}", proj_str);
+      std::println(std::cerr, "Expected format: '[near, far]'");
+      return std::nullopt;
+    }
+    options.projection = *proj_opt;
   }
 
   if (vm.count("bench-name")) {

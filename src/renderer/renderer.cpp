@@ -30,8 +30,8 @@ void mr::Application::start_render_loop(RenderContext &render_context, SceneHand
         render_context.render(scene, *window);
 
         if (stat_log_stream.has_value()) {
-          render_context.stat().write_to_json(stat_log_stream.value().get());
-          // std::println(stat_log_stream.value().get());
+          render_context.prev_stat().write_to_json(stat_log_stream.value().get());
+          // render_context.stat().write_to_json(stat_log_stream.value().get());
         }
       }
     }

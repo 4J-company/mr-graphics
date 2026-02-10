@@ -36,7 +36,18 @@ mr::Buffer::Buffer(const VulkanState &state, size_t byte_size,
   allocation_create_info.usage = VMA_MEMORY_USAGE_AUTO;
 
   if (memory_properties & vk::MemoryPropertyFlagBits::eHostVisible) {
-    allocation_create_info.flags |= VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+    // Check is buffer use for shader read or CPU read
+    bool is_readback = (usage_flags & vk::BufferUsageFlagBits::eTransferDst) &&
+                       !(usage_flags & vk::BufferUsageFlagBits::eTransferSrc);
+
+    if (is_readback) {
+      // GPU → CPU
+      allocation_create_info.flags |= VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT;
+      allocation_create_info.preferredFlags = VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
+    } else {
+      // CPU → GPU
+      allocation_create_info.flags |= VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+    }
   }
 
   auto result = vmaCreateBuffer(
@@ -113,22 +124,24 @@ mr::HostBuffer & mr::HostBuffer::write(std::span<const std::byte> src)
   return *this;
 }
 
-// ----------------------------------------------------------------------------
-// Data mapper
-// ----------------------------------------------------------------------------
-
-mr::HostBuffer::MappedData & mr::HostBuffer::MappedData::operator=(MappedData &&other) noexcept
+mr::HostBuffer & mr::HostBuffer::operator=(HostBuffer &&other) noexcept
 {
-  std::swap(_buf, other._buf);
-  std::swap(_data, other._data);
+  // Call move operator= for base class
+  Buffer &me = *this;
+  Buffer &he = other;
+  me = std::move(he);
+
+  _mapped_data._buf = this;
+  _mapped_data._data = other._mapped_data._data;
+  other._mapped_data._buf = nullptr;
+  other._mapped_data._data = nullptr;
+
   return *this;
 }
 
-mr::HostBuffer::MappedData::MappedData(MappedData &&other) noexcept
-{
-  std::swap(_buf, other._buf);
-  std::swap(_data, other._data);
-}
+// ----------------------------------------------------------------------------
+// Data mapper
+// ----------------------------------------------------------------------------
 
 void * mr::HostBuffer::MappedData::map() noexcept
 {
@@ -229,17 +242,11 @@ vk::DeviceSize mr::VectorBuffer::append_range(CommandUnit &command_unit, std::sp
   return offset;
 }
 
-void mr::VectorBuffer::resize(vk::DeviceSize new_size) noexcept
+void mr::VectorBuffer::resize(CommandUnit &command_unit, vk::DeviceSize new_size) noexcept
 {
   if (new_size > capacity()) {
-    CommandUnit command_unit {*_state};
-    command_unit.begin();
     DeviceBuffer::resize(command_unit, new_size);
-    command_unit.end();
-
-    UniqueFenceGuard(_state->device(), command_unit.submit(*_state));
   }
-
   _current_size = new_size;
 }
 
@@ -407,18 +414,18 @@ mr::HeapBuffer::HeapBuffer(const VulkanState &state,
 {
 }
 
-vk::DeviceSize mr::HeapBuffer::allocate(vk::DeviceSize size) noexcept
+vk::DeviceSize mr::HeapBuffer::allocate(CommandUnit &command_unit, vk::DeviceSize size) noexcept
 {
   auto alloc = _heap.allocate(size);
   if (alloc.resized) {
-    _buffer.resize(_heap.size());
+    _buffer.resize(command_unit, _heap.size());
   }
   return alloc.offset;
 }
 
 vk::DeviceSize mr::HeapBuffer::allocate_and_write(CommandUnit &command_unit, std::span<const std::byte> src) noexcept
 {
-  auto offset = allocate(src.size());
+  auto offset = allocate(command_unit, src.size());
   write(command_unit, src, offset);
   return offset;
 }

@@ -21,7 +21,7 @@ inline namespace graphics {
       uint32_t mesh_offset;
       uint32_t instance_offset;
       uint32_t material_ubo_id;
-      uint32_t transfroms_buffer_id;
+      uint32_t intances_render_info_buffer_id;
     };
 
   private:
@@ -34,6 +34,7 @@ inline namespace graphics {
     uint32_t _instance_offset = 0; // offset to the *per instance* data buffer in the scene
 
     AABBf _bound_box;
+    BoundingSphere _bound_sphere;
 
   public:
     Mesh() = default;
@@ -43,7 +44,8 @@ inline namespace graphics {
          size_t instance_count,
          size_t mesh_offset,
          size_t instance_offset,
-         const AABBf &bound_box) noexcept;
+         const AABBf &bound_box,
+         const BoundingSphere &bound_sphere) noexcept;
 
     // move semantics
     Mesh(Mesh &&other) noexcept { *this = std::move(other); }
@@ -56,6 +58,7 @@ inline namespace graphics {
       _mesh_offset = std::move(other._mesh_offset);
       _instance_offset = std::move(other._instance_offset);
       _bound_box = other._bound_box;
+      _bound_sphere = other._bound_sphere;
 
       return *this;
     }

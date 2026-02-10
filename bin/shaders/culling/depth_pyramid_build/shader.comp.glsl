@@ -28,7 +28,6 @@ void main()
     return;
   }
 
-  // TODO(dk6): Maybe size of depth pyramid must me pow of 2 closest to screen size
   vec2 tex_coord = (vec2(coord) + vec2(0.5)) / data.dst_size;
 
   // Real size of texture can be bigger - for simple resize we have a size of the biggest monitor
@@ -37,5 +36,6 @@ void main()
 
   // Using max sampler for texture
   float depth = texture(SrcImage, tex_coord).r;
+
   imageStore(DstImage, ivec2(coord), vec4(depth));
 }

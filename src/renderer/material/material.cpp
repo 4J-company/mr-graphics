@@ -119,7 +119,6 @@ mr::MaterialHandle mr::MaterialBuilder::build() noexcept
   const auto &state = _scene->render_context().vulkan_state();
   auto shdhandle = shdfindres ? shdfindres : shdmanager.create(shdname, state, _shader_filename, generate_shader_defines());
 
-
   return mtlmanager.create(unnamed,
     *_scene,
     shdhandle,
@@ -141,5 +140,8 @@ boost::unordered_map<std::string, std::string> mr::MaterialBuilder::generate_sha
   defines["TEXTURES_BINDING"] = std::to_string(RenderContext::textures_binding);
   defines["UNIFORM_BUFFERS_BINDING"] = std::to_string(RenderContext::uniform_buffer_binding);
   defines["STORAGE_BUFFERS_BINDING"] = std::to_string(RenderContext::storage_buffer_binding);
+  if (is_render_option_enabled(_scene->render_context().options(), RenderOptions::EnableCullingVisualiztion)) {
+    defines["ENABLE_CULLING_VISUALIZATION"] = "ON";
+  }
   return defines;
 }

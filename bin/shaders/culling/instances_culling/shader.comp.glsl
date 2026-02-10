@@ -4,6 +4,7 @@
 
 layout(local_size_x = THREADS_NUM, local_size_y = 1, local_size_z = 1) in;
 
+#include "types.h"
 #include "culling/culling.h"
 
 layout(push_constant) uniform PushContants {
@@ -19,7 +20,7 @@ layout(push_constant) uniform PushContants {
   uint bound_boxes_buffer_id;
 } buffers_data;
 
-layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer MeshInstanceCullingDatasBuffer {
+layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) buffer MeshInstanceCullingDatasBuffer {
   MeshInstanceCullingData[] data;
 } MeshInstanceCullingDatas[];
 #define instances_datas MeshInstanceCullingDatas[buffers_data.instances_culling_data_buffer_id].data
@@ -40,15 +41,9 @@ layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) buffer CountersBuf
 #define intances_count(index) Counters[buffers_data.counters_buffer_id].data[index]
 
 layout(set = BINDLESS_SET, binding = UNIFORM_BUFFERS_BINDING) readonly uniform CameraBuffer {
-  mat4 vp;
-  vec4 pos;
-  float fov;
-  float gamma;
-  float speed;
-  float sens;
-  vec4 frustum_planes[6];
+  CameraData data;
 } CameraBufferArray[];
-#define camera_buffer CameraBufferArray[buffers_data.camera_buffer_id]
+#define camera_buffer CameraBufferArray[buffers_data.camera_buffer_id].data
 
 layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer TransformsIn {
   mat4 transforms[];
@@ -56,9 +51,10 @@ layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer Tr
 #define transforms_in TransformsInArray[buffers_data.transforms_in_buffer_id].transforms
 
 layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) writeonly buffer TransformsOut {
-  mat4 transforms[];
+  InstanceDrawInfo infos[];
 } TransformsOutArray[];
-#define transforms_out(mesh_data) TransformsOutArray[mesh_data.mesh_draw_info.transforms_buffer_id].transforms
+#define out_transforms_index(mesh_data, instance_number) \
+  TransformsOutArray[mesh_data.mesh_draw_info.instance_render_info_buffer_id].infos[instance_number].transforms_index
 
 void main()
 {
@@ -68,7 +64,8 @@ void main()
   }
 
   MeshInstanceCullingData instance_data = instances_datas[id];
-  if (instance_data.visible_last_frame == 0) {
+  if (IS_INSTANCE_WAS_OCCLUDED(instance_data.visibility_bits)) {
+    instances_datas[id].visibility_bits = SET_INSTANCE_FRUSTUM_CALCULATED(instance_data.visibility_bits, false);
     return; // rendering only previously visible objects
   }
 
@@ -79,11 +76,15 @@ void main()
   BoundBox bb = transform_bound_box(bound_box(mesh_data), transfrom);
 
   if (!is_bound_box_frustum_visible(bb, camera_buffer.frustum_planes)) {
+    instances_datas[id].visibility_bits = SET_INSTANCE_IN_FRUSTUM(instance_data.visibility_bits, false) &
+                                          SET_INSTANCE_RENDERER_AT_FIRST_PASS(instance_data.visibility_bits, false);
     return;
   }
 #endif // not det DISABLE_CULLING
 
-  // After frustun culling tests we still here - object is visible
+  // After frustum culling tests we still here - object is visible
   uint instance_number = atomicAdd(intances_count(mesh_data.instance_counter_index), 1);
-  transforms_out(mesh_data)[instance_number] = transforms_in[instance_data.transform_index];
+  out_transforms_index(mesh_data, instance_number) = instance_data.transform_index;
+  instances_datas[id].visibility_bits = SET_INSTANCE_IN_FRUSTUM(instance_data.visibility_bits, true) |
+                                        SET_INSTANCE_RENDERER_AT_FIRST_PASS(instance_data.visibility_bits, true);
 }

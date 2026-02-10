@@ -53,6 +53,8 @@ inline namespace graphics {
   class HostBuffer : public Buffer {
   private:
     class MappedData {
+      friend class HostBuffer;
+
     private:
       HostBuffer *_buf = nullptr;
       void *_data = nullptr;
@@ -61,11 +63,7 @@ inline namespace graphics {
       MappedData(HostBuffer &buf) : _buf(&buf) {}
       ~MappedData() { if (mapped()) { unmap(); } }
 
-      MappedData & operator=(MappedData &&other) noexcept;
-      MappedData(MappedData &&other) noexcept;
-
-      MappedData & operator=(const MappedData &other) = delete;
-      MappedData(const MappedData &other) = delete;
+      MappedData() noexcept = default;
 
       void * map() noexcept;
       void unmap() noexcept;
@@ -77,10 +75,12 @@ inline namespace graphics {
 
   public:
     HostBuffer() noexcept : Buffer(), _mapped_data(*this) {}
-    HostBuffer(HostBuffer &&) noexcept = default;
-    HostBuffer &operator=(HostBuffer &&) noexcept = default;
+
+    HostBuffer(HostBuffer &&other) noexcept { *this = std::move(other); };
+    HostBuffer & operator=(HostBuffer &&other) noexcept;
+
     HostBuffer(const HostBuffer&) noexcept = delete;
-    HostBuffer& operator=(const HostBuffer&) noexcept = delete;
+    HostBuffer & operator=(const HostBuffer&) noexcept = delete;
 
     HostBuffer(
       const VulkanState &state, std::size_t size,
@@ -308,7 +308,7 @@ inline namespace graphics {
     vk::DeviceSize capacity() const noexcept { return DeviceBuffer::_size; }
     vk::DeviceSize size() const noexcept { return _current_size; }
 
-    void resize(vk::DeviceSize new_size) noexcept;
+    void resize(CommandUnit &command_unit, vk::DeviceSize new_size) noexcept;
 
     vk::DeviceSize append_range(CommandUnit &command_unit, std::span<const std::byte> src) noexcept;
 
@@ -456,8 +456,9 @@ inline namespace graphics {
                vk::DeviceSize start_byte_size = HeapBuffer::default_initial_byte_size,
                vk::DeviceSize alignment = HeapBuffer::default_alignment);
 
-    // return offset in buffer
-    vk::DeviceSize allocate(vk::DeviceSize size) noexcept;
+    // Returns offset in buffer
+    // CommandUnit used only for resizing buffer
+    vk::DeviceSize allocate(CommandUnit &command_unit, vk::DeviceSize size) noexcept;
     void free(vk::DeviceSize offset) noexcept;
 
     template <typename T, size_t Extent>

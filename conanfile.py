@@ -30,15 +30,15 @@ class MrGraphicsRecipe(ConanFile):
 
         self.requires("glfw/3.4")
 
-        self.requires("mr-math/1.1.5")
+        self.requires("mr-math/1.1.6")
         self.requires("mr-utils/1.1.2")
-        self.requires("mr-importer/3.1.0")
+        self.requires("mr-importer/3.4.0")
 
         self.requires("stb/cci.20240531")
 
         self.requires("onetbb/2022.2.0")
 
-        self.requires("tracy/0.12.2")
+        self.requires("tracy/0.13.1")
 
     def build_requirements(self):
         self.tool_requires("cmake/[>3.26]")

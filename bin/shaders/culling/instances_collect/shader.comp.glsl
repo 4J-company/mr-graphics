@@ -14,6 +14,8 @@ layout(push_constant) uniform PushContants {
 
   uint counters_buffer_id;
   uint draw_count_index;
+  uint draw_visibility_buffer_id;
+  uint draw_prefix_buffer_id;
 } buffers_data;
 
 layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer MeshCullingDatasBuffer {
@@ -31,6 +33,16 @@ layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) buffer CountersBuf
 } Counters[];
 #define draws_count Counters[buffers_data.counters_buffer_id].data[buffers_data.draw_count_index]
 #define instances_count(index) Counters[buffers_data.counters_buffer_id].data[index]
+
+layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer DrawVisibilityBuffer {
+  uint data[];
+} DrawVisibilityBuffers[];
+#define draw_visibility DrawVisibilityBuffers[buffers_data.draw_visibility_buffer_id].data
+
+layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer DrawPrefixBuffer {
+  uint data[];
+} DrawPrefixBuffers[];
+#define draw_prefix DrawPrefixBuffers[buffers_data.draw_prefix_buffer_id].data
 
 layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) writeonly buffer DrawInfoBuffer {
   MeshDrawInfo data[];
@@ -61,10 +73,24 @@ void main()
   }
   fill_command(id, id, meshes_data[id].command.instance_count);
 #else // DISABLE_CULLING
-  uint instance_number = instances_count(meshes_data[id].instance_counter_index);
-  if (instance_number > 0) {
-    uint draw_id = atomicAdd(draws_count, 1);
-    fill_command(draw_id, id, instance_number);
+
+  // Calculate total number of draws
+  if (id == 0u) {
+    if (buffers_data.meshes_number == 0u) {
+      draws_count = 0u;
+    } else {
+      uint last = buffers_data.meshes_number - 1u;
+      draws_count = draw_prefix[last] + draw_visibility[last];
+    }
   }
+
+  if (draw_visibility[id] == 0) {
+    return;
+  }
+
+  uint draw_id = draw_prefix[id];
+  uint instance_number = instances_count(meshes_data[id].instance_counter_index);
+  fill_command(draw_id, id, instance_number);
+
 #endif // DISABLE_CULLING
 }

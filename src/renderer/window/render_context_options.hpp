@@ -6,10 +6,14 @@
 namespace mr {
 namespace graphics {
   enum struct RenderOptions : uint32_t {
-    None           =          0,
-    DisableCulling =          (1u << 0),
-    EnableVsync    =          (1u << 1),
-    DisableOcclusionCulling = (1u << 2),
+    None           =            0,
+    DisableCulling =            (1u << 0),
+    EnableVsync    =            (1u << 1),
+    DisableOcclusionCulling =   (1u << 2),
+    EnableCullingStats      =   (1u << 3),
+    EnableCullingVisualiztion = (1u << 4),
+    CollectPosInstanceId =      (1u << 5),
+    HashColoring =              (1u << 6),
   };
 
   constexpr static inline RenderOptions operator&(RenderOptions options, RenderOptions option) noexcept

@@ -65,6 +65,8 @@ mr::Window::Window(const RenderContext &parent, Extent extent, bool enable_vsync
   _window->callbacks()->on_cursor_move = _input_state.get_mouse_callback();
   _window->callbacks()->on_key = _input_state.get_key_callback();
   _window->callbacks()->on_scroll = _input_state.get_mouse_scroll_callback();
+  _window->callbacks()->on_cursor_enter = _input_state.get_mouse_enter_callback();
+  _window->callbacks()->on_mouse_button = _input_state.get_mouse_button_callback();
   _window->callbacks()->on_window_resize = [this](const vkfw::Window&, uint32_t, uint32_t) { _should_update_swapchain = true; };
 }
 
@@ -119,6 +121,7 @@ std::optional<vk::RenderingAttachmentInfoKHR> mr::Window::target_image_info_impl
     .loadOp = vk::AttachmentLoadOp::eClear,
     .storeOp = vk::AttachmentStoreOp::eStore,
     // TODO(dk6): added bckg color as parameter
+    // .clearValue = {vk::ClearColorValue( std::array {0.3f, 0.47f, 0.8f, 0.f})},
     .clearValue = {vk::ClearColorValue( std::array {0.f, 0.f, 0.f, 0.f})},
   };
 }

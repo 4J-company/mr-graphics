@@ -2,6 +2,7 @@
 #define __MR_SCENE_HPP_
 
 #include <filesystem>
+#include <array>
 #include "lights/lights.hpp"
 #include "model/model.hpp"
 #include "manager/resource.hpp"
@@ -41,6 +42,12 @@ inline namespace graphics {
       StorageBuffer instances_data_buffer; // Data for each drawed instance
       StorageBuffer meshes_data_buffer; // Draw commands for all rendering meshes
       StorageBuffer draw_commands_buffer; // It must have same size as meshes_data_buffer
+      StorageBuffer draw_visibility_buffer; // 0/1 visibility flag per mesh draw
+      StorageBuffer draw_prefix_buffer; // exclusive prefix sum for visible draws
+      // TODO(dk6): If we will have problems with memory usage, we can share this buffers
+      // between all pipelines. But it reqires more complex logic for zeroing and synchronization and also
+      // it costs some time.
+      std::array<StorageBuffer, 3> scan_aux_buffers; // temporary scan storages
 
       uint32_t draw_counter_index; // index of draws number counter in counters buffer
 
@@ -50,6 +57,13 @@ inline namespace graphics {
       uint32_t instances_data_buffer_id = BindlessDescriptorSet::invalid_id;
       uint32_t meshes_data_buffer_id = BindlessDescriptorSet::invalid_id;
       uint32_t draw_commands_buffer_id = BindlessDescriptorSet::invalid_id;
+      uint32_t draw_visibility_buffer_id = BindlessDescriptorSet::invalid_id;
+      uint32_t draw_prefix_buffer_id = BindlessDescriptorSet::invalid_id;
+      std::array<uint32_t, 3> scan_aux_buffer_ids {
+        BindlessDescriptorSet::invalid_id,
+        BindlessDescriptorSet::invalid_id,
+        BindlessDescriptorSet::invalid_id,
+      };
 
       // It must have same elements as 'meshes_data_buffer'
       StorageBuffer meshes_render_info; // render data for each mesh
@@ -61,8 +75,6 @@ inline namespace graphics {
 
   private:
     RenderContext *_parent = nullptr;
-
-    bool _draw_bound_rects = false;
 
     // For statistic
     std::atomic_uint64_t _vertexes_number;
@@ -89,9 +101,19 @@ inline namespace graphics {
     std::vector<mr::Matr4f> _transforms_data;
     uint32_t _transforms_buffer_id = BindlessDescriptorSet::invalid_id;  // id in bindless descriptor set
 
+    // --- This used if EnableCullingVisialization option is enabled ---
+    // This buffer save all occluded geometry at stash moment
+    StorageBuffer _occluded_instances_state_buffer;
+    uint32_t _occluded_instances_state_buffer_id = BindlessDescriptorSet::invalid_id;
+
     StorageBuffer _bound_boxes;
     uint32_t _bound_boxes_buffer_id = BindlessDescriptorSet::invalid_id;
     std::vector<AABBf> _bound_boxes_data;
+
+    // Now we have bound boxes and bound spheres together - think about this
+    StorageBuffer _bound_spheres;
+    uint32_t _bound_spheres_buffer_id = BindlessDescriptorSet::invalid_id;
+    std::vector<BoundingSphere> _bound_spheres_data;
 
     ConditionalBuffer _visibility; // u32 visibility mask for each draw call
     std::vector<uint32_t> _visibility_data;
@@ -106,6 +128,8 @@ inline namespace graphics {
     mutable UniformBuffer _camera_uniform_buffer;
     mr::FPSCamera _camera;
     uint32_t _camera_buffer_id = BindlessDescriptorSet::invalid_id;  // id in bindless descriptor set
+
+    mr::FPSCamera _save_camera_on_visibility_save;
 
     bool _is_buffers_dirty = true;
 
