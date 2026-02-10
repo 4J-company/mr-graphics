@@ -152,7 +152,7 @@ inline namespace graphics {
   private:
     std::string generate_shader_defines_str() const noexcept
     {
-      boost::unordered_map<std::string, std::string> defines = generate_shader_defines();
+      auto defines = generate_shader_defines();
       std::stringstream ss;
       for (auto &[name, value] : defines) {
         ss << "-D" << name << '=' << value << ' ';

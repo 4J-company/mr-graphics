@@ -13,6 +13,8 @@ inline namespace graphics {
   class InputState {
   public:
     constexpr static uint32_t max_keys_number = std::to_underlying(vkfw::Key::eLAST);
+    constexpr static uint32_t max_mouse_buttons_number = std::to_underlying(vkfw::MouseButton::eLAST);
+
   private:
     // ----------------------
     // Keyboard
@@ -25,6 +27,16 @@ inline namespace graphics {
     std::span<bool> _writer_key_tapped {}, _reader_key_tapped {};
 
     // ----------------------
+    // Mouse buttons
+    // ----------------------
+
+    std::array<bool, max_mouse_buttons_number> _mouse_button_pressed {}, _prev_mouse_button_pressed {};
+    std::span<bool> _writer_mouse_button_pressed {}, _reader_mouse_button_pressed {};
+
+    std::array<bool, max_mouse_buttons_number> _mouse_button_tapped {}, _prev_mouse_button_tapped {};
+    std::span<bool> _writer_mouse_button_tapped {}, _reader_mouse_button_tapped {};
+
+    // ----------------------
     // Mouse
     // ----------------------
 
@@ -32,13 +44,16 @@ inline namespace graphics {
     Vec2d _prev_mouse_pos {};
     Vec2d _mouse_pos_delta {};
 
+    std::atomic_bool _mouse_in_screen;
+    std::atomic_bool _mouse_in_screen_at_last_frame;
+
     std::atomic<double> _mouse_scroll_offset = 0;
     std::atomic<double> _prev_mouse_scroll_offset = 0;
 
     // I think mutex here is good - we have one writer, one reader,
     //  but reader works once per frame only for copy ~400 bytes, in other time it have no affect for writer
     // Expected, what update(), key_pressed() and key_tapped() call in one thread, key callback in other
-    mutable std::mutex update_mutex;
+    mutable std::mutex _update_mutex;
 
   public:
     InputState();
@@ -47,6 +62,9 @@ inline namespace graphics {
 
     bool key_pressed(vkfw::Key key) const noexcept;
     bool key_tapped(vkfw::Key key) const noexcept;
+
+    bool mouse_button_pressed(vkfw::MouseButton button) const noexcept;
+    bool mouse_button_tapped(vkfw::MouseButton button) const noexcept;
 
     const Vec2d & mouse_pos() const noexcept { return _prev_mouse_pos; }
     const Vec2d & mouse_pos_delta() const noexcept { return _mouse_pos_delta; }
@@ -62,8 +80,15 @@ inline namespace graphics {
       std::function<void(const vkfw::Window &, vkfw::Key, int, vkfw::KeyAction, vkfw::ModifierKeyFlags)>;
     KeyCallbackT get_key_callback() noexcept;
 
+    using MouseButtonCallbackT =
+      std::function<void(const vkfw::Window &, vkfw::MouseButton, vkfw::MouseButtonAction, vkfw::ModifierKeyFlags)>;
+    MouseButtonCallbackT get_mouse_button_callback() noexcept;
+
     using MouseCallbackT = std::function<void(const vkfw::Window &, double, double)>;
     MouseCallbackT get_mouse_callback() noexcept;
+
+    using MouseEnterCallbackT = std::function<void(const vkfw::Window &, bool)>;
+    MouseEnterCallbackT get_mouse_enter_callback() noexcept;
 
     using MouseScrollCallback = std::function<void(const vkfw::Window &, double, double)>;
     MouseScrollCallback get_mouse_scroll_callback() noexcept;
