@@ -96,6 +96,10 @@ void main()
     return;
   }
 
+#ifdef COLLECT_CULLING_STAT
+  atomicAdd(culling_stat.total_objects_cnt, 1);
+#endif // COLLECT_CULLING_STAT
+
   // -------------------------------------
   // Frustum culling
   // -------------------------------------
@@ -110,6 +114,10 @@ void main()
   if (!is_bound_box_frustum_visible(bb, camera_buffer.frustum_planes)) {
     // TODO(dk6): maybe it correct to set it not visible
     // instances_datas[id].visible_last_frame = 0;
+
+#ifdef COLLECT_CULLING_STAT
+    atomicAdd(culling_stat.outside_frustum_objects_number, 1);
+#endif // COLLECT_CULLING_STAT
     return;
   }
 
@@ -158,18 +166,21 @@ void main()
   float new_depth = projected.z / projected.w;
 
   // --- Check visibility ---
+  // When group of object is at far distance they have equal new and old depth
+  float bias = 0.00001;
   // If new_depth >= 1 it means that object is very big and clips with camera.
   // But we here after frustum culling so object is visible
-  bool visible = new_depth >= 1 || new_depth < old_depth;
+  bool visible = new_depth >= 1 || new_depth < old_depth - bias;
 
   bool was_visible = instance_data.visible_last_frame == 1;
   instances_datas[id].visible_last_frame = visible ? 1 : 0;
 
+#ifdef COLLECT_CULLING_STAT
+  atomicAdd(culling_stat.occluded_objects_cnt, visible ? 0 : 1);
+#endif // COLLECT_CULLING_STAT
+
   if (!visible || was_visible) {
     // If object was visible it has been already rendered in first pass
-#ifdef COLLECT_CULLING_STAT
-    atomicAdd(culling_stat.occluded_objects_cnt, 1);
-#endif // COLLECT_CULLING_STAT
     return;
   }
 

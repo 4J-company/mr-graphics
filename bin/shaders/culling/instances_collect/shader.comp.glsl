@@ -14,9 +14,6 @@ layout(push_constant) uniform PushContants {
 
   uint counters_buffer_id;
   uint draw_count_index;
-
-  // If COLLECT_CULLING_STAT this field is not initializated and must not be used
-  uint culling_stat_buffer_id;
 } buffers_data;
 
 layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer MeshCullingDatasBuffer {
@@ -34,13 +31,6 @@ layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) buffer CountersBuf
 } Counters[];
 #define draws_count Counters[buffers_data.counters_buffer_id].data[buffers_data.draw_count_index]
 #define instances_count(index) Counters[buffers_data.counters_buffer_id].data[index]
-
-#ifdef COLLECT_CULLING_STAT
-layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) buffer CullingStatsBuffer {
-  CullingStats stat;
-} CullingStatsBuffers[];
-#define culling_stat CullingStatsBuffers[buffers_data.culling_stat_buffer_id].stat
-#endif // COLLECT_CULLING_STAT
 
 layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) writeonly buffer DrawInfoBuffer {
   MeshDrawInfo data[];
@@ -76,11 +66,5 @@ void main()
     uint draw_id = atomicAdd(draws_count, 1);
     fill_command(draw_id, id, instance_number);
   }
-
-#ifdef COLLECT_CULLING_STAT
-  atomicAdd(culling_stat.visible_objects_cnt, instance_number);
-  atomicAdd(culling_stat.total_objects_cnt, meshes_data[id].command.instance_count);
-#endif // COLLECT_CULLING_STAT
-
 #endif // DISABLE_CULLING
 }

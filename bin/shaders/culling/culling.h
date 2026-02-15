@@ -28,9 +28,9 @@ struct MeshCullingData {
 
 #ifdef COLLECT_CULLING_STAT
 struct CullingStats {
-  uint visible_objects_cnt;
-  uint occluded_objects_cnt;
   uint total_objects_cnt;
+  uint outside_frustum_objects_number;
+  uint occluded_objects_cnt;
 };
 #endif // COLLECT_CULLING_STAT
 

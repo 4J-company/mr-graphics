@@ -41,6 +41,7 @@ int main(int argc, const char **argv)
   if (options.enable_vsync) {
     render_options |= mr::RenderOptions::EnableVsync;
   }
+  render_options |= mr::RenderOptions::EnableCullingStats;
 
   auto render_context = app.create_render_context(render_context_extent, render_options);
 
@@ -67,7 +68,12 @@ int main(int argc, const char **argv)
 
   if (options.mode == mr::CliOptions::Mode::Default) {
     auto window = render_context->create_window({options.width, options.height});
-    app.start_render_loop(*render_context, scene, window);
+    if (options.print_stat) {
+      std::ofstream stat_file("stats.json");
+      app.start_render_loop(*render_context, scene, window, stat_file);
+    } else {
+      app.start_render_loop(*render_context, scene, window);
+    }
   } else if (options.mode == mr::CliOptions::Mode::Frames) {
     auto file_writer = render_context->create_file_writer({options.width, options.height});
     app.render_frames(*render_context, scene, file_writer,

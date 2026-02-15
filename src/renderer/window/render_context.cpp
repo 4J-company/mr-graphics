@@ -711,7 +711,7 @@ void mr::RenderContext::late_culling_geometry(const SceneHandle scene)
         _depth_pyramid_image_id,
         _depth_pyramid_mips_scale_coefs_buffer_id,
 
-        // if EnableCullingStats option not enabled this number is not initializated and must not be used
+        // if EnableCullingStats option not enabled this number is not initializated and must not be used in shader
         _culling_stat_buffer_id,
       };
       _late_culling_command_unit->pushConstants(_late_instances_culling_pipeline.layout(), vk::ShaderStageFlagBits::eCompute,
@@ -1180,9 +1180,11 @@ void mr::RenderContext::calculate_stat(SceneHandle scene,
   if (is_render_option_enabled(_render_options, RenderOptions::EnableCullingStats)) {
     auto data = _culling_stat_stage_buffer.copy();
     const CullingStats *stat = reinterpret_cast<const CullingStats *>(data.data());
-    _render_stat.visible_objects_number = stat->visible_objects_cnt;
-    _render_stat.occluded_objects_number = stat->occluded_objects_cnt;
-    _render_stat.total_objects_number = stat->total_objects_cnt;
+    _render_stat.total_objects_number = stat->total_objects_number;
+    _render_stat.outside_frustum_objects_number = stat->outside_frustum_objects_number;
+    _render_stat.occluded_objects_number = stat->occluded_objects_number;
+    _render_stat.visible_objects_number =
+      stat->total_objects_number - stat->occluded_objects_number - stat->outside_frustum_objects_number;
   }
 }
 
@@ -1208,9 +1210,10 @@ void mr::RenderStat::write_to_json(std::ostream &out) const noexcept
   std::println(out, "  \"vertexes_number\": {},", vertexes_number);
 
   // These all value can be 0
+  std::println(out, "  \"total_objects_number\": {},", total_objects_number);
+  std::println(out, "  \"outside_frustum_objects_number\": {},", outside_frustum_objects_number);
   std::println(out, "  \"visible_objects_number\": {},", visible_objects_number);
-  std::println(out, "  \"occluded_objects_number\": {},", occluded_objects_number);
-  std::println(out, "  \"total_objects_number\": {}", total_objects_number);
+  std::println(out, "  \"occluded_objects_number\": {}", occluded_objects_number);
 
   std::println(out, "}}");
 }

@@ -49,8 +49,9 @@ inline namespace graphics {
 
     // This field fills if EnableCullingStat option is enabled
     uint32_t total_objects_number = 0;
-    uint32_t visible_objects_number = 0;
+    uint32_t outside_frustum_objects_number = 0;
     uint32_t occluded_objects_number = 0;
+    uint32_t visible_objects_number = 0; // extra information
 
     void write_to_json(std::ostream &out) const noexcept;
   };
@@ -119,9 +120,9 @@ inline namespace graphics {
     };
 
     struct CullingStats {
-      uint32_t visible_objects_cnt;
-      uint32_t occluded_objects_cnt;
-      uint32_t total_objects_cnt;
+      uint32_t total_objects_number = 0;
+      uint32_t outside_frustum_objects_number = 0;
+      uint32_t occluded_objects_number = 0;
     };
 
   private:

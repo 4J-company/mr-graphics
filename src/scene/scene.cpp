@@ -101,7 +101,7 @@ mr::ModelHandle mr::Scene::create_model(std::fs::path filename) noexcept
     draw.meshes_data_buffer_data.emplace_back(MeshCullingData {
       .draw_command = vk::DrawIndexedIndirectCommand {
         .indexCount = mesh._ibufs[lod_index].elements_count,
-        .instanceCount = mesh.num_of_instances(),
+        .instanceCount = 0,
         .firstIndex = static_cast<uint32_t>(mesh._ibufs[lod_index].offset / sizeof(uint32_t)),
         .vertexOffset = static_cast<int32_t>(mesh._vbufs[0].offset / position_bytes_size),
         .firstInstance = 0,
