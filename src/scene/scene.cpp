@@ -24,6 +24,15 @@ mr::Scene::Scene(RenderContext &render_context)
   _transforms_buffer_id = render_context.bindless_set().register_resource(&_transforms);
   _bound_boxes_buffer_id = render_context.bindless_set().register_resource(&_bound_boxes);
   _counters_buffer_id = render_context.bindless_set().register_resource(&_counters_buffer);
+
+  if (is_render_option_enabled(_parent->options(), RenderOptions::EnableCullingVisualiztion)) {
+    // fuck it per model...
+    // TODO(dk6): Try change uint int to byte && use dynamic buffer
+    _occluded_instances_state_buffer = StorageBuffer(_parent->vulkan_state(),
+                                                         sizeof(uint32_t) * max_scene_instances);
+    _occluded_instances_state_buffer_id =
+      _parent->bindless_set().register_resource(&_occluded_instances_state_buffer);
+  }
 }
 
 mr::Scene::~Scene()
@@ -110,7 +119,7 @@ mr::ModelHandle mr::Scene::create_model(std::fs::path filename) noexcept
         .mesh_offset = mesh._mesh_offset,
         .instance_offset = mesh._instance_offset,
         .material_ubo_id = material->material_ubo_id(),
-        .transfroms_buffer_id = model_mesh.transforms_buffer_id,
+        .intances_render_info_buffer_id = model_mesh.intances_render_info_buffer_id,
       },
       .instance_counter_index = _current_counter_index++,
       .bound_box_index = bound_box_index,

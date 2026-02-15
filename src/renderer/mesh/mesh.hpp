@@ -21,7 +21,7 @@ inline namespace graphics {
       uint32_t mesh_offset;
       uint32_t instance_offset;
       uint32_t material_ubo_id;
-      uint32_t transfroms_buffer_id;
+      uint32_t intances_render_info_buffer_id;
     };
 
   private:

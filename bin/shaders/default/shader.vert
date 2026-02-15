@@ -24,6 +24,7 @@ layout(location = 3) out flat uint materialid;
 
 layout(push_constant) uniform DrawsIndosBufferId {
   uint draw_infos_buffer;
+  uint transforms_buffer_id;
   uint camera_buffer_id;
 };
 
@@ -43,17 +44,22 @@ layout(set = BINDLESS_SET, binding = UNIFORM_BUFFERS_BINDING) readonly uniform C
 } CameraUboArray[];
 #define cam_ubo CameraUboArray[camera_buffer_id]
 
+layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer InstancesRenderInfosBuffer {
+  InstanceDrawInfo infos[];
+} InstancesRenderInfos[];
+#define transform_index InstancesRenderInfos[draw.instance_render_info_buffer_id].infos[gl_InstanceIndex].transforms_index
+
 layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer Transforms {
   mat4 transforms[];
-} SSBOArray[];
-#define transforms SSBOArray[draw.transforms_buffer_id].transforms
+} TransfromsArray[];
+#define transforms TransfromsArray[transforms_buffer_id].transforms
 
 void main()
 {
   texcoord = InTexCoord;
   materialid = draw.material_buffer_id;
 
-  mat4 transform = transpose(transforms[gl_InstanceIndex]);
+  mat4 transform = transpose(transforms[transform_index]);
   position = transform * vec4(InPos.xyz, 1.0);
   normal = InNorm;
 

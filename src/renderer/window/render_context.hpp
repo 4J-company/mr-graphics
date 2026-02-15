@@ -195,7 +195,7 @@ inline namespace graphics {
     ShaderHandle _late_instances_culling_shader;
     ComputePipeline _late_instances_culling_pipeline;
 
-    // This used if EnableCullingStats optin is enabled
+    // --- This used if EnableCullingStats option is enabled ---
     StorageBuffer _culling_stat_buffer;
     uint32_t _culling_stat_buffer_id = BindlessDescriptorSet::invalid_id;
     HostBuffer _culling_stat_stage_buffer;

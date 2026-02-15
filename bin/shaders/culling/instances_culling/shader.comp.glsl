@@ -56,9 +56,10 @@ layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer Tr
 #define transforms_in TransformsInArray[buffers_data.transforms_in_buffer_id].transforms
 
 layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) writeonly buffer TransformsOut {
-  mat4 transforms[];
+  InstanceDrawInfo infos[];
 } TransformsOutArray[];
-#define transforms_out(mesh_data) TransformsOutArray[mesh_data.mesh_draw_info.transforms_buffer_id].transforms
+#define out_transforms_index(mesh_data, instance_number) \
+  TransformsOutArray[mesh_data.mesh_draw_info.instance_render_info_buffer_id].infos[instance_number].transforms_index
 
 void main()
 {
@@ -85,5 +86,5 @@ void main()
 
   // After frustun culling tests we still here - object is visible
   uint instance_number = atomicAdd(intances_count(mesh_data.instance_counter_index), 1);
-  transforms_out(mesh_data)[instance_number] = transforms_in[instance_data.transform_index];
+  out_transforms_index(mesh_data, instance_number) = instance_data.transform_index;
 }

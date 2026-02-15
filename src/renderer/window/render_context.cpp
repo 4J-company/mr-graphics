@@ -502,6 +502,7 @@ void mr::RenderContext::render_models(const SceneHandle scene, CommandUnit &cmd_
 
     uint32_t model_push_constant[] {
       draw.meshes_render_info_id,
+      scene->transforms_buffer_id(),
       scene->camera_buffer_id(),
     };
 
