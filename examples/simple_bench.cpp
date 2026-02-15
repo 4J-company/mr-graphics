@@ -40,7 +40,9 @@ int main(int argc, const char **argv)
   if (options.disable_occlusion_culling) {
     render_options |= mr::RenderOptions::DisableOcclusionCulling;
   }
-  render_options |= mr::RenderOptions::EnableCullingStats;
+  if (options.enable_culling_stat) {
+    render_options |= mr::RenderOptions::EnableCullingStats;
+  }
 
   auto render_context = app.create_render_context(render_context_extent, render_options);
 

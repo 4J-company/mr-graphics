@@ -93,6 +93,9 @@ std::optional<mr::CliOptions> mr::CliOptions::parse(int argc, const char **argv)
     ("models",
      po::value<std::vector<std::string>>()->multitoken(),
      "GLTF model files to render (can be specified anywhere in arguments)")
+    ("enable-culling-stat",
+     po::bool_switch()->default_value(false),
+     "Collect statistics of culling")
   ;
 
   po::positional_options_description pos_desc;
@@ -139,6 +142,7 @@ std::optional<mr::CliOptions> mr::CliOptions::parse(int argc, const char **argv)
   options.enable_bound_boxes = vm["enable-bound-boxes"].as<bool>();
   options.stat_dir = vm["stat-dir"].as<std::string>();
   options.print_stat = vm["print-stat"].as<bool>();
+  options.enable_culling_stat = vm["enable-culling-stat"].as<bool>();
 
   auto mode_str = vm["mode"].as<std::string>();
   auto mode_opt = parse_mode(mode_str);

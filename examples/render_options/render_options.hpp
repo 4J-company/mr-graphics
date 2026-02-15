@@ -27,6 +27,7 @@ inline namespace graphics {
     std::optional<uint32_t> bench_instances_number;
     bool enable_bound_boxes;
     bool print_stat;
+    bool enable_culling_stat;
 
     static std::optional<CliOptions> parse(int argc, const char **argv);
 
