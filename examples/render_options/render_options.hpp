@@ -28,6 +28,7 @@ inline namespace graphics {
     bool enable_bound_boxes;
     bool print_stat;
     bool enable_culling_stat;
+    bool enable_culling_visualization;
 
     static std::optional<CliOptions> parse(int argc, const char **argv);
 

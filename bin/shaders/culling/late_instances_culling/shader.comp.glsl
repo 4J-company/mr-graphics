@@ -112,7 +112,7 @@ void main()
 
   if (!is_bound_box_frustum_visible(bb, camera_buffer.frustum_planes)) {
     // TODO(dk6): maybe it correct to set it not visible
-    // instances_datas[id].visible_last_frame = 0;
+    instances_datas[id].visible_last_frame = 0;
 
 #ifdef COLLECT_CULLING_STAT
     atomicAdd(culling_stat.outside_frustum_objects_number, 1);

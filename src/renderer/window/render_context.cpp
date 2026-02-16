@@ -269,6 +269,12 @@ void mr::RenderContext::init_culling()
     _culling_stat_buffer_id = _bindless_set.register_resource(&_culling_stat_buffer);
     _culling_stat_stage_buffer = HostBuffer(*_state, sizeof(CullingStats), vk::BufferUsageFlagBits::eTransferDst);
   }
+
+  if (is_render_option_enabled(_render_options, RenderOptions::EnableCullingVisualiztion)) {
+    _copy_visibility_states_shader = ResourceManager<Shader>::get().create("CopyVisibility",
+      *_state, "culling/copy_visibility", defines);
+    _copy_visibility_states_pipeline = ComputePipeline(*_state, _copy_visibility_states_shader, set_layouts);
+  }
 }
 
 void mr::RenderContext::init_bound_box_rendering()
@@ -504,6 +510,7 @@ void mr::RenderContext::render_models(const SceneHandle scene, CommandUnit &cmd_
       draw.meshes_render_info_id,
       scene->transforms_buffer_id(),
       scene->camera_buffer_id(),
+      scene->_occluded_instances_state_buffer_id,
     };
 
     cmd_unit->pushConstants(pipeline->layout(), vk::ShaderStageFlagBits::eAllGraphics,
@@ -715,7 +722,8 @@ void mr::RenderContext::late_culling_geometry(const SceneHandle scene)
         // if EnableCullingStats option not enabled this number is not initializated and must not be used in shader
         _culling_stat_buffer_id,
       };
-      _late_culling_command_unit->pushConstants(_late_instances_culling_pipeline.layout(), vk::ShaderStageFlagBits::eCompute,
+      _late_culling_command_unit->pushConstants(_late_instances_culling_pipeline.layout(),
+                                                vk::ShaderStageFlagBits::eCompute,
                                                 0, sizeof(culling_push_contants), culling_push_contants);
 
       _late_culling_command_unit->dispatch(calculate_work_groups_number(instances_number, culling_work_group_size), 1, 1);
@@ -764,6 +772,10 @@ void mr::RenderContext::late_culling_geometry(const SceneHandle scene)
     _late_culling_command_unit->dispatch(calculate_work_groups_number(max_draws_count, culling_work_group_size), 1, 1);
   }
 
+  // --------------------------------------------------------------------------
+  // Culling statistics collecting
+  // --------------------------------------------------------------------------
+
   if (is_render_option_enabled(_render_options, RenderOptions::EnableCullingStats)) {
     vk::BufferMemoryBarrier options_fill_barrier {
       .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
@@ -776,6 +788,53 @@ void mr::RenderContext::late_culling_geometry(const SceneHandle scene)
                                                 vk::PipelineStageFlagBits::eTransfer,
                                                 {}, {}, {options_fill_barrier}, {});
     bufcopy(_late_culling_command_unit, BufferRegion(_culling_stat_buffer), BufferRegion(_culling_stat_stage_buffer));
+  }
+
+  // --------------------------------------------------------------------------
+  // Culling visualization
+  // --------------------------------------------------------------------------
+
+  if (is_render_option_enabled(_render_options, RenderOptions::EnableCullingVisualiztion)) {
+    if (_save_culling_visualization || _clear_culling_visualization) {
+      for (auto &[pipeline, draw] : scene->_draws) {
+        _late_culling_command_unit->bindPipeline(vk::PipelineBindPoint::eCompute,
+          _copy_visibility_states_pipeline.pipeline());
+
+        _late_culling_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eCompute,
+                                                 {_copy_visibility_states_pipeline.layout()},
+                                                 bindless_set_number,
+                                                 culling_descriptor_sets,
+                                                 {});
+
+        uint32_t instances_number = static_cast<uint32_t>(draw.instances_data_buffer_data.size());
+        uint32_t copy_visibility_push_contants[] {
+          draw.instances_data_buffer_id,
+          instances_number,
+          scene->_occluded_instances_state_buffer_id,
+          _save_culling_visualization ? 0u : 1u,
+        };
+        _late_culling_command_unit->pushConstants(_copy_visibility_states_pipeline.layout(),
+                                                  vk::ShaderStageFlagBits::eCompute,
+                                                  0, sizeof(copy_visibility_push_contants),
+                                                  copy_visibility_push_contants);
+
+        _late_culling_command_unit->dispatch(
+          calculate_work_groups_number(instances_number, culling_work_group_size), 1, 1);
+
+        vk::BufferMemoryBarrier visibility_states_barrier {
+          .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
+          .dstAccessMask = vk::AccessFlagBits::eShaderRead,
+          .buffer = scene->_occluded_instances_state_buffer.buffer(),
+          .offset = 0,
+          .size = scene->_occluded_instances_state_buffer.byte_size(),
+        };
+        _late_culling_command_unit->pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
+                                                    vk::PipelineStageFlagBits::eDrawIndirect,
+                                                    {}, {}, {visibility_states_barrier}, {});
+      }
+      _save_culling_visualization = false;
+      _clear_culling_visualization = false;
+    }
   }
 
   _late_culling_command_unit->writeTimestamp(vk::PipelineStageFlagBits::eComputeShader,

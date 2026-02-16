@@ -96,6 +96,9 @@ std::optional<mr::CliOptions> mr::CliOptions::parse(int argc, const char **argv)
     ("enable-culling-stat",
      po::bool_switch()->default_value(false),
      "Collect statistics of culling")
+    ("enable-culling-visualization",
+     po::bool_switch()->default_value(false),
+     "Stash invisible objects on '0' key")
   ;
 
   po::positional_options_description pos_desc;
@@ -143,6 +146,7 @@ std::optional<mr::CliOptions> mr::CliOptions::parse(int argc, const char **argv)
   options.stat_dir = vm["stat-dir"].as<std::string>();
   options.print_stat = vm["print-stat"].as<bool>();
   options.enable_culling_stat = vm["enable-culling-stat"].as<bool>();
+  options.enable_culling_visualization = vm["enable-culling-visualization"].as<bool>();
 
   auto mode_str = vm["mode"].as<std::string>();
   auto mode_opt = parse_mode(mode_str);

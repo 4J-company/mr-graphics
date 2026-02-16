@@ -89,17 +89,17 @@ inline namespace graphics {
     std::vector<mr::Matr4f> _transforms_data;
     uint32_t _transforms_buffer_id = BindlessDescriptorSet::invalid_id;  // id in bindless descriptor set
 
+    // --- This used if EnableCullingVisialization option is enabled ---
+    // This buffer save all occluded geometry at stash moment
+    StorageBuffer _occluded_instances_state_buffer;
+    uint32_t _occluded_instances_state_buffer_id = BindlessDescriptorSet::invalid_id;
+
     StorageBuffer _bound_boxes;
     uint32_t _bound_boxes_buffer_id = BindlessDescriptorSet::invalid_id;
     std::vector<AABBf> _bound_boxes_data;
 
     ConditionalBuffer _visibility; // u32 visibility mask for each draw call
     std::vector<uint32_t> _visibility_data;
-
-    // --- This used if EnableCullingVisialization option is enabled ---
-    // This buffer save all occluded geometry at stash moment
-    StorageBuffer _occluded_instances_state_buffer;
-    uint32_t _occluded_instances_state_buffer_id = BindlessDescriptorSet::invalid_id;
 
     // Now all counters are collected in one buffer - it simplifies zeroing and syncronization
     // Note: here can be trouble with false sharing, but we don't know, is it actual for GPU atomics

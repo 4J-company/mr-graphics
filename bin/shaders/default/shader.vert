@@ -22,10 +22,15 @@ layout(location = 1) out vec3 normal;
 layout(location = 2) out vec2 texcoord;
 layout(location = 3) out flat uint materialid;
 
+#ifdef ENABLE_CULLING_VISUALIZATION
+layout(location = 4) out flat uint visible_at_stash;
+#endif // ENABLE_CULLING_VISUALIZATION
+
 layout(push_constant) uniform DrawsIndosBufferId {
   uint draw_infos_buffer;
   uint transforms_buffer_id;
   uint camera_buffer_id;
+  uint visibility_states_buffer_id; // Used if ENABLE_CULLING_VISUALIZATION defined
 };
 
 layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer DrawIndoBuffers {
@@ -54,6 +59,13 @@ layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer Tr
 } TransfromsArray[];
 #define transforms TransfromsArray[transforms_buffer_id].transforms
 
+#ifdef ENABLE_CULLING_VISUALIZATION
+layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) buffer VisibilityStatesBuffer {
+  uint data[];
+} VisibilityStates[];
+#define visibility_states VisibilityStates[visibility_states_buffer_id].data
+#endif // ENABLE_CULLING_VISUALIZATION
+
 void main()
 {
   texcoord = InTexCoord;
@@ -65,4 +77,8 @@ void main()
 
   gl_Position = cam_ubo.vp * position;
   gl_Position = vec4(gl_Position.x, -gl_Position.y, gl_Position.z, gl_Position.w);
+
+#ifdef ENABLE_CULLING_VISUALIZATION
+  visible_at_stash = visibility_states[transform_index];
+#endif // ENABLE_CULLING_VISUALIZATION
 }

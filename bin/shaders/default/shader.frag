@@ -12,11 +12,23 @@ layout(location = 1) in vec3 normal;
 layout(location = 2) in vec2 texcoord;
 layout(location = 3) in flat uint materialid;
 
+#ifdef ENABLE_CULLING_VISUALIZATION
+layout(location = 4) in flat uint visible_at_stash;
+#endif // ENABLE_CULLING_VISUALIZATION
+
 #include "pbr_params.h"
 
 void main()
 {
   vec4 bckg_color = vec4(0.3, 0.47, 0.8, 1);
+
+#ifdef ENABLE_CULLING_VISUALIZATION
+  if (visible_at_stash == 0) {
+    OutNIsShade = vec4(vec3(0), 0);
+    OutColorTrans = vec4(1, 0, 0, 1);
+    return;
+  }
+#endif // ENABLE_CULLING_VISUALIZATION
 
   OutPos = position;
   OutNIsShade = vec4(normal, 1);

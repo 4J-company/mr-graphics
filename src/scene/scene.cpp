@@ -29,9 +29,21 @@ mr::Scene::Scene(RenderContext &render_context)
     // fuck it per model...
     // TODO(dk6): Try change uint int to byte && use dynamic buffer
     _occluded_instances_state_buffer = StorageBuffer(_parent->vulkan_state(),
-                                                         sizeof(uint32_t) * max_scene_instances);
+                                                     sizeof(uint32_t) * max_scene_instances);
     _occluded_instances_state_buffer_id =
       _parent->bindless_set().register_resource(&_occluded_instances_state_buffer);
+
+    // TODO(dk6): use shader clear instead
+    // fill by 1
+    std::vector<uint32_t> data(max_scene_instances, 1);
+    CommandUnit cmd_unit(_parent->vulkan_state());
+    cmd_unit.begin();
+    _occluded_instances_state_buffer.write(cmd_unit, std::span(data));
+    cmd_unit.end();
+    UniqueFenceGuard(
+      _parent->vulkan_state().device(),
+      cmd_unit.submit(_parent->vulkan_state())
+    );
   }
 }
 
@@ -245,12 +257,21 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
     if (input_state.key_pressed(vkfw::Key::eSpace)) {
       _camera.move(_camera.cam().up());
     }
-    if (input_state.key_pressed(vkfw::Key::eLeftShift)) {
+    if (input_state.key_pressed(vkfw::Key::eRightShift)) {
       _camera.move(_camera.cam().up());
     }
     if (input_state.key_pressed(vkfw::Key::eP)) {
       std::cout << "camera_pos, camera_dir, camera_up:\n"
         << _camera.cam().position() << ", " << _camera.cam().direction() << _camera.cam().up() << std::endl;
+    }
+    if (is_render_option_enabled(_parent->options(), RenderOptions::EnableCullingVisualiztion)) {
+      if (input_state.key_tapped(vkfw::Key::eO)) {
+        if (input_state.key_pressed(vkfw::Key::eLeftShift)) {
+          _parent->clear_visibility();
+        } else {
+          _parent->save_visibility();
+        }
+      }
     }
 
     if (input_state.key_tapped(vkfw::Key::e1)) {

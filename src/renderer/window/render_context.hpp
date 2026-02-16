@@ -200,6 +200,12 @@ inline namespace graphics {
     uint32_t _culling_stat_buffer_id = BindlessDescriptorSet::invalid_id;
     HostBuffer _culling_stat_stage_buffer;
 
+    // --- This used if EnableCullingVisualization option is enabled ---
+    std::atomic_bool _save_culling_visualization = false;
+    std::atomic_bool _clear_culling_visualization = false;
+    ShaderHandle _copy_visibility_states_shader;
+    ComputePipeline _copy_visibility_states_pipeline;
+
     Extent _depth_pyramid_extent;
     PyramidImage _depth_pyramid;
     ShaderImageResource _depth_pyramid_resource;
@@ -248,6 +254,10 @@ inline namespace graphics {
 
     void enable_bound_boxes() noexcept { _bound_boxes_draw_enabled = true; }
     void disable_bound_boxes() noexcept { _bound_boxes_draw_enabled = false; }
+
+    // Works only if EnableCullingVisualiztion option is enabled
+    void save_visibility() noexcept { _save_culling_visualization = true; }
+    void clear_visibility() noexcept { _clear_culling_visualization = true; }
 
     IndexHeapBuffer & index_buffer() noexcept { return _index_buffer; }
     VertexBuffersArray add_vertex_buffers(CommandUnit &command_unit, std::span<const std::span<const std::byte>> vbufs_data) noexcept;
