@@ -33,7 +33,6 @@ mr::Scene::Scene(RenderContext &render_context)
     _occluded_instances_state_buffer_id =
       _parent->bindless_set().register_resource(&_occluded_instances_state_buffer);
 
-    // TODO(dk6): use shader clear instead
     // fill by 1
     std::vector<uint32_t> data(max_scene_instances, 1);
     CommandUnit cmd_unit(_parent->vulkan_state());
@@ -159,7 +158,7 @@ uint32_t mr::Scene::add_model_instance(ModelHandle model, Matr4f transform) noex
 
       draw.instances_data_buffer_data.emplace_back(MeshInstanceCullingData {
         .transform_index = instance_id,
-        .visible_last_frame = 1, // all meshes are visible at first
+        .visible_last_frame = std::numeric_limits<uint32_t>::max(), // all meshes are visible at first
         .mesh_culling_data_index = model_mesh.mesh_scene_id,
       });
 

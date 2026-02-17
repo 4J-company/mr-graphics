@@ -19,7 +19,7 @@ layout(push_constant) uniform PushContants {
   uint bound_boxes_buffer_id;
 } buffers_data;
 
-layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer MeshInstanceCullingDatasBuffer {
+layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) buffer MeshInstanceCullingDatasBuffer {
   MeshInstanceCullingData[] data;
 } MeshInstanceCullingDatas[];
 #define instances_datas MeshInstanceCullingDatas[buffers_data.instances_culling_data_buffer_id].data
@@ -69,7 +69,7 @@ void main()
   }
 
   MeshInstanceCullingData instance_data = instances_datas[id];
-  if (instance_data.visible_last_frame == 0) {
+  if (IS_INSTANCE_WAS_OCCLUDED(instance_data.visibility_bits)) {
     return; // rendering only previously visible objects
   }
 
@@ -80,6 +80,8 @@ void main()
   BoundBox bb = transform_bound_box(bound_box(mesh_data), transfrom);
 
   if (!is_bound_box_frustum_visible(bb, camera_buffer.frustum_planes)) {
+    instances_datas[id].visibility_bits = SET_INSTANCE_IN_FRUSTUM(instance_data.visibility_bits, false) &
+                                          SET_INSTANCE_RENDERER_AT_FIRST_PASS_BIT(instance_data.visibility_bits, false);
     return;
   }
 #endif // not det DISABLE_CULLING
@@ -87,4 +89,6 @@ void main()
   // After frustun culling tests we still here - object is visible
   uint instance_number = atomicAdd(intances_count(mesh_data.instance_counter_index), 1);
   out_transforms_index(mesh_data, instance_number) = instance_data.transform_index;
+  instances_datas[id].visibility_bits = SET_INSTANCE_IN_FRUSTUM(instance_data.visibility_bits, true) |
+                                        SET_INSTANCE_RENDERER_AT_FIRST_PASS_BIT(instance_data.visibility_bits, true);
 }

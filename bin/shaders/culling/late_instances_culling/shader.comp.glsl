@@ -105,15 +105,11 @@ void main()
 
   MeshInstanceCullingData instance_data = instances_datas[id];
   MeshCullingData mesh_data = meshes_datas[instance_data.mesh_culling_data_index];
-  uint transforms_start = mesh_data.mesh_draw_info.instance_offset;
 
   mat4 transfrom = transpose(transforms_in[instance_data.transform_index]);
   BoundBox bb = transform_bound_box(bound_box(mesh_data), transfrom);
 
-  if (!is_bound_box_frustum_visible(bb, camera_buffer.frustum_planes)) {
-    // TODO(dk6): maybe it correct to set it not visible
-    instances_datas[id].visible_last_frame = 0;
-
+  if (!IS_INSTANCE_IN_FRUSTUM(instance_data.visibility_bits)) {
 #ifdef COLLECT_CULLING_STAT
     atomicAdd(culling_stat.outside_frustum_objects_number, 1);
 #endif // COLLECT_CULLING_STAT
@@ -171,14 +167,13 @@ void main()
   // But we here after frustum culling so object is visible
   bool visible = new_depth >= 1 || new_depth < old_depth - bias;
 
-  bool was_visible = instance_data.visible_last_frame == 1;
-  instances_datas[id].visible_last_frame = visible ? 1 : 0;
+  instances_datas[id].visibility_bits = SET_INSTANCE_WAS_OCCLUDED(instance_data.visibility_bits, !visible);
 
 #ifdef COLLECT_CULLING_STAT
   atomicAdd(culling_stat.occluded_objects_cnt, visible ? 0 : 1);
 #endif // COLLECT_CULLING_STAT
 
-  if (!visible || was_visible) {
+  if (!visible || IS_INSTANCE_RENDERER_AT_FIRST_PASS_BIT(instance_data.visibility_bits)) {
     // If object was visible it has been already rendered in first pass
     return;
   }
