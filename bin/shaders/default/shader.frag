@@ -13,6 +13,7 @@ layout(location = 2) in vec2 texcoord;
 layout(location = 3) in flat uint materialid;
 
 #ifdef ENABLE_CULLING_VISUALIZATION
+#include "culling/culling.h"
 layout(location = 4) in flat uint visible_at_stash;
 #endif // ENABLE_CULLING_VISUALIZATION
 
@@ -23,7 +24,11 @@ void main()
   vec4 bckg_color = vec4(0.3, 0.47, 0.8, 1);
 
 #ifdef ENABLE_CULLING_VISUALIZATION
-  if (visible_at_stash == 0) {
+  if (!IS_INSTANCE_IN_FRUSTUM(visible_at_stash)) {
+    OutNIsShade = vec4(vec3(0), 0);
+    OutColorTrans = vec4(0, 0, 1, 1);
+    return;
+  } else if (IS_INSTANCE_WAS_OCCLUDED(visible_at_stash)) {
     OutNIsShade = vec4(vec3(0), 0);
     OutColorTrans = vec4(1, 0, 0, 1);
     return;

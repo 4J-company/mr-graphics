@@ -34,7 +34,7 @@ mr::Scene::Scene(RenderContext &render_context)
       _parent->bindless_set().register_resource(&_occluded_instances_state_buffer);
 
     // fill by 1
-    std::vector<uint32_t> data(max_scene_instances, 1);
+    std::vector<uint32_t> data(max_scene_instances, 0b01);
     CommandUnit cmd_unit(_parent->vulkan_state());
     cmd_unit.begin();
     _occluded_instances_state_buffer.write(cmd_unit, std::span(data));
