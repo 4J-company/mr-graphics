@@ -28,20 +28,33 @@ void main()
     return;
   }
 
-  // TODO(dk6): Maybe size of depth pyramid must me pow of 2 closest to screen size
-  vec2 tex_coord_left_angle = vec2(coord) / data.dst_size;
-  vec2 tex_coord_rigth_angle = (vec2(coord) + vec2(1)) / data.dst_size;
+  bool last_level = data.dst_size.x == 1 && data.dst_size.y == 1;
 
-  // Real size of texture can be bigger - for simple resize we have a size of the biggest monitor
-  tex_coord_left_angle /= data.real_src_size;
-  tex_coord_left_angle *= data.src_size;
-  tex_coord_rigth_angle /= data.real_src_size;
-  tex_coord_rigth_angle *= data.src_size;
+  if (!last_level) {
+    // TODO(dk6): Maybe size of depth pyramid must me pow of 2 closest to screen size
+    vec2 tex_coord = (vec2(coord) + vec2(0.5)) / data.dst_size;
 
-  // Using max sampler for texture
-  float depth_left_angle = texture(SrcImage, tex_coord_left_angle).r;
-  float depth_rigth_angle = texture(SrcImage, tex_coord_rigth_angle).r;
-  float depth = max(depth_left_angle, depth_rigth_angle);
+    // Real size of texture can be bigger - for simple resize we have a size of the biggest monitor
+    tex_coord /= data.real_src_size;
+    tex_coord *= data.src_size;
 
-  imageStore(DstImage, ivec2(coord), vec4(depth));
+    // Using max sampler for texture
+    float depth = texture(SrcImage, tex_coord).r;
+
+    imageStore(DstImage, ivec2(coord), vec4(depth));
+  } else {
+    // Workaround for situation when prelast level is 3x2 and last is 1x1 and max sampler doesn't catch 1.0 value
+    vec2 offsets[] = {vec2(0), vec2(1)};
+    float depth = 1;
+    for (int i = 0; i < 2; i++) {
+      vec2 tex_coord = (vec2(coord) + offsets[i]) / data.dst_size;
+
+      // Real size of texture can be bigger - for simple resize we have a size of the biggest monitor
+      tex_coord /= data.real_src_size;
+      tex_coord *= data.src_size;
+
+      depth = max(depth, texture(SrcImage, tex_coord).r);
+    }
+    imageStore(DstImage, ivec2(coord), vec4(depth));
+  }
 }

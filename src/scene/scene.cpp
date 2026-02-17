@@ -258,11 +258,11 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
       _camera.move(_camera.cam().up());
     }
     if (input_state.key_pressed(vkfw::Key::eRightShift)) {
-      _camera.move(_camera.cam().up());
+      _camera.move(-_camera.cam().up());
     }
     if (input_state.key_pressed(vkfw::Key::eP)) {
-      std::cout << "camera_pos, camera_dir, camera_up:\n"
-        << _camera.cam().position() << ", " << _camera.cam().direction() << _camera.cam().up() << std::endl;
+      std::cout << "(camera_pos, camera_dir, camera_up):\n"
+        << '(' << _camera.cam().position() << ", " << _camera.cam().direction() << ", " << _camera.cam().up() << ")/n";
     }
     if (is_render_option_enabled(_parent->options(), RenderOptions::EnableCullingVisualiztion)) {
       if (input_state.key_tapped(vkfw::Key::eO)) {
