@@ -12,6 +12,7 @@ namespace graphics {
     DisableOcclusionCulling =   (1u << 2),
     EnableCullingStats      =   (1u << 3),
     EnableCullingVisualiztion = (1u << 4),
+    CollectPosInstanceId =      (1u << 5),
   };
 
   constexpr static inline RenderOptions operator&(RenderOptions options, RenderOptions option) noexcept

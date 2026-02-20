@@ -11,10 +11,11 @@ layout(location = 0) in vec4 position;
 layout(location = 1) in vec3 normal;
 layout(location = 2) in vec2 texcoord;
 layout(location = 3) in flat uint materialid;
+layout(location = 4) in flat uint instance_id;
 
 #ifdef ENABLE_CULLING_VISUALIZATION
 #include "culling/culling.h"
-layout(location = 4) in flat uint visible_at_stash;
+layout(location = 5) in flat uint visible_at_stash;
 #endif // ENABLE_CULLING_VISUALIZATION
 
 #include "pbr_params.h"
@@ -35,7 +36,7 @@ void main()
   }
 #endif // ENABLE_CULLING_VISUALIZATION
 
-  OutPos = position;
+  OutPos = vec4(position.xyz, float(instance_id));
   OutNIsShade = vec4(normal, 1);
 
   OutMR         = get_metallic_roughness_color(materialid, texcoord);

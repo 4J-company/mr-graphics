@@ -52,6 +52,7 @@ inline namespace graphics {
     uint32_t outside_frustum_objects_number = 0;
     uint32_t occluded_objects_number = 0;
     uint32_t visible_objects_number = 0; // extra information
+    uint32_t really_visible_objects_number = 0;
 
     void write_to_json(std::ostream &out) const noexcept;
   };
@@ -194,6 +195,10 @@ inline namespace graphics {
     ComputePipeline _instances_collect_pipeline;
     ShaderHandle _late_instances_culling_shader;
     ComputePipeline _late_instances_culling_pipeline;
+
+    // --- Collecting world coordinates and instances id ---
+    vk::UniqueSemaphore _models_gbuffer_filling_done_semaphore;
+    std::vector<float> _position_instance_id_data;
 
     // --- This used if EnableCullingStats option is enabled ---
     StorageBuffer _culling_stat_buffer;

@@ -21,9 +21,10 @@ layout(location = 0) out vec4 position;
 layout(location = 1) out vec3 normal;
 layout(location = 2) out vec2 texcoord;
 layout(location = 3) out flat uint materialid;
+layout(location = 4) out flat uint instance_id;
 
 #ifdef ENABLE_CULLING_VISUALIZATION
-layout(location = 4) out flat uint visible_at_stash;
+layout(location = 5) out flat uint visible_at_stash;
 #endif // ENABLE_CULLING_VISUALIZATION
 
 layout(push_constant) uniform DrawsIndosBufferId {
@@ -74,6 +75,7 @@ void main()
   mat4 transform = transpose(transforms[transform_index]);
   position = transform * vec4(InPos.xyz, 1.0);
   normal = InNorm;
+  instance_id = transform_index;
 
   gl_Position = cam_ubo.vp * position;
   gl_Position = vec4(gl_Position.x, -gl_Position.y, gl_Position.z, gl_Position.w);

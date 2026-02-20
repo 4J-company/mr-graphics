@@ -54,6 +54,10 @@ mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent,
   }
   _models_render_finished_semaphore = _state->device().createSemaphoreUnique({}).value;
 
+  if (is_render_option_enabled(_render_options, RenderOptions::CollectPosInstanceId)) {
+    _models_gbuffer_filling_done_semaphore = _state->device().createSemaphoreUnique({}).value;
+  }
+
   init_bindless_rendering();
   init_lights_render_data();
   init_profiling();
@@ -1000,6 +1004,12 @@ void mr::RenderContext::render_geometry(const SceneHandle scene, bool is_late_pa
       : _visible_models_rendering_semaphore.get();
   cmd_unit.add_signal_semaphore(finish_semaphore);
 
+  if (is_render_option_enabled(_render_options, RenderOptions::CollectPosInstanceId)) {
+    if (is_render_option_enabled(_render_options, RenderOptions::DisableOcclusionCulling) || is_late_pass) {
+      cmd_unit.add_signal_semaphore(_models_gbuffer_filling_done_semaphore.get());
+    }
+  }
+
   cmd_unit.end();
 
   vk::SubmitInfo pre_model_layout_transition_submit_info =
@@ -1167,6 +1177,27 @@ void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
 
   FrameMarkEnd(frame_name);
 
+  if (is_render_option_enabled(_render_options, RenderOptions::CollectPosInstanceId)) {
+    // collect real visible objects
+    auto &pos_gbuf = _gbuffers[enum_cast(GBuffer::Position)];
+    CommandUnit cmd_unit(*_state);
+    cmd_unit.begin();
+    auto stage_buffer = pos_gbuf.read_to_host_buffer(cmd_unit);
+    cmd_unit.add_wait_semaphore(_models_gbuffer_filling_done_semaphore.get(),
+                                vk::PipelineStageFlagBits::eColorAttachmentOutput);
+    cmd_unit.end();
+    auto fence = cmd_unit.submit(*_state);
+    _state->device().waitForFences({fence.get()}, vk::True, UINT64_MAX);
+
+    auto [w, h, _z] = pos_gbuf.extent();
+    assert(stage_buffer.byte_size() == format_byte_size(pos_gbuf.format()) * w * h);
+    assert(format_byte_size(pos_gbuf.format()) == sizeof(float) * 4);
+    _position_instance_id_data.resize(stage_buffer.byte_size() / sizeof(float));
+
+    auto char_data = stage_buffer.copy();
+    memcpy(reinterpret_cast<std::byte *>(_position_instance_id_data.data()), char_data.data(), char_data.size());
+  }
+
   calculate_stat(scene, render_start_time, ClockT::now());
 }
 
@@ -1245,6 +1276,21 @@ void mr::RenderContext::calculate_stat(SceneHandle scene,
     _render_stat.occluded_objects_number = stat->occluded_objects_number;
     _render_stat.visible_objects_number =
       stat->total_objects_number - stat->occluded_objects_number - stat->outside_frustum_objects_number;
+
+    if (is_render_option_enabled(_render_options, RenderOptions::CollectPosInstanceId)) {
+      // calculate really visible objects
+      boost::unordered_set<uint32_t> visible_objects;
+      auto &pos_gbuf = _gbuffers[enum_cast(GBuffer::Position)];
+      auto [w, h, _z] = pos_gbuf.extent();
+      for (uint32_t x = 0; x < w; x++) {
+        for (uint32_t y = 0; y < h; y++) {
+          uint32_t index = (y * w) + x + 3;
+          uint32_t id = static_cast<uint32_t>(_position_instance_id_data[index]);
+          visible_objects.insert(id);
+        }
+      }
+      _render_stat.really_visible_objects_number = static_cast<uint32_t>(visible_objects.size());
+    }
   }
 }
 
@@ -1273,7 +1319,7 @@ void mr::RenderStat::write_to_json(std::ostream &out) const noexcept
   std::println(out, "  \"total_objects_number\": {},", total_objects_number);
   std::println(out, "  \"outside_frustum_objects_number\": {},", outside_frustum_objects_number);
   std::println(out, "  \"visible_objects_number\": {},", visible_objects_number);
-  std::println(out, "  \"occluded_objects_number\": {}", occluded_objects_number);
-
+  std::println(out, "  \"occluded_objects_number\": {},", occluded_objects_number);
+  std::println(out, "  \"really_visible_objects_number\": {}", really_visible_objects_number);
   std::println(out, "}}");
 }

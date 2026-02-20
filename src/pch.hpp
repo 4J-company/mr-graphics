@@ -29,10 +29,12 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 #include <variant>
 #include <vector>
 
 #include <boost/unordered_map.hpp>
+#include <boost/unordered_set.hpp>
 #include <boost/container/small_vector.hpp>
 
 #include <tbb/concurrent_unordered_map.h>
