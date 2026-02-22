@@ -24,11 +24,6 @@ inline namespace graphics {
       StorageBuffer intances_render_info_buffer;
       uint32_t intances_render_info_buffer_id = BindlessDescriptorSet::invalid_id;
 
-      // --- This used if EnableCullingVisialization option is enabled ---
-      // This contains info for visuilization of occluded objects at stash moment, same indexing as in transforms_buffer
-      StorageBuffer occluded_instances_render_buffer;
-      uint32_t occluded_instances_render_buffer_id = BindlessDescriptorSet::invalid_id;
-
       // It is mutable because it writes by scene
       mutable uint32_t mesh_scene_id = static_cast<uint32_t>(-1);
       mutable uint32_t mesh_bound_box_id = static_cast<uint32_t>(-1);

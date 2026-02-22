@@ -2,6 +2,7 @@
 #extension GL_EXT_nonuniform_qualifier : enable
 
 #include "bounds.h"
+#include "types.h"
 
 layout (points) in;
 layout (line_strip, max_vertices = 24) out;
@@ -38,14 +39,9 @@ layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer Tr
 #define transform TransformsArray[bb_data.transforms_buffer_id].transforms[bb_data.transform_index]
 
 layout(set = BINDLESS_SET, binding = UNIFORM_BUFFERS_BINDING) readonly uniform CameraUbo {
-  mat4 vp;
-  vec4 pos;
-  float fov;
-  float gamma;
-  float speed;
-  float sens;
+  CameraData data;
 } CameraUboArray[];
-#define cam_ubo CameraUboArray[draw.camera_buffer_id]
+#define cam_ubo CameraUboArray[draw.camera_buffer_id].data
 
 void render_bound_rectangle(BoundBox bb, mat4 proj)
 {

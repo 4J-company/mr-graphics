@@ -225,7 +225,7 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
     const auto &input_state = input_state_ref->get();
 
     float min_speed = 0.005;
-    float max_speed = 5;
+    float max_speed = 20;
     float speed_delta_coef = 0.005;
     float new_speed = _camera.speed() + input_state.mouse_scroll() * speed_delta_coef;
     if (new_speed >= min_speed && new_speed <= max_speed) {
@@ -256,7 +256,7 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
     if (input_state.key_pressed(vkfw::Key::eSpace)) {
       _camera.move(_camera.cam().up());
     }
-    if (input_state.key_pressed(vkfw::Key::eRightShift)) {
+    if (input_state.key_pressed(vkfw::Key::eLeftAlt)) {
       _camera.move(-_camera.cam().up());
     }
     if (input_state.key_pressed(vkfw::Key::eP)) {
@@ -303,9 +303,11 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
 
 void mr::Scene::update_camera_buffer() noexcept
 {
+  auto dir = _camera.cam().direction();
   mr::ShaderCameraData cam_data {
     .vp = _camera.viewproj(),
     .campos = _camera.cam().position(),
+    .dir = mr::Vec4f(dir.x(), dir.y(), dir.z(), 0),
     .fov = static_cast<float>(_camera.fov()),
     .gamma = _camera.gamma(),
     .speed = _camera.speed(),

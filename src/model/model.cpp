@@ -50,6 +50,7 @@ mr::graphics::Model::Model(
     & (is_3component_supported ? Options::All : ~Options::Allow3ComponentImages)
     & (is_4component_supported ? Options::All : ~Options::Allow4ComponentImages)
     & ~Options::PreferUncompressed
+    & ~Options::GenerateDiscreteLODs & ~Options::OptimizeMeshes
   };
 
   auto model = mr::import(model_path, options);
@@ -96,9 +97,6 @@ mr::graphics::Model::Model(
       scene._visibility_data.emplace_back(1);
 
       uint32_t instance_render_info_size = sizeof(uint32_t);
-      if (is_render_option_enabled(scene.render_context().options(), RenderOptions::EnableCullingVisualiztion)) {
-        instance_render_info_size += sizeof(uint32_t);
-      }
 
       auto &mesh_descr = _meshes.emplace_back(MeshInstances {
         .mesh = graphics::Mesh(std::move(vbufs), std::move(ibufs),
@@ -107,18 +105,10 @@ mr::graphics::Model::Model(
         .instances_number = static_cast<uint32_t>(instance_count),
         .transforms = std::move(mesh.transforms),
         // TODO(dk6): use dynamic buffer
-        .intances_render_info_buffer = StorageBuffer(state, instance_render_info_size * Scene::max_scene_instances),
+        .intances_render_info_buffer = StorageBuffer(state, instance_render_info_size * 100'000),
       });
       mesh_descr.intances_render_info_buffer_id =
         scene.render_context().bindless_set().register_resource(&mesh_descr.intances_render_info_buffer);
-
-      if (is_render_option_enabled(scene.render_context().options(), RenderOptions::EnableCullingVisualiztion)) {
-        // TODO(dk6): Try change uint int to byte
-        // TODO(dk6): use dynamic buffer
-        mesh_descr.occluded_instances_render_buffer = StorageBuffer(state, sizeof(uint32_t) * Scene::max_scene_instances);
-        mesh_descr.occluded_instances_render_buffer_id =
-          scene.render_context().bindless_set().register_resource(&mesh_descr.occluded_instances_render_buffer);
-      }
 
       mr::MaterialBuilder builder(scene, "default");
 

@@ -4,6 +4,8 @@
 // For uniforms array
 #extension GL_EXT_nonuniform_qualifier : enable
 
+#include "types.h"
+
 layout(location = 0) out vec4 OutColor;
 
 layout(input_attachment_index = 0, set = 0, binding = 0) uniform subpassInput InPos;
@@ -20,14 +22,9 @@ layout(push_constant) uniform Offsets {
 #define BINDLESS_SET 1
 
 layout(set = BINDLESS_SET, binding = UNIFORM_BUFFERS_BINDING) readonly uniform CameraUbo {
-  mat4 vp;
-  vec4 pos;
-  float fov;
-  float gamma;
-  float speed;
-  float sens;
+  CameraData data;
 } CameraUboArray[];
-#define cam_uniform_buffer CameraUboArray[camera_ubo_id]
+#define cam_uniform_buffer CameraUboArray[camera_ubo_id].data
 
 layout(set = BINDLESS_SET, binding = UNIFORM_BUFFERS_BINDING) readonly uniform LightUbo {
   vec4 direction;
@@ -46,7 +43,7 @@ void main( void )
   vec4 pos = subpassLoad(InPos);
   vec3 color = subpassLoad(InColorTrans).xyz;
   vec4 norm_is_shade = subpassLoad(InNIsShade);
-  vec3 norm = norm_is_shade.xyz;
+  vec3 norm = -norm_is_shade.xyz;
   bool is_shade = norm_is_shade.w != 0;
 
   if (!is_shade) {

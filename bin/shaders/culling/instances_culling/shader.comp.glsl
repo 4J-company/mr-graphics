@@ -4,6 +4,7 @@
 
 layout(local_size_x = THREADS_NUM, local_size_y = 1, local_size_z = 1) in;
 
+#include "types.h"
 #include "culling/culling.h"
 
 layout(push_constant) uniform PushContants {
@@ -40,15 +41,9 @@ layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) buffer CountersBuf
 #define intances_count(index) Counters[buffers_data.counters_buffer_id].data[index]
 
 layout(set = BINDLESS_SET, binding = UNIFORM_BUFFERS_BINDING) readonly uniform CameraBuffer {
-  mat4 vp;
-  vec4 pos;
-  float fov;
-  float gamma;
-  float speed;
-  float sens;
-  vec4 frustum_planes[6];
+  CameraData data;
 } CameraBufferArray[];
-#define camera_buffer CameraBufferArray[buffers_data.camera_buffer_id]
+#define camera_buffer CameraBufferArray[buffers_data.camera_buffer_id].data
 
 layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer TransformsIn {
   mat4 transforms[];

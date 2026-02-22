@@ -4,6 +4,7 @@
 
 layout(local_size_x = THREADS_NUM, local_size_y = 1, local_size_z = 1) in;
 
+#include "types.h"
 #include "culling/culling.h"
 
 layout(push_constant) uniform PushContants {
@@ -51,15 +52,9 @@ layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) buffer CountersBuf
 
 // TODO(dk6): move description of camera buffer to types.h
 layout(set = BINDLESS_SET, binding = UNIFORM_BUFFERS_BINDING) readonly uniform CameraBuffer {
-  mat4 vp;
-  vec4 pos;
-  float fov;
-  float gamma;
-  float speed;
-  float sens;
-  vec4 frustum_planes[6];
+  CameraData data;
 } CameraBufferArray[];
-#define camera_buffer CameraBufferArray[buffers_data.camera_buffer_id]
+#define camera_buffer CameraBufferArray[buffers_data.camera_buffer_id].data
 
 layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer TransformsIn {
   mat4 transforms[];
@@ -153,7 +148,7 @@ void main()
   // --- Get current depth closest to cam point of bound box ---
   vec3 bb_center = (bb.min.xyz + bb.max.xyz) / 2;
 
-  vec3 dir_to_cam = camera_buffer.pos.xyz - bb_center;
+  vec3 dir_to_cam = normalize(camera_buffer.pos.xyz - bb_center);
   float bb_size = length(bb.max.xyz - bb.min.xyz) / 2;
   vec3 closest_bb_point = bb_center + dir_to_cam * bb_size;
 
@@ -162,7 +157,7 @@ void main()
 
   // --- Check visibility ---
   // When group of object is at far distance they have equal new and old depth
-  float bias = 0.00001;
+  float bias = 0.00000;
   // If new_depth >= 1 it means that object is very big and clips with camera.
   // But we here after frustum culling so object is visible
   bool visible = new_depth >= 1 || new_depth < old_depth - bias;

@@ -41,14 +41,9 @@ layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer Dr
 #define draw draws[gl_DrawID]
 
 layout(set = BINDLESS_SET, binding = UNIFORM_BUFFERS_BINDING) readonly uniform CameraUbo {
-  mat4 vp;
-  vec4 pos;
-  float fov;
-  float gamma;
-  float speed;
-  float sens;
+  CameraData data;
 } CameraUboArray[];
-#define cam_ubo CameraUboArray[camera_buffer_id]
+#define cam_ubo CameraUboArray[camera_buffer_id].data
 
 layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer InstancesRenderInfosBuffer {
   InstanceDrawInfo infos[];
