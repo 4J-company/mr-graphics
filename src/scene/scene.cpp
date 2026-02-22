@@ -158,7 +158,7 @@ uint32_t mr::Scene::add_model_instance(ModelHandle model, Matr4f transform) noex
 
       draw.instances_data_buffer_data.emplace_back(MeshInstanceCullingData {
         .transform_index = instance_id,
-        .visible_last_frame = std::numeric_limits<uint32_t>::max(), // all meshes are visible at first
+        .visible_last_frame = 0b1,
         .mesh_culling_data_index = model_mesh.mesh_scene_id,
       });
 
