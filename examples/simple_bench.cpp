@@ -50,9 +50,7 @@ int main(int argc, const char **argv)
   auto render_context = app.create_render_context(render_context_extent, render_options);
 
   if (options.enable_bound_boxes) {
-    render_context->enable_bound_boxes();
-  } else {
-    render_context->disable_bound_boxes();
+    render_context->render_bounds_state(mr::RenderContext::RenderBoundsState::BoundBoxes);
   }
 
   auto scene = render_context->create_scene();

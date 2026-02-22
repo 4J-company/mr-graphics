@@ -858,7 +858,7 @@ void mr::RenderContext::late_culling_geometry(const SceneHandle scene)
 
 void mr::RenderContext::update_bound_boxes_data()
 {
-  if (not _bound_boxes_draw_enabled) {
+  if (_render_bounds_state == RenderBoundsState::Disable) {
     return;
   }
 
@@ -883,7 +883,7 @@ void mr::RenderContext::update_bound_boxes_data()
 
 void mr::RenderContext::render_bound_boxes(const SceneHandle scene)
 {
-  if (not _bound_boxes_draw_enabled) {
+  if (_render_bounds_state == RenderBoundsState::Disable) {
     return;
   }
 
@@ -900,7 +900,7 @@ void mr::RenderContext::render_bound_boxes(const SceneHandle scene)
   uint32_t bound_boxes_push_contants[] {
     scene->camera_buffer_id(),
     _bound_boxes_buffer_id,
-    (uint32_t)scene->_draw_bound_rects,
+    (uint32_t)(_render_bounds_state == RenderBoundsState::BoundRectangles),
   };
   _models_command_unit->pushConstants(_bound_boxes_draw_pipeline.layout(),
                                       vk::ShaderStageFlagBits::eAllGraphics,

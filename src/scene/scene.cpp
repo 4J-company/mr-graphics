@@ -294,7 +294,9 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
       _camera.cam().projection() = mr::math::Camera<float>::Projection(45_deg);
     }
     if (input_state.key_tapped(vkfw::Key::eB)) {
-      _draw_bound_rects = !_draw_bound_rects;
+      auto state = _parent->render_bounds_state();
+      uint32_t s = (enum_cast(state) + 1) % RenderContext::RenderBoundsState::StatesNumber;
+      _parent->render_bounds_state(enum_cast<RenderContext::RenderBoundsState>(s));
     }
   }
 

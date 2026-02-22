@@ -72,6 +72,14 @@ inline namespace graphics {
       ColorTrans = 5
     };
 
+    enum RenderBoundsState : uint32_t {
+      Disable,
+      BoundBoxes,
+      BoundRectangles,
+      // BoundSpheres // TODO
+      StatesNumber,
+    };
+
     // Bindings numbers in bindless descriptor set
     constexpr static inline uint32_t textures_binding = 0;
     constexpr static inline uint32_t uniform_buffer_binding = 1;
@@ -231,7 +239,7 @@ inline namespace graphics {
     uint32_t _bound_boxes_buffer_id = -1;
     std::vector<BoundBoxRenderData> _bound_boxes_data;
     std::atomic_bool _bound_boxes_data_dirty = false;
-    std::atomic_bool _bound_boxes_draw_enabled = false;
+    RenderBoundsState _render_bounds_state = RenderBoundsState::Disable;
 
   public:
     RenderContext(RenderContext &&other) noexcept = default;
@@ -257,8 +265,8 @@ inline namespace graphics {
     RenderOptions options() const noexcept { return _render_options; }
     CommandUnit & transfer_command_unit() const noexcept { return _transfer_command_unit; }
 
-    void enable_bound_boxes() noexcept { _bound_boxes_draw_enabled = true; }
-    void disable_bound_boxes() noexcept { _bound_boxes_draw_enabled = false; }
+    void render_bounds_state(RenderBoundsState state) noexcept { _render_bounds_state = state; }
+    RenderBoundsState render_bounds_state() const noexcept { return _render_bounds_state; }
 
     // Works only if EnableCullingVisualiztion option is enabled
     void save_visibility() noexcept { _save_culling_visualization = true; }

@@ -119,6 +119,7 @@ std::optional<vk::RenderingAttachmentInfoKHR> mr::Window::target_image_info_impl
     .loadOp = vk::AttachmentLoadOp::eClear,
     .storeOp = vk::AttachmentStoreOp::eStore,
     // TODO(dk6): added bckg color as parameter
+    // .clearValue = {vk::ClearColorValue( std::array {0.3f, 0.47f, 0.8f, 0.f})},
     .clearValue = {vk::ClearColorValue( std::array {0.f, 0.f, 0.f, 0.f})},
   };
 }
