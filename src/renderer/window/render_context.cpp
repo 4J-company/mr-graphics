@@ -55,7 +55,8 @@ mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent,
   _models_render_finished_semaphore = _state->device().createSemaphoreUnique({}).value;
 
   if (is_render_option_enabled(_render_options, RenderOptions::CollectPosInstanceId)) {
-    _models_gbuffer_filling_done_semaphore = _state->device().createSemaphoreUnique({}).value;
+    _gbuffers_data_copy_ready_semaphore = _state->device().createSemaphoreUnique({}).value;
+    _position_instance_copy_cmd_unit = CommandUnit(*_state);
   }
 
   init_bindless_rendering();
@@ -428,6 +429,7 @@ void mr::RenderContext::render_lights(const SceneHandle scene, Presenter &presen
       gbuf.switch_layout(_pre_light_layout_transition_command_unit, vk::ImageLayout::eShaderReadOnlyOptimal);
     }
     _depthbuffer.switch_layout(_pre_light_layout_transition_command_unit, vk::ImageLayout::eDepthStencilAttachmentOptimal);
+
     _pre_light_layout_transition_command_unit.end();
     _pre_light_layout_transition_command_unit.add_signal_semaphore(
         _pre_light_layout_transition_semaphore.get());
@@ -1004,12 +1006,6 @@ void mr::RenderContext::render_geometry(const SceneHandle scene, bool is_late_pa
       : _visible_models_rendering_semaphore.get();
   cmd_unit.add_signal_semaphore(finish_semaphore);
 
-  if (is_render_option_enabled(_render_options, RenderOptions::CollectPosInstanceId)) {
-    if (is_render_option_enabled(_render_options, RenderOptions::DisableOcclusionCulling) || is_late_pass) {
-      cmd_unit.add_signal_semaphore(_models_gbuffer_filling_done_semaphore.get());
-    }
-  }
-
   cmd_unit.end();
 
   vk::SubmitInfo pre_model_layout_transition_submit_info =
@@ -1166,6 +1162,10 @@ void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
     _lights_command_unit.add_signal_semaphore(render_finished_semaphore);
   }
 
+  if (is_render_option_enabled(_render_options, RenderOptions::CollectPosInstanceId)) {
+    _lights_command_unit.add_signal_semaphore(_gbuffers_data_copy_ready_semaphore.get());
+  }
+
   vk::SubmitInfo pre_light_layout_transition_submit_info =
     _pre_light_layout_transition_command_unit.submit_info();
   _state->queue().submit(pre_light_layout_transition_submit_info);
@@ -1175,28 +1175,17 @@ void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
 
   presenter.present();
 
-  FrameMarkEnd(frame_name);
-
   if (is_render_option_enabled(_render_options, RenderOptions::CollectPosInstanceId)) {
-    // collect real visible objects
     auto &pos_gbuf = _gbuffers[enum_cast(GBuffer::Position)];
-    CommandUnit cmd_unit(*_state);
-    cmd_unit.begin();
-    auto stage_buffer = pos_gbuf.read_to_host_buffer(cmd_unit);
-    cmd_unit.add_wait_semaphore(_models_gbuffer_filling_done_semaphore.get(),
-                                vk::PipelineStageFlagBits::eColorAttachmentOutput);
-    cmd_unit.end();
-    auto fence = cmd_unit.submit(*_state);
-    _state->device().waitForFences({fence.get()}, vk::True, UINT64_MAX);
-
-    auto [w, h, _z] = pos_gbuf.extent();
-    assert(stage_buffer.byte_size() == format_byte_size(pos_gbuf.format()) * w * h);
-    assert(format_byte_size(pos_gbuf.format()) == sizeof(float) * 4);
-    _position_instance_id_data.resize(stage_buffer.byte_size() / sizeof(float));
-
-    auto char_data = stage_buffer.copy();
-    memcpy(reinterpret_cast<std::byte *>(_position_instance_id_data.data()), char_data.data(), char_data.size());
+    _position_instance_copy_cmd_unit.begin();
+    // _position_instance_id_stage_buffer = pos_gbuf.read_to_host_buffer(_position_instance_copy_cmd_unit);
+    _position_instance_copy_cmd_unit.end();
+    _position_instance_copy_cmd_unit.add_wait_semaphore(_gbuffers_data_copy_ready_semaphore.get(),
+                                                         vk::PipelineStageFlagBits::eColorAttachmentOutput);
+    _position_instance_copy_fence = _position_instance_copy_cmd_unit.submit(*_state);
   }
+
+  FrameMarkEnd(frame_name);
 
   calculate_stat(scene, render_start_time, ClockT::now());
 }
@@ -1278,18 +1267,27 @@ void mr::RenderContext::calculate_stat(SceneHandle scene,
       stat->total_objects_number - stat->occluded_objects_number - stat->outside_frustum_objects_number;
 
     if (is_render_option_enabled(_render_options, RenderOptions::CollectPosInstanceId)) {
-      // calculate really visible objects
-      boost::unordered_set<uint32_t> visible_objects;
-      auto &pos_gbuf = _gbuffers[enum_cast(GBuffer::Position)];
-      auto [w, h, _z] = pos_gbuf.extent();
-      for (uint32_t x = 0; x < w; x++) {
-        for (uint32_t y = 0; y < h; y++) {
-          uint32_t index = (y * w) + x + 3;
-          uint32_t id = static_cast<uint32_t>(_position_instance_id_data[index]);
-          visible_objects.insert(id);
-        }
-      }
-      _render_stat.really_visible_objects_number = static_cast<uint32_t>(visible_objects.size());
+      // _state->device().waitForFences({_position_instance_copy_fence.get()},
+      //                                vk::True, std::numeric_limits<uint64_t>::max());
+      // auto &pos_gbuf = _gbuffers[enum_cast(GBuffer::Position)];
+      // auto [w, h, _z] = pos_gbuf.extent();
+      // assert(_position_instance_id_stage_buffer.byte_size() == format_byte_size(pos_gbuf.format()) * w * h);
+      // assert(format_byte_size(pos_gbuf.format()) == sizeof(float) * 4);
+      // _position_instance_id_data.resize(_position_instance_id_stage_buffer.byte_size() / sizeof(float));
+
+      // auto char_data = _position_instance_id_stage_buffer.copy();
+      // memcpy(reinterpret_cast<std::byte *>(_position_instance_id_data.data()), char_data.data(), char_data.size());
+
+      // // calculate really visible objects
+      // boost::unordered_set<uint32_t> visible_objects;
+      // for (uint32_t x = 0; x < w; x++) {
+      //   for (uint32_t y = 0; y < h; y++) {
+      //     uint32_t index = (y * w) + x + 3;
+      //     uint32_t id = static_cast<uint32_t>(_position_instance_id_data[index]);
+      //     visible_objects.insert(id);
+      //   }
+      // }
+      // _render_stat.really_visible_objects_number = static_cast<uint32_t>(visible_objects.size());
     }
   }
 }

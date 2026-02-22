@@ -205,8 +205,11 @@ inline namespace graphics {
     ComputePipeline _late_instances_culling_pipeline;
 
     // --- Collecting world coordinates and instances id ---
-    vk::UniqueSemaphore _models_gbuffer_filling_done_semaphore;
+    vk::UniqueSemaphore _gbuffers_data_copy_ready_semaphore;
+    CommandUnit _position_instance_copy_cmd_unit;
+    vk::UniqueFence _position_instance_copy_fence;
     std::vector<float> _position_instance_id_data;
+    HostBuffer _position_instance_id_stage_buffer;
 
     // --- This used if EnableCullingStats option is enabled ---
     StorageBuffer _culling_stat_buffer;
