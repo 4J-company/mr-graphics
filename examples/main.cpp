@@ -29,6 +29,7 @@ int main(int argc, const char **argv)
   } else {
     render_context_extent = {options.width, options.height};
   }
+  std::println("render context extent: {}x{}", render_context_extent.width, render_context_extent.height);
   render_context_extent = {options.width, options.height};
 
   mr::RenderOptions render_options = mr::RenderOptions::None;
