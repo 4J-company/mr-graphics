@@ -53,6 +53,7 @@ inline namespace graphics {
     uint32_t occluded_objects_number = 0;
     uint32_t visible_objects_number = 0; // extra information
     uint32_t really_visible_objects_number = 0;
+    double occlusion_culling_accuracy = 0;
 
     void write_to_json(std::ostream &out) const noexcept;
   };
@@ -140,7 +141,7 @@ inline namespace graphics {
     RenderOptions _render_options;
 
     vk::UniqueQueryPool _timestamps_query_pool {};
-    RenderStat _render_stat;
+    RenderStat _render_stat, _prev_render_stat;
     ClockT::time_point _prev_start_time {};
     uint64_t _prev_first_timestamp = 0;
     double _timestamp_to_ms = 0;
@@ -208,7 +209,6 @@ inline namespace graphics {
     vk::UniqueSemaphore _gbuffers_data_copy_ready_semaphore;
     CommandUnit _position_instance_copy_cmd_unit;
     vk::UniqueFence _position_instance_copy_fence;
-    std::vector<float> _position_instance_id_data;
     HostBuffer _position_instance_id_stage_buffer;
 
     // --- This used if EnableCullingStats option is enabled ---
@@ -265,6 +265,7 @@ inline namespace graphics {
     const VulkanState & vulkan_state() const noexcept { return *_state; }
     const Extent & extent() const noexcept { return _extent; }
     const RenderStat & stat() const noexcept { return _render_stat; }
+    const RenderStat & prev_stat() const noexcept { return _prev_render_stat; }
     RenderOptions options() const noexcept { return _render_options; }
     CommandUnit & transfer_command_unit() const noexcept { return _transfer_command_unit; }
 
@@ -317,7 +318,10 @@ inline namespace graphics {
     void update_bound_boxes_data();
     void update_camera_buffer(UniformBuffer &uniform_buffer);
 
-    void calculate_stat(SceneHandle scene, ClockT::time_point render_start_time, ClockT::time_point render_finish_time);
+    void calculate_stat(SceneHandle scene,
+                        ClockT::time_point render_start_time,
+                        ClockT::time_point render_finish_time) noexcept;
+    void calculate_prev_stat(SceneHandle scene) noexcept;
 
     constexpr static inline uint32_t calculate_work_groups_number(uint32_t threads_number, uint32_t group_size)
     {

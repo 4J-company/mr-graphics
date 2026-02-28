@@ -36,7 +36,18 @@ mr::Buffer::Buffer(const VulkanState &state, size_t byte_size,
   allocation_create_info.usage = VMA_MEMORY_USAGE_AUTO;
 
   if (memory_properties & vk::MemoryPropertyFlagBits::eHostVisible) {
-    allocation_create_info.flags |= VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+    // Check is buffer use for shader read or CPU read
+    bool is_readback = (usage_flags & vk::BufferUsageFlagBits::eTransferDst) &&
+                       !(usage_flags & vk::BufferUsageFlagBits::eTransferSrc);
+
+    if (is_readback) {
+      // GPU → CPU
+      allocation_create_info.flags |= VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT;
+      allocation_create_info.preferredFlags = VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
+    } else {
+      // CPU → GPU
+      allocation_create_info.flags |= VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+    }
   }
 
   auto result = vmaCreateBuffer(

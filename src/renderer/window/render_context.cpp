@@ -57,6 +57,10 @@ mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent,
   if (is_render_option_enabled(_render_options, RenderOptions::CollectPosInstanceId)) {
     _gbuffers_data_copy_ready_semaphore = _state->device().createSemaphoreUnique({}).value;
     _position_instance_copy_cmd_unit = CommandUnit(*_state);
+    auto &pos_gbuf = _gbuffers[enum_cast(GBuffer::Position)];
+    _position_instance_id_stage_buffer = HostBuffer(*_state, pos_gbuf.size(), vk::BufferUsageFlagBits::eTransferDst,
+      vk::MemoryPropertyFlagBits::eHostCached);
+    _position_instance_copy_fence = _state->device().createFenceUnique({.flags = vk::FenceCreateFlagBits::eSignaled}).value;
   }
 
   init_bindless_rendering();
@@ -423,7 +427,6 @@ void mr::RenderContext::render_lights(const SceneHandle scene, Presenter &presen
                                          _timestamps_query_pool.get(),
                                          enum_cast(Timestamp::ShadingStart));
 
-    // CommandUnit command_unit {scene->render_context().vulkan_state()};
     _pre_light_layout_transition_command_unit.begin();
     for (auto &gbuf : _gbuffers) {
       gbuf.switch_layout(_pre_light_layout_transition_command_unit, vk::ImageLayout::eShaderReadOnlyOptimal);
@@ -951,6 +954,7 @@ void mr::RenderContext::render_geometry(const SceneHandle scene, bool is_late_pa
       return gbuf.attachment_info();
     }) | std::ranges::to<InplaceVector<vk::RenderingAttachmentInfoKHR, gbuffers_number>>();
     auto depth_attachment_info = _depthbuffer.attachment_info();
+    gbufs_attachs[enum_cast(GBuffer::Position)].clearValue.color.uint32[3] = std::numeric_limits<uint32_t>::max();
 
     if (is_late_pass) {
       for (auto &attach : gbufs_attachs) {
@@ -1114,6 +1118,8 @@ void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
   _state->device().waitForFences(_image_fence.get(), VK_TRUE, UINT64_MAX);
   _state->device().resetFences(_image_fence.get());
 
+  calculate_prev_stat(scene);
+
   resize(presenter.extent());
   // NOTE: Camera UBO is already updated and this resize will only affect next frame
   scene->_camera.cam().projection().resize((float)_extent.width / _extent.height);
@@ -1178,11 +1184,12 @@ void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
   if (is_render_option_enabled(_render_options, RenderOptions::CollectPosInstanceId)) {
     auto &pos_gbuf = _gbuffers[enum_cast(GBuffer::Position)];
     _position_instance_copy_cmd_unit.begin();
-    // _position_instance_id_stage_buffer = pos_gbuf.read_to_host_buffer(_position_instance_copy_cmd_unit);
+    pos_gbuf.read_to_host_buffer(_position_instance_copy_cmd_unit, _position_instance_id_stage_buffer);
     _position_instance_copy_cmd_unit.end();
     _position_instance_copy_cmd_unit.add_wait_semaphore(_gbuffers_data_copy_ready_semaphore.get(),
                                                          vk::PipelineStageFlagBits::eColorAttachmentOutput);
-    _position_instance_copy_fence = _position_instance_copy_cmd_unit.submit(*_state);
+    vk::SubmitInfo copy_gbuf_submit_info = _position_instance_copy_cmd_unit.submit_info();
+    _state->queue().submit(copy_gbuf_submit_info, _position_instance_copy_fence.get());
   }
 
   FrameMarkEnd(frame_name);
@@ -1192,7 +1199,7 @@ void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
 
 void mr::RenderContext::calculate_stat(SceneHandle scene,
                                        ClockT::time_point render_start_time,
-                                       ClockT::time_point render_finish_time)
+                                       ClockT::time_point render_finish_time) noexcept
 {
   auto get_ms = [](ClockT::duration time) -> double {
     using namespace std::chrono;
@@ -1265,31 +1272,51 @@ void mr::RenderContext::calculate_stat(SceneHandle scene,
     _render_stat.occluded_objects_number = stat->occluded_objects_number;
     _render_stat.visible_objects_number =
       stat->total_objects_number - stat->occluded_objects_number - stat->outside_frustum_objects_number;
-
-    if (is_render_option_enabled(_render_options, RenderOptions::CollectPosInstanceId)) {
-      // _state->device().waitForFences({_position_instance_copy_fence.get()},
-      //                                vk::True, std::numeric_limits<uint64_t>::max());
-      // auto &pos_gbuf = _gbuffers[enum_cast(GBuffer::Position)];
-      // auto [w, h, _z] = pos_gbuf.extent();
-      // assert(_position_instance_id_stage_buffer.byte_size() == format_byte_size(pos_gbuf.format()) * w * h);
-      // assert(format_byte_size(pos_gbuf.format()) == sizeof(float) * 4);
-      // _position_instance_id_data.resize(_position_instance_id_stage_buffer.byte_size() / sizeof(float));
-
-      // auto char_data = _position_instance_id_stage_buffer.copy();
-      // memcpy(reinterpret_cast<std::byte *>(_position_instance_id_data.data()), char_data.data(), char_data.size());
-
-      // // calculate really visible objects
-      // boost::unordered_set<uint32_t> visible_objects;
-      // for (uint32_t x = 0; x < w; x++) {
-      //   for (uint32_t y = 0; y < h; y++) {
-      //     uint32_t index = (y * w) + x + 3;
-      //     uint32_t id = static_cast<uint32_t>(_position_instance_id_data[index]);
-      //     visible_objects.insert(id);
-      //   }
-      // }
-      // _render_stat.really_visible_objects_number = static_cast<uint32_t>(visible_objects.size());
-    }
   }
+}
+
+void mr::RenderContext::calculate_prev_stat(SceneHandle scene) noexcept
+{
+  if (is_render_option_enabled(_render_options, RenderOptions::EnableCullingStats) &&
+      is_render_option_enabled(_render_options, RenderOptions::CollectPosInstanceId)) {
+    _state->device().waitForFences({_position_instance_copy_fence.get()},
+                                   vk::True, std::numeric_limits<uint64_t>::max());
+    _state->device().resetFences({_position_instance_copy_fence.get()});
+
+    auto &pos_gbuf = _gbuffers[enum_cast(GBuffer::Position)];
+    auto [w, h, _z] = pos_gbuf.extent();
+    assert(_position_instance_id_stage_buffer.byte_size() == format_byte_size(pos_gbuf.format()) * w * h);
+    assert(format_byte_size(pos_gbuf.format()) == sizeof(float) * 4);
+
+    // Copy from mapped host visible memory about 4 ms because we use readback
+    auto char_data = _position_instance_id_stage_buffer.copy();
+    const float *data = reinterpret_cast<const float *>(char_data.data());
+
+    // Iteration over 1920x1080 gbuf takes about 7 ms. It can be used ONLY for debug
+    // calculate really visible objects
+    boost::unordered_set<uint32_t> visible_objects;
+    uint32_t pixels_nums = w * h;
+    for (uint32_t i = 0; i < pixels_nums; i++) {
+      uint32_t index = i * 4 + 3;
+      float id = data[index];
+      if (std::bit_cast<uint32_t>(id) != std::numeric_limits<uint32_t>::max()) {
+        visible_objects.insert(static_cast<uint32_t>(id));
+      }
+    }
+    _render_stat.really_visible_objects_number = static_cast<uint32_t>(visible_objects.size());
+
+    uint32_t in_frustum_objects = _render_stat.total_objects_number - _render_stat.outside_frustum_objects_number;
+    uint32_t not_occluded_in_frustum_objects = in_frustum_objects - _render_stat.occluded_objects_number;
+    _render_stat.occlusion_culling_accuracy = not_occluded_in_frustum_objects != 0
+      ? (_render_stat.really_visible_objects_number / double(not_occluded_in_frustum_objects))
+      : (_render_stat.really_visible_objects_number == 0 ? 1.0f : (0.5f / _render_stat.really_visible_objects_number));
+
+    std::println("really visible: {}", _render_stat.really_visible_objects_number);
+    std::println("not occluded in frustum: {}", not_occluded_in_frustum_objects);
+    std::println("accuracy: {}", _render_stat.occlusion_culling_accuracy);
+    std::println();
+  }
+  _prev_render_stat = _render_stat;
 }
 
 void mr::RenderStat::write_to_json(std::ostream &out) const noexcept
