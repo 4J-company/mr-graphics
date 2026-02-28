@@ -53,6 +53,7 @@ inline namespace graphics {
     uint32_t occluded_objects_number = 0;
     uint32_t visible_objects_number = 0; // extra information
     uint32_t really_visible_objects_number = 0;
+    uint32_t not_occluded_in_frustum_objects = 0; // extra information
     double occlusion_culling_accuracy = 0;
 
     void write_to_json(std::ostream &out) const noexcept;

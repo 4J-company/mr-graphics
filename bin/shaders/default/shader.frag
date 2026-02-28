@@ -24,6 +24,8 @@ void main()
 {
   vec4 bckg_color = vec4(0.3, 0.47, 0.8, 1);
 
+  OutPos = vec4(position.xyz, float(instance_id));
+
 #ifdef ENABLE_CULLING_VISUALIZATION
   if (!IS_INSTANCE_IN_FRUSTUM(visible_at_stash)) {
     OutNIsShade = vec4(vec3(0), 0);
@@ -36,7 +38,6 @@ void main()
   }
 #endif // ENABLE_CULLING_VISUALIZATION
 
-  OutPos = vec4(position.xyz, float(instance_id));
   OutNIsShade = vec4(normal, 1);
 
   OutMR         = get_metallic_roughness_color(materialid, texcoord);

@@ -1306,15 +1306,10 @@ void mr::RenderContext::calculate_prev_stat(SceneHandle scene) noexcept
     _render_stat.really_visible_objects_number = static_cast<uint32_t>(visible_objects.size());
 
     uint32_t in_frustum_objects = _render_stat.total_objects_number - _render_stat.outside_frustum_objects_number;
-    uint32_t not_occluded_in_frustum_objects = in_frustum_objects - _render_stat.occluded_objects_number;
-    _render_stat.occlusion_culling_accuracy = not_occluded_in_frustum_objects != 0
-      ? (_render_stat.really_visible_objects_number / double(not_occluded_in_frustum_objects))
+    _render_stat.not_occluded_in_frustum_objects = in_frustum_objects - _render_stat.occluded_objects_number;
+    _render_stat.occlusion_culling_accuracy = _render_stat.not_occluded_in_frustum_objects != 0
+      ? (_render_stat.really_visible_objects_number / double(_render_stat.not_occluded_in_frustum_objects))
       : (_render_stat.really_visible_objects_number == 0 ? 1.0f : (0.5f / _render_stat.really_visible_objects_number));
-
-    std::println("really visible: {}", _render_stat.really_visible_objects_number);
-    std::println("not occluded in frustum: {}", not_occluded_in_frustum_objects);
-    std::println("accuracy: {}", _render_stat.occlusion_culling_accuracy);
-    std::println();
   }
   _prev_render_stat = _render_stat;
 }
@@ -1345,6 +1340,9 @@ void mr::RenderStat::write_to_json(std::ostream &out) const noexcept
   std::println(out, "  \"outside_frustum_objects_number\": {},", outside_frustum_objects_number);
   std::println(out, "  \"visible_objects_number\": {},", visible_objects_number);
   std::println(out, "  \"occluded_objects_number\": {},", occluded_objects_number);
-  std::println(out, "  \"really_visible_objects_number\": {}", really_visible_objects_number);
+  std::println(out, "  \"really_visible_objects_number\": {},", really_visible_objects_number);
+  std::println(out, "  \"not_occluded_in_frustum_objects\": {},", not_occluded_in_frustum_objects);
+  std::println(out, "  \"occlusion_culling_accuracy\": {}", occlusion_culling_accuracy);
+
   std::println(out, "}}");
 }
