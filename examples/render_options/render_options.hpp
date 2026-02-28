@@ -29,6 +29,7 @@ inline namespace graphics {
     bool print_stat;
     bool enable_culling_stat;
     bool enable_culling_visualization;
+    bool read_gbuf;
 
     static std::optional<CliOptions> parse(int argc, const char **argv);
 

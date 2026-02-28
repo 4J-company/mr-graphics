@@ -48,7 +48,9 @@ int main(int argc, const char **argv)
   if (options.enable_culling_visualization) {
     render_options |= mr::RenderOptions::EnableCullingVisualiztion;
   }
-  render_options |= mr::RenderOptions::CollectPosInstanceId;
+  if (options.read_gbuf) {
+    render_options |= mr::RenderOptions::CollectPosInstanceId;
+  }
 
   auto render_context = app.create_render_context(render_context_extent, render_options);
 

@@ -99,6 +99,9 @@ std::optional<mr::CliOptions> mr::CliOptions::parse(int argc, const char **argv)
     ("enable-culling-visualization",
      po::bool_switch()->default_value(false),
      "Stash invisible objects on '0' key")
+    ("read-gbuf",
+     po::bool_switch()->default_value(false),
+     "Read first gbuffer with positions and instance ids")
   ;
 
   po::positional_options_description pos_desc;
@@ -147,6 +150,7 @@ std::optional<mr::CliOptions> mr::CliOptions::parse(int argc, const char **argv)
   options.print_stat = vm["print-stat"].as<bool>();
   options.enable_culling_stat = vm["enable-culling-stat"].as<bool>();
   options.enable_culling_visualization = vm["enable-culling-visualization"].as<bool>();
+  options.read_gbuf = vm["read-gbuf"].as<bool>();
 
   auto mode_str = vm["mode"].as<std::string>();
   auto mode_opt = parse_mode(mode_str);
