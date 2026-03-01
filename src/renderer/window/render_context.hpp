@@ -222,6 +222,11 @@ inline namespace graphics {
     std::atomic_bool _clear_culling_visualization = false;
     ShaderHandle _copy_visibility_states_shader;
     ComputePipeline _copy_visibility_states_pipeline;
+    ShaderHandle _copy_on_screen_shader;
+    ComputePipeline _copy_on_screen_pipeline;
+    Sampler _read_from_gbuf_sampler;
+    CommandUnit _copy_on_screen_command_unit;
+    vk::Semaphore _copy_on_screen_signal_semaphore;
 
     Extent _depth_pyramid_extent;
     PyramidImage _depth_pyramid;

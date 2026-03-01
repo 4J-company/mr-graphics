@@ -283,6 +283,12 @@ void mr::RenderContext::init_culling()
     _copy_visibility_states_shader = ResourceManager<Shader>::get().create("CopyVisibility",
       *_state, "culling/copy_visibility", defines);
     _copy_visibility_states_pipeline = ComputePipeline(*_state, _copy_visibility_states_shader, set_layouts);
+
+    _copy_on_screen_shader = ResourceManager<Shader>::get().create("CopyOnScreen",
+      *_state, "culling/copy_visibility/copy_visible_from_gbuf", defines);
+    _copy_on_screen_pipeline = ComputePipeline(*_state, _copy_on_screen_shader, set_layouts);
+    _read_from_gbuf_sampler = Sampler(*_state, vk::Filter::eNearest, vk::SamplerMipmapMode::eNearest,
+                                      vk::SamplerAddressMode::eClampToEdge);
   }
 }
 
@@ -1149,6 +1155,10 @@ void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
 
     render_geometry(scene, true);
   }
+
+  // copy on screen visibility
+  _copy_on_screen_command_unit.begin();
+  _copy_on_screen_command_unit.end();
 
   // --------------------------------------------------------------------------
   // Lights shading pass
