@@ -104,11 +104,23 @@ void main()
   mat4 transfrom = transpose(transforms_in[instance_data.transform_index]);
   BoundBox bb = transform_bound_box(bound_box(mesh_data), transfrom);
 
-  if (!IS_INSTANCE_IN_FRUSTUM(instance_data.visibility_bits)) {
+  if (IS_INSTANCE_FRUSTUM_CALCULATED(instance_data.visibility_bits)) {
+    if (!IS_INSTANCE_IN_FRUSTUM(instance_data.visibility_bits)) {
 #ifdef COLLECT_CULLING_STAT
-    atomicAdd(culling_stat.outside_frustum_objects_number, 1);
+      atomicAdd(culling_stat.outside_frustum_objects_number, 1);
 #endif // COLLECT_CULLING_STAT
-    return;
+      return;
+    }
+  } else {
+    // Object was occluded at last frame so at first phase of current phase frustum visibility wasn't calculated
+    if (!is_bound_box_frustum_visible(bb, camera_buffer.frustum_planes)) {
+      // Clear occluded bit - not this object will be handled by first pass until it become in frustum
+      instances_datas[id].visibility_bits = SET_INSTANCE_WAS_OCCLUDED(instance_data.visibility_bits, false);
+#ifdef COLLECT_CULLING_STAT
+      atomicAdd(culling_stat.outside_frustum_objects_number, 1);
+#endif // COLLECT_CULLING_STAT
+      return;
+    }
   }
 
   // -------------------------------------
@@ -168,7 +180,7 @@ void main()
   atomicAdd(culling_stat.occluded_objects_cnt, visible ? 0 : 1);
 #endif // COLLECT_CULLING_STAT
 
-  if (!visible || IS_INSTANCE_RENDERER_AT_FIRST_PASS_BIT(instance_data.visibility_bits)) {
+  if (!visible || IS_INSTANCE_RENDERER_AT_FIRST_PASS(instance_data.visibility_bits)) {
     // If object was visible it has been already rendered in first pass
     return;
   }

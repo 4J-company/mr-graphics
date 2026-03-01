@@ -33,7 +33,7 @@ void main()
     return;
   } else if (IS_INSTANCE_WAS_OCCLUDED(visible_at_stash)) {
     OutNIsShade = vec4(vec3(0), 0);
-    OutColorTrans = vec4(1, 0, 0, 1);
+    OutColorTrans = vec4(0.1, 0.5, 0, 1);
     return;
   }
 #endif // ENABLE_CULLING_VISUALIZATION
