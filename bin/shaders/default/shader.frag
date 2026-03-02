@@ -24,16 +24,22 @@ void main()
 {
   vec4 bckg_color = vec4(0.3, 0.47, 0.8, 1);
 
-  OutPos = vec4(position.xyz, float(instance_id));
+  OutPos = vec4(position.xyz, uintBitsToFloat(instance_id));
 
 #ifdef ENABLE_CULLING_VISUALIZATION
-  if (!IS_INSTANCE_IN_FRUSTUM(visible_at_stash)) {
+  //if (!IS_INSTANCE_IN_FRUSTUM(visible_at_stash)) {
+  //  OutNIsShade = vec4(vec3(0), 0);
+  //  OutColorTrans = vec4(0, 0, 1, 1);
+  //  return;
+  //} else if (IS_INSTANCE_WAS_OCCLUDED(visible_at_stash)) {
+  //  OutNIsShade = vec4(vec3(0), 0);
+  //  OutColorTrans = vec4(0.1, 0.5, 0, 1);
+  //  return;
+  //}
+  // else
+  if (IS_INSTANCE_ON_SCREEN(visible_at_stash)) {
     OutNIsShade = vec4(vec3(0), 0);
-    OutColorTrans = vec4(0, 0, 1, 1);
-    return;
-  } else if (IS_INSTANCE_WAS_OCCLUDED(visible_at_stash)) {
-    OutNIsShade = vec4(vec3(0), 0);
-    OutColorTrans = vec4(0.1, 0.5, 0, 1);
+    OutColorTrans = vec4(1, 0.8, 0, 1);
     return;
   }
 #endif // ENABLE_CULLING_VISUALIZATION

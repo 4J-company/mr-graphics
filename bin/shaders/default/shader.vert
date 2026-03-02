@@ -56,7 +56,7 @@ layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer Tr
 #define transforms TransfromsArray[transforms_buffer_id].transforms
 
 #ifdef ENABLE_CULLING_VISUALIZATION
-layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) buffer VisibilityStatesBuffer {
+layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer VisibilityStatesBuffer {
   uint data[];
 } VisibilityStates[];
 #define visibility_states VisibilityStates[visibility_states_buffer_id].data

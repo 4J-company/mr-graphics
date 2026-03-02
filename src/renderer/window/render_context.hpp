@@ -225,6 +225,8 @@ inline namespace graphics {
     ShaderHandle _copy_on_screen_shader;
     ComputePipeline _copy_on_screen_pipeline;
     Sampler _read_from_gbuf_sampler;
+    ShaderImageResource _read_from_gbuf_resource;
+    uint32_t _sampled_gbuffer_id;
     CommandUnit _copy_on_screen_command_unit;
     vk::Semaphore _copy_on_screen_signal_semaphore;
 

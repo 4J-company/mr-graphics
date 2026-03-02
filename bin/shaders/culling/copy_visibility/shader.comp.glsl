@@ -33,6 +33,6 @@ void main()
   MeshInstanceCullingData instance_data = instances_datas[id];
 
   visibility_states[instance_data.transform_index] = (buffers_data.clear_visibility == 1)
-    ? (SET_INSTANCE_IN_FRUSTUM(0, true) | SET_INSTANCE_WAS_OCCLUDED(0, false) | SET_INSTANCE_ON_SCREEN(0, false))
+    ? (SET_INSTANCE_IN_FRUSTUM(0, true) | SET_INSTANCE_WAS_OCCLUDED(0, false))
     : instance_data.visibility_bits;
 }

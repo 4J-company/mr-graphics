@@ -2,10 +2,13 @@
 
 #extension GL_EXT_nonuniform_qualifier : enable
 
+#include "culling/culling.h"
+
 layout(local_size_x = THREADS_NUM, local_size_y = THREADS_NUM, local_size_z = 1) in;
 layout(push_constant) uniform PushContants {
   uint gbuf_id;
-  uvec2 gbuf_size;
+  uint gbuf_width;
+  uint gbuf_heigth;
   uint visibility_states_buffer_id;
 } data;
 
@@ -20,11 +23,17 @@ layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) buffer VisibilityS
 void main()
 {
   uvec2 coord = gl_GlobalInvocationID.xy;
-  if (coord.x >= data.dst_size.x || coord.y >= data.dst_size.y) {
+  uvec2 gbuf_size = uvec2(data.gbuf_width, data.gbuf_heigth);
+  if (coord.x >= gbuf_size.x || coord.y >= gbuf_size.y) {
     return;
   }
-  coord /= data.gbuf_size;
+  vec2 tex_coord = vec2(coord) / gbuf_size;
 
-  uint id = floatBitsToInt(texutre(PosGbuf, coord).w);
-  visibility_states[id] = SET_INSTANCE_ON_SCREEN(visibility_states[id], true);
+  vec4 pixel = texture(PosGbuf, coord);
+  uint id = floatBitsToUint(pixel.w);
+
+  // uint id = floatBitsToUint(texture(PosGbuf, coord).w);
+  if (id != 0xFFFFFFFF && id != 0x7FFFFFFF) { // TODO: remove second value
+    visibility_states[id] = SET_INSTANCE_ON_SCREEN(visibility_states[id], true);
+  }
 }

@@ -289,6 +289,13 @@ void mr::RenderContext::init_culling()
     _copy_on_screen_pipeline = ComputePipeline(*_state, _copy_on_screen_shader, set_layouts);
     _read_from_gbuf_sampler = Sampler(*_state, vk::Filter::eNearest, vk::SamplerMipmapMode::eNearest,
                                       vk::SamplerAddressMode::eClampToEdge);
+    // This resource don't unregister in destructor becase bindless set die with them
+    _read_from_gbuf_resource = ShaderImageResource {
+      .image = &_gbuffers[enum_cast(GBuffer::Position)],
+      .sampler = &_read_from_gbuf_sampler,
+      .layout = vk::ImageLayout::eShaderReadOnlyOptimal,
+    };
+    _sampled_gbuffer_id = _bindless_set.register_resource(&_read_from_gbuf_resource);
   }
 }
 
@@ -647,6 +654,52 @@ void mr::RenderContext::culling_geometry(const SceneHandle scene)
                                        _timestamps_query_pool.get(),
                                        enum_cast(Timestamp::CullingEnd));
 
+  // --------------------------------------------------------------------------
+  // Culling visualization: copy invisible, but considered visible objects
+  // --------------------------------------------------------------------------
+
+  if (is_render_option_enabled(_render_options, RenderOptions::EnableCullingVisualiztion)) {
+    if (_save_culling_visualization || _clear_culling_visualization) {
+      _culling_command_unit->bindPipeline(vk::PipelineBindPoint::eCompute, _copy_on_screen_pipeline.pipeline());
+
+      _culling_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eCompute,
+                                                {_copy_on_screen_pipeline.layout()},
+                                                bindless_set_number,
+                                                culling_descriptor_sets,
+                                                {});
+
+      auto &gbuf = _gbuffers[enum_cast(GBuffer::Position)];
+      auto [width, heigth, _z] = gbuf.extent();
+      uint32_t read_on_screen_visibility_push_constants[] {
+        _sampled_gbuffer_id,
+        width, heigth,
+        scene->_occluded_instances_state_buffer_id,
+      };
+      _culling_command_unit->pushConstants(_copy_on_screen_pipeline.layout(),
+                                           vk::ShaderStageFlagBits::eCompute,
+                                           0, sizeof(read_on_screen_visibility_push_constants),
+                                           read_on_screen_visibility_push_constants);
+
+      gbuf.switch_layout(_culling_command_unit, vk::ImageLayout::eShaderReadOnlyOptimal);
+      _culling_command_unit->dispatch(
+        calculate_work_groups_number(width, culling_work_group_size),
+        calculate_work_groups_number(heigth, culling_work_group_size),
+        1
+      );
+
+      // vk::BufferMemoryBarrier visibility_states_barrier {
+      //   .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
+      //   .dstAccessMask = vk::AccessFlagBits::eShaderRead,
+      //   .buffer = scene->_occluded_instances_state_buffer.buffer(),
+      //   .offset = 0,
+      //   .size = scene->_occluded_instances_state_buffer.byte_size(),
+      // };
+      // _late_culling_command_unit->pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
+      //                                             vk::PipelineStageFlagBits::eDrawIndirect,
+      //                                             {}, {}, {visibility_states_barrier}, {});
+    }
+  }
+
   _culling_command_unit.end();
   if (scene->_was_transfer_in_this_frame) {
     _culling_command_unit.add_wait_semaphore(scene->_transfers_semaphore.get(),
@@ -838,7 +891,7 @@ void mr::RenderContext::late_culling_geometry(const SceneHandle scene)
 
         vk::BufferMemoryBarrier visibility_states_barrier {
           .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
-          .dstAccessMask = vk::AccessFlagBits::eShaderRead,
+          .dstAccessMask = vk::AccessFlagBits::eIndirectCommandRead,
           .buffer = scene->_occluded_instances_state_buffer.buffer(),
           .offset = 0,
           .size = scene->_occluded_instances_state_buffer.byte_size(),
@@ -1156,10 +1209,6 @@ void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
     render_geometry(scene, true);
   }
 
-  // copy on screen visibility
-  _copy_on_screen_command_unit.begin();
-  _copy_on_screen_command_unit.end();
-
   // --------------------------------------------------------------------------
   // Lights shading pass
   // --------------------------------------------------------------------------
@@ -1308,9 +1357,9 @@ void mr::RenderContext::calculate_prev_stat(SceneHandle scene) noexcept
     uint32_t pixels_nums = w * h;
     for (uint32_t i = 0; i < pixels_nums; i++) {
       uint32_t index = i * 4 + 3;
-      float id = data[index];
-      if (std::bit_cast<uint32_t>(id) != std::numeric_limits<uint32_t>::max()) {
-        visible_objects.insert(static_cast<uint32_t>(id));
+      uint32_t id = std::bit_cast<uint32_t>(data[index]);
+      if (id != std::numeric_limits<uint32_t>::max()) {
+        visible_objects.insert(id);
       }
     }
     _render_stat.really_visible_objects_number = static_cast<uint32_t>(visible_objects.size());
