@@ -24,16 +24,9 @@ void mr::Application::start_render_loop(RenderContext &render_context, SceneHand
 {
   std::jthread render_thread {
     [&](std::stop_token stop_token) {
-      uint32_t frame = 0;
       while (not stop_token.stop_requested()) {
         window->update_state();
         scene->update(std::optional(std::reference_wrapper(window->input_state())));
-
-        scene->camera().cam() = mr::math::Camera<float>({1}, {-1}, {0, 1, 0});
-        scene->camera().cam().projection() = mr::math::Camera<float>::Projection(45_deg);
-        if (frame++ == 5) {
-          render_context.save_visibility();
-        }
         render_context.render(scene, *window);
 
         if (stat_log_stream.has_value()) {

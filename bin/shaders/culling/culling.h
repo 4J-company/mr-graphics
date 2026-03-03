@@ -26,13 +26,13 @@ struct MeshInstanceCullingData {
 #define INSTANCE_WAS_OCCLUDED_BIT           1
 #define INSTANCE_RENDERER_AT_FIRST_PASS_BIT 2
 #define INSTANCE_FRUSTUM_CALCULATED_BIT     3
-#define INSTANCE_ON_SCREEN_BIT          4 // for debug culling
+#define INSTANCE_ON_SCREEN_BIT              4 // for debug culling
 
 #define IS_INSTANCE_IN_FRUSTUM(v)                 (((v) & (1 << INSTANCE_IN_FRUSTUM_BIT))             != 0)
 #define IS_INSTANCE_WAS_OCCLUDED(v)               (((v) & (1 << INSTANCE_WAS_OCCLUDED_BIT))           != 0)
 #define IS_INSTANCE_RENDERER_AT_FIRST_PASS(v)     (((v) & (1 << INSTANCE_RENDERER_AT_FIRST_PASS_BIT)) != 0)
 #define IS_INSTANCE_FRUSTUM_CALCULATED(v)         (((v) & (1 << INSTANCE_FRUSTUM_CALCULATED_BIT)) != 0)
-#define IS_INSTANCE_ON_SCREEN(v)              (((v) & (1 << INSTANCE_ON_SCREEN_BIT)) != 0)
+#define IS_INSTANCE_ON_SCREEN(v)                  (((v) & (1 << INSTANCE_ON_SCREEN_BIT)) != 0)
 
 #define SET_INSTANCE_IN_FRUSTUM(v, value) \
   ((value) ? ((v) | (1 << INSTANCE_IN_FRUSTUM_BIT)) : ((v) & ~((1 << INSTANCE_IN_FRUSTUM_BIT))))

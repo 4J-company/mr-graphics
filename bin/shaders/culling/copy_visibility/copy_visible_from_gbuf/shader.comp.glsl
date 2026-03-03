@@ -27,13 +27,11 @@ void main()
   if (coord.x >= gbuf_size.x || coord.y >= gbuf_size.y) {
     return;
   }
-  vec2 tex_coord = vec2(coord) / gbuf_size;
 
-  vec4 pixel = texture(PosGbuf, coord);
+  vec4 pixel = texelFetch(PosGbuf, ivec2(coord), 0);
   uint id = floatBitsToUint(pixel.w);
 
-  // uint id = floatBitsToUint(texture(PosGbuf, coord).w);
-  if (id != 0xFFFFFFFF && id != 0x7FFFFFFF) { // TODO: remove second value
+  if (id != 0xFFFFFFFF) {
     visibility_states[id] = SET_INSTANCE_ON_SCREEN(visibility_states[id], true);
   }
 }

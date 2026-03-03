@@ -25,6 +25,7 @@ void main()
   vec4 bckg_color = vec4(0.3, 0.47, 0.8, 1);
 
   OutPos = vec4(position.xyz, uintBitsToFloat(instance_id));
+  // OutPos = vec4(position.xyz, 1.0);
 
 #ifdef ENABLE_CULLING_VISUALIZATION
   //if (!IS_INSTANCE_IN_FRUSTUM(visible_at_stash)) {

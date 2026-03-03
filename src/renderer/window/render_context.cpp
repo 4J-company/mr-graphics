@@ -660,6 +660,9 @@ void mr::RenderContext::culling_geometry(const SceneHandle scene)
 
   if (is_render_option_enabled(_render_options, RenderOptions::EnableCullingVisualiztion)) {
     if (_save_culling_visualization || _clear_culling_visualization) {
+      // TODO: clear data - new shader is required
+
+      // Copy from last frame gbuffer
       _culling_command_unit->bindPipeline(vk::PipelineBindPoint::eCompute, _copy_on_screen_pipeline.pipeline());
 
       _culling_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eCompute,
@@ -1353,7 +1356,7 @@ void mr::RenderContext::calculate_prev_stat(SceneHandle scene) noexcept
 
     // Iteration over 1920x1080 gbuf takes about 7 ms. It can be used ONLY for debug
     // calculate really visible objects
-    boost::unordered_set<uint32_t> visible_objects;
+    boost::unordered_set<uint32_t> visible_objects; // maybe use boost::container::flat_set
     uint32_t pixels_nums = w * h;
     for (uint32_t i = 0; i < pixels_nums; i++) {
       uint32_t index = i * 4 + 3;
