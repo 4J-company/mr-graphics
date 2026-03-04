@@ -110,6 +110,8 @@ inline namespace graphics {
     mr::FPSCamera _camera;
     uint32_t _camera_buffer_id = BindlessDescriptorSet::invalid_id;  // id in bindless descriptor set
 
+    mr::FPSCamera _save_camera_on_visibility_save;
+
     bool _is_buffers_dirty = true;
 
     template <std::derived_from<Light> L>
