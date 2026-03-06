@@ -45,7 +45,7 @@ void main()
     OutNIsShade = vec4(normal, is_shade);
     OutColorTrans = vec4(0, 0, 1, 1) * coef;
     return;
-  } else if (IS_INSTANCE_ON_SCREEN(visible_at_stash)) {
+  } else if (!IS_INSTANCE_ON_SCREEN(visible_at_stash)) {
     OutNIsShade = vec4(normal, is_shade);
     OutColorTrans = vec4(1, 0.8, 0, 1) * coef;
     return;

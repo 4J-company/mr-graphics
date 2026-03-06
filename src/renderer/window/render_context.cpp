@@ -296,6 +296,10 @@ void mr::RenderContext::init_culling()
       .layout = vk::ImageLayout::eShaderReadOnlyOptimal,
     };
     _sampled_gbuffer_id = _bindless_set.register_resource(&_read_from_gbuf_resource);
+    _clear_on_screen_state_shader = ResourceManager<Shader>::get().create("ClearOnScreenStates",
+      *_state, "culling/copy_visibility/clear_on_screen_states", defines);
+    _clear_on_screen_state_pipeline = ComputePipeline(*_state, _clear_on_screen_state_shader, set_layouts);
+
   }
 }
 
@@ -660,11 +664,44 @@ void mr::RenderContext::culling_geometry(const SceneHandle scene)
 
   if (is_render_option_enabled(_render_options, RenderOptions::EnableCullingVisualiztion)) {
     if (_save_culling_visualization || _clear_culling_visualization) {
-      // TODO: clear data - new shader is required
+      // ---------------------------------------
+      // Copy previous data
+      // ---------------------------------------
+      _culling_command_unit->bindPipeline(vk::PipelineBindPoint::eCompute, _clear_on_screen_state_pipeline.pipeline());
+      _culling_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eCompute,
+                                                {_copy_on_screen_pipeline.layout()},
+                                                bindless_set_number,
+                                                culling_descriptor_sets,
+                                                {});
 
+      uint32_t transforms_number = static_cast<uint32_t>(scene->_transforms_data.size());
+      uint32_t clear_states_push_constants[] {
+        scene->_occluded_instances_state_buffer_id,
+        transforms_number,
+      };
+      _culling_command_unit->pushConstants(_clear_on_screen_state_pipeline.layout(),
+                                           vk::ShaderStageFlagBits::eCompute,
+                                           0, sizeof(clear_states_push_constants),
+                                           clear_states_push_constants);
+
+      _culling_command_unit->dispatch(calculate_work_groups_number(transforms_number, culling_work_group_size), 1, 1);
+
+      vk::BufferMemoryBarrier visibility_states_barrier {
+        .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
+        .dstAccessMask = vk::AccessFlagBits::eShaderRead,
+        .buffer = scene->_occluded_instances_state_buffer.buffer(),
+        .offset = 0,
+        .size = scene->_occluded_instances_state_buffer.byte_size(),
+      };
+      _culling_command_unit->pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
+                                                  vk::PipelineStageFlagBits::eComputeShader,
+                                                  {}, {}, {visibility_states_barrier}, {});
+
+
+      // ---------------------------------------
       // Copy from last frame gbuffer
+      // ---------------------------------------
       _culling_command_unit->bindPipeline(vk::PipelineBindPoint::eCompute, _copy_on_screen_pipeline.pipeline());
-
       _culling_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eCompute,
                                                 {_copy_on_screen_pipeline.layout()},
                                                 bindless_set_number,
