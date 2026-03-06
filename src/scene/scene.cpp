@@ -241,25 +241,25 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
     _camera.turn(angular_delta);
 
     // camera controls
+    float speedup = input_state.key_pressed(vkfw::Key::eLeftShift) ? 10.0 : 1.0;
     if (input_state.key_pressed(vkfw::Key::eW)) {
-      float speedup = input_state.key_pressed(vkfw::Key::eLeftShift) ? 10.0 : 1.0;
       _camera.move(Vec3f(_camera.cam().direction()) * speedup);
     }
     if (input_state.key_pressed(vkfw::Key::eA)) {
-      _camera.move(-_camera.cam().right());
+      _camera.move(Vec3f(-_camera.cam().right()) * speedup);
     }
     if (input_state.key_pressed(vkfw::Key::eS)) {
       float speedup = input_state.key_pressed(vkfw::Key::eLeftShift) ? 10.0 : 1.0;
       _camera.move(Vec3f(-_camera.cam().direction()) * speedup);
     }
     if (input_state.key_pressed(vkfw::Key::eD)) {
-      _camera.move(_camera.cam().right());
+      _camera.move(Vec3f(_camera.cam().right()) * speedup);
     }
     if (input_state.key_pressed(vkfw::Key::eSpace)) {
-      _camera.move(_camera.cam().up());
+      _camera.move(Vec3f(_camera.cam().up()) * speedup);
     }
     if (input_state.key_pressed(vkfw::Key::eLeftAlt)) {
-      _camera.move(-_camera.cam().up());
+      _camera.move(Vec3f(-_camera.cam().up()) * speedup);
     }
     if (input_state.key_pressed(vkfw::Key::eP)) {
       std::cout << "(camera_pos, camera_dir, camera_up):\n"
@@ -276,20 +276,19 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
           _parent->save_visibility();
         }
       }
-      if (input_state.key_tapped(vkfw::Key::eU)) {
-        _camera.cam() = _save_camera_on_visibility_save.cam();
-      }
     }
 
-    if (input_state.key_tapped(vkfw::Key::e1)) {
-      _camera.cam() = mr::math::Camera<float>({1}, {-1}, {0, 1, 0});
-      _camera.cam().projection() = mr::math::Camera<float>::Projection(45_deg);
+    if (input_state.key_tapped(vkfw::Key::e0)) {
       auto &proj = _camera.cam().projection();
       auto fov = 45_deg;
       proj.distance = 0.1f;
       proj.width = 2 * proj.distance * std::tan(fov._data / 2);
       float aspect_ratio = 16.f / 9.f;
       proj.height = proj.width * aspect_ratio;
+    }
+    if (input_state.key_tapped(vkfw::Key::e1)) {
+      _camera.cam() = mr::math::Camera<float>({1}, {-1}, {0, 1, 0});
+      _camera.cam().projection() = mr::math::Camera<float>::Projection(45_deg);
     }
     if (input_state.key_tapped(vkfw::Key::e2)) {
       _camera.cam() = mr::math::Camera<float>({10}, {-1}, {0, 1, 0});
@@ -302,23 +301,11 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
     if (input_state.key_tapped(vkfw::Key::e4)) {
       _camera.cam() = mr::math::Camera<float>({500}, {-1}, {0, 1, 0});
       _camera.cam().projection() = mr::math::Camera<float>::Projection(45_deg);
-      auto &proj = _camera.cam().projection();
-      auto fov = 45_deg;
-      proj.distance = 0.1f;
-      proj.width = 2 * proj.distance * std::tan(fov._data / 2);
-      float aspect_ratio = 16.f / 9.f;
-      proj.height = proj.width * aspect_ratio;
     }
     if (input_state.key_tapped(vkfw::Key::e5)) {
       auto cam_pos = _camera.cam().position();
       _camera.cam() = mr::math::Camera<float>(cam_pos, -cam_pos.normalized().value(), {0, 1, 0});
       _camera.cam().projection() = mr::math::Camera<float>::Projection(45_deg);
-      auto &proj = _camera.cam().projection();
-      auto fov = 45_deg;
-      proj.distance = 0.1f;
-      proj.width = 2 * proj.distance * std::tan(fov._data / 2);
-      float aspect_ratio = 16.f / 9.f;
-      proj.height = proj.width * aspect_ratio;
     }
     if (input_state.key_tapped(vkfw::Key::eB)) {
       auto state = _parent->render_bounds_state();

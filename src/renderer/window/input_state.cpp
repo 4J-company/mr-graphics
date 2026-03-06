@@ -16,8 +16,8 @@ void mr::InputState::update() noexcept
   std::ranges::fill(_reader_key_tapped, 0);
 
   /* scope for mutex lock */ {
-    std::lock_guard lock(update_mutex);
-    std::swap(_reader_key_pressed, _writer_key_pressed);
+    std::lock_guard lock(_update_mutex);
+    std::copy(_writer_key_pressed.begin(), _writer_key_pressed.end(), _reader_key_pressed.begin());
     std::swap(_reader_key_tapped, _writer_key_tapped);
     mouse_pos_copy = _mouse_pos;
   }
@@ -46,7 +46,7 @@ mr::InputState::KeyCallbackT mr::InputState::get_key_callback() noexcept
 {
   return [this](const vkfw::Window &window, vkfw::Key key, int scan_code,
                 vkfw::KeyAction action, vkfw::ModifierKeyFlags flags) {
-    std::lock_guard lock(update_mutex);
+    std::lock_guard lock(_update_mutex);
     auto idx = std::to_underlying(key);
 
     if (idx < 0 && idx >= _writer_key_tapped.size()) {
@@ -54,9 +54,9 @@ mr::InputState::KeyCallbackT mr::InputState::get_key_callback() noexcept
     }
 
     if (action == vkfw::KeyAction::ePress) {
-        _writer_key_tapped[idx] = true;
+      _writer_key_tapped[idx] = true;
     }
-    _writer_key_pressed[idx] = true;
+    _writer_key_pressed[idx] = action == vkfw::KeyAction::eRelease ? false : true;
   };
 }
 
@@ -71,7 +71,7 @@ mr::InputState::MouseScrollCallback mr::InputState::get_mouse_scroll_callback() 
 mr::InputState::MouseCallbackT mr::InputState::get_mouse_callback() noexcept
 {
   return [this](const vkfw::Window &window, double x, double y) {
-    std::lock_guard lock(update_mutex);
+    std::lock_guard lock(_update_mutex);
     _mouse_pos = {x, y};
   };
 }
