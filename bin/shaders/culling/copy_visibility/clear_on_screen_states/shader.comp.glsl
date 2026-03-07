@@ -9,6 +9,7 @@ layout(local_size_x = THREADS_NUM, local_size_y = 1, local_size_z = 1) in;
 layout(push_constant) uniform PushContants {
   uint visibility_states_buffer_id;
   uint instances_number;
+  uint clear_value;
 } buffers_data;
 
 layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) buffer VisibilityStatesBuffer {
@@ -22,5 +23,5 @@ void main()
   if (id >= buffers_data.instances_number) {
     return;
   }
-  visibility_states[id] = SET_INSTANCE_ON_SCREEN(visibility_states[id], false);
+  visibility_states[id] = SET_INSTANCE_ON_SCREEN(visibility_states[id], bool(buffers_data.clear_value));
 }

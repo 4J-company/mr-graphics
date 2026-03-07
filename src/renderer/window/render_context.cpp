@@ -678,6 +678,7 @@ void mr::RenderContext::culling_geometry(const SceneHandle scene)
       uint32_t clear_states_push_constants[] {
         scene->_occluded_instances_state_buffer_id,
         transforms_number,
+        (uint32_t) _clear_culling_visualization,
       };
       _culling_command_unit->pushConstants(_clear_on_screen_state_pipeline.layout(),
                                            vk::ShaderStageFlagBits::eCompute,
@@ -701,42 +702,45 @@ void mr::RenderContext::culling_geometry(const SceneHandle scene)
       // ---------------------------------------
       // Copy from last frame gbuffer
       // ---------------------------------------
-      _culling_command_unit->bindPipeline(vk::PipelineBindPoint::eCompute, _copy_on_screen_pipeline.pipeline());
-      _culling_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eCompute,
-                                                {_copy_on_screen_pipeline.layout()},
-                                                bindless_set_number,
-                                                culling_descriptor_sets,
-                                                {});
+      if (_save_culling_visualization) {
+        _culling_command_unit->bindPipeline(vk::PipelineBindPoint::eCompute, _copy_on_screen_pipeline.pipeline());
+        _culling_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eCompute,
+                                                  {_copy_on_screen_pipeline.layout()},
+                                                  bindless_set_number,
+                                                  culling_descriptor_sets,
+                                                  {});
 
-      auto &gbuf = _gbuffers[enum_cast(GBuffer::Position)];
-      auto [width, heigth, _z] = gbuf.extent();
-      uint32_t read_on_screen_visibility_push_constants[] {
-        _sampled_gbuffer_id,
-        width, heigth,
-        scene->_occluded_instances_state_buffer_id,
-      };
-      _culling_command_unit->pushConstants(_copy_on_screen_pipeline.layout(),
-                                           vk::ShaderStageFlagBits::eCompute,
-                                           0, sizeof(read_on_screen_visibility_push_constants),
-                                           read_on_screen_visibility_push_constants);
+        auto &gbuf = _gbuffers[enum_cast(GBuffer::Position)];
+        auto [width, heigth, _z] = gbuf.extent();
+        uint32_t read_on_screen_visibility_push_constants[] {
+          _sampled_gbuffer_id,
+          width, heigth,
+          scene->_occluded_instances_state_buffer_id,
+        };
+        _culling_command_unit->pushConstants(_copy_on_screen_pipeline.layout(),
+                                             vk::ShaderStageFlagBits::eCompute,
+                                             0, sizeof(read_on_screen_visibility_push_constants),
+                                             read_on_screen_visibility_push_constants);
 
-      gbuf.switch_layout(_culling_command_unit, vk::ImageLayout::eShaderReadOnlyOptimal);
-      _culling_command_unit->dispatch(
-        calculate_work_groups_number(width, culling_work_group_size),
-        calculate_work_groups_number(heigth, culling_work_group_size),
-        1
-      );
+        gbuf.switch_layout(_culling_command_unit, vk::ImageLayout::eShaderReadOnlyOptimal);
+        _culling_command_unit->dispatch(
+          calculate_work_groups_number(width, culling_work_group_size),
+          calculate_work_groups_number(heigth, culling_work_group_size),
+          1
+        );
 
-      // vk::BufferMemoryBarrier visibility_states_barrier {
-      //   .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
-      //   .dstAccessMask = vk::AccessFlagBits::eShaderRead,
-      //   .buffer = scene->_occluded_instances_state_buffer.buffer(),
-      //   .offset = 0,
-      //   .size = scene->_occluded_instances_state_buffer.byte_size(),
-      // };
-      // _late_culling_command_unit->pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
-      //                                             vk::PipelineStageFlagBits::eDrawIndirect,
-      //                                             {}, {}, {visibility_states_barrier}, {});
+        // TODO(dk6): maybe use barrier?
+        // vk::BufferMemoryBarrier visibility_states_barrier {
+        //   .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
+        //   .dstAccessMask = vk::AccessFlagBits::eShaderRead,
+        //   .buffer = scene->_occluded_instances_state_buffer.buffer(),
+        //   .offset = 0,
+        //   .size = scene->_occluded_instances_state_buffer.byte_size(),
+        // };
+        // _late_culling_command_unit->pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
+        //                                             vk::PipelineStageFlagBits::eDrawIndirect,
+        //                                             {}, {}, {visibility_states_barrier}, {});
+      }
     }
   }
 

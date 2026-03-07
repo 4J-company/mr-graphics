@@ -34,6 +34,6 @@ void main()
 
   uint state = visibility_states[instance_data.transform_index];
   visibility_states[instance_data.transform_index] = (buffers_data.clear_visibility == 1)
-    ? (SET_INSTANCE_IN_FRUSTUM(state, true) | SET_INSTANCE_WAS_OCCLUDED(state, false))
+    ? SET_INSTANCE_WAS_OCCLUDED(SET_INSTANCE_IN_FRUSTUM(state, true), false)
     : (instance_data.visibility_bits | SET_INSTANCE_ON_SCREEN(0, IS_INSTANCE_ON_SCREEN(state)));
 }

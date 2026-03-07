@@ -60,7 +60,6 @@ mr::InputState::KeyCallbackT mr::InputState::get_key_callback() noexcept
   };
 }
 
-
 mr::InputState::MouseScrollCallback mr::InputState::get_mouse_scroll_callback() noexcept
 {
   return [this](const vkfw::Window &window, double xoff, double yoff) {
