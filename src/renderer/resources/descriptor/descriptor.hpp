@@ -24,7 +24,7 @@ inline namespace graphics {
   //     3. After recreate descriptor set layout we must recreate all pipelines - it is very
   //        slow operation and very uncomfortable for supporting in code
   // So, decisions of 1) and 2) aren't very difficult, but 3) is an issue
-  constexpr static uint32_t resource_max_number_per_binding = 6000;
+  constexpr static uint32_t resource_max_number_per_binding = 100000;
 
   constexpr static uint32_t desciptor_set_max_bindings = 30;
 

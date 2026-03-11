@@ -320,7 +320,7 @@ void mr::RenderContext::init_bound_box_rendering()
     GraphicsPipeline(*this, GraphicsPipeline::Subpass::OpaqueGeometry, _bound_boxes_draw_shader, {}, set_layouts);
 
   // TODO(dk6): use dynamic buffer
-  _bound_boxes_buffer = StorageBuffer(*_state, sizeof(BoundBoxRenderData) * 10000);
+  _bound_boxes_buffer = StorageBuffer(*_state, sizeof(BoundBoxRenderData) * 1'000'000);
   _bound_boxes_buffer_id = _bindless_set.register_resource(&_bound_boxes_buffer);
 }
 

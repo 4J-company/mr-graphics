@@ -204,7 +204,7 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
 
     _transforms.write(_transfer_command_unit, std::span(_transforms_data));
     _bound_boxes.write(_transfer_command_unit, std::span(_bound_boxes_data));
-    _visibility.write(_transfer_command_unit, std::span(_visibility_data));
+    // _visibility.write(_transfer_command_unit, std::span(_visibility_data));
 
     for (auto &[_, draw] : _draws) {
       draw.meshes_data_buffer.write(_transfer_command_unit, std::span(draw.meshes_data_buffer_data));
