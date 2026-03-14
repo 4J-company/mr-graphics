@@ -25,6 +25,8 @@ void mr::InputState::update() noexcept
   _mouse_pos_delta = mouse_pos_copy - _prev_mouse_pos;
   _prev_mouse_pos = mouse_pos_copy;
 
+  _mouse_in_screen_at_last_frame = _mouse_in_screen.load();
+
   _prev_mouse_scroll_offset = _mouse_scroll_offset.exchange(0);
 }
 
@@ -72,6 +74,17 @@ mr::InputState::MouseCallbackT mr::InputState::get_mouse_callback() noexcept
   return [this](const vkfw::Window &window, double x, double y) {
     std::lock_guard lock(_update_mutex);
     _mouse_pos = {x, y};
+    if (not _mouse_in_screen_at_last_frame) {
+      _prev_mouse_pos = _mouse_pos;
+    }
+  };
+}
+
+
+mr::InputState::MouseEnterCallbackT mr::InputState::get_mouse_enter_callback() noexcept
+{
+  return [this](const vkfw::Window &window, bool entered) {
+    _mouse_in_screen = entered;
   };
 }
 

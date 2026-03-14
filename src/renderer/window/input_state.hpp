@@ -32,6 +32,9 @@ inline namespace graphics {
     Vec2d _prev_mouse_pos {};
     Vec2d _mouse_pos_delta {};
 
+    std::atomic_bool _mouse_in_screen;
+    std::atomic_bool _mouse_in_screen_at_last_frame;
+
     std::atomic<double> _mouse_scroll_offset = 0;
     std::atomic<double> _prev_mouse_scroll_offset = 0;
 
@@ -64,6 +67,9 @@ inline namespace graphics {
 
     using MouseCallbackT = std::function<void(const vkfw::Window &, double, double)>;
     MouseCallbackT get_mouse_callback() noexcept;
+
+    using MouseEnterCallbackT = std::function<void(const vkfw::Window &, bool)>;
+    MouseEnterCallbackT get_mouse_enter_callback() noexcept;
 
     using MouseScrollCallback = std::function<void(const vkfw::Window &, double, double)>;
     MouseScrollCallback get_mouse_scroll_callback() noexcept;
