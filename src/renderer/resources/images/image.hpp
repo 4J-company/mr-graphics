@@ -4,6 +4,7 @@
 #include "pch.hpp"
 
 #include "vulkan_state.hpp"
+#include "resources/command_unit/command_unit.hpp"
 
 namespace mr {
 inline namespace graphics {

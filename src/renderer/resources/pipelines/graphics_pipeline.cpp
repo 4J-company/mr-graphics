@@ -1,13 +1,16 @@
 #include "resources/images/image.hpp"
 #include "resources/pipelines/graphics_pipeline.hpp"
-#include "renderer/window/render_context.hpp"
+#include "vulkan_state.hpp"
 
-mr::GraphicsPipeline::GraphicsPipeline(const RenderContext &render_context,
+mr::GraphicsPipeline::GraphicsPipeline(const VulkanState &state,
                                        Subpass subpass,
                                        mr::ShaderHandle shader,
                                        std::span<const vk::VertexInputAttributeDescription> attributes,
-                                       std::span<const DescriptorSetLayoutHandle> descriptor_layouts)
-  : Pipeline(render_context.vulkan_state(), shader, descriptor_layouts, graphics_pipeline_push_constants)
+                                       std::span<const DescriptorSetLayoutHandle> descriptor_layouts,
+                                       uint32_t geometry_pass_color_attachment_count,
+                                       vk::Format depth_format,
+                                       vk::Format swapchain_format)
+  : Pipeline(state, shader, descriptor_layouts, graphics_pipeline_push_constants)
   , _subpass(subpass)
 {
   // dynamic states of pipeline (viewport)
@@ -82,16 +85,17 @@ mr::GraphicsPipeline::GraphicsPipeline(const RenderContext &render_context,
 
   vk::PipelineRenderingCreateInfoKHR pipiline_rendering_create_info {};
 
-  std::array<vk::PipelineColorBlendAttachmentState, RenderContext::gbuffers_number> color_blend_attachments;
-  std::array<vk::Format, RenderContext::gbuffers_number> color_attachments_formats;
+  constexpr uint32_t max_color_attachments = 8;
+  std::array<vk::PipelineColorBlendAttachmentState, max_color_attachments> color_blend_attachments;
+  std::array<vk::Format, max_color_attachments> color_attachments_formats;
   uint32_t color_attacmhents_cnt = 0;
 
-  auto &state = render_context.vulkan_state();
   switch (subpass) {
     case Subpass::OpaqueGeometry:
-      color_attacmhents_cnt = RenderContext::gbuffers_number;
+      color_attacmhents_cnt = geometry_pass_color_attachment_count;
+      ASSERT(geometry_pass_color_attachment_count <= max_color_attachments);
 
-      for (int i = 0; i < RenderContext::gbuffers_number; i++) {
+      for (uint32_t i = 0; i < geometry_pass_color_attachment_count; i++) {
         color_blend_attachments[i].blendEnable = false;
         color_blend_attachments[i].srcColorBlendFactor = vk::BlendFactor::eOne;
         color_blend_attachments[i].dstColorBlendFactor = vk::BlendFactor::eZero;
@@ -104,11 +108,10 @@ mr::GraphicsPipeline::GraphicsPipeline(const RenderContext &render_context,
           vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
       }
 
-      for (int i = 0; i < RenderContext::gbuffers_number; i++) {
-        // TODO(dk6): remove magic number
+      for (uint32_t i = 0; i < geometry_pass_color_attachment_count; i++) {
         color_attachments_formats[i] = vk::Format::eR32G32B32A32Sfloat;
       }
-      pipiline_rendering_create_info.depthAttachmentFormat = mr::get_depthbuffer_format(state);
+      pipiline_rendering_create_info.depthAttachmentFormat = depth_format;
 
       break;
     case Subpass::OpaqueLighting:
@@ -119,7 +122,6 @@ mr::GraphicsPipeline::GraphicsPipeline(const RenderContext &render_context,
       color_blend_attachments[0].dstColorBlendFactor = vk::BlendFactor::eOne;
       color_blend_attachments[0].colorBlendOp = vk::BlendOp::eAdd;
 
-      // Alpha doesn't matter now
       color_blend_attachments[0].srcAlphaBlendFactor = vk::BlendFactor::eOne;
       color_blend_attachments[0].dstAlphaBlendFactor = vk::BlendFactor::eOne;
       color_blend_attachments[0].alphaBlendOp = vk::BlendOp::eAdd;
@@ -128,7 +130,7 @@ mr::GraphicsPipeline::GraphicsPipeline(const RenderContext &render_context,
         vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
         vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
 
-      color_attachments_formats[0] = mr::get_swapchain_format(state);
+      color_attachments_formats[0] = swapchain_format;
 
       break;
     default:
@@ -165,7 +167,8 @@ mr::GraphicsPipeline::GraphicsPipeline(const RenderContext &render_context,
     pipiline_rendering_create_info,
   };
 
-  _pipeline = std::move(state.device().createGraphicsPipelinesUnique(state.pipeline_cache(), chain.get()).value.front());
+  _pipeline = std::move(
+    state.device().createGraphicsPipelinesUnique(state.pipeline_cache(), chain.get()).value.front());
 }
 
 void mr::GraphicsPipeline::apply(vk::CommandBuffer cmd_buffer) const

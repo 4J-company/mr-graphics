@@ -21,6 +21,7 @@
 
 #include <VkBootstrap.h>
 #include <vulkan/vulkan_core.h>
+#include <span>
 
 namespace mr {
 inline namespace graphics {

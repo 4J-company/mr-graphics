@@ -29,12 +29,16 @@ mr::graphics::Material::Material(Scene &scene,
   auto pipeline_name = std::format("{}_{}", materials_pipeline_name, shader->id());
   _pipeline = pipelines_manager.find(pipeline_name);
   if (not _pipeline) {
-    _pipeline = pipelines_manager.create(pipeline_name,
-                                         scene.render_context(),
+    const auto &state = scene.render_context().vulkan_state();
+  _pipeline = pipelines_manager.create(pipeline_name,
+                                         state,
                                          mr::GraphicsPipeline::Subpass::OpaqueGeometry,
                                          _shader,
                                          std::span {mr::importer::Mesh::vertex_input_attribute_descriptions},
-                                         std::span {layouts});
+                                         std::span {layouts},
+                                         RenderContext::gbuffers_number,
+                                         mr::get_depthbuffer_format(state),
+                                         mr::get_swapchain_format(state));
   }
 
   constexpr size_t max_textures_size = enum_cast(MaterialParameter::EnumSize);

@@ -6,7 +6,7 @@
 
 namespace mr {
 inline namespace graphics {
-  class RenderContext;
+  class VulkanState;
 
   class GraphicsPipeline : public Pipeline, public ResourceBase<GraphicsPipeline> {
     public:
@@ -35,11 +35,14 @@ inline namespace graphics {
     public:
       GraphicsPipeline() = default;
 
-      GraphicsPipeline(const RenderContext &render_context,
+      GraphicsPipeline(const VulkanState &state,
                        Subpass subpass,
                        mr::ShaderHandle shader,
                        std::span<const vk::VertexInputAttributeDescription> attributes,
-                       std::span<const DescriptorSetLayoutHandle> descriptor_layouts);
+                       std::span<const DescriptorSetLayoutHandle> descriptor_layouts,
+                       uint32_t geometry_pass_color_attachment_count,
+                       vk::Format depth_format,
+                       vk::Format swapchain_format);
 
       void recompile();
 

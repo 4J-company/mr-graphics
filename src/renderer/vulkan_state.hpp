@@ -3,6 +3,7 @@
 
 #include "pch.hpp"
 #include <VkBootstrap.h>
+#include <vk_mem_alloc.h>
 
 namespace mr {
 inline namespace graphics {

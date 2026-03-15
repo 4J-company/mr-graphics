@@ -2,6 +2,7 @@
 #define __MR_MESH_HPP_
 
 #include "pch.hpp"
+#include "mesh/attribute_types.hpp"
 #include "resources/resources.hpp"
 #include <vulkan/vulkan_core.h>
 

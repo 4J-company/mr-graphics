@@ -4,12 +4,10 @@
 #include "pch.hpp"
 
 #include "vulkan_state.hpp"
+#include "resources/buffer/buffer_core.hpp"
 
 namespace mr {
 inline namespace graphics {
-  class HostBuffer;
-  class DeviceBuffer;
-
   class CommandUnit {
   private:
     constexpr static size_t max_semaphores_number = 10;

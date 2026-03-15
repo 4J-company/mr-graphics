@@ -122,9 +122,12 @@ void mr::RenderContext::init_lights_render_data() {
     };
 
     // TODO(dk6): here move instead inplace contruct, because without move this doesn't compile
-    _lights_render_data.pipelines.emplace_back(GraphicsPipeline(*this,
+    _lights_render_data.pipelines.emplace_back(GraphicsPipeline(*_state,
       GraphicsPipeline::Subpass::OpaqueLighting, shader,
-      {&light_descr, 1}, set_layouts));
+      {&light_descr, 1}, set_layouts,
+      gbuffers_number,
+      get_depthbuffer_format(*_state),
+      get_swapchain_format(*_state)));
   }
 }
 
@@ -317,7 +320,10 @@ void mr::RenderContext::init_bound_box_rendering()
     _converted_bindless_set_layout,
   };
   _bound_boxes_draw_pipeline =
-    GraphicsPipeline(*this, GraphicsPipeline::Subpass::OpaqueGeometry, _bound_boxes_draw_shader, {}, set_layouts);
+    GraphicsPipeline(*_state, GraphicsPipeline::Subpass::OpaqueGeometry, _bound_boxes_draw_shader, {}, set_layouts,
+                     gbuffers_number,
+                     get_depthbuffer_format(*_state),
+                     get_swapchain_format(*_state));
 
   // TODO(dk6): use dynamic buffer
   _bound_boxes_buffer = StorageBuffer(*_state, sizeof(BoundBoxRenderData) * 1'000'000);
