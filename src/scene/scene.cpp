@@ -2,6 +2,24 @@
 #include "renderer/window/render_context.hpp"
 #include "manager/manager.hpp"
 
+namespace {
+void update_camera_buffer(mr::FPSCamera &camera, mr::UniformBuffer &camera_uniform_buffer) noexcept
+{
+  auto dir = camera.cam().direction();
+  mr::ShaderCameraData cam_data{
+    .vp = camera.viewproj(),
+    .campos = camera.cam().position(),
+    .dir = mr::Vec4f(dir.x(), dir.y(), dir.z(), 0),
+    .fov = static_cast<float>(camera.fov()),
+    .gamma = camera.gamma(),
+    .speed = camera.speed(),
+    .sens = camera.sensetivity(),
+    .frustum_planes = camera.frustum_planes(),
+  };
+  camera_uniform_buffer.write(std::span<mr::ShaderCameraData>{&cam_data, 1});
+}
+}  // namespace
+
 mr::Scene::Scene(RenderContext &render_context)
   : _parent(&render_context)
   , _camera_uniform_buffer(_parent->vulkan_state(), sizeof(ShaderCameraData))
@@ -112,23 +130,25 @@ mr::ModelHandle mr::Scene::create_model(std::fs::path filename) noexcept
     draw.meshes.emplace_back(&mesh);
 
     uint32_t bound_box_index = static_cast<uint32_t>(_bound_boxes_data.size());
-    _bound_boxes_data.emplace_back(mesh._bound_box);
+    _bound_boxes_data.emplace_back(mesh.bound_box());
     model_mesh.mesh_bound_box_id = bound_box_index;
 
     uint32_t mesh_culling_data_index = static_cast<uint32_t>(draw.meshes_data_buffer_data.size());
     model_mesh.mesh_scene_id = mesh_culling_data_index;
     uint32_t lod_index = 0;
+    const auto &ibufs = mesh.index_buffers();
+    const auto &vbufs = mesh.vertex_buffers();
     draw.meshes_data_buffer_data.emplace_back(MeshCullingData {
       .draw_command = vk::DrawIndexedIndirectCommand {
-        .indexCount = mesh._ibufs[lod_index].elements_count,
+        .indexCount = ibufs[lod_index].elements_count,
         .instanceCount = 0,
-        .firstIndex = static_cast<uint32_t>(mesh._ibufs[lod_index].offset / sizeof(uint32_t)),
-        .vertexOffset = static_cast<int32_t>(mesh._vbufs[0].offset / position_bytes_size),
+        .firstIndex = static_cast<uint32_t>(ibufs[lod_index].offset / sizeof(uint32_t)),
+        .vertexOffset = static_cast<int32_t>(vbufs[0].offset / position_bytes_size),
         .firstInstance = 0,
       },
       .render_info = Mesh::RenderInfo {
-        .mesh_offset = mesh._mesh_offset,
-        .instance_offset = mesh._instance_offset,
+        .mesh_offset = mesh.mesh_offset(),
+        .instance_offset = mesh.instance_offset(),
         .material_ubo_id = material->material_ubo_id(),
         .intances_render_info_buffer_id = model_mesh.intances_render_info_buffer_id,
       },
@@ -143,11 +163,12 @@ mr::ModelHandle mr::Scene::create_model(std::fs::path filename) noexcept
 }
 
 uint32_t mr::Scene::add_model_instance(ModelHandle model, Matr4f transform) noexcept {
-  uint32_t index = model->_transforms_data.size();
-  model->_transforms_data.emplace_back(transform);
-  // Not it will works incorrect in multithreading
-  uint32_t offset_in_transforms = _transforms_data.size();
-  model->_offsets_of_instances.emplace_back(offset_in_transforms);
+  auto &model_transforms = model->transforms_data();
+  auto &model_offsets = model->offsets_of_instances();
+  uint32_t index = static_cast<uint32_t>(model_transforms.size());
+  model_transforms.emplace_back(transform);
+  uint32_t offset_in_transforms = static_cast<uint32_t>(_transforms_data.size());
+  model_offsets.emplace_back(offset_in_transforms);
 
   for (const auto &[material, model_mesh] : model->draws()) {
     const auto &mesh = model_mesh.mesh;
@@ -169,7 +190,7 @@ uint32_t mr::Scene::add_model_instance(ModelHandle model, Matr4f transform) noex
     draw.meshes_data_buffer_data[model_mesh.mesh_scene_id].draw_command.instanceCount += model_mesh.transforms.size();
 
     _triangles_number += (mesh.element_count() / 3) * model_mesh.instances_number;
-    _vertexes_number += (mesh._vbufs[0].vertex_count) * model_mesh.instances_number;
+    _vertexes_number += (mesh.vertex_buffers()[0].vertex_count) * model_mesh.instances_number;
   }
   _is_buffers_dirty = true;
 
@@ -178,8 +199,8 @@ uint32_t mr::Scene::add_model_instance(ModelHandle model, Matr4f transform) noex
 
 void mr::Scene::update_model_transform(ModelHandle model,
                                        Matr4f transform, uint32_t instance) noexcept {
-  uint32_t offset_in_transforms = model->_offsets_of_instances[instance];
-  model->_transforms_data[instance] = transform;
+  uint32_t offset_in_transforms = model->offsets_of_instances()[instance];
+  model->transforms_data()[instance] = transform;
 
   for (const auto &[material, model_mesh] : model->draws()) {
     const auto &mesh = model_mesh.mesh;
@@ -314,22 +335,25 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
     }
   }
 
-  update_camera_buffer();
+  update_camera_buffer(_camera, _camera_uniform_buffer);
 }
 
-void mr::Scene::update_camera_buffer() noexcept
+mr::SceneRenderData mr::Scene::get_render_data() const noexcept
 {
-  auto dir = _camera.cam().direction();
-  mr::ShaderCameraData cam_data {
-    .vp = _camera.viewproj(),
-    .campos = _camera.cam().position(),
-    .dir = mr::Vec4f(dir.x(), dir.y(), dir.z(), 0),
-    .fov = static_cast<float>(_camera.fov()),
-    .gamma = _camera.gamma(),
-    .speed = _camera.speed(),
-    .sens = _camera.sensetivity(),
-    .frustum_planes = _camera.frustum_planes(),
-  };
-
-  _camera_uniform_buffer.write(std::span<mr::ShaderCameraData> {&cam_data, 1});
+  SceneRenderData rd;
+  rd.lights = &_lights;
+  rd.draws = &_draws;
+  rd.counters_buffer = &_counters_buffer;
+  rd.counters_buffer_id = _counters_buffer_id;
+  rd.transforms_buffer_id = _transforms_buffer_id;
+  rd.bound_boxes_buffer_id = _bound_boxes_buffer_id;
+  rd.transforms_data_size = _transforms_data.size();
+  rd.occluded_instances_state_buffer = &_occluded_instances_state_buffer;
+  rd.occluded_instances_state_buffer_id = _occluded_instances_state_buffer_id;
+  rd.was_transfer_in_this_frame = _was_transfer_in_this_frame;
+  rd.transfers_semaphore = _transfers_semaphore.get();
+  rd.triangles_number = _triangles_number.load();
+  rd.vertexes_number = _vertexes_number.load();
+  rd.camera = &_camera;
+  return rd;
 }

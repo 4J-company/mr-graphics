@@ -12,10 +12,6 @@ inline namespace graphics {
   class Scene;
 
   class Mesh {
-    friend class Model;
-    friend class RenderContext;
-    friend class Scene;
-
   public:
     struct RenderInfo {
       uint32_t mesh_offset;
@@ -62,8 +58,13 @@ inline namespace graphics {
 
     std::atomic<uint32_t> & num_of_instances() noexcept { return _instance_count; }
     uint32_t num_of_instances() const noexcept { return _instance_count.load(); }
-    // uint32_t element_count() const noexcept { return _ibufs[0].element_count(); }
     uint32_t element_count() const noexcept { return _ibufs[0].elements_count; }
+
+    const AABBf & bound_box() const noexcept { return _bound_box; }
+    const VertexBuffersArray & vertex_buffers() const noexcept { return _vbufs; }
+    const std::vector<IndexBufferDescription> & index_buffers() const noexcept { return _ibufs; }
+    uint32_t mesh_offset() const noexcept { return _mesh_offset; }
+    uint32_t instance_offset() const noexcept { return _instance_offset; }
   };
 }
 }     // namespace mr

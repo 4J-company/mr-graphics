@@ -295,18 +295,14 @@ std::optional<mr::SmallVector<mr::DescriptorSet>> mr::DescriptorAllocator::alloc
   static constexpr size_t max_descriptor_set_number = 64;
   ASSERT(set_layouts.size() < max_descriptor_set_number);
   InplaceVector<vk::DescriptorSetLayout, max_descriptor_set_number> layouts;
-
-  SmallVector<DescriptorSet> sets;
-  sets.reserve(set_layouts.size());
-
+  layouts.reserve(set_layouts.size());
   for (const auto &layout : set_layouts) {
     layouts.emplace_back(layout->layout());
-    sets.emplace_back(vk::DescriptorSet(), layout);
   }
 
   vk::DescriptorSetAllocateInfo descriptor_alloc_info {
     .descriptorPool = _pools.back().get(),
-    .descriptorSetCount = static_cast<uint32_t>(sets.size()),
+    .descriptorSetCount = static_cast<uint32_t>(set_layouts.size()),
     .pSetLayouts = layouts.data(),
   };
   auto [res, val] =
@@ -315,11 +311,11 @@ std::optional<mr::SmallVector<mr::DescriptorSet>> mr::DescriptorAllocator::alloc
     return std::nullopt;
   }
 
-  // fill output variable with created vk::DescriptorSet's
-  for (int i = 0; i < sets.size(); i++) {
-    sets[i]._set = val[i];
+  SmallVector<DescriptorSet> sets;
+  sets.reserve(set_layouts.size());
+  for (size_t i = 0; i < set_layouts.size(); ++i) {
+    sets.emplace_back(val[i], set_layouts[i]);
   }
-
   return std::move(sets);
 }
 

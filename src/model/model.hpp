@@ -10,9 +10,6 @@ inline namespace graphics {
   class VulkanState;
 
   class Model : public ResourceBase<Model> {
-    friend class Scene;
-    friend class Mesh;
-
   public:
     struct MeshInstances {
       mr::graphics::Mesh mesh;
@@ -60,6 +57,9 @@ inline namespace graphics {
 
     uint32_t instances_number() const noexcept { return _transforms_data.size(); }
     Matr4f transform(uint32_t instance) const noexcept;
+
+    std::vector<Matr4f> & transforms_data() noexcept { return _transforms_data; }
+    std::vector<uint32_t> & offsets_of_instances() noexcept { return _offsets_of_instances; }
   };
 
   MR_DECLARE_HANDLE(Model);

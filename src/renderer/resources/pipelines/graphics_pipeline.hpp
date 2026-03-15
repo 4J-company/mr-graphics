@@ -6,6 +6,8 @@
 
 namespace mr {
 inline namespace graphics {
+  class RenderContext;
+
   class GraphicsPipeline : public Pipeline, public ResourceBase<GraphicsPipeline> {
     public:
       enum struct Subpass {

@@ -11,11 +11,7 @@ inline namespace graphics {
     vk::Rect2D scissors {};
   };
 
-  class RenderContext;
-
   class FrameData {
-    friend class RenderContext;
-
   private:
     static inline constexpr size_t max_gbuffers = 6;
 

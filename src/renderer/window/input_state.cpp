@@ -44,47 +44,53 @@ bool mr::InputState::key_tapped(vkfw::Key key) const noexcept
   return _reader_key_tapped[idx];
 }
 
-mr::InputState::KeyCallbackT mr::InputState::get_key_callback() noexcept
+void mr::InputState::on_key(const vkfw::Window &, vkfw::Key key, int,
+                            vkfw::KeyAction action, vkfw::ModifierKeyFlags)
 {
-  return [this](const vkfw::Window &window, vkfw::Key key, int scan_code,
-                vkfw::KeyAction action, vkfw::ModifierKeyFlags flags) {
-    std::lock_guard lock(_update_mutex);
-    auto idx = std::to_underlying(key);
-
-    if (idx < 0 && idx >= _writer_key_tapped.size()) {
-      return;
-    }
-
-    if (action == vkfw::KeyAction::ePress) {
-      _writer_key_tapped[idx] = true;
-    }
-    _writer_key_pressed[idx] = action == vkfw::KeyAction::eRelease ? false : true;
-  };
+  std::lock_guard lock(_update_mutex);
+  auto idx = std::to_underlying(key);
+  if (idx >= _writer_key_tapped.size()) {
+    return;
+  }
+  if (action == vkfw::KeyAction::ePress) {
+    _writer_key_tapped[idx] = true;
+  }
+  _writer_key_pressed[idx] = action != vkfw::KeyAction::eRelease;
 }
 
-mr::InputState::MouseScrollCallback mr::InputState::get_mouse_scroll_callback() noexcept
+void mr::InputState::on_mouse_move(const vkfw::Window &, double x, double y)
 {
-  return [this](const vkfw::Window &window, double xoff, double yoff) {
-    _mouse_scroll_offset += yoff;
-  };
+  std::lock_guard lock(_update_mutex);
+  _mouse_pos = {x, y};
+  if (not _mouse_in_screen_at_last_frame) {
+    _prev_mouse_pos = _mouse_pos;
+  }
 }
 
-mr::InputState::MouseCallbackT mr::InputState::get_mouse_callback() noexcept
+void mr::InputState::on_mouse_enter(const vkfw::Window &, bool entered)
 {
-  return [this](const vkfw::Window &window, double x, double y) {
-    std::lock_guard lock(_update_mutex);
-    _mouse_pos = {x, y};
-    if (not _mouse_in_screen_at_last_frame) {
-      _prev_mouse_pos = _mouse_pos;
-    }
-  };
+  _mouse_in_screen = entered;
 }
 
-
-mr::InputState::MouseEnterCallbackT mr::InputState::get_mouse_enter_callback() noexcept
+void mr::InputState::on_scroll(const vkfw::Window &, double, double yoff)
 {
-  return [this](const vkfw::Window &window, bool entered) {
-    _mouse_in_screen = entered;
+  _mouse_scroll_offset += yoff;
+}
+
+void mr::register_input_state_with_window(InputState &state, vkfw::Window &window)
+{
+  window.callbacks()->on_cursor_move = [&state](const vkfw::Window &w, double x, double y) {
+    state.on_mouse_move(w, x, y);
+  };
+  window.callbacks()->on_key = [&state](const vkfw::Window &w, vkfw::Key key, int scan_code,
+                                         vkfw::KeyAction action, vkfw::ModifierKeyFlags flags) {
+    state.on_key(w, key, scan_code, action, flags);
+  };
+  window.callbacks()->on_scroll = [&state](const vkfw::Window &w, double xoff, double yoff) {
+    state.on_scroll(w, xoff, yoff);
+  };
+  window.callbacks()->on_cursor_enter = [&state](const vkfw::Window &w, bool entered) {
+    state.on_mouse_enter(w, entered);
   };
 }
 

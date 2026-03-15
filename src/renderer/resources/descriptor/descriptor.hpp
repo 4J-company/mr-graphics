@@ -76,8 +76,6 @@ inline namespace graphics {
   MR_DECLARE_HANDLE(BindlessDescriptorSetLayout);
 
   class DescriptorSet {
-    friend class DescriptorAllocator;
-
   private:
     vk::DescriptorSet _set;
     DescriptorSetLayoutHandle _set_layout;
@@ -101,8 +99,6 @@ inline namespace graphics {
   };
 
   class BindlessDescriptorSet {
-    friend class DescriptorAllocator;
-
   public:
     static constexpr inline uint32_t invalid_id = static_cast<uint32_t>(-1);
 

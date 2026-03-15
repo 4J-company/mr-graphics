@@ -14,49 +14,60 @@ inline namespace graphics {
   class RenderContext;
   class Model;
 
+  struct MeshInstanceCullingData {
+    uint32_t transform_index;
+    uint32_t visible_last_frame;
+    uint32_t mesh_culling_data_index;
+  };
+
+  struct MeshCullingData {
+    vk::DrawIndexedIndirectCommand draw_command;
+    Mesh::RenderInfo render_info;
+
+    uint32_t instance_counter_index;
+    uint32_t bound_box_index;
+  };
+
+  struct MeshesWithSamePipeline {
+    std::vector<const Mesh *> meshes;
+
+    StorageBuffer instances_data_buffer;
+    StorageBuffer meshes_data_buffer;
+    StorageBuffer draw_commands_buffer;
+
+    uint32_t draw_counter_index;
+
+    std::vector<MeshInstanceCullingData> instances_data_buffer_data;
+    std::vector<MeshCullingData> meshes_data_buffer_data;
+
+    uint32_t instances_data_buffer_id = BindlessDescriptorSet::invalid_id;
+    uint32_t meshes_data_buffer_id = BindlessDescriptorSet::invalid_id;
+    uint32_t draw_commands_buffer_id = BindlessDescriptorSet::invalid_id;
+
+    StorageBuffer meshes_render_info;
+    uint32_t meshes_render_info_id = BindlessDescriptorSet::invalid_id;
+  };
+
+  struct SceneRenderData {
+    const std::tuple<SmallVector<DirectionalLightHandle>> *lights = nullptr;
+    const boost::unordered_map<GraphicsPipelineHandle, MeshesWithSamePipeline> *draws = nullptr;
+    const StorageBuffer *counters_buffer = nullptr;
+    uint32_t counters_buffer_id = BindlessDescriptorSet::invalid_id;
+    uint32_t transforms_buffer_id = BindlessDescriptorSet::invalid_id;
+    uint32_t bound_boxes_buffer_id = BindlessDescriptorSet::invalid_id;
+    size_t transforms_data_size = 0;
+    const StorageBuffer *occluded_instances_state_buffer = nullptr;
+    uint32_t occluded_instances_state_buffer_id = BindlessDescriptorSet::invalid_id;
+    bool was_transfer_in_this_frame = false;
+    vk::Semaphore transfers_semaphore = VK_NULL_HANDLE;
+    uint64_t triangles_number = 0;
+    uint64_t vertexes_number = 0;
+    const FPSCamera *camera = nullptr;
+  };
+
   class Scene : public ResourceBase<Scene> {
-    friend class RenderContext;
-    friend class Model;
-
-  private:
-    struct MeshInstanceCullingData {
-      uint32_t transform_index;
-      uint32_t visible_last_frame;
-      uint32_t mesh_culling_data_index;
-    };
-
-    struct MeshCullingData {
-      vk::DrawIndexedIndirectCommand draw_command;
-      Mesh::RenderInfo render_info; // just for copy
-
-      uint32_t instance_counter_index; // index of visible instances number counter in counters buffer
-      uint32_t bound_box_index;
-    };
-
-    // TODO(dk6): destruct all this stuff in Scene destructor
-    struct MeshesWithSamePipeline {
-      std::vector<const Mesh *> meshes;
-
-      // TODO(dk6): Use dynamic sizable VectorBuffer
-      StorageBuffer instances_data_buffer; // Data for each drawed instance
-      StorageBuffer meshes_data_buffer; // Draw commands for all rendering meshes
-      StorageBuffer draw_commands_buffer; // It must have same size as meshes_data_buffer
-
-      uint32_t draw_counter_index; // index of draws number counter in counters buffer
-
-      std::vector<MeshInstanceCullingData> instances_data_buffer_data;
-      std::vector<MeshCullingData> meshes_data_buffer_data;
-
-      uint32_t instances_data_buffer_id = BindlessDescriptorSet::invalid_id;
-      uint32_t meshes_data_buffer_id = BindlessDescriptorSet::invalid_id;
-      uint32_t draw_commands_buffer_id = BindlessDescriptorSet::invalid_id;
-
-      // It must have same elements as 'meshes_data_buffer'
-      StorageBuffer meshes_render_info; // render data for each mesh
-      uint32_t meshes_render_info_id = BindlessDescriptorSet::invalid_id;
-    };
-
   public:
+    SceneRenderData get_render_data() const noexcept;
     static inline constexpr int max_scene_instances = 1'000'000;
 
   private:
@@ -167,8 +178,11 @@ inline namespace graphics {
 
     FPSCamera & camera() noexcept { return _camera; }
 
-  private:
-    void update_camera_buffer() noexcept;
+    size_t transforms_data_size() const noexcept { return _transforms_data.size(); }
+    uint32_t next_mesh_offset() noexcept { return _mesh_offset++; }
+    StorageBuffer & transforms() noexcept { return _transforms; }
+    ConditionalBuffer & visibility() noexcept { return _visibility; }
+    std::vector<uint32_t> & visibility_data() noexcept { return _visibility_data; }
   };
 
   MR_DECLARE_HANDLE(Scene);

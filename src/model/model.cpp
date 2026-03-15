@@ -75,8 +75,8 @@ mr::graphics::Model::Model(
       const auto &transform = mesh.transforms[0];
 
       const size_t instance_count = mesh.transforms.size();
-      const size_t instance_offset = scene._transforms_data.size();
-      const size_t mesh_offset = scene._mesh_offset++;
+      const size_t instance_offset = scene.transforms_data_size();
+      const size_t mesh_offset = scene.next_mesh_offset();
 
       MR_DEBUG("{}: [{}; {})", mesh.name, instance_offset, instance_offset + instance_count);
 
@@ -87,8 +87,8 @@ mr::graphics::Model::Model(
       for (const auto &texture : material.textures) {
         builder.add_texture(importer2graphics(texture.type), texture);
       }
-      builder.add_storage_buffer(&scene._transforms);
-      builder.add_conditional_buffer(&scene._visibility);
+      builder.add_storage_buffer(&scene.transforms());
+      builder.add_conditional_buffer(&scene.visibility());
 
       _builders.push_back(std::move(builder));
       auto gpu_mtl = _builders.back().build();
@@ -183,7 +183,7 @@ mr::graphics::Model::Model(
         }
 
         // TODO(dk6): maybe erase this
-        scene._visibility_data.emplace_back(1);
+        scene.visibility_data().emplace_back(1);
 
         uint32_t instance_render_info_size = sizeof(uint32_t);
 
