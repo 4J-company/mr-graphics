@@ -70,6 +70,7 @@ target_include_directories(${MR_GRAPHICS_LIB_VK_NAME}
 target_precompile_headers(${MR_GRAPHICS_LIB_VK_NAME} PRIVATE
   ${CMAKE_CURRENT_LIST_DIR}/src/pch.hpp
   )
+target_compile_definitions(${MR_GRAPHICS_LIB_VK_NAME} PRIVATE MR_GRAPHICS_VK_LAYER)
 target_compile_definitions(${MR_GRAPHICS_LIB_VK_NAME} PUBLIC
   MR_PROJECT_DIR="${CMAKE_CURRENT_LIST_DIR}"
   MR_RES_DIR="${MR_RES_FULL_DIR}"
@@ -93,6 +94,8 @@ target_compile_definitions(${MR_GRAPHICS_LIB_NAME} PUBLIC
   MR_PROJECT_DIR="${CMAKE_CURRENT_LIST_DIR}"
   MR_RES_DIR="${MR_RES_FULL_DIR}"
 )
+
+set(MR_GRAPHICS_PCH_HEADER ${CMAKE_CURRENT_SOURCE_DIR}/src/pch.hpp)
 
 option(BUILD_EXAMPLES "Build examples" ON)
 if (BUILD_EXAMPLES)

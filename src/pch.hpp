@@ -46,6 +46,10 @@
 #define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
 #include <vulkan/vulkan.hpp>
 
+#ifdef MR_GRAPHICS_VK_LAYER
+#include <vk_mem_alloc.h>
+#endif
+
 #include <mr-math/math.hpp>
 #include <mr-utils/assert.hpp>
 #include <mr-utils/misc.hpp>
