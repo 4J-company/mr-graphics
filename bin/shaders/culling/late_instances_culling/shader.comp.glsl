@@ -18,6 +18,7 @@ layout(push_constant) uniform PushContants {
 
   uint camera_buffer_id;
   uint bound_boxes_buffer_id;
+  uint bound_spheres_buffer_id;
 
   uint mip_levels_number;
   uint depth_pyramid_width;
@@ -40,10 +41,15 @@ layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer Me
 } MeshCullingDatas[];
 #define meshes_datas MeshCullingDatas[buffers_data.mesh_culling_data_buffer_id].data
 
-layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer BoudBoxesBuffer {
+layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer BoundBoxesBuffer {
   BoundBox[] data;
 } BoundBoxes[];
 #define bound_box(mesh_data) BoundBoxes[buffers_data.bound_boxes_buffer_id].data[mesh_data.bound_box_index]
+
+layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) readonly buffer BoundSpheresBuffer {
+  BoundSphere[] data;
+} BoundSpheres[];
+#define bound_sphere(mesh_data) BoundSpheres[buffers_data.bound_spheres_buffer_id].data[mesh_data.bound_box_index]
 
 layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) buffer CountersBuffer {
   uint data[];
@@ -82,6 +88,33 @@ layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) buffer CullingStat
 } CullingStatsBuffers[];
 #define culling_stat CullingStatsBuffers[buffers_data.culling_stat_buffer_id].stat
 #endif // COLLECT_CULLING_STAT
+
+// Copied from niagara src
+// 2D Polyhedral Bounds of a Clipped, Perspective-Projected 3D Sphere. Michael Mara, Morgan McGuire. 2013
+bool project_sphere(vec3 c, float r, float znear, float P00, float P11, out vec4 aabb)
+{
+	if (c.z < r + znear) {
+		return false;
+  }
+
+	vec3 cr = c * r;
+	float czr2 = c.z * c.z - r * r;
+
+	float vx = sqrt(c.x * c.x + czr2);
+	float minx = (vx * c.x - cr.z) / (vx * c.z + cr.x);
+	float maxx = (vx * c.x + cr.z) / (vx * c.z - cr.x);
+
+	float vy = sqrt(c.y * c.y + czr2);
+	float miny = (vy * c.y - cr.z) / (vy * c.z + cr.y);
+	float maxy = (vy * c.y + cr.z) / (vy * c.z - cr.y);
+
+	aabb = vec4(minx * P00, miny * P11, maxx * P00, maxy * P11);
+	aabb = aabb.xwzy * vec4(0.5f, -0.5f, 0.5f, -0.5f) + vec4(0.5f); // clip space -> uv space
+
+	return true;
+}
+
+#define USE_BOUND_BOXES 1
 
 void main()
 {
@@ -127,6 +160,7 @@ void main()
   // Occlussion culling
   // -------------------------------------
 
+#if USE_BOUND_BOXES
   // --- Get current depth of already visible objects ---
   vec4 rectangle_screen = get_bound_box_screen_rectangle(bb, camera_buffer.vp);
   rectangle_screen.x = clamp(rectangle_screen.x, -1, 1);
@@ -173,6 +207,30 @@ void main()
   // If new_depth >= 1 it means that object is very big and clips with camera.
   // But we here after frustum culling so object is visible
   bool visible = new_depth >= 1 || new_depth < old_depth - bias;
+#else // USE_BOUND_BOXES
+	vec4 aabb;
+  bool visible = true;
+  BoundSphere bs = bound_sphere(mesh_data);
+  float znear = 0.1;
+  float p00 = camera_buffer.vp[0][0];
+  float p11 = camera_buffer.vp[1][1];
+	if (project_sphere(bs.center, bs.radius, znear, p00, p11, aabb)) {
+		float width = (aabb.z - aabb.x) * buffers_data.depth_pyramid_width;
+		float height = (aabb.w - aabb.y) * buffers_data.depth_pyramid_heigth;
+
+		// Because we only consider 2x2 pixels, we need to make sure we are sampling from a mip that reduces the rectangle to 1x1 texel or smaller.
+		// Due to the rectangle being arbitrarily offset, a 1x1 rectangle may cover 2x2 texel area. Using floor() here would require sampling 4 corners
+		// of AABB (using bilinear fetch), which is a little slower.
+		float level = ceil(log2(max(width, height)));
+
+		// Sampler is set up to do min reduction, so this computes the minimum depth of a 2x2 texel quad
+		float depth = textureLod(DepthPyramid, (aabb.xy + aabb.zw) * 0.5, level).x;
+		float depth_sphere = znear / (bs.center.z - bs.radius);
+		// depth_sphere = 1 - depth_sphere;
+
+		visible = depth_sphere > depth;
+	}
+#endif // USE_BOUND_BOXES
 
   instances_datas[id].visibility_bits = SET_INSTANCE_WAS_OCCLUDED(instance_data.visibility_bits, !visible);
 

@@ -9,6 +9,7 @@ mr::Scene::Scene(RenderContext &render_context)
   , _transfers_semaphore(_parent->vulkan_state().device().createSemaphoreUnique({}).value)
   , _transforms(_parent->vulkan_state(), max_scene_instances * sizeof(mr::Matr4f))
   , _bound_boxes(_parent->vulkan_state(), max_scene_instances * sizeof(AABBf))
+  , _bound_spheres(_parent->vulkan_state(), max_scene_instances * sizeof(AABBf))
   , _visibility(_parent->vulkan_state(), max_scene_instances * sizeof(uint32_t))
   , _counters_buffer(_parent->vulkan_state(), max_scene_instances * sizeof(uint32_t),
                      vk::BufferUsageFlagBits::eStorageBuffer |
@@ -23,6 +24,7 @@ mr::Scene::Scene(RenderContext &render_context)
   _camera_buffer_id = render_context.bindless_set().register_resource(&_camera_uniform_buffer);
   _transforms_buffer_id = render_context.bindless_set().register_resource(&_transforms);
   _bound_boxes_buffer_id = render_context.bindless_set().register_resource(&_bound_boxes);
+  _bound_spheres_buffer_id = render_context.bindless_set().register_resource(&_bound_spheres);
   _counters_buffer_id = render_context.bindless_set().register_resource(&_counters_buffer);
 
   if (is_render_option_enabled(_parent->options(), RenderOptions::EnableCullingVisualiztion)) {
@@ -115,6 +117,10 @@ mr::ModelHandle mr::Scene::create_model(std::fs::path filename) noexcept
     _bound_boxes_data.emplace_back(mesh._bound_box);
     model_mesh.mesh_bound_box_id = bound_box_index;
 
+    // TODO(dk6): use same index can be incorrect in multithread code - but anyway this is temporary solution,
+    // I think we must merge these buffers
+    _bound_spheres_data.emplace_back(mesh._bound_sphere);
+
     uint32_t mesh_culling_data_index = static_cast<uint32_t>(draw.meshes_data_buffer_data.size());
     model_mesh.mesh_scene_id = mesh_culling_data_index;
     uint32_t lod_index = 0;
@@ -204,6 +210,7 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
 
     _transforms.write(_transfer_command_unit, std::span(_transforms_data));
     _bound_boxes.write(_transfer_command_unit, std::span(_bound_boxes_data));
+    _bound_spheres.write(_transfer_command_unit, std::span(_bound_spheres_data));
     // _visibility.write(_transfer_command_unit, std::span(_visibility_data));
 
     for (auto &[_, draw] : _draws) {

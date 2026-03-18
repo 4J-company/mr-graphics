@@ -73,6 +73,8 @@ namespace mr {
 
   template <typename T, size_t N = 16>
   using SmallVector = boost::container::small_vector<T, N>;
+
+  using importer::BoundingSphere;
 } // namespace mr
 
 using namespace std::literals;

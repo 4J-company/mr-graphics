@@ -63,6 +63,7 @@ mr::graphics::Model::Model(
   CommandUnit geometry_command_unit (state);
   geometry_command_unit.begin();
 
+  // TODO(dk6): pass it as option
   constexpr bool split_on_meshlets = false;
 
   using enum mr::MaterialParameter;
@@ -105,7 +106,7 @@ mr::graphics::Model::Model(
             std::vector<std::array<uint32_t, 3>> indices; // correct name is triangles
           };
           TemporaryMesh result;
- 
+
           result.positions.reserve(meshlet.vertex_count);
           for (uint32_t i = 0; i < meshlet.vertex_count; ++i) {
             uint32_t vertex_index = meshlet_vertices[meshlet.vertex_offset + i];
@@ -155,7 +156,7 @@ mr::graphics::Model::Model(
 
           auto &mesh_descr = _meshes.emplace_back(MeshInstances {
             .mesh = graphics::Mesh(std::move(vbufs), std::move(ibufs), instance_count,
-                                   mesh_offset, instance_offset, bb),
+                                   mesh_offset, instance_offset, bb, bs),
             .instances_number = static_cast<uint32_t>(instance_count),
             .transforms = mesh.transforms,
             // TODO(dk6): use dynamic buffer
@@ -190,7 +191,7 @@ mr::graphics::Model::Model(
         auto &mesh_descr = _meshes.emplace_back(MeshInstances {
           .mesh = graphics::Mesh(std::move(vbufs), std::move(ibufs),
                                  instance_count, mesh_offset, instance_offset,
-                                 mesh.aabb),
+                                 mesh.aabb, mesh.bounding_sphere),
           .instances_number = static_cast<uint32_t>(instance_count),
           .transforms = std::move(mesh.transforms),
           // TODO(dk6): use dynamic buffer

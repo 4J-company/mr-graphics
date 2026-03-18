@@ -823,6 +823,7 @@ void mr::RenderContext::late_culling_geometry(const SceneHandle scene)
 
         scene->camera_buffer_id(),
         scene->_bound_boxes_buffer_id,
+        scene->_bound_spheres_buffer_id,
 
         _depth_pyramid.mip_levels_number(),
         _depth_pyramid_extent.width,

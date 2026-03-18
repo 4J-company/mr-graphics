@@ -96,6 +96,11 @@ inline namespace graphics {
     uint32_t _bound_boxes_buffer_id = BindlessDescriptorSet::invalid_id;
     std::vector<AABBf> _bound_boxes_data;
 
+    // Now we have bound boxes and bound spheres together - think about this
+    StorageBuffer _bound_spheres;
+    uint32_t _bound_spheres_buffer_id = BindlessDescriptorSet::invalid_id;
+    std::vector<BoundingSphere> _bound_spheres_data;
+
     ConditionalBuffer _visibility; // u32 visibility mask for each draw call
     std::vector<uint32_t> _visibility_data;
 

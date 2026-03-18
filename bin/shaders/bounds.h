@@ -11,6 +11,12 @@ struct BoundSphere {
   float radius;
 };
 
+// TODO(dk6): use this and store bounds together
+struct Bounds {
+  BoundSphere sphere;
+  BoundBox box;
+};
+
 // Get bound box in world-space
 BoundBox transform_bound_box(BoundBox bb, mat4 transform)
 {
