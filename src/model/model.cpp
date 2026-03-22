@@ -53,7 +53,9 @@ mr::graphics::Model::Model(
     & ~Options::GenerateDiscreteLODs & ~Options::OptimizeMeshes
   };
 
+  std::println("before import");
   auto model = mr::import(model_path, options);
+  std::println("after import");
   if (!model) {
     MR_ERROR("Loading model {} failed", model_path.string());
     return;

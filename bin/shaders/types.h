@@ -14,6 +14,8 @@ struct InstanceDrawInfo {
 
 struct CameraData {
   mat4 vp;
+  mat4 view;
+  mat4 proj;
   vec4 pos;
   vec4 dir;
   float fov;

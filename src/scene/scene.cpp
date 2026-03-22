@@ -169,7 +169,8 @@ uint32_t mr::Scene::add_model_instance(ModelHandle model, Matr4f transform) noex
       });
 
       _parent->draw_bound_box(_transforms_buffer_id, instance_id,
-                              _bound_boxes_buffer_id, model_mesh.mesh_bound_box_id);
+                              _bound_boxes_buffer_id, _bound_spheres_buffer_id,
+                              model_mesh.mesh_bound_box_id);
     }
 
     draw.meshes_data_buffer_data[model_mesh.mesh_scene_id].draw_command.instanceCount += model_mesh.transforms.size();
@@ -265,7 +266,7 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
     if (input_state.key_pressed(vkfw::Key::eSpace)) {
       _camera.move(Vec3f(_camera.cam().up()) * speedup);
     }
-    if (input_state.key_pressed(vkfw::Key::eLeftAlt)) {
+    if (input_state.key_pressed(vkfw::Key::eZ)) {
       _camera.move(Vec3f(-_camera.cam().up()) * speedup);
     }
     if (input_state.key_pressed(vkfw::Key::eP)) {
@@ -329,6 +330,8 @@ void mr::Scene::update_camera_buffer() noexcept
   auto dir = _camera.cam().direction();
   mr::ShaderCameraData cam_data {
     .vp = _camera.viewproj(),
+    .view = _camera.cam().perspective(),
+    .proj = _camera.cam().frustum(),
     .campos = _camera.cam().position(),
     .dir = mr::Vec4f(dir.x(), dir.y(), dir.z(), 0),
     .fov = static_cast<float>(_camera.fov()),

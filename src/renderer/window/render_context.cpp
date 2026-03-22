@@ -310,6 +310,7 @@ void mr::RenderContext::init_bound_box_rendering()
     {"UNIFORM_BUFFERS_BINDING", std::to_string(uniform_buffer_binding)},
     {"STORAGE_BUFFERS_BINDING", std::to_string(storage_buffer_binding)},
     {"BINDLESS_SET", std::to_string(bindless_set_number)},
+    // {"ENABLE_BOUNDS_FRAG_COLOR", "ON"}, // this can cause DEVICE_LOST on some GPUs
   };
   _bound_boxes_draw_shader = ResourceManager<Shader>::get().create("BoundBoxShader", *_state, "bound_box", defines);
 
@@ -325,12 +326,14 @@ void mr::RenderContext::init_bound_box_rendering()
 }
 
 void mr::RenderContext::draw_bound_box(uint32_t transforms_buffer_id, uint32_t transform_index,
-                                       uint32_t bound_boxes_buffer_id, uint32_t bound_box_index) noexcept
+                                       uint32_t bound_boxes_buffer_id, uint32_t bound_spheres_buffer_id,
+                                       uint32_t bound_box_index) noexcept
 {
   _bound_boxes_data.emplace_back(BoundBoxRenderData {
     .transforms_buffer_id = transforms_buffer_id,
     .transform_index = transform_index,
     .bound_boxes_buffer_id = bound_boxes_buffer_id,
+    .bound_spheres_buffer_id = bound_spheres_buffer_id,
     .bound_box_index = bound_box_index,
   });
   _bound_boxes_data_dirty = true;

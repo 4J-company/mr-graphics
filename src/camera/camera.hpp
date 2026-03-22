@@ -7,6 +7,8 @@ namespace mr {
 inline namespace graphics {
   struct ShaderCameraData {
     mr::Matr4f vp;
+    mr::Matr4f view;
+    mr::Matr4f proj;
     mr::Vec4f campos;
     mr::Vec4f dir;
     float fov;

@@ -44,6 +44,7 @@ void main()
     imageStore(DstImage, ivec2(coord), vec4(depth));
   } else {
     // Workaround for situation when prelast level is 3x2 and last is 1x1 and max sampler doesn't catch 1.0 value
+    // TODO(dk6): this error also actual for 5x2 predlast level in 2K resolution
     vec2 offsets[] = {vec2(0), vec2(1)};
     float depth = 1;
     for (int i = 0; i < 2; i++) {

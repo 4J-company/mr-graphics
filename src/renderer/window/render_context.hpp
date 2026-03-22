@@ -120,6 +120,7 @@ inline namespace graphics {
       uint32_t transforms_buffer_id;
       uint32_t transform_index;
       uint32_t bound_boxes_buffer_id; // TODO: move to push contants
+      uint32_t bound_spheres_buffer_id; // TODO: move to push contants
       uint32_t bound_box_index;
     };
 
@@ -305,7 +306,8 @@ inline namespace graphics {
     const DescriptorAllocator & desciptor_allocator() const noexcept { return _default_descriptor_allocator; }
 
     void draw_bound_box(uint32_t transforms_buffer_id, uint32_t transform_index,
-                        uint32_t bound_boxes_buffer_id, uint32_t bound_box_index) noexcept;
+                        uint32_t bound_boxes_buffer_id, uint32_t bound_spheres_buffer_id,
+                        uint32_t bound_box_index) noexcept;
 
   private:
     void init_lights_render_data();

@@ -89,32 +89,7 @@ layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) buffer CullingStat
 #define culling_stat CullingStatsBuffers[buffers_data.culling_stat_buffer_id].stat
 #endif // COLLECT_CULLING_STAT
 
-// Copied from niagara src
-// 2D Polyhedral Bounds of a Clipped, Perspective-Projected 3D Sphere. Michael Mara, Morgan McGuire. 2013
-bool project_sphere(vec3 c, float r, float znear, float P00, float P11, out vec4 aabb)
-{
-	if (c.z < r + znear) {
-		return false;
-  }
-
-	vec3 cr = c * r;
-	float czr2 = c.z * c.z - r * r;
-
-	float vx = sqrt(c.x * c.x + czr2);
-	float minx = (vx * c.x - cr.z) / (vx * c.z + cr.x);
-	float maxx = (vx * c.x + cr.z) / (vx * c.z - cr.x);
-
-	float vy = sqrt(c.y * c.y + czr2);
-	float miny = (vy * c.y - cr.z) / (vy * c.z + cr.y);
-	float maxy = (vy * c.y + cr.z) / (vy * c.z - cr.y);
-
-	aabb = vec4(minx * P00, miny * P11, maxx * P00, maxy * P11);
-	aabb = aabb.xwzy * vec4(0.5f, -0.5f, 0.5f, -0.5f) + vec4(0.5f); // clip space -> uv space
-
-	return true;
-}
-
-#define USE_BOUND_BOXES 1
+#define USE_BOUND_BOXES 0
 
 void main()
 {
@@ -210,11 +185,12 @@ void main()
 #else // USE_BOUND_BOXES
 	vec4 aabb;
   bool visible = true;
-  BoundSphere bs = bound_sphere(mesh_data);
+  BoundSphere bs = transform_bound_sphere(bound_sphere(mesh_data), transfrom);
+  bs.center = (camera_buffer.view * vec4(bs.center, 1)).xyz;
   float znear = 0.1;
-  float p00 = camera_buffer.vp[0][0];
-  float p11 = camera_buffer.vp[1][1];
-	if (project_sphere(bs.center, bs.radius, znear, p00, p11, aabb)) {
+  float p00 = camera_buffer.proj[0][0];
+  float p11 = camera_buffer.proj[1][1];
+	if (get_bound_sphere_screen_rectangle(bs.center, bs.radius, znear, p00, p11, aabb)) {
 		float width = (aabb.z - aabb.x) * buffers_data.depth_pyramid_width;
 		float height = (aabb.w - aabb.y) * buffers_data.depth_pyramid_heigth;
 
@@ -223,12 +199,15 @@ void main()
 		// of AABB (using bilinear fetch), which is a little slower.
 		float level = ceil(log2(max(width, height)));
 
-		// Sampler is set up to do min reduction, so this computes the minimum depth of a 2x2 texel quad
-		float depth = textureLod(DepthPyramid, (aabb.xy + aabb.zw) * 0.5, level).x;
-		float depth_sphere = znear / (bs.center.z - bs.radius);
-		// depth_sphere = 1 - depth_sphere;
+    vec2 mip_scale = vec2(depth_mip_scales[2 * uint(level)], depth_mip_scales[2 * uint(level) + 1]);
+    vec2 tex_coord = ((aabb.xy + aabb.zw) * 0.5) * mip_scale;
 
-		visible = depth_sphere > depth;
+		// Sampler is set up to do max reduction, so this computes the max depth of a 2x2 texel quad
+		float depth = textureLod(DepthPyramid, tex_coord, level).x;
+    vec4 projected_center = camera_buffer.proj * vec4(bs.center, 1.0);
+    float depth_sphere = projected_center.z / projected_center.w;
+
+		visible = depth_sphere <= depth;
 	}
 #endif // USE_BOUND_BOXES
 
