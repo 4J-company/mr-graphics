@@ -28,7 +28,6 @@ mr::Scene::Scene(RenderContext &render_context)
   _counters_buffer_id = render_context.bindless_set().register_resource(&_counters_buffer);
 
   if (is_render_option_enabled(_parent->options(), RenderOptions::EnableCullingVisualiztion)) {
-    // fuck it per model...
     // TODO(dk6): Try change uint int to byte && use dynamic buffer
     _occluded_instances_state_buffer = StorageBuffer(_parent->vulkan_state(),
                                                      sizeof(uint32_t) * max_scene_instances);

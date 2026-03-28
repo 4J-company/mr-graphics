@@ -70,9 +70,6 @@ mr::graphics::Model::Model(
   static auto &manager = ResourceManager<Texture>::get();
   std::for_each(std::execution::seq, model_value.meshes.begin(), model_value.meshes.end(),
     [&, this] (auto &mesh) {
-      ASSERT(mesh.material < model_value.materials.size(), "Failed to load material from GLTF file");
-
-      const auto &material = model_value.materials[mesh.material];
       const auto &transform = mesh.transforms[0];
 
       const size_t instance_count = mesh.transforms.size();
@@ -82,14 +79,26 @@ mr::graphics::Model::Model(
       MR_DEBUG("{}: [{}; {})", mesh.name, instance_offset, instance_offset + instance_count);
 
       mr::MaterialBuilder builder(scene, "default");
-
-      builder.add_camera(scene.camera_uniform_buffer());
-      builder.add_value(&material.constants);
-      for (const auto &texture : material.textures) {
-        builder.add_texture(importer2graphics(texture.type), texture);
-      }
       builder.add_storage_buffer(&scene._transforms);
       builder.add_conditional_buffer(&scene._visibility);
+      builder.add_camera(scene.camera_uniform_buffer());
+      if (mesh.material < model_value.materials.size()) {
+        const auto &material = model_value.materials[mesh.material];
+        builder.add_value(&material.constants);
+        for (const auto &texture : material.textures) {
+          builder.add_texture(importer2graphics(texture.type), texture);
+        }
+      } else {
+        mr::importer::MaterialData::ConstantBlock constant_block {
+          .base_color_factor = Color(Vec4f{1}),
+          .emissive_color = Color(Vec4f{1}),
+          .emissive_strength = 1,
+          .normal_map_intensity = 1,
+          .roughness_factor = 1,
+          .metallic_factor = 1,
+        };
+        builder.add_value(&constant_block);
+      }
 
       _builders.push_back(std::move(builder));
       auto gpu_mtl = _builders.back().build();
