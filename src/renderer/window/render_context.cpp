@@ -1396,8 +1396,8 @@ void mr::RenderContext::calculate_prev_stat(SceneHandle scene) noexcept
     assert(format_byte_size(pos_gbuf.format()) == sizeof(float) * 4);
 
     // Copy from mapped host visible memory about 4 ms because we use readback
-    auto char_data = _position_instance_id_stage_buffer.copy();
-    const float *data = reinterpret_cast<const float *>(char_data.data());
+    _position_instance_id_data = _position_instance_id_stage_buffer.copy();
+    const float *data = reinterpret_cast<const float *>(_position_instance_id_data.data());
 
     // Iteration over 1920x1080 gbuf takes about 7 ms. It can be used ONLY for debug
     // calculate really visible objects
@@ -1419,6 +1419,21 @@ void mr::RenderContext::calculate_prev_stat(SceneHandle scene) noexcept
       : (_render_stat.really_visible_objects_number == 0 ? 1.0f : (0.5f / _render_stat.really_visible_objects_number));
   }
   _prev_render_stat = _render_stat;
+}
+
+std::optional<mr::Vec4f> mr::RenderContext::get_position_id_pixel(uint32_t x, uint32_t y) const noexcept
+{
+  if (_position_instance_id_data.empty()) {
+    return std::nullopt;
+  }
+
+  auto &pos_gbuf = _gbuffers[enum_cast(GBuffer::Position)];
+  auto [w, h, _z] = pos_gbuf.extent();
+  ASSERT(x < w && y < h);
+
+  const float *data = reinterpret_cast<const float *>(_position_instance_id_data.data());
+  uint32_t idx = (y * w + x) * 4;
+  return Vec4f(data[idx], data[idx + 1], data[idx + 2], data[idx + 3]);
 }
 
 void mr::RenderStat::write_to_json(std::ostream &out) const noexcept

@@ -308,6 +308,21 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
       uint32_t s = (enum_cast(state) + 1) % RenderContext::RenderBoundsState::StatesNumber;
       _parent->render_bounds_state(enum_cast<RenderContext::RenderBoundsState>(s));
     }
+
+    if (is_render_option_enabled(_parent->options(), RenderOptions::CollectPosInstanceId)) {
+      if (input_state.mouse_button_tapped(vkfw::MouseButton::eLeft)) {
+        auto pos = input_state.mouse_pos();
+        uint32_t x = static_cast<uint32_t>(pos.x());
+        uint32_t y = static_cast<uint32_t>(pos.y());
+        auto pixel_opt = _parent->get_position_id_pixel(x, y);
+        if (pixel_opt) {
+          auto pixel = *pixel_opt;
+          auto pos = Vec3f(pixel.x(), pixel.y(), pixel.z());
+          uint32_t id = std::bit_cast<uint32_t>(pixel.w());
+          std::println("pos: {}, id: {}", pos, id);
+        }
+      }
+    }
   }
 
   update_camera_buffer();

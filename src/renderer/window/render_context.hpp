@@ -212,6 +212,7 @@ inline namespace graphics {
     CommandUnit _position_instance_copy_cmd_unit;
     vk::UniqueFence _position_instance_copy_fence;
     HostBuffer _position_instance_id_stage_buffer;
+    std::vector<std::byte> _position_instance_id_data;
 
     // --- This used if EnableCullingStats option is enabled ---
     StorageBuffer _culling_stat_buffer;
@@ -308,6 +309,8 @@ inline namespace graphics {
     void draw_bound_box(uint32_t transforms_buffer_id, uint32_t transform_index,
                         uint32_t bound_boxes_buffer_id, uint32_t bound_spheres_buffer_id,
                         uint32_t bound_box_index) noexcept;
+
+    std::optional<Vec4f> get_position_id_pixel(uint32_t x, uint32_t y) const noexcept;
 
   private:
     void init_lights_render_data();
