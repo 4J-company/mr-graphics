@@ -13,6 +13,8 @@ inline namespace graphics {
   class InputState {
   public:
     constexpr static uint32_t max_keys_number = std::to_underlying(vkfw::Key::eLAST);
+    constexpr static uint32_t max_mouse_buttons_number = std::to_underlying(vkfw::MouseButton::eLAST);
+
   private:
     // ----------------------
     // Keyboard
@@ -23,6 +25,16 @@ inline namespace graphics {
 
     std::array<bool, max_keys_number> _key_tapped {}, _prev_key_tapped {};
     std::span<bool> _writer_key_tapped {}, _reader_key_tapped {};
+
+    // ----------------------
+    // Mouse buttons
+    // ----------------------
+
+    std::array<bool, max_mouse_buttons_number> _mouse_button_pressed {}, _prev_mouse_button_pressed {};
+    std::span<bool> _writer_mouse_button_pressed {}, _reader_mouse_button_pressed {};
+
+    std::array<bool, max_mouse_buttons_number> _mouse_button_tapped {}, _prev_mouse_button_tapped {};
+    std::span<bool> _writer_mouse_button_tapped {}, _reader_mouse_button_tapped {};
 
     // ----------------------
     // Mouse
@@ -51,6 +63,9 @@ inline namespace graphics {
     bool key_pressed(vkfw::Key key) const noexcept;
     bool key_tapped(vkfw::Key key) const noexcept;
 
+    bool mouse_button_pressed(vkfw::MouseButton button) const noexcept;
+    bool mouse_button_tapped(vkfw::MouseButton button) const noexcept;
+
     const Vec2d & mouse_pos() const noexcept { return _prev_mouse_pos; }
     const Vec2d & mouse_pos_delta() const noexcept { return _mouse_pos_delta; }
     const double mouse_scroll() const noexcept { return _prev_mouse_scroll_offset; }
@@ -64,6 +79,10 @@ inline namespace graphics {
     using KeyCallbackT =
       std::function<void(const vkfw::Window &, vkfw::Key, int, vkfw::KeyAction, vkfw::ModifierKeyFlags)>;
     KeyCallbackT get_key_callback() noexcept;
+
+    using MouseButtonCallbackT =
+      std::function<void(const vkfw::Window &, vkfw::MouseButton, vkfw::MouseButtonAction, vkfw::ModifierKeyFlags)>;
+    MouseButtonCallbackT get_mouse_button_callback() noexcept;
 
     using MouseCallbackT = std::function<void(const vkfw::Window &, double, double)>;
     MouseCallbackT get_mouse_callback() noexcept;

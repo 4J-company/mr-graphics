@@ -66,6 +66,7 @@ mr::Window::Window(const RenderContext &parent, Extent extent, bool enable_vsync
   _window->callbacks()->on_key = _input_state.get_key_callback();
   _window->callbacks()->on_scroll = _input_state.get_mouse_scroll_callback();
   _window->callbacks()->on_cursor_enter = _input_state.get_mouse_enter_callback();
+  _window->callbacks()->on_mouse_button = _input_state.get_mouse_button_callback();
   _window->callbacks()->on_window_resize = [this](const vkfw::Window&, uint32_t, uint32_t) { _should_update_swapchain = true; };
 }
 

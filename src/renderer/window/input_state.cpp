@@ -7,6 +7,12 @@ mr::InputState::InputState()
 
   _writer_key_tapped = std::span(_key_tapped.data(), _key_tapped.size());
   _reader_key_tapped = std::span(_prev_key_tapped.data(), _prev_key_tapped.size());
+
+  _writer_mouse_button_pressed = std::span(_mouse_button_pressed.data(), _mouse_button_pressed.size());
+  _reader_mouse_button_pressed = std::span(_prev_mouse_button_pressed.data(), _prev_mouse_button_pressed.size());
+
+  _writer_mouse_button_tapped = std::span(_mouse_button_tapped.data(), _mouse_button_tapped.size());
+  _reader_mouse_button_tapped = std::span(_prev_mouse_button_tapped.data(), _prev_mouse_button_tapped.size());
 }
 
 void mr::InputState::update() noexcept
@@ -15,10 +21,19 @@ void mr::InputState::update() noexcept
   std::ranges::fill(_reader_key_pressed, 0);
   std::ranges::fill(_reader_key_tapped, 0);
 
+  std::ranges::fill(_reader_mouse_button_pressed, 0);
+  std::ranges::fill(_reader_mouse_button_tapped, 0);
+
   /* scope for mutex lock */ {
     std::lock_guard lock(_update_mutex);
+
     std::copy(_writer_key_pressed.begin(), _writer_key_pressed.end(), _reader_key_pressed.begin());
     std::swap(_reader_key_tapped, _writer_key_tapped);
+
+    std::copy(_writer_mouse_button_pressed.begin(), _writer_mouse_button_pressed.end(),
+              _reader_mouse_button_pressed.begin());
+    std::swap(_reader_mouse_button_tapped, _writer_mouse_button_tapped);
+
     mouse_pos_copy = _mouse_pos;
   }
 
@@ -44,6 +59,20 @@ bool mr::InputState::key_tapped(vkfw::Key key) const noexcept
   return _reader_key_tapped[idx];
 }
 
+bool mr::InputState::mouse_button_pressed(vkfw::MouseButton button) const noexcept
+{
+  auto idx = std::to_underlying(button);
+  ASSERT(idx < max_mouse_buttons_number);
+  return _reader_mouse_button_pressed[idx];
+}
+
+bool mr::InputState::mouse_button_tapped(vkfw::MouseButton button) const noexcept
+{
+  auto idx = std::to_underlying(button);
+  ASSERT(idx < max_mouse_buttons_number);
+  return _reader_mouse_button_tapped[idx];
+}
+
 mr::InputState::KeyCallbackT mr::InputState::get_key_callback() noexcept
 {
   return [this](const vkfw::Window &window, vkfw::Key key, int scan_code,
@@ -51,7 +80,7 @@ mr::InputState::KeyCallbackT mr::InputState::get_key_callback() noexcept
     std::lock_guard lock(_update_mutex);
     auto idx = std::to_underlying(key);
 
-    if (idx < 0 && idx >= _writer_key_tapped.size()) {
+    if (idx < 0 && idx >= max_keys_number) {
       return;
     }
 
@@ -59,6 +88,24 @@ mr::InputState::KeyCallbackT mr::InputState::get_key_callback() noexcept
       _writer_key_tapped[idx] = true;
     }
     _writer_key_pressed[idx] = action == vkfw::KeyAction::eRelease ? false : true;
+  };
+}
+
+mr::InputState::MouseButtonCallbackT mr::InputState::get_mouse_button_callback() noexcept
+{
+  return [this](const vkfw::Window &window, vkfw::MouseButton button,
+                vkfw::MouseButtonAction action, vkfw::ModifierKeyFlags flags) {
+    std::lock_guard lock(_update_mutex);
+    auto idx = std::to_underlying(button);
+
+    if (idx < 0 && idx >= max_mouse_buttons_number) {
+      return;
+    }
+
+    if (action == vkfw::MouseButtonAction::ePress) {
+      _writer_mouse_button_tapped[idx] = true;
+    }
+    _writer_mouse_button_pressed[idx] = action == vkfw::MouseButtonAction::eRelease ? false : true;
   };
 }
 
