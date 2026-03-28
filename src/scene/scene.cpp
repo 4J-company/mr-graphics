@@ -19,7 +19,7 @@ mr::Scene::Scene(RenderContext &render_context)
   ASSERT(_parent != nullptr);
 
   _camera.cam() = mr::math::Camera<float>({1}, {-1}, {0, 1, 0});
-  _camera.cam().projection() = mr::math::Camera<float>::Projection(45_deg);
+  _camera.cam().projection() = mr::math::Camera<float>::Projection(45_deg, 0.01, 1000.0);
 
   _camera_buffer_id = render_context.bindless_set().register_resource(&_camera_uniform_buffer);
   _transforms_buffer_id = render_context.bindless_set().register_resource(&_transforms);
@@ -286,35 +286,23 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
       }
     }
 
-    if (input_state.key_tapped(vkfw::Key::e0)) {
-      auto &proj = _camera.cam().projection();
-      auto fov = 45_deg;
-      proj.distance = 0.1f;
-      proj.width = 2 * proj.distance * std::tan(fov._data / 2);
-      float aspect_ratio = 16.f / 9.f;
-      proj.height = proj.width * aspect_ratio;
-    }
     if (input_state.key_tapped(vkfw::Key::e1)) {
-      _camera.cam() = mr::math::Camera<float>({1}, {-1}, {0, 1, 0});
-      _camera.cam().projection() = mr::math::Camera<float>::Projection(45_deg);
+      _camera.cam().set({1}, {-1}, {0, 1, 0});
     }
     if (input_state.key_tapped(vkfw::Key::e2)) {
-      _camera.cam() = mr::math::Camera<float>({10}, {-1}, {0, 1, 0});
-      _camera.cam().projection() = mr::math::Camera<float>::Projection(45_deg);
+      _camera.cam().set({10}, {-1}, {0, 1, 0});
     }
     if (input_state.key_tapped(vkfw::Key::e3)) {
-      _camera.cam() = mr::math::Camera<float>({100}, {-1}, {0, 1, 0});
-      _camera.cam().projection() = mr::math::Camera<float>::Projection(45_deg);
+      _camera.cam().set({100}, {-1}, {0, 1, 0});
     }
     if (input_state.key_tapped(vkfw::Key::e4)) {
-      _camera.cam() = mr::math::Camera<float>({500}, {-1}, {0, 1, 0});
-      _camera.cam().projection() = mr::math::Camera<float>::Projection(45_deg);
+      _camera.cam().set({500}, {-1}, {0, 1, 0});
     }
     if (input_state.key_tapped(vkfw::Key::e5)) {
       auto cam_pos = _camera.cam().position();
-      _camera.cam() = mr::math::Camera<float>(cam_pos, -cam_pos.normalized().value(), {0, 1, 0});
-      _camera.cam().projection() = mr::math::Camera<float>::Projection(45_deg);
+      _camera.cam().set(cam_pos, -cam_pos.normalized().value(), {0, 1, 0});
     }
+
     if (input_state.key_tapped(vkfw::Key::eB)) {
       auto state = _parent->render_bounds_state();
       uint32_t s = (enum_cast(state) + 1) % RenderContext::RenderBoundsState::StatesNumber;
