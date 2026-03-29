@@ -89,7 +89,7 @@ layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) buffer CullingStat
 #define culling_stat CullingStatsBuffers[buffers_data.culling_stat_buffer_id].stat
 #endif // COLLECT_CULLING_STAT
 
-#define USE_BOUND_BOXES 0
+#define USE_BOUND_BOXES 1
 
 void main()
 {

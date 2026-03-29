@@ -268,9 +268,8 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
     if (input_state.key_pressed(vkfw::Key::eZ)) {
       _camera.move(Vec3f(-_camera.cam().up()) * speedup);
     }
-    if (input_state.key_pressed(vkfw::Key::eP)) {
-      std::cout << "(camera_pos, camera_dir, camera_up):\n"
-        << '(' << _camera.cam().position() << ", " << _camera.cam().direction() << ", " << _camera.cam().up() << ")/n";
+    if (input_state.key_tapped(vkfw::Key::eP)) {
+      std::println("({}, {}, {})", _camera.cam().position(), Vec3f(_camera.cam().direction()), Vec3f(_camera.cam().up()));
     }
     if (is_render_option_enabled(_parent->options(), RenderOptions::EnableCullingVisualiztion)) {
       if (input_state.key_tapped(vkfw::Key::eO)) {

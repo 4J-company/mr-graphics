@@ -14,6 +14,10 @@
 
 #define TRACY_VK_ZONE_BEGIN()
 
+static mr::Extent calculate_depth_pyramid_extent(mr::Extent screen_extent) {
+  return {std::bit_floor(screen_extent.width), std::bit_floor(screen_extent.height)};
+}
+
 mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent, RenderOptions options)
   : _state(std::make_shared<VulkanState>(global_state))
   , _render_options(options)
@@ -39,10 +43,11 @@ mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent,
   , _positions_vertex_buffer(*_state, default_vertex_number * position_bytes_size)
   , _attributes_vertex_buffer(*_state, default_vertex_number * attributes_bytes_size)
   , _index_buffer(*_state, default_index_number * sizeof(uint32_t), sizeof(uint32_t))
-  , _depth_pyramid_extent(extent.width / 2, extent.height / 2)
+  , _depth_pyramid_extent(calculate_depth_pyramid_extent(_extent))
   , _depth_pyramid(*_state, _depth_pyramid_extent, vk::Format::eR32Sfloat,
                    calculate_mips_levels_number(_depth_pyramid_extent))
 {
+  std::println("ext: {}, {}", _depth_pyramid_extent.width, _depth_pyramid_extent.height);
   if (is_render_option_enabled(_render_options, RenderOptions::DisableCulling) &&
       not is_render_option_enabled(_render_options, RenderOptions::DisableOcclusionCulling)) {
     _render_options |= RenderOptions::DisableOcclusionCulling;
@@ -1189,7 +1194,8 @@ void mr::RenderContext::build_depth_pyramid()
 void mr::RenderContext::resize(const mr::Extent &extent)
 {
   _extent = extent;
-  _depth_pyramid_extent = Extent(extent.width / 2, extent.height / 2);
+  // TODO(dk6): number of mips can be changed too
+  _depth_pyramid_extent = calculate_depth_pyramid_extent(_extent);
 
   // Calculate scale coefs for depth pyramid
   std::array<float, depth_pyramid_max_levels * 2> scales;
