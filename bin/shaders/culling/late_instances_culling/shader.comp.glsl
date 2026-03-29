@@ -89,7 +89,7 @@ layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) buffer CullingStat
 #define culling_stat CullingStatsBuffers[buffers_data.culling_stat_buffer_id].stat
 #endif // COLLECT_CULLING_STAT
 
-#define USE_BOUND_BOXES 1
+#define USE_BOUND_BOXES 0
 
 void main()
 {
@@ -186,11 +186,11 @@ void main()
 	vec4 aabb;
   bool visible = true;
   BoundSphere bs = transform_bound_sphere(bound_sphere(mesh_data), transfrom);
-  bs.center = (camera_buffer.view * vec4(bs.center, 1)).xyz;
+  vec3 center_in_view = (camera_buffer.view * vec4(bs.center, 1)).xyz;
   float znear = 0.1;
   float p00 = camera_buffer.proj[0][0];
   float p11 = camera_buffer.proj[1][1];
-	if (get_bound_sphere_screen_rectangle(bs.center, bs.radius, znear, p00, p11, aabb)) {
+	if (get_bound_sphere_screen_rectangle(center_in_view, bs.radius, znear, p00, p11, aabb)) {
 		float width = (aabb.z - aabb.x) * buffers_data.depth_pyramid_width;
 		float height = (aabb.w - aabb.y) * buffers_data.depth_pyramid_heigth;
 
@@ -204,7 +204,9 @@ void main()
 
 		// Sampler is set up to do max reduction, so this computes the max depth of a 2x2 texel quad
 		float depth = textureLod(DepthPyramid, tex_coord, level).x;
-    vec4 projected_center = camera_buffer.proj * vec4(bs.center, 1.0);
+    // TODO(dk6): try write it without matrix multiplication
+    vec3 dir_to_cam = normalize(camera_buffer.pos.xyz - bs.center);
+    vec4 projected_center = camera_buffer.vp * vec4(bs.center + dir_to_cam * bs.radius, 1.0);
     float depth_sphere = projected_center.z / projected_center.w;
 
 		visible = depth_sphere <= depth;

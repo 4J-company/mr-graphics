@@ -338,13 +338,13 @@ void main()
   mat4 proj = cam_ubo.vp;
   BoundBox bb = transform_bound_box(bound_box, transpose(transform));
 
-  if (bool(draw.render_bound_rects)) {
-    render_br_from_bs();
-    // render_br_from_bb(bb, proj);
-  } else {
-    render_bound_sphere(0xFF000000);
-  }
-  return;
+  // if (bool(draw.render_bound_rects)) {
+  //   render_br_from_bs();
+  //   // render_br_from_bb(bb, proj);
+  // } else {
+  //   render_bound_sphere(0xFF000000);
+  // }
+  // return;
 
   if (bool(draw.render_bound_rects)) {
     render_br_from_bb(bb, proj);
