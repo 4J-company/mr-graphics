@@ -333,10 +333,22 @@ void render_bound_sphere(uint color)
   }
 }
 
+float bb_volume(BoundBox bb)
+{
+  vec4 dim = bb.max - bb.min;
+  return dim.x * dim.y * dim.z;
+}
+
+float bs_volume(BoundSphere bs)
+{
+  return bs.radius * bs.radius * bs.radius * 4 / 3.0 * PI;
+}
+
 void main()
 {
   mat4 proj = cam_ubo.vp;
   BoundBox bb = transform_bound_box(bound_box, transpose(transform));
+  BoundSphere bs = transform_bound_sphere(bound_sphere, transpose(transform));
 
   // if (bool(draw.render_bound_rects)) {
   //   render_br_from_bs();
@@ -346,8 +358,19 @@ void main()
   // }
   // return;
 
+  float bbv = bb_volume(bb), bsv = bs_volume(bs);
+  if (bsv < bbv) {
+    render_bound_sphere(0xFF000000);
+  } else {
+    render_bound_box(bb, proj, 0x0000FF00);
+
+  }
+
+  return;
+
   if (bool(draw.render_bound_rects)) {
-    render_br_from_bb(bb, proj);
+    // render_br_from_bb(bb, proj);
+    render_bound_sphere(0xFF000000);
   } else {
     render_bound_box(bb, proj, 0xFF000000);
   }

@@ -315,7 +315,7 @@ void mr::RenderContext::init_bound_box_rendering()
     {"UNIFORM_BUFFERS_BINDING", std::to_string(uniform_buffer_binding)},
     {"STORAGE_BUFFERS_BINDING", std::to_string(storage_buffer_binding)},
     {"BINDLESS_SET", std::to_string(bindless_set_number)},
-    // {"ENABLE_BOUNDS_FRAG_COLOR", "ON"}, // this can cause DEVICE_LOST on some GPUs
+    {"ENABLE_BOUNDS_FRAG_COLOR", "ON"}, // this can cause DEVICE_LOST on some GPUs
   };
   _bound_boxes_draw_shader = ResourceManager<Shader>::get().create("BoundBoxShader", *_state, "bound_box", defines);
 
@@ -367,8 +367,14 @@ mr::VertexBuffersArray mr::RenderContext::add_vertex_buffers(CommandUnit &comman
   // Tmp theme - fixed attributes layout
   ASSERT(vbufs_data.size() == 2);
 
-  auto &positions_data = vbufs_data[0];
-  auto &attributes_data = vbufs_data[1];
+  auto positions_data = vbufs_data[0];
+  auto attributes_data = vbufs_data[1];
+  std::vector<std::byte> attributes_fake_data;
+  // TODO(dk6): temporary solution for loading models without attributes
+  if (attributes_data.size() == 0) {
+    attributes_fake_data.resize(attributes_bytes_size * positions_data.size() / position_bytes_size);
+    attributes_data = attributes_fake_data;
+  }
 
   ASSERT(positions_data.size() % position_bytes_size == 0);
   ASSERT(attributes_data.size() % attributes_bytes_size == 0);
@@ -378,8 +384,8 @@ mr::VertexBuffersArray mr::RenderContext::add_vertex_buffers(CommandUnit &comman
 
   auto alloc_info = _vertex_buffers_heap.allocate(vertexes_number);
   if (alloc_info.resized) {
-    _positions_vertex_buffer.resize(_vertex_buffers_heap.size() * position_bytes_size);
-    _attributes_vertex_buffer.resize(_vertex_buffers_heap.size() * attributes_bytes_size);
+    _positions_vertex_buffer.resize(command_unit, _vertex_buffers_heap.size() * position_bytes_size);
+    _attributes_vertex_buffer.resize(command_unit, _vertex_buffers_heap.size() * attributes_bytes_size);
   }
 
   VkDeviceSize positions_offset = alloc_info.offset * position_bytes_size;

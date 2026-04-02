@@ -70,8 +70,7 @@ int main(int argc, const char **argv)
   }
 
   if (options.camera.has_value()) {
-    scene->camera().cam() = options.camera.value();
-    scene->camera().cam().projection() = mr::math::Camera<float>::Projection(45_deg);
+    scene->camera().cam().set(options.camera->position(), options.camera->direction(), options.camera->up());
   }
 
   if (options.mode == mr::CliOptions::Mode::Default) {

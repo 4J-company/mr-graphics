@@ -242,17 +242,11 @@ vk::DeviceSize mr::VectorBuffer::append_range(CommandUnit &command_unit, std::sp
   return offset;
 }
 
-void mr::VectorBuffer::resize(vk::DeviceSize new_size) noexcept
+void mr::VectorBuffer::resize(CommandUnit &command_unit, vk::DeviceSize new_size) noexcept
 {
   if (new_size > capacity()) {
-    CommandUnit command_unit {*_state};
-    command_unit.begin();
     DeviceBuffer::resize(command_unit, new_size);
-    command_unit.end();
-
-    UniqueFenceGuard(_state->device(), command_unit.submit(*_state));
   }
-
   _current_size = new_size;
 }
 
@@ -420,18 +414,18 @@ mr::HeapBuffer::HeapBuffer(const VulkanState &state,
 {
 }
 
-vk::DeviceSize mr::HeapBuffer::allocate(vk::DeviceSize size) noexcept
+vk::DeviceSize mr::HeapBuffer::allocate(CommandUnit &command_unit, vk::DeviceSize size) noexcept
 {
   auto alloc = _heap.allocate(size);
   if (alloc.resized) {
-    _buffer.resize(_heap.size());
+    _buffer.resize(command_unit, _heap.size());
   }
   return alloc.offset;
 }
 
 vk::DeviceSize mr::HeapBuffer::allocate_and_write(CommandUnit &command_unit, std::span<const std::byte> src) noexcept
 {
-  auto offset = allocate(src.size());
+  auto offset = allocate(command_unit, src.size());
   write(command_unit, src, offset);
   return offset;
 }

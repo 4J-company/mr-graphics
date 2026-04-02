@@ -308,7 +308,7 @@ inline namespace graphics {
     vk::DeviceSize capacity() const noexcept { return DeviceBuffer::_size; }
     vk::DeviceSize size() const noexcept { return _current_size; }
 
-    void resize(vk::DeviceSize new_size) noexcept;
+    void resize(CommandUnit &command_unit, vk::DeviceSize new_size) noexcept;
 
     vk::DeviceSize append_range(CommandUnit &command_unit, std::span<const std::byte> src) noexcept;
 
@@ -456,8 +456,9 @@ inline namespace graphics {
                vk::DeviceSize start_byte_size = HeapBuffer::default_initial_byte_size,
                vk::DeviceSize alignment = HeapBuffer::default_alignment);
 
-    // return offset in buffer
-    vk::DeviceSize allocate(vk::DeviceSize size) noexcept;
+    // Returns offset in buffer
+    // CommandUnit used only for resizing buffer
+    vk::DeviceSize allocate(CommandUnit &command_unit, vk::DeviceSize size) noexcept;
     void free(vk::DeviceSize offset) noexcept;
 
     template <typename T, size_t Extent>

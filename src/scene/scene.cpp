@@ -20,6 +20,7 @@ mr::Scene::Scene(RenderContext &render_context)
 
   _camera.cam() = mr::math::Camera<float>({1}, {-1}, {0, 1, 0});
   _camera.cam().projection() = mr::math::Camera<float>::Projection(45_deg, 0.01, 1000.0);
+  // _camera.cam().projection() = mr::math::Camera<float>::Projection(45_deg, 1, 15000.0);
 
   _camera_buffer_id = render_context.bindless_set().register_resource(&_camera_uniform_buffer);
   _transforms_buffer_id = render_context.bindless_set().register_resource(&_transforms);
@@ -297,6 +298,12 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
       _camera.cam().set({500}, {-1}, {0, 1, 0});
     }
     if (input_state.key_tapped(vkfw::Key::e5)) {
+      _camera.cam().set({10000}, {-1}, {0, 1, 0});
+    }
+    if (input_state.key_tapped(vkfw::Key::e6)) {
+      _camera.cam().set({100000}, {-1}, {0, 1, 0});
+    }
+    if (input_state.key_tapped(vkfw::Key::e0)) {
       auto cam_pos = _camera.cam().position();
       _camera.cam().set(cam_pos, -cam_pos.normalized().value(), {0, 1, 0});
     }

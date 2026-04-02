@@ -76,7 +76,7 @@ mr::graphics::Model::Model(
       const size_t instance_offset = scene._transforms_data.size();
       const size_t mesh_offset = scene._mesh_offset++;
 
-      MR_DEBUG("{}: [{}; {})", mesh.name, instance_offset, instance_offset + instance_count);
+      // MR_DEBUG("{}: [{}; {})", mesh.name, instance_offset, instance_offset + instance_count);
 
       mr::MaterialBuilder builder(scene, "default");
       builder.add_storage_buffer(&scene._transforms);
@@ -204,7 +204,7 @@ mr::graphics::Model::Model(
           .instances_number = static_cast<uint32_t>(instance_count),
           .transforms = std::move(mesh.transforms),
           // TODO(dk6): use dynamic buffer
-          .intances_render_info_buffer = StorageBuffer(state, instance_render_info_size * 100'000),
+          .intances_render_info_buffer = StorageBuffer(state, instance_render_info_size * 10),
         });
         mesh_descr.intances_render_info_buffer_id =
           scene.render_context().bindless_set().register_resource(&mesh_descr.intances_render_info_buffer);

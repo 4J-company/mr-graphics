@@ -52,6 +52,10 @@ void main()
   }
 #endif // ENABLE_CULLING_VISUALIZATION
 
+  // OutNIsShade = vec4(normal, 0);
+  // OutColorTrans = vec4(0.8, 0.47, 0.30, 1);
+  // return;
+
   OutNIsShade = vec4(normal, 1);
 
   OutMR         = get_metallic_roughness_color(materialid, texcoord);

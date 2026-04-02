@@ -89,7 +89,7 @@ layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) buffer CullingStat
 #define culling_stat CullingStatsBuffers[buffers_data.culling_stat_buffer_id].stat
 #endif // COLLECT_CULLING_STAT
 
-#define USE_BOUND_BOXES 0
+#define USE_BOUND_BOXES 1
 
 void main()
 {
@@ -175,6 +175,12 @@ void main()
 
   vec4 projected = (camera_buffer.vp * vec4(closest_bb_point, 1));
   float new_depth = projected.z / projected.w;
+
+  // BoundSphere bs = transform_bound_sphere(bound_sphere(mesh_data), transfrom);
+  // vec3 dir_to_cam_from_bs = normalize(camera_buffer.pos.xyz - bs.center);
+  // vec4 projected_center = camera_buffer.vp * vec4(bs.center + dir_to_cam_from_bs * bs.radius, 1.0);
+  // float depth_sphere = projected_center.z / projected_center.w;
+  // new_depth = depth_sphere;
 
   // --- Check visibility ---
   // When group of object is at far distance they have equal new and old depth
