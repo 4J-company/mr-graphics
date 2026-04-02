@@ -1441,7 +1441,9 @@ std::optional<mr::Vec4f> mr::RenderContext::get_position_id_pixel(uint32_t x, ui
 
   auto &pos_gbuf = _gbuffers[enum_cast(GBuffer::Position)];
   auto [w, h, _z] = pos_gbuf.extent();
-  ASSERT(x < w && y < h);
+  if (x >= w || y >= h) {
+    return std::nullopt;
+  }
 
   const float *data = reinterpret_cast<const float *>(_position_instance_id_data.data());
   uint32_t idx = (y * w + x) * 4;

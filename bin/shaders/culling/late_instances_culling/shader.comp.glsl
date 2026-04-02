@@ -193,7 +193,7 @@ void main()
   bool visible = true;
   BoundSphere bs = transform_bound_sphere(bound_sphere(mesh_data), transfrom);
   vec3 center_in_view = (camera_buffer.view * vec4(bs.center, 1)).xyz;
-  float znear = 0.1;
+  float znear = camera_buffer.near;
   float p00 = camera_buffer.proj[0][0];
   float p11 = camera_buffer.proj[1][1];
 	if (get_bound_sphere_screen_rectangle(center_in_view, bs.radius, znear, p00, p11, aabb)) {

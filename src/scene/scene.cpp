@@ -20,7 +20,7 @@ mr::Scene::Scene(RenderContext &render_context)
 
   _camera.cam() = mr::math::Camera<float>({1}, {-1}, {0, 1, 0});
   _camera.cam().projection() = mr::math::Camera<float>::Projection(45_deg, 0.01, 1000.0);
-  // _camera.cam().projection() = mr::math::Camera<float>::Projection(45_deg, 1, 15000.0);
+  // _camera.cam().projection() = mr::math::Camera<float>::Projection(45_deg, 0.5, 15000.0);
 
   _camera_buffer_id = render_context.bindless_set().register_resource(&_camera_uniform_buffer);
   _transforms_buffer_id = render_context.bindless_set().register_resource(&_transforms);
@@ -340,6 +340,8 @@ void mr::Scene::update_camera_buffer() noexcept
     .vp = _camera.viewproj(),
     .view = _camera.cam().perspective(),
     .proj = _camera.cam().frustum(),
+    .near = _camera.cam().projection().distance,
+    .far = _camera.cam().projection().far,
     .campos = _camera.cam().position(),
     .dir = mr::Vec4f(dir.x(), dir.y(), dir.z(), 0),
     .fov = static_cast<float>(_camera.fov()),

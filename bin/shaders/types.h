@@ -16,8 +16,10 @@ struct CameraData {
   mat4 vp;
   mat4 view;
   mat4 proj;
-  vec4 pos;
-  vec4 dir;
+  float near;
+  float far;
+  vec3 pos;
+  vec3 dir;
   float fov;
   float gamma;
   float speed;

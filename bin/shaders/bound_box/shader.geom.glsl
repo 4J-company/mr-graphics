@@ -131,7 +131,7 @@ void render_br_from_bs()
   proj = cam_ubo.proj;
   // bs = bound_sphere;
 	vec4 aabb;
-  float znear = 0.1;
+  float znear = cam_ubo.near;
   float p00 = proj[0][0];
   float p11 = proj[1][1];
   bool v = get_bound_sphere_screen_rectangle(bs.center, bs.radius, znear, p00, p11, aabb);
@@ -344,26 +344,47 @@ float bs_volume(BoundSphere bs)
   return bs.radius * bs.radius * bs.radius * 4 / 3.0 * PI;
 }
 
+float br_square(vec4 br) {
+  return abs((br.x - br.z) * (br.y - br.w));
+}
+
 void main()
 {
   mat4 proj = cam_ubo.vp;
   BoundBox bb = transform_bound_box(bound_box, transpose(transform));
   BoundSphere bs = transform_bound_sphere(bound_sphere, transpose(transform));
 
-  // if (bool(draw.render_bound_rects)) {
-  //   render_br_from_bs();
-  //   // render_br_from_bb(bb, proj);
-  // } else {
-  //   render_bound_sphere(0xFF000000);
-  // }
-  // return;
+  float bbv = 0, bsv = 0;
+  if (bool(draw.render_bound_rects)) {
+    vec3 center = (cam_ubo.view * vec4(bs.center, 1)).xyz;
+	  vec4 aabb;
+    float znear = cam_ubo.near;
+    float p00 = cam_ubo.proj[0][0], p11 = cam_ubo.proj[1][1];
+    bool v = get_bound_sphere_screen_rectangle(center, bs.radius, znear, p00, p11, aabb);
+    if (v) {
+      aabb -= vec4(0.5);
+      aabb *= vec4(2);
 
-  float bbv = bb_volume(bb), bsv = bs_volume(bs);
+      vec4 rectangle = get_bound_box_screen_rectangle(bb, proj);
+      // Flip over Ox
+      float tmp = -rectangle.y;
+      rectangle.y = -rectangle.w;
+      rectangle.w = tmp;
+
+      bbv = br_square(rectangle);
+      bsv = br_square(aabb);
+    } else {
+      render_bound_box(bb, proj, 0x00FFF0000);
+      return;
+    }
+  } else {
+    bbv = bb_volume(bb), bsv = bs_volume(bs);
+  }
+
   if (bsv < bbv) {
     render_bound_sphere(0xFF000000);
   } else {
     render_bound_box(bb, proj, 0x0000FF00);
-
   }
 
   return;

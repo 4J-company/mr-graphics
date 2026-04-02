@@ -9,8 +9,10 @@ inline namespace graphics {
     mr::Matr4f vp;
     mr::Matr4f view;
     mr::Matr4f proj;
-    mr::Vec4f campos;
-    mr::Vec4f dir;
+    float near;
+    float far;
+    mr::Vec3f campos;
+    mr::Vec3f dir;
     float fov;
     float gamma;
     float speed;
