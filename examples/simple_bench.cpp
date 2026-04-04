@@ -29,6 +29,12 @@ int main(int argc, const char **argv)
   } else {
     render_context_extent = {options.width, options.height};
   }
+  // TODO(dk6) - if remove this i have bug on my pc on 2k in with occlusion culling - depth pyramid become 2048x1024
+  // and occlusion culling works incorrectly. But when use FullHD - dp is 1024x1024 and this trouble doesn't exists.
+  // But once i saw small object disappear - i think trouble is in first scale from 1920x1080 -> 1024x1024
+  // Similar trouble described here: https://github.com/bevyengine/bevy/pull/17413 (crtl+f to "precision").
+  // Also there is potential solution: https://github.com/Themaister/Granite/blob/master/assets/shaders/post/hiz.comp
+  render_context_extent = {options.width, options.height};
 
   mr::RenderOptions render_options = mr::RenderOptions::None;
   if (options.disable_culling) {
@@ -100,7 +106,7 @@ int main(int argc, const char **argv)
   }
 
   if (options.camera.has_value()) {
-    scene->camera().cam() = options.camera.value();
+    scene->camera().cam().set(options.camera->position(), options.camera->direction(), options.camera->up());
   }
 
   auto window = render_context->create_window({options.width, options.height});
