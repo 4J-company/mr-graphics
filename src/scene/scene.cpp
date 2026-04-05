@@ -20,7 +20,7 @@ mr::Scene::Scene(RenderContext &render_context)
 
   _camera.cam() = mr::math::Camera<float>({1}, {-1}, {0, 1, 0});
   _camera.cam().projection() = mr::math::Camera<float>::Projection(45_deg, 0.01, 1000.0);
-  // _camera.cam().projection() = mr::math::Camera<float>::Projection(45_deg, 0.5, 15000.0);
+  _camera.cam().projection() = mr::math::Camera<float>::Projection(45_deg, 0.5, 15000.0);
 
   _camera_buffer_id = render_context.bindless_set().register_resource(&_camera_uniform_buffer);
   _transforms_buffer_id = render_context.bindless_set().register_resource(&_transforms);

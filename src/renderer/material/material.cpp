@@ -1,9 +1,35 @@
 #include "material/material.hpp"
 #include "window/render_context.hpp"
 
+#include <mr-importer/assets.hpp>
+
 // ----------------------------------------------------------------------------
 // Material
 // ----------------------------------------------------------------------------
+
+namespace {
+
+constexpr std::array k_position_only_vertex_attributes {
+  vk::VertexInputAttributeDescription {
+    .location = 0,
+    .binding = 0,
+    .format = vk::Format::eR32G32B32Sfloat,
+    .offset = 0,
+  },
+};
+
+static_assert(
+  k_position_only_vertex_attributes[0].location
+    == mr::importer::Mesh::vertex_input_attribute_descriptions[0].location
+  && k_position_only_vertex_attributes[0].binding
+       == mr::importer::Mesh::vertex_input_attribute_descriptions[0].binding
+  && k_position_only_vertex_attributes[0].format
+       == mr::importer::Mesh::vertex_input_attribute_descriptions[0].format
+  && k_position_only_vertex_attributes[0].offset
+       == mr::importer::Mesh::vertex_input_attribute_descriptions[0].offset,
+  "Position-only layout must match mr-importer binding 0 (positions)");
+
+} // namespace
 
 static size_t get_aligned_16_byte(size_t size) {
   return size % 4 == 0 ? size : ((size / 4 + 1) * 4);
@@ -14,7 +40,9 @@ mr::graphics::Material::Material(Scene &scene,
                                  std::span<std::byte> ubo_data,
                                  std::span<std::optional<mr::TextureHandle>> textures,
                                  std::span<mr::StorageBuffer *> storage_buffers,
-                                 std::span<mr::ConditionalBuffer *> conditional_buffers) noexcept
+                                 std::span<mr::ConditionalBuffer *> conditional_buffers,
+                                 MaterialVertexLayout vertex_layout,
+                                 std::span<const vk::VertexInputAttributeDescription> vertex_attributes) noexcept
     : _ubo(scene.render_context().vulkan_state(),
            ubo_data.size() + sizeof(uint32_t) * get_aligned_16_byte(textures.size()))
     , _shader(shader)
@@ -26,14 +54,15 @@ mr::graphics::Material::Material(Scene &scene,
 
   std::array layouts { scene.render_context().bindless_set_layout() };
   auto &pipelines_manager = mr::ResourceManager<GraphicsPipeline>::get();
-  auto pipeline_name = std::format("{}_{}", materials_pipeline_name, shader->id());
+  const char *layout_tag = vertex_layout == MaterialVertexLayout::PositionOnly ? "pos" : "full";
+  auto pipeline_name = std::format("{}_{}_{}", materials_pipeline_name, shader->id(), layout_tag);
   _pipeline = pipelines_manager.find(pipeline_name);
   if (not _pipeline) {
     _pipeline = pipelines_manager.create(pipeline_name,
                                          scene.render_context(),
                                          mr::GraphicsPipeline::Subpass::OpaqueGeometry,
                                          _shader,
-                                         std::span {mr::importer::Mesh::vertex_input_attribute_descriptions},
+                                         vertex_attributes,
                                          std::span {layouts});
   }
 
@@ -119,6 +148,17 @@ mr::MaterialHandle mr::MaterialBuilder::build() noexcept
   const auto &state = _scene->render_context().vulkan_state();
   auto shdhandle = shdfindres ? shdfindres : shdmanager.create(shdname, state, _shader_filename, generate_shader_defines());
 
+  const MaterialVertexLayout vtx_layout = _shader_filename == "default_position_only"
+                                            ? MaterialVertexLayout::PositionOnly
+                                            : MaterialVertexLayout::Full;
+
+  std::span<const vk::VertexInputAttributeDescription> vtx_attrs;
+  if (vtx_layout == MaterialVertexLayout::PositionOnly) {
+    vtx_attrs = std::span {k_position_only_vertex_attributes};
+  }
+  else {
+    vtx_attrs = std::span {mr::importer::Mesh::vertex_input_attribute_descriptions};
+  }
 
   return mtlmanager.create(unnamed,
     *_scene,
@@ -126,7 +166,9 @@ mr::MaterialHandle mr::MaterialBuilder::build() noexcept
     std::span {_ubo_data},
     std::span {_textures},
     std::span {_storage_buffers.data(), _storage_buffers.size()},
-    std::span {_conditional_buffers.data(), _conditional_buffers.size()}
+    std::span {_conditional_buffers.data(), _conditional_buffers.size()},
+    vtx_layout,
+    vtx_attrs
   );
 }
 

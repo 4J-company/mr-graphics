@@ -67,18 +67,18 @@ mr::graphics::Model::Model(
   constexpr bool split_on_meshlets = false;
 
   using enum mr::MaterialParameter;
-  static auto &manager = ResourceManager<Texture>::get();
   std::for_each(std::execution::seq, model_value.meshes.begin(), model_value.meshes.end(),
     [&, this] (auto &mesh) {
-      const auto &transform = mesh.transforms[0];
-
       const size_t instance_count = mesh.transforms.size();
       const size_t instance_offset = scene._transforms_data.size();
       const size_t mesh_offset = scene._mesh_offset++;
 
-      // MR_DEBUG("{}: [{}; {})", mesh.name, instance_offset, instance_offset + instance_count);
+      MR_DEBUG("{}: [{}; {})", mesh.name, instance_offset, instance_offset + instance_count);
 
-      mr::MaterialBuilder builder(scene, "default");
+      const bool position_only = mesh.attributes.empty();
+      ASSERT(!mesh.positions.empty());
+
+      mr::MaterialBuilder builder(scene, position_only ? "default_position_only" : "default");
       builder.add_storage_buffer(&scene._transforms);
       builder.add_conditional_buffer(&scene._visibility);
       builder.add_camera(scene.camera_uniform_buffer());
@@ -120,7 +120,9 @@ mr::graphics::Model::Model(
           for (uint32_t i = 0; i < meshlet.vertex_count; ++i) {
             uint32_t vertex_index = meshlet_vertices[meshlet.vertex_offset + i];
             result.positions.push_back(mesh.positions[vertex_index]);
-            result.attributes.push_back(mesh.attributes[vertex_index]);
+            if (not position_only) {
+              result.attributes.push_back(mesh.attributes[vertex_index]);
+            }
           }
 
           result.indices.reserve(meshlet.triangle_count);
@@ -133,11 +135,17 @@ mr::graphics::Model::Model(
 
             result.indices.push_back({v0, v1, v2});
           }
-          std::array vbufs_data {
-            std::as_bytes(std::span(result.positions)),
-            std::as_bytes(std::span(result.attributes))
-          };
-          auto vbufs = scene.render_context().add_vertex_buffers(geometry_command_unit, vbufs_data);
+          mr::VertexBuffersArray vbufs;
+          if (position_only) {
+            vbufs = scene.render_context().add_vertex_buffers_positions_only(
+              geometry_command_unit, std::as_bytes(std::span(result.positions)));
+          } else {
+            std::array vbufs_data {
+              std::as_bytes(std::span(result.positions)),
+              std::as_bytes(std::span(result.attributes))
+            };
+            vbufs = scene.render_context().add_vertex_buffers(geometry_command_unit, vbufs_data);
+          }
 
           IndexBufferDescription ibuf {
             .offset = scene.render_context().index_buffer().allocate_and_write(geometry_command_unit, std::span(result.indices)),
@@ -177,11 +185,17 @@ mr::graphics::Model::Model(
           _materials.push_back(gpu_mtl);
         }
       } else {
-        std::array vbufs_data {
-          std::as_bytes(std::span(mesh.positions)),
-          std::as_bytes(std::span(mesh.attributes))
-        };
-        auto vbufs = scene.render_context().add_vertex_buffers(geometry_command_unit, vbufs_data);
+        mr::VertexBuffersArray vbufs;
+        if (position_only) {
+          vbufs = scene.render_context().add_vertex_buffers_positions_only(
+            geometry_command_unit, std::as_bytes(std::span(mesh.positions)));
+        } else {
+          std::array vbufs_data {
+            std::as_bytes(std::span(mesh.positions)),
+            std::as_bytes(std::span(mesh.attributes))
+          };
+          vbufs = scene.render_context().add_vertex_buffers(geometry_command_unit, vbufs_data);
+        }
 
         std::vector<IndexBufferDescription> ibufs;
         ibufs.reserve(mesh.lods.size());

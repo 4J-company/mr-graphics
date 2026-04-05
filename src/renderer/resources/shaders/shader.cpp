@@ -1,8 +1,13 @@
 #include "resources/shaders/shader.hpp"
 
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
+
+#if !defined(_WIN32)
+#include <sys/wait.h>
+#endif
 
 mr::graphics::Shader::Shader(const VulkanState &state, std::string_view filename, const boost::unordered_map<std::string, std::string> &define_map)
     : _path(std::filesystem::current_path())
@@ -63,7 +68,7 @@ mr::graphics::Shader::Shader(const VulkanState &state, std::string_view filename
 }
 
 // TODO: replace with Google's libshaderc
-void mr::graphics::Shader::compile(Shader::Stage stage) const noexcept
+void mr::graphics::Shader::compile(Shader::Stage stage) const
 {
   MR_INFO("Compiling shader {}\n\t with defines {}\n", _path.string(), _define_string);
 
@@ -99,7 +104,18 @@ void mr::graphics::Shader::compile(Shader::Stage stage) const noexcept
   // TODO(dk6): maybe instead -fshader-stage #pragma shader_stage() will be better, i don't know
   auto argstr = std::format("glslc -fshader-stage={} {} {} -g {} -o {}",
     get_full_stage_name(stage), _define_string, _include_string, src_path.string(), dst_path.string());
-  std::system(argstr.c_str());
+  const int status = std::system(argstr.c_str());
+  if (status != 0) {
+#if defined(_WIN32)
+    MR_ERROR("glslc failed (status {}) for {}\n\t{}\n", status, src_path.string(), argstr);
+#else
+    if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
+      MR_ERROR("glslc failed (exit {}) for {}\n\t{}\n", WEXITSTATUS(status), src_path.string(), argstr);
+    } else {
+      MR_ERROR("glslc failed for {} (status {})\n\t{}\n", src_path.string(), status, argstr);
+    }
+#endif
+  }
 }
 
 std::optional<std::vector<char>> mr::graphics::Shader::load(Shader::Stage stage) noexcept

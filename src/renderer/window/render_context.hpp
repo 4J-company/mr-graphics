@@ -287,7 +287,11 @@ inline namespace graphics {
     void clear_visibility() noexcept { _clear_culling_visualization = true; }
 
     IndexHeapBuffer & index_buffer() noexcept { return _index_buffer; }
+    /** Positions + packed attributes (two bindings); used by the full PBR \c default shader. */
     VertexBuffersArray add_vertex_buffers(CommandUnit &command_unit, std::span<const std::span<const std::byte>> vbufs_data) noexcept;
+    /** Positions only (binding 0); use with \c default_position_only material shader. */
+    VertexBuffersArray add_vertex_buffers_positions_only(CommandUnit &command_unit,
+                                                         std::span<const std::byte> positions_data) noexcept;
     void delete_vertex_buffers(std::span<const VertexBufferDescription> vbufs) noexcept;
 
     // ===== Resources creation =====

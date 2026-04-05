@@ -18,6 +18,12 @@ inline namespace graphics {
     EnumSize
   };
 
+  /** \brief Vertex input layout for the opaque geometry pipeline (must match bound VBs and shader). */
+  enum class MaterialVertexLayout {
+    Full,
+    PositionOnly,
+  };
+
   inline const char * get_material_parameter_define(MaterialParameter param) noexcept {
     constexpr std::array defines {
       "BASE_COLOR_MAP_BINDING",
@@ -59,7 +65,9 @@ inline namespace graphics {
              std::span<std::byte> ubo_data,
              std::span<std::optional<mr::TextureHandle>> textures,
              std::span<mr::StorageBuffer *> storage_buffers,
-             std::span<mr::ConditionalBuffer *> conditional_buffers) noexcept;
+             std::span<mr::ConditionalBuffer *> conditional_buffers,
+             MaterialVertexLayout vertex_layout,
+             std::span<const vk::VertexInputAttributeDescription> vertex_attributes) noexcept;
 
     ~Material();
 

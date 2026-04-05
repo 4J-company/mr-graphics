@@ -22,6 +22,8 @@ layout(location = 5) in flat uint visible_at_stash;
 
 void main()
 {
+  vec4 bckg_color = vec4(0.3, 0.47, 0.8, 1);
+
   OutPos = vec4(position.xyz, uintBitsToFloat(instance_id));
 
 #ifdef ENABLE_CULLING_VISUALIZATION
@@ -49,7 +51,10 @@ void main()
   }
 #endif // ENABLE_CULLING_VISUALIZATION
 
-  OutNIsShade = vec4(normal, 0);
+  // Deferred light pass treats w==0 as unlit: OutColor = InColorTrans (see light/shader.frag).
+  // Position-only meshes have no reliable tangent space / consistent normals; BRDF often ends up
+  // with N·L≈0 or NaNs from inverse(mat3). Unlit base color matches how bound_box draws.
+  OutNIsShade = vec4(0.0, 0.0, 0.0, 0.0);
 
   OutMR         = get_metallic_roughness_color(materialid, texcoord);
   OutEmissive   = get_emissive_color(materialid, texcoord);

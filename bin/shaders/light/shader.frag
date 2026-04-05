@@ -44,10 +44,11 @@ void main( void )
   vec3 color = subpassLoad(InColorTrans).xyz;
   vec4 norm_is_shade = subpassLoad(InNIsShade);
   vec3 norm = -norm_is_shade.xyz;
-  bool is_shade = norm_is_shade.w != 0;
+  // Match lit path: same gamma on swapchain (eB8G8R8A8Unorm, non-sRGB).
+  bool is_shade = norm_is_shade.w > 0.5;
 
   if (!is_shade) {
-    OutColor = vec4(color, 1);
+    OutColor = vec4(gc_linear(tm_aces(clamp(color, 0.0, 1.0))), 1.0);
     return;
   }
 

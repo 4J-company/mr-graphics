@@ -69,7 +69,7 @@ inline namespace graphics {
 
   private:
     // compile sources
-    void compile(Stage stage) const noexcept;
+    void compile(Stage stage) const;
 
     // load sources
     std::optional<std::vector<char>> load(Stage stage) noexcept;

@@ -364,7 +364,7 @@ mr::RenderContext::~RenderContext()
 mr::VertexBuffersArray mr::RenderContext::add_vertex_buffers(CommandUnit &command_unit,
   std::span<const std::span<const std::byte>> vbufs_data) noexcept
 {
-  // Tmp theme - fixed attributes layout
+  // Geometry heap: slot N uses the same vertex index in positions and attributes VBs (see render_models).
   ASSERT(vbufs_data.size() == 2);
 
   auto positions_data = vbufs_data[0];
@@ -406,11 +406,33 @@ mr::VertexBuffersArray mr::RenderContext::add_vertex_buffers(CommandUnit &comman
   };
 }
 
+mr::VertexBuffersArray mr::RenderContext::add_vertex_buffers_positions_only(CommandUnit &command_unit,
+  std::span<const std::byte> positions_data) noexcept
+{
+  ASSERT(positions_data.size() % position_bytes_size == 0);
+  VkDeviceSize vertexes_number = positions_data.size() / position_bytes_size;
+
+  auto alloc_info = _vertex_buffers_heap.allocate(vertexes_number);
+  if (alloc_info.resized) {
+    _positions_vertex_buffer.resize(command_unit, _vertex_buffers_heap.size() * position_bytes_size);
+    _attributes_vertex_buffer.resize(command_unit, _vertex_buffers_heap.size() * attributes_bytes_size);
+  }
+
+  VkDeviceSize positions_offset = alloc_info.offset * position_bytes_size;
+  _positions_vertex_buffer.write(command_unit, positions_data, positions_offset);
+
+  VertexBuffersArray out;
+  out.push_back(VertexBufferDescription {
+    .offset = positions_offset,
+    .vertex_count = static_cast<uint32_t>(positions_data.size()) / position_bytes_size,
+  });
+  return out;
+}
+
 void mr::RenderContext::delete_vertex_buffers(std::span<const VertexBufferDescription> vbufs) noexcept
 {
-  // Tmp theme - fixed attributes layout
-  ASSERT(vbufs.size() == 2);
-  uint32_t heap_offset = vbufs[0].offset / position_bytes_size;
+  ASSERT(vbufs.size() == 1 || vbufs.size() == 2);
+  uint32_t heap_offset = static_cast<uint32_t>(vbufs[0].offset / position_bytes_size);
   _vertex_buffers_heap.deallocate(heap_offset);
 }
 
@@ -527,6 +549,7 @@ void mr::RenderContext::render_models(const SceneHandle scene, CommandUnit &cmd_
                                        _timestamps_query_pool.get(),
                                        enum_cast(Timestamp::ModelsStart));
 
+  // Binding 0: positions heap; binding 1: attributes heap. Position-only pipelines use binding 0 only.
   std::array<vk::Buffer, 2> vertex_buffers {
     _positions_vertex_buffer.buffer(),
     _attributes_vertex_buffer.buffer(),
