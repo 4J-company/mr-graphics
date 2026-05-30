@@ -2,6 +2,7 @@
 #define __render_options_hpp_
 
 #include <pch.hpp>
+#include "renderer/window/render_context_options.hpp"
 
 namespace mr {
 inline namespace graphics {
@@ -14,7 +15,7 @@ inline namespace graphics {
     };
 
     Mode mode;
-    uint32_t frames_number;
+    std::optional<uint32_t> frames_number;
     std::fs::path dst_dir;
     uint32_t width, height;
     std::optional<mr::math::Camera<float>> camera;
@@ -32,6 +33,8 @@ inline namespace graphics {
     bool enable_culling_visualization;
     bool read_gbuf;
     bool hash_coloring;
+    std::optional<RenderBoundsState> bounds_state;
+    std::optional<OcclusionCullingBounds> oc_bounds;
 
     static std::optional<CliOptions> parse(int argc, const char **argv);
 

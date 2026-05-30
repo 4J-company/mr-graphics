@@ -49,6 +49,10 @@ mr::Scene::Scene(RenderContext &render_context)
 
 mr::Scene::~Scene()
 {
+
+  // TODO(dj6): temporary solution - now we have segfault because some scene buffers used at some command buffer
+  _parent->vulkan_state().queue().waitIdle();
+
   // TODO(dk6): Now this is segfault - RenderContext here has already destoryed - Scene class creating by RenderContext
   //            using Managers, RenderContext creating as std::shared_ptr by Application.
   //            So in end of main function RenderContext instance will be deleted, but Scene instances will be deleted
@@ -56,6 +60,7 @@ mr::Scene::~Scene()
   //            For fix it RenderContext must store all Scene instances and in destructor delete it from Manager,
   //            but now Manager doesn't support it. Maybe we can add as tmp solution Scene
   //            method 'notify_render_context_deleted` and use it as destuctor and move Scene in "disabeld" state
+  return;
   _parent->bindless_set().unregister_resource(&_camera_uniform_buffer);
   _parent->bindless_set().unregister_resource(&_transforms);
   _parent->bindless_set().unregister_resource(&_counters_buffer);
@@ -330,8 +335,8 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
 
     if (input_state.key_tapped(vkfw::Key::eB)) {
       auto state = _parent->render_bounds_state();
-      uint32_t s = (enum_cast(state) + 1) % RenderContext::RenderBoundsState::StatesNumber;
-      _parent->render_bounds_state(enum_cast<RenderContext::RenderBoundsState>(s));
+      uint32_t s = (enum_cast(state) + 1) % enum_cast(RenderBoundsState::StatesNumber);
+      _parent->render_bounds_state(enum_cast<RenderBoundsState>(s));
     }
 
     if (is_render_option_enabled(_parent->options(), RenderOptions::CollectPosInstanceId)) {

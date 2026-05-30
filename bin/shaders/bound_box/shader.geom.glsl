@@ -18,10 +18,38 @@ layout(location = 0) in flat uint instance_indexes[];
 layout(location = 1) out flat uint vertex_color;
 #endif // ENABLE_BOUNDS_FRAG_COLOR
 
+#ifndef STATE_DISABLE
+#define STATE_DISABLE                  0
+#endif // STATE_DISABLE
+
+#ifndef STATE_BOUND_BOXES
+#define STATE_BOUND_BOXES              1
+#endif // STATE_BOUND_BOXES
+
+#ifndef STATE_BOUND_BOX_RECTANGLES
+#define STATE_BOUND_BOX_RECTANGLES     2
+#endif // STATE_BOUND_BOX_RECTANGLES
+
+#ifndef STATE_BOUND_SPHERES
+#define STATE_BOUND_SPHERES            3
+#endif // STATE_BOUND_SPHERES
+
+#ifndef STATE_BOUND_SPHERE_RECTANGLES
+#define STATE_BOUND_SPHERE_RECTANGLES  4
+#endif // STATE_BOUND_SPHERE_RECTANGLES
+
+#ifndef STATE_DYNAMIC_BEST
+#define STATE_DYNAMIC_BEST             5
+#endif // STATE_DYNAMIC_BEST
+
+#ifndef STATE_DYNAMIC_BEST_RECTANGLES
+#define STATE_DYNAMIC_BEST_RECTANGLES  6
+#endif // STATE_DYNAMIC_BEST_RECTANGLES
+
 layout(push_constant) uniform PushContants {
   uint camera_buffer_id;
   uint bound_boxes_data;
-  uint render_bound_rects; // refactor to mode
+  uint render_bounds_state;
 } draw;
 
 struct DrawData {
@@ -111,16 +139,15 @@ void render_bound_rectangle(vec4 rectangle, uint color)
   }
 }
 
+// Tex space [0, 1] -> Screen space [-1,1]
+vec4 convert_tex_rect_to_screen_rect(vec4 rect) {
+  return (rect - vec4(0.5)) * vec4(2);
+}
+
 void render_br_from_bb(BoundBox bb, mat4 proj)
 {
   vec4 rectangle = get_bound_box_screen_rectangle(bb, proj);
-
-  // Flip over Ox
-  float tmp = -rectangle.y;
-  rectangle.y = -rectangle.w;
-  rectangle.w = tmp;
-
-  render_bound_rectangle(rectangle, 0x0000FF00);
+  render_bound_rectangle(convert_tex_rect_to_screen_rect(rectangle), 0xFF000000);
 }
 
 void render_br_from_bs()
@@ -136,9 +163,7 @@ void render_br_from_bs()
   float p11 = proj[1][1];
   bool v = get_bound_sphere_screen_rectangle(bs.center, bs.radius, znear, p00, p11, aabb);
   if (v) {
-    aabb -= vec4(0.5);
-    aabb *= vec4(2);
-    render_bound_rectangle(aabb, 0xFF000000);
+    render_bound_rectangle(convert_tex_rect_to_screen_rect(aabb), 0x0000FF00);
   }
 }
 
@@ -333,19 +358,11 @@ void render_bound_sphere(uint color)
   }
 }
 
-float bb_volume(BoundBox bb)
-{
-  vec4 dim = bb.max - bb.min;
-  return dim.x * dim.y * dim.z;
-}
-
-float bs_volume(BoundSphere bs)
-{
-  return bs.radius * bs.radius * bs.radius * 4 / 3.0 * PI;
-}
-
-float br_square(vec4 br) {
-  return abs((br.x - br.z) * (br.y - br.w));
+bool best_screen_rect(BoundBox bb, BoundSphere bs, out vec4 rectangle, out bool is_bs) {
+  vec3 center = (cam_ubo.view * vec4(bs.center, 1)).xyz;
+  float znear = cam_ubo.near;
+  BoundSphere bs_transformed = {center, bs.radius};
+  return get_best_screen_rectangle(bb, bs_transformed, znear, cam_ubo.proj, cam_ubo.vp, rectangle, is_bs);
 }
 
 void main()
@@ -354,48 +371,33 @@ void main()
   BoundBox bb = transform_bound_box(bound_box, transpose(transform));
   BoundSphere bs = transform_bound_sphere(bound_sphere, transpose(transform));
 
-  float bbv = 0, bsv = 0;
-  if (bool(draw.render_bound_rects)) {
-    vec3 center = (cam_ubo.view * vec4(bs.center, 1)).xyz;
-	  vec4 aabb;
-    float znear = cam_ubo.near;
-    float p00 = cam_ubo.proj[0][0], p11 = cam_ubo.proj[1][1];
-    bool v = get_bound_sphere_screen_rectangle(center, bs.radius, znear, p00, p11, aabb);
-    if (v) {
-      aabb -= vec4(0.5);
-      aabb *= vec4(2);
-
-      vec4 rectangle = get_bound_box_screen_rectangle(bb, proj);
-      // Flip over Ox
-      float tmp = -rectangle.y;
-      rectangle.y = -rectangle.w;
-      rectangle.w = tmp;
-
-      bbv = br_square(rectangle);
-      bsv = br_square(aabb);
-
-      bbv = max(abs(rectangle.x - rectangle.w), abs(rectangle.y - rectangle.w));
-      bsv = max(abs(aabb.x - aabb.w), abs(aabb.y - aabb.w));
-    } else {
-      render_bound_box(bb, proj, 0x00FFF0000);
+  if (draw.render_bounds_state == STATE_BOUND_BOXES) {
+    render_bound_box(bb, proj, 0xFF000000);
+  } else if (draw.render_bounds_state == STATE_BOUND_BOX_RECTANGLES) {
+    render_br_from_bb(bb, proj);
+  } else if (draw.render_bounds_state == STATE_BOUND_SPHERES) {
+    render_bound_sphere(0x0000FF00);
+  } else if (draw.render_bounds_state == STATE_BOUND_SPHERE_RECTANGLES) {
+    render_br_from_bs();
+  } else if (draw.render_bounds_state == STATE_DYNAMIC_BEST) {
+    vec4 rect;
+    bool is_bs;
+    if (!best_screen_rect(bb, bs, rect, is_bs)) {
+      // render_bound_rectangle(vec4(-0.25, -0.25, 0.25, 0.25), 0x00FF0000); // for debug
       return;
     }
-  } else {
-    bbv = bb_volume(bb), bsv = bs_volume(bs);
-  }
 
-  if (bsv < bbv) {
-    render_bound_sphere(0xFF000000);
-  } else {
-    render_bound_box(bb, proj, 0x0000FF00);
-  }
-
-  return;
-
-  if (bool(draw.render_bound_rects)) {
-    // render_br_from_bb(bb, proj);
-    render_bound_sphere(0xFF000000);
-  } else {
-    render_bound_box(bb, proj, 0xFF000000);
+    if (is_bs) {
+      render_bound_sphere(0x0000FF00);
+    } else {
+      render_bound_box(bb, proj, 0xFF000000);
+    }
+  } else if (draw.render_bounds_state == STATE_DYNAMIC_BEST_RECTANGLES) {
+    vec4 rect;
+    bool is_bs;
+    if (!best_screen_rect(bb, bs, rect, is_bs)) {
+      return;
+    }
+    render_bound_rectangle(convert_tex_rect_to_screen_rect(rect), is_bs ? 0x0000FF00 : 0xFF000000);
   }
 }

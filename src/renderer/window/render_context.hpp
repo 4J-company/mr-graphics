@@ -74,14 +74,6 @@ inline namespace graphics {
       ColorTrans = 5
     };
 
-    enum RenderBoundsState : uint32_t {
-      Disable,
-      BoundBoxes,
-      BoundRectangles,
-      // BoundSpheres // TODO
-      StatesNumber,
-    };
-
     // Bindings numbers in bindless descriptor set
     constexpr static inline uint32_t textures_binding = 0;
     constexpr static inline uint32_t uniform_buffer_binding = 1;
@@ -142,7 +134,7 @@ inline namespace graphics {
   private:
     std::shared_ptr<VulkanState> _state;
     Extent _extent;
-    RenderOptions _render_options;
+    RenderContextConfig _config;
 
     vk::UniqueQueryPool _timestamps_query_pool {};
     RenderStat _render_stat, _prev_render_stat;
@@ -270,7 +262,7 @@ inline namespace graphics {
     RenderContext & operator=(const RenderContext &other) noexcept = delete;
 
     // TODO(dk6): change pointer to reference
-    RenderContext(VulkanGlobalState *global_state, Extent extent, RenderOptions options = RenderOptions::None);
+    RenderContext(VulkanGlobalState *global_state, Extent extent, RenderContextConfig config);
 
     ~RenderContext();
 
@@ -284,7 +276,8 @@ inline namespace graphics {
     const Extent & extent() const noexcept { return _extent; }
     const RenderStat & stat() const noexcept { return _render_stat; }
     const RenderStat & prev_stat() const noexcept { return _prev_render_stat; }
-    RenderOptions options() const noexcept { return _render_options; }
+    RenderOptions options() const noexcept { return _config.options; }
+    RenderContextConfig config() const noexcept { return _config; }
     CommandUnit & transfer_command_unit() const noexcept { return _transfer_command_unit; }
 
     void render_bounds_state(RenderBoundsState state) noexcept { _render_bounds_state = state; }

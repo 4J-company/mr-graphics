@@ -36,30 +36,42 @@ int main(int argc, const char **argv)
   // Also there is potential solution: https://github.com/Themaister/Granite/blob/master/assets/shaders/post/hiz.comp
   render_context_extent = {options.width, options.height};
 
-  mr::RenderOptions render_options = mr::RenderOptions::None;
+  mr::RenderContextConfig config;
   if (options.disable_culling) {
-    render_options |= mr::RenderOptions::DisableCulling;
-  }
-  if (options.enable_vsync) {
-    render_options |= mr::RenderOptions::EnableVsync;
+    config.options |= mr::RenderOptions::DisableCulling;
   }
   if (options.disable_occlusion_culling) {
-    render_options |= mr::RenderOptions::DisableOcclusionCulling;
+    config.options |= mr::RenderOptions::DisableOcclusionCulling;
+  }
+  if (options.enable_vsync) {
+    config.options |= mr::RenderOptions::EnableVsync;
   }
   if (options.enable_culling_stat) {
-    render_options |= mr::RenderOptions::EnableCullingStats;
+    config.options |= mr::RenderOptions::EnableCullingStats;
   }
   if (options.enable_culling_visualization) {
-    render_options |= mr::RenderOptions::EnableCullingVisualiztion;
+    config.options |= mr::RenderOptions::EnableCullingVisualiztion;
   }
   if (options.read_gbuf) {
-    render_options |= mr::RenderOptions::CollectPosInstanceId;
+    config.options |= mr::RenderOptions::CollectPosInstanceId;
+  }
+  if (options.hash_coloring) {
+    config.options |= mr::RenderOptions::HashColoring;
   }
 
-  auto render_context = app.create_render_context(render_context_extent, render_options);
+  if (options.bounds_state.has_value()) {
+    config.bounds_state = options.bounds_state.value();
+  }
+  if (options.oc_bounds.has_value()) {
+    config.oc_bounds = options.oc_bounds.value();
+  }
+  uint32_t models_number = options.bench_instances_number.value_or(1'000);
+  config.max_instance_number_per_object = models_number;
+
+  auto render_context = app.create_render_context(render_context_extent, config);
 
   if (options.enable_bound_boxes) {
-    render_context->render_bounds_state(mr::RenderContext::RenderBoundsState::BoundBoxes);
+    render_context->render_bounds_state(mr::RenderBoundsState::BoundBoxes);
   }
 
   auto scene = render_context->create_scene();
@@ -73,7 +85,6 @@ int main(int argc, const char **argv)
       return scene->create_model(model_path);
     }) | std::ranges::to<std::vector>();
 
-  uint32_t models_number = options.bench_instances_number.value_or(1'000);
   for (uint32_t i = 0; i < models_number - models.size(); i++) {
     auto rnd = [](float min, float max) -> float {
       float v = float(rand()) / RAND_MAX; // between 0 and 1
@@ -115,9 +126,9 @@ int main(int argc, const char **argv)
   auto window = render_context->create_window({options.width, options.height});
   if (options.print_stat) {
     std::ofstream stat_file("stats.json");
-    app.start_render_loop(*render_context, scene, window, stat_file);
+    app.start_render_loop(*render_context, scene, window, stat_file, options.frames_number);
   } else {
-    app.start_render_loop(*render_context, scene, window);
+    app.start_render_loop(*render_context, scene, window, std::nullopt, options.frames_number);
   }
 }
 

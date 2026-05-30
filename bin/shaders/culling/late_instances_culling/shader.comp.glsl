@@ -7,6 +7,22 @@ layout(local_size_x = THREADS_NUM, local_size_y = 1, local_size_z = 1) in;
 #include "types.h"
 #include "culling/culling.h"
 
+#ifndef BOUNDS_TYPE
+#define BOUNDS_TYPE 0
+#endif // BOUNDS_TYPE
+
+#ifndef BOUNDS_TYPE_BOXES
+#define BOUNDS_TYPE_BOXES 0
+#endif // BOUNDS_TYPE_BOXES
+
+#ifndef BOUNDS_TYPE_SPHERES
+#define BOUNDS_TYPE_SPHERES 1
+#endif // BOUNDS_TYPE_SPHERES
+
+#ifndef BOUNDS_TYPE_DYNAMIC_BEST
+#define BOUNDS_TYPE_DYNAMIC_BEST 2
+#endif // BOUNDS_TYPE_DYNAMIC_BEST
+
 layout(push_constant) uniform PushContants {
   uint mesh_culling_data_buffer_id;
   uint instances_culling_data_buffer_id;
@@ -89,7 +105,112 @@ layout(set = BINDLESS_SET, binding = STORAGE_BUFFERS_BINDING) buffer CullingStat
 #define culling_stat CullingStatsBuffers[buffers_data.culling_stat_buffer_id].stat
 #endif // COLLECT_CULLING_STAT
 
-#define USE_BOUND_BOXES 1
+float read_hiz_depth(vec4 rectangle)
+{
+  rectangle = clamp(rectangle, vec4(-1), vec4(1));
+
+  vec2 rectangle_size = rectangle.zw - rectangle.xy;
+  // It is very important to exact pick rectangle center - when minmax sampler will fetch all 2x2 quad data
+  vec2 rectangle_center = rectangle.xy + (rectangle_size / 2);
+
+  // Find mip level where bound rectangle is covered by 2x2 pixel quad
+  float level = floor(log2(max(
+    rectangle_size.x * buffers_data.depth_pyramid_width,
+    rectangle_size.y * buffers_data.depth_pyramid_heigth
+  )));
+
+  vec2 mip_scale = vec2(depth_mip_scales[2 * uint(level)], depth_mip_scales[2 * uint(level) + 1]);
+  vec2 tex_coord = rectangle_center * mip_scale;
+
+  // Using max sampler get max depth of 2x2 quad which covers rectangle
+  float old_depth = textureLod(DepthPyramid, tex_coord, level).r;
+
+  return old_depth;
+}
+
+float get_bound_box_depth(BoundBox bb)
+{
+  vec3 bb_center = (bb.min.xyz + bb.max.xyz) / 2;
+
+  vec3 dir_to_cam = normalize(camera_buffer.pos.xyz - bb_center);
+  float bb_size = length(bb.max.xyz - bb.min.xyz) / 2;
+  vec3 closest_bb_point = bb_center + dir_to_cam * bb_size;
+
+  vec4 projected = (camera_buffer.vp * vec4(closest_bb_point, 1));
+  float new_depth = projected.z / projected.w;
+
+  return new_depth;
+}
+
+// We have 3 variants to get closest point, there is example:
+// 1. Get world-space closest point, but it can be not a closest at clip space. For example:
+//    campos = (0, 0, 0), camdir = (0, 0, 1).
+//    ┌───────┬───────────┬──────────────────────┬───────────┐
+//    │ Point │ Position  │ World space distance │ Depth (z) │
+//    ├───────┼───────────┼──────────────────────┼───────────┤
+//    │ A     │ (0, 0, 4) │ 4.0                  │ 4         │
+//    │ B     │ (3, 0, 3) │ ≈ 4.24               │ 3         │
+//    └───────┴───────────┴──────────────────────┴───────────┘
+// 2. Project each point and get minimum depth - it is not always true
+//    For example object is... a cube, his bound box equal itself.
+//    CLO = Closest Object Point, depth - calculated depth
+//    CLO < depth - depth is not minimum of distances
+//       camera ●
+//            / |
+//     depth /  | COP
+//          /   |
+//         ●----●----●
+//         |         |
+//         |         |
+//         ●----●----●
+// 3. Use a bound sphere of bound box - it is simple to determine it's closest point
+// 4. Use original bound sphere of object - if it is provided
+
+float get_bound_sphere_depth(BoundSphere bs)
+{
+  // TODO(dk6): try write it without matrix multiplication
+  vec3 dir_to_cam = normalize(camera_buffer.pos.xyz - bs.center);
+  vec4 projected_center = camera_buffer.vp * vec4(bs.center + dir_to_cam * bs.radius, 1.0);
+  float depth_sphere = projected_center.z / projected_center.w;
+  return depth_sphere;
+}
+
+bool project_sphere(BoundSphere bs, out vec4 rectangle)
+{
+  vec3 center_in_view = (camera_buffer.view * vec4(bs.center, 1)).xyz;
+  float znear = camera_buffer.near;
+  float p00 = camera_buffer.proj[0][0];
+  float p11 = camera_buffer.proj[1][1];
+  return get_bound_sphere_screen_rectangle(center_in_view, bs.radius, znear, p00, p11, rectangle);
+}
+
+bool is_visible_bound_box(BoundBox bb, BoundSphere bs)
+{
+  if (!is_bound_sphere_dont_clips_camera((camera_buffer.view * vec4(bs.center, 1)).xyz,
+                                         bs.radius, camera_buffer.near)) {
+    return true;
+  }
+
+  vec4 rectangle = get_bound_box_screen_rectangle(bb, camera_buffer.vp);
+  float old_depth = read_hiz_depth(rectangle);
+
+  float new_depth = get_bound_sphere_depth(bs);
+  return new_depth <= old_depth;
+
+  // float new_depth = get_bound_box_depth(bb);
+  // return new_depth >= 1 || new_depth <= old_depth;
+}
+
+bool is_visible_bound_sphere(BoundSphere bs)
+{
+  vec4 rectangle;
+  if (!project_sphere(bs, rectangle)) {
+    return true;
+  }
+  float old_depth = read_hiz_depth(rectangle);
+  float new_depth = get_bound_sphere_depth(bs);
+  return new_depth <= old_depth;
+}
 
 void main()
 {
@@ -135,89 +256,16 @@ void main()
   // Occlussion culling
   // -------------------------------------
 
-#if USE_BOUND_BOXES
-  // --- Get current depth of already visible objects ---
-  vec4 rectangle_screen = get_bound_box_screen_rectangle(bb, camera_buffer.vp);
-  rectangle_screen.x = clamp(rectangle_screen.x, -1, 1);
-  rectangle_screen.y = clamp(rectangle_screen.y, -1, 1);
-  rectangle_screen.z = clamp(rectangle_screen.z, -1, 1);
-  rectangle_screen.w = clamp(rectangle_screen.w, -1, 1);
-
-  // Flip over Ox
-  float tmp = -rectangle_screen.y;
-  rectangle_screen.y = -rectangle_screen.w;
-  rectangle_screen.w = tmp;
-
-  // rectangle now in [-1; 1] screen coords, convert to [0; 1] texture coords
-  vec4 rectangle = (rectangle_screen + vec4(1)) / 2;
-
-  vec2 rectangle_size = rectangle.zw - rectangle.xy;
-  vec2 rectangle_center = rectangle.xy + (rectangle_size / 2);
-
-  // Find mip level where bound rectange is covered by 2x2 pixel quad
-  float level = floor(log2(max(
-    rectangle_size.x * buffers_data.depth_pyramid_width,
-    rectangle_size.y * buffers_data.depth_pyramid_heigth
-  )));
-
-  vec2 mip_scale = vec2(depth_mip_scales[2 * uint(level)], depth_mip_scales[2 * uint(level) + 1]);
-  vec2 tex_coord = rectangle_center * mip_scale;
-
-  // Using max sampler get max depth of 2x2 quad which covers rectangle
-  float old_depth = textureLod(DepthPyramid, tex_coord, level).r;
-
-  // --- Get current depth closest to cam point of bound box ---
-  vec3 bb_center = (bb.min.xyz + bb.max.xyz) / 2;
-
-  vec3 dir_to_cam = normalize(camera_buffer.pos.xyz - bb_center);
-  float bb_size = length(bb.max.xyz - bb.min.xyz) / 2;
-  vec3 closest_bb_point = bb_center + dir_to_cam * bb_size;
-
-  vec4 projected = (camera_buffer.vp * vec4(closest_bb_point, 1));
-  float new_depth = projected.z / projected.w;
-
-  // BoundSphere bs = transform_bound_sphere(bound_sphere(mesh_data), transfrom);
-  // vec3 dir_to_cam_from_bs = normalize(camera_buffer.pos.xyz - bs.center);
-  // vec4 projected_center = camera_buffer.vp * vec4(bs.center + dir_to_cam_from_bs * bs.radius, 1.0);
-  // float depth_sphere = projected_center.z / projected_center.w;
-  // new_depth = depth_sphere;
-
-  // --- Check visibility ---
-  // When group of object is at far distance they have equal new and old depth
-  float bias = 0.00000;
-  // If new_depth >= 1 it means that object is very big and clips with camera.
-  // But we here after frustum culling so object is visible
-  bool visible = new_depth >= 1 || new_depth < old_depth - bias;
-#else // USE_BOUND_BOXES
-	vec4 aabb;
   bool visible = true;
   BoundSphere bs = transform_bound_sphere(bound_sphere(mesh_data), transfrom);
-  vec3 center_in_view = (camera_buffer.view * vec4(bs.center, 1)).xyz;
-  float znear = camera_buffer.near;
-  float p00 = camera_buffer.proj[0][0];
-  float p11 = camera_buffer.proj[1][1];
-	if (get_bound_sphere_screen_rectangle(center_in_view, bs.radius, znear, p00, p11, aabb)) {
-		float width = (aabb.z - aabb.x) * buffers_data.depth_pyramid_width;
-		float height = (aabb.w - aabb.y) * buffers_data.depth_pyramid_heigth;
 
-		// Because we only consider 2x2 pixels, we need to make sure we are sampling from a mip that reduces the rectangle to 1x1 texel or smaller.
-		// Due to the rectangle being arbitrarily offset, a 1x1 rectangle may cover 2x2 texel area. Using floor() here would require sampling 4 corners
-		// of AABB (using bilinear fetch), which is a little slower.
-		float level = ceil(log2(max(width, height)));
-
-    vec2 mip_scale = vec2(depth_mip_scales[2 * uint(level)], depth_mip_scales[2 * uint(level) + 1]);
-    vec2 tex_coord = ((aabb.xy + aabb.zw) * 0.5) * mip_scale;
-
-		// Sampler is set up to do max reduction, so this computes the max depth of a 2x2 texel quad
-		float depth = textureLod(DepthPyramid, tex_coord, level).x;
-    // TODO(dk6): try write it without matrix multiplication
-    vec3 dir_to_cam = normalize(camera_buffer.pos.xyz - bs.center);
-    vec4 projected_center = camera_buffer.vp * vec4(bs.center + dir_to_cam * bs.radius, 1.0);
-    float depth_sphere = projected_center.z / projected_center.w;
-
-		visible = depth_sphere <= depth;
-	}
-#endif // USE_BOUND_BOXES
+#if (BOUNDS_TYPE == BOUNDS_TYPE_BOXES)
+  visible = is_visible_bound_box(bb, bs);
+#elif (BOUNDS_TYPE == BOUNDS_TYPE_SPHERES)
+  visible = is_visible_bound_sphere(bs);
+#elif (BOUNDS_TYPE == BOUNDS_TYPE_DYNAMIC_BEST)
+  visible = is_visible_bound_box(bb, bs) && is_visible_bound_sphere(bs);
+#endif // BOUNDS_TYPE choose
 
   instances_datas[id].visibility_bits = SET_INSTANCE_WAS_OCCLUDED(instance_data.visibility_bits, !visible);
 

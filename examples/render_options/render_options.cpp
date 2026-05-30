@@ -64,8 +64,8 @@ std::optional<mr::CliOptions> mr::CliOptions::parse(int argc, const char **argv)
      po::value<std::string>()->default_value("frames"),
      "Destination directory for frames (default: ./frames). Used only for frames mode")
     ("frames-number",
-     po::value<int>()->default_value(1),
-     "Number of frames to render (default: 1)")
+     po::value<int>(),
+     "Number of frames to render (if not set it became infinity)")
     ("resolution",
      po::value<std::string>()->default_value("1920x1080"),
      "Resolution in format WIDTHxHEIGHT (default: 1920x1080)")
@@ -117,6 +117,12 @@ std::optional<mr::CliOptions> mr::CliOptions::parse(int argc, const char **argv)
     ("hash-coloring",
      po::bool_switch()->default_value(false),
      "Use hash coloring for objects")
+    ("render-bounds-state",
+     po::value<std::string>(),
+     "Render bounds state, can be: Disable, BoundBoxes, BoundRectangles")
+    ("oc-bounds",
+     po::value<std::string>(),
+     "Occlusion culling bounds for test, can be: Box, Sphere, Dynamic")
   ;
 
   po::positional_options_description pos_desc;
@@ -156,7 +162,6 @@ std::optional<mr::CliOptions> mr::CliOptions::parse(int argc, const char **argv)
   CliOptions options;
 
   options.dst_dir = vm["dst-dir"].as<std::string>();
-  options.frames_number = vm["frames-number"].as<int>();
   options.disable_culling = vm["disable-culling"].as<bool>();
   options.disable_occlusion_culling = vm["disable-occlusion-culling"].as<bool>();
   options.enable_vsync = vm["enable-vsync"].as<bool>();
@@ -221,6 +226,44 @@ std::optional<mr::CliOptions> mr::CliOptions::parse(int argc, const char **argv)
       std::views::transform([](const auto &s){return std::fs::path(s);}) | std::ranges::to<std::vector>();
   }
 
+  if (vm.count("frames-number")) {
+    options.frames_number = vm["frames-number"].as<int>();
+  }
+
+  if (vm.count("render-bounds-state")) {
+    std::flat_map<std::string_view, mr::graphics::RenderBoundsState> bounds_states {
+      {"Disable", mr::graphics::RenderBoundsState::Disable},
+      {"BoundBoxes", mr::graphics::RenderBoundsState::BoundBoxes},
+      {"BoundBoxRectangles", mr::graphics::RenderBoundsState::BoundBoxRectangles},
+      {"BoundSpheres", mr::graphics::RenderBoundsState::BoundSpheres},
+      {"BoundSphereRectangles", mr::graphics::RenderBoundsState::BoundSphereRectangles},
+      {"DynamicBest", mr::graphics::RenderBoundsState::DynamicBest},
+      {"DynamicBestRectangles", mr::graphics::RenderBoundsState::DynamicBestRectangles},
+    };
+    auto value = vm["render-bounds-state"].as<std::string>();
+    auto it = bounds_states.find(value);
+    if (it != bounds_states.end()) {
+      options.bounds_state = it->second;
+    } else {
+      MR_ERROR("Invalid 'render-bounds-state' value: '{}'", value);
+    }
+  }
+
+  if (vm.count("oc-bounds")) {
+    std::flat_map<std::string_view, mr::graphics::OcclusionCullingBounds> bounds_states {
+      {"Box", mr::graphics::OcclusionCullingBounds::Box},
+      {"Sphere", mr::graphics::OcclusionCullingBounds::Sphere},
+      {"DynamicBest", mr::graphics::OcclusionCullingBounds::DynamicBest},
+    };
+    auto value = vm["oc-bounds"].as<std::string>();
+    auto it = bounds_states.find(value);
+    if (it != bounds_states.end()) {
+      options.oc_bounds = it->second;
+    } else {
+      MR_ERROR("Invalid 'render-bounds-state' value: '{}'", value);
+    }
+  }
+
   if (options.models.empty()) {
     std::println(std::cerr, "Error: No model files specified");
     std::println(std::cerr, "Use --help for usage information");
@@ -242,19 +285,30 @@ void mr::CliOptions::print() const noexcept
   if (mode == Mode::Frames) {
     std::println("Destination directory: {}", dst_dir.string().c_str());
   }
-  if (mode != Mode::Default) {
-    std::println("Frames number: {}", frames_number);
+  if (frames_number) {
+    std::println("Frames number: {}", frames_number.value());
   }
   std::println("Resolution: {}x{}", width, height);
   std::println("Culling: {}", disable_culling ? "DISABLED" : "ENABLED");
   std::println("Statistics directory: {}", stat_dir.string().c_str());
 
   if (camera) {
-    std::println("camera:");
+    std::println("Camera:");
     std::cout
       << "    " << camera->position() << std::endl
       << "    " << camera->direction() << std::endl
       << "    " << camera->up() << std::endl;
+  }
+  if (projection) {
+    std::println("Projection: [{}, {}]", projection.value().distance, projection.value().far);
+  }
+
+  if (bounds_state) {
+    std::println("Render bounds state: {}", enum_cast(*bounds_state));
+  }
+
+  if (oc_bounds) {
+    std::println("Occlusion culling bounds: {}", enum_cast(*oc_bounds));
   }
 
   std::println("Model files ({}):", models.size());
