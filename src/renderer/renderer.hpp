@@ -26,17 +26,18 @@ inline namespace graphics {
     ~Application();
 
     [[nodiscard]] std::unique_ptr<RenderContext>
-    create_render_context(Extent extent, RenderOptions options = RenderOptions::None);
+    create_render_context(Extent extent, RenderContextConfig config = {});
 
     void start_render_loop(RenderContext &render_context, SceneHandle scene, WindowHandle window,
-                           std::optional<std::reference_wrapper<std::ostream>> stat_log_stream = std::nullopt) const noexcept;
+                           std::optional<std::reference_wrapper<std::ostream>> stat_log_stream = std::nullopt,
+                           std::optional<uint32_t> frame_number = std::nullopt) const noexcept;
 
     void render_frames(RenderContext &render_context,
                        SceneHandle scene,
                        FileWriterHandle file_writer,
                        std::fs::path dst_dir = "",
                        std::string_view filename_prefix = "frame",
-                       uint32_t frames = 1) const noexcept;
+                       std::optional<uint32_t> frames = std::nullopt) const noexcept;
   };
 }
 } // namespace mr

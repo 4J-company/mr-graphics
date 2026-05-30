@@ -18,9 +18,10 @@ static mr::Extent calculate_depth_pyramid_extent(mr::Extent screen_extent) {
   return {std::bit_floor(screen_extent.width), std::bit_floor(screen_extent.height)};
 }
 
-mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent, RenderOptions options)
+mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent, RenderContextConfig config)
   : _state(std::make_shared<VulkanState>(global_state))
-  , _render_options(options)
+  , _config(config)
+  , _render_bounds_state(config.bounds_state)
   , _models_command_unit(*_state)
   , _late_models_command_unit(*_state)
   , _lights_command_unit(*_state)
@@ -47,10 +48,11 @@ mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent,
   , _depth_pyramid(*_state, _depth_pyramid_extent, vk::Format::eR32Sfloat,
                    calculate_mips_levels_number(_depth_pyramid_extent))
 {
-  std::println("ext: {}, {}", _depth_pyramid_extent.width, _depth_pyramid_extent.height);
-  if (is_render_option_enabled(_render_options, RenderOptions::DisableCulling) &&
-      not is_render_option_enabled(_render_options, RenderOptions::DisableOcclusionCulling)) {
-    _render_options |= RenderOptions::DisableOcclusionCulling;
+  std::println("render_bounds_state: {}", enum_cast(_render_bounds_state));
+
+  if (is_render_option_enabled(_config.options, RenderOptions::DisableCulling) &&
+      not is_render_option_enabled(_config.options, RenderOptions::DisableOcclusionCulling)) {
+    _config.options |= RenderOptions::DisableOcclusionCulling;
     MR_WARNING("Disabling frustum culling also disable occlusion culling");
   }
 
@@ -59,7 +61,7 @@ mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent,
   }
   _models_render_finished_semaphore = _state->device().createSemaphoreUnique({}).value;
 
-  if (is_render_option_enabled(_render_options, RenderOptions::CollectPosInstanceId)) {
+  if (is_render_option_enabled(_config.options, RenderOptions::CollectPosInstanceId)) {
     _gbuffers_data_copy_ready_semaphore = _state->device().createSemaphoreUnique({}).value;
     _position_instance_copy_cmd_unit = CommandUnit(*_state);
     auto &pos_gbuf = _gbuffers[enum_cast(GBuffer::Position)];
@@ -116,7 +118,7 @@ void mr::RenderContext::init_lights_render_data() {
     {"STORAGE_BUFFERS_BINDING", std::to_string(storage_buffer_binding)},
   };
 
-  if (is_render_option_enabled(_render_options, RenderOptions::HashColoring)) {
+  if (is_render_option_enabled(_config.options, RenderOptions::HashColoring)) {
     defines["HASH_COLORING"] = "ON";
   }
 
@@ -198,10 +200,10 @@ void mr::RenderContext::init_culling()
     {"SCAN_BLOCKS_LOCAL_SIZE_X", std::to_string(scan_blocks_local_size_x)},
     {"SCAN_BLOCK_SIZE", std::to_string(scan_block_size)},
   };
-  if (is_render_option_enabled(_render_options, RenderOptions::DisableCulling)) {
+  if (is_render_option_enabled(_config.options, RenderOptions::DisableCulling)) {
     defines.insert({"DISABLE_CULLING", "ON"});
   }
-  if (is_render_option_enabled(_render_options, RenderOptions::EnableCullingStats)) {
+  if (is_render_option_enabled(_config.options, RenderOptions::EnableCullingStats)) {
     defines.insert({"COLLECT_CULLING_STAT", "ON"});
   }
 
@@ -287,6 +289,12 @@ void mr::RenderContext::init_culling()
   // ---------------------------
 
   defines["MAX_DEPTH_PYRAMID_LEVELS"] = std::to_string(depth_pyramid_max_levels);
+
+  defines["BOUNDS_TYPE"] = std::to_string(enum_cast(_config.oc_bounds));
+  defines["BOUNDS_TYPE_BOXES"] = std::to_string(enum_cast(OcclusionCullingBounds::Box));
+  defines["BOUNDS_TYPE_SPHERES"] = std::to_string(enum_cast(OcclusionCullingBounds::Sphere));
+  defines["BOUNDS_TYPE_DYNAMIC_BEST"] = std::to_string(enum_cast(OcclusionCullingBounds::DynamicBest));
+
   _late_instances_culling_shader = ResourceManager<Shader>::get().create("LateInstancesCullingShader",
     *_state, "culling/late_instances_culling", defines);
   _late_instances_culling_pipeline = ComputePipeline(*_state, _late_instances_culling_shader, set_layouts);
@@ -295,13 +303,13 @@ void mr::RenderContext::init_culling()
   // Stats
   // ---------------------------
 
-  if (is_render_option_enabled(_render_options, RenderOptions::EnableCullingStats)) {
+  if (is_render_option_enabled(_config.options, RenderOptions::EnableCullingStats)) {
     _culling_stat_buffer = StorageBuffer(*_state, sizeof(CullingStats), vk::BufferUsageFlagBits::eTransferSrc);
     _culling_stat_buffer_id = _bindless_set.register_resource(&_culling_stat_buffer);
     _culling_stat_stage_buffer = HostBuffer(*_state, sizeof(CullingStats), vk::BufferUsageFlagBits::eTransferDst);
   }
 
-  if (is_render_option_enabled(_render_options, RenderOptions::EnableCullingVisualiztion)) {
+  if (is_render_option_enabled(_config.options, RenderOptions::EnableCullingVisualiztion)) {
     _copy_visibility_states_shader = ResourceManager<Shader>::get().create("CopyVisibility",
       *_state, "culling/copy_visibility", defines);
     _copy_visibility_states_pipeline = ComputePipeline(*_state, _copy_visibility_states_shader, set_layouts);
@@ -333,6 +341,13 @@ void mr::RenderContext::init_bound_box_rendering()
     {"STORAGE_BUFFERS_BINDING", std::to_string(storage_buffer_binding)},
     {"BINDLESS_SET", std::to_string(bindless_set_number)},
     {"ENABLE_BOUNDS_FRAG_COLOR", "ON"}, // this can cause DEVICE_LOST on some GPUs
+    {"STATE_DISABLE", std::to_string(enum_cast(RenderBoundsState::Disable))},
+    {"STATE_BOUND_BOXES", std::to_string(enum_cast(RenderBoundsState::BoundBoxes))},
+    {"STATE_BOUND_BOX_RECTANGLES", std::to_string(enum_cast(RenderBoundsState::BoundBoxRectangles))},
+    {"STATE_BOUND_SPHERES", std::to_string(enum_cast(RenderBoundsState::BoundSpheres))},
+    {"STATE_BOUND_SPHERE_RECTANGLES", std::to_string(enum_cast(RenderBoundsState::BoundSphereRectangles))},
+    {"STATE_DYNAMIC_BEST", std::to_string(enum_cast(RenderBoundsState::DynamicBest))},
+    {"STATE_DYNAMIC_BEST_RECTANGLES", std::to_string(enum_cast(RenderBoundsState::DynamicBestRectangles))},
   };
   _bound_boxes_draw_shader = ResourceManager<Shader>::get().create("BoundBoxShader", *_state, "bound_box", defines);
 
@@ -439,7 +454,7 @@ mr::WindowHandle mr::RenderContext::create_window() const noexcept
 mr::WindowHandle mr::RenderContext::create_window(const mr::Extent &extent) const noexcept
 {
   return ResourceManager<Window>::get().create(mr::unnamed, *this, extent,
-    is_render_option_enabled(_render_options, RenderOptions::EnableVsync));
+    is_render_option_enabled(_config.options, RenderOptions::EnableVsync));
 }
 
 mr::FileWriterHandle mr::RenderContext::create_file_writer() const noexcept
@@ -793,7 +808,7 @@ void mr::RenderContext::culling_geometry(const SceneHandle scene)
                                         {}, {}, {instances_count_culling_barrier}, {});
 
   // ===== Build compact draw list =====
-  bool disable_culling = is_render_option_enabled(_render_options, RenderOptions::DisableCulling);
+  bool disable_culling = is_render_option_enabled(_config.options, RenderOptions::DisableCulling);
   for (auto &[pipeline, draw] : scene->_draws) {
     uint32_t max_draws_count = static_cast<uint32_t>(draw.meshes_data_buffer_data.size());
     if (!disable_culling) {
@@ -886,7 +901,7 @@ void mr::RenderContext::culling_geometry(const SceneHandle scene)
   // Culling visualization: copy invisible, but considered visible objects
   // --------------------------------------------------------------------------
 
-  if (is_render_option_enabled(_render_options, RenderOptions::EnableCullingVisualiztion)) {
+  if (is_render_option_enabled(_config.options, RenderOptions::EnableCullingVisualiztion)) {
     if (_save_culling_visualization || _clear_culling_visualization) {
       // ---------------------------------------
       // Copy previous data
@@ -1008,7 +1023,7 @@ void mr::RenderContext::late_culling_geometry(const SceneHandle scene)
     vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eComputeShader, {},
     {}, {set_count_to_zero_barrier}, {});
 
-  if (is_render_option_enabled(_render_options, RenderOptions::EnableCullingStats)) {
+  if (is_render_option_enabled(_config.options, RenderOptions::EnableCullingStats)) {
     _late_culling_command_unit->fillBuffer(_culling_stat_buffer.buffer(), 0, _culling_stat_buffer.byte_size(), 0);
     vk::BufferMemoryBarrier set_culling_stat_to_zero_barrier {
       .srcAccessMask = vk::AccessFlagBits::eTransferWrite,
@@ -1025,7 +1040,7 @@ void mr::RenderContext::late_culling_geometry(const SceneHandle scene)
   std::array culling_descriptor_sets {_bindless_set.set()};
 
   // ===== Setup and call culling instances shader =====
-  if (not is_render_option_enabled(_render_options, RenderOptions::DisableCulling)) {
+  if (not is_render_option_enabled(_config.options, RenderOptions::DisableCulling)) {
     _late_culling_command_unit->bindPipeline(vk::PipelineBindPoint::eCompute, _late_instances_culling_pipeline.pipeline());
 
     _late_culling_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eCompute,
@@ -1083,7 +1098,7 @@ void mr::RenderContext::late_culling_geometry(const SceneHandle scene)
                                         {}, {}, {instances_count_culling_barrier}, {});
 
   // ===== Build compact draw list =====
-  bool disable_culling = is_render_option_enabled(_render_options, RenderOptions::DisableCulling);
+  bool disable_culling = is_render_option_enabled(_config.options, RenderOptions::DisableCulling);
   for (auto &[pipeline, draw] : scene->_draws) {
     uint32_t max_draws_count = static_cast<uint32_t>(draw.meshes_data_buffer_data.size());
     if (!disable_culling) {
@@ -1172,7 +1187,7 @@ void mr::RenderContext::late_culling_geometry(const SceneHandle scene)
   // Culling statistics collecting
   // --------------------------------------------------------------------------
 
-  if (is_render_option_enabled(_render_options, RenderOptions::EnableCullingStats)) {
+  if (is_render_option_enabled(_config.options, RenderOptions::EnableCullingStats)) {
     vk::BufferMemoryBarrier options_fill_barrier {
       .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
       .dstAccessMask = vk::AccessFlagBits::eTransferRead,
@@ -1190,7 +1205,7 @@ void mr::RenderContext::late_culling_geometry(const SceneHandle scene)
   // Culling visualization
   // --------------------------------------------------------------------------
 
-  if (is_render_option_enabled(_render_options, RenderOptions::EnableCullingVisualiztion)) {
+  if (is_render_option_enabled(_config.options, RenderOptions::EnableCullingVisualiztion)) {
     if (_save_culling_visualization || _clear_culling_visualization) {
       for (auto &[pipeline, draw] : scene->_draws) {
         _late_culling_command_unit->bindPipeline(vk::PipelineBindPoint::eCompute,
@@ -1292,7 +1307,7 @@ void mr::RenderContext::render_bound_boxes(const SceneHandle scene)
   uint32_t bound_boxes_push_contants[] {
     scene->camera_buffer_id(),
     _bound_boxes_buffer_id,
-    (uint32_t)(_render_bounds_state == RenderBoundsState::BoundRectangles),
+    enum_cast<uint32_t>(_render_bounds_state),
   };
   _models_command_unit->pushConstants(_bound_boxes_draw_pipeline.layout(),
                                       vk::ShaderStageFlagBits::eAllGraphics,
@@ -1392,7 +1407,7 @@ void mr::RenderContext::render_geometry(const SceneHandle scene, bool is_late_pa
   TracyVkCollect(_models_tracy_gpu_context, cmd_unit.command_buffer());
 
   auto finish_semaphore =
-    is_render_option_enabled(_render_options, RenderOptions::DisableOcclusionCulling) || is_late_pass
+    is_render_option_enabled(_config.options, RenderOptions::DisableOcclusionCulling) || is_late_pass
       ? _models_render_finished_semaphore.get()
       : _visible_models_rendering_semaphore.get();
   cmd_unit.add_signal_semaphore(finish_semaphore);
@@ -1524,7 +1539,7 @@ void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
 
   render_geometry(scene, false);
 
-  if (not is_render_option_enabled(_render_options, RenderOptions::DisableOcclusionCulling)) {
+  if (not is_render_option_enabled(_config.options, RenderOptions::DisableOcclusionCulling)) {
     // ------------------------------------------------
     // Late frusum culling and occlusion culling
     // ------------------------------------------------
@@ -1556,7 +1571,7 @@ void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
     _lights_command_unit.add_signal_semaphore(render_finished_semaphore);
   }
 
-  if (is_render_option_enabled(_render_options, RenderOptions::CollectPosInstanceId)) {
+  if (is_render_option_enabled(_config.options, RenderOptions::CollectPosInstanceId)) {
     _lights_command_unit.add_signal_semaphore(_gbuffers_data_copy_ready_semaphore.get());
   }
 
@@ -1569,7 +1584,7 @@ void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
 
   presenter.present();
 
-  if (is_render_option_enabled(_render_options, RenderOptions::CollectPosInstanceId)) {
+  if (is_render_option_enabled(_config.options, RenderOptions::CollectPosInstanceId)) {
     auto &pos_gbuf = _gbuffers[enum_cast(GBuffer::Position)];
     _position_instance_copy_cmd_unit.begin();
     pos_gbuf.read_to_host_buffer(_position_instance_copy_cmd_unit, _position_instance_id_stage_buffer);
@@ -1652,7 +1667,7 @@ void mr::RenderContext::calculate_stat(SceneHandle scene,
   _render_stat.vertexes_number = scene->_vertexes_number.load();
   _render_stat.frame_number = _frame_number++;
 
-  if (is_render_option_enabled(_render_options, RenderOptions::EnableCullingStats)) {
+  if (is_render_option_enabled(_config.options, RenderOptions::EnableCullingStats)) {
     auto data = _culling_stat_stage_buffer.copy();
     const CullingStats *stat = reinterpret_cast<const CullingStats *>(data.data());
     _render_stat.total_objects_number = stat->total_objects_number;
@@ -1665,8 +1680,8 @@ void mr::RenderContext::calculate_stat(SceneHandle scene,
 
 void mr::RenderContext::calculate_prev_stat(SceneHandle scene) noexcept
 {
-  if (is_render_option_enabled(_render_options, RenderOptions::EnableCullingStats) &&
-      is_render_option_enabled(_render_options, RenderOptions::CollectPosInstanceId)) {
+  if (is_render_option_enabled(_config.options, RenderOptions::EnableCullingStats) &&
+      is_render_option_enabled(_config.options, RenderOptions::CollectPosInstanceId)) {
     _state->device().waitForFences({_position_instance_copy_fence.get()},
                                    vk::True, std::numeric_limits<uint64_t>::max());
     _state->device().resetFences({_position_instance_copy_fence.get()});

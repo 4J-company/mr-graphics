@@ -103,6 +103,7 @@ mr::graphics::Model::Model(
       _builders.push_back(std::move(builder));
       auto gpu_mtl = _builders.back().build();
 
+      uint32_t max_instance_number_per_object = scene.render_context().config().max_instance_number_per_object;
       if (split_on_meshlets) {
         auto &lod = mesh.lods[0];
         for (auto &&[meshlet, bs] : std::views::zip(lod.meshlet_array.meshlets, lod.meshlet_bounds.bounding_spheres)) {
@@ -169,7 +170,7 @@ mr::graphics::Model::Model(
             .instances_number = static_cast<uint32_t>(instance_count),
             .transforms = mesh.transforms,
             // TODO(dk6): use dynamic buffer
-            .intances_render_info_buffer = StorageBuffer(state, sizeof(uint32_t) * 10),
+            .intances_render_info_buffer = StorageBuffer(state, sizeof(uint32_t) * max_instance_number_per_object),
           });
           mesh_descr.intances_render_info_buffer_id =
             scene.render_context().bindless_set().register_resource(&mesh_descr.intances_render_info_buffer);
@@ -204,7 +205,8 @@ mr::graphics::Model::Model(
           .instances_number = static_cast<uint32_t>(instance_count),
           .transforms = std::move(mesh.transforms),
           // TODO(dk6): use dynamic buffer
-          .intances_render_info_buffer = StorageBuffer(state, instance_render_info_size * 10),
+          .intances_render_info_buffer = StorageBuffer(state,
+                                                       instance_render_info_size * max_instance_number_per_object),
         });
         mesh_descr.intances_render_info_buffer_id =
           scene.render_context().bindless_set().register_resource(&mesh_descr.intances_render_info_buffer);
