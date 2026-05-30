@@ -4,7 +4,7 @@
 #include "pch.hpp"
 
 namespace mr {
-namespace graphics {
+inline namespace graphics {
   enum struct RenderOptions : uint32_t {
     None           =            0,
     DisableCulling =            (1u << 0),
@@ -40,6 +40,32 @@ namespace graphics {
   {
     return (options & option) != RenderOptions::None;
   }
+
+  enum struct RenderBoundsState : uint32_t {
+    Disable,
+    BoundBoxes,
+    BoundBoxRectangles,
+    BoundSpheres,
+    BoundSphereRectangles,
+    DynamicBest,
+    DynamicBestRectangles,
+    StatesNumber,
+  };
+
+  enum struct OcclusionCullingBounds : uint32_t {
+    Box,
+    Sphere,
+    DynamicBest,
+    BoundsNumber,
+  };
+
+  struct RenderContextConfig {
+    RenderOptions options = RenderOptions::None;
+    RenderBoundsState bounds_state = RenderBoundsState::Disable;
+    OcclusionCullingBounds oc_bounds = OcclusionCullingBounds::Box;
+    // Temporary workaround while instances buffers sizes are not dynamic
+    uint32_t max_instance_number_per_object = 10;
+  };
 } // end of 'graphics' namespace
 } // end of 'mr' namespace
 

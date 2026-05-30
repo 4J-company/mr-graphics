@@ -32,33 +32,41 @@ int main(int argc, const char **argv)
   std::println("render context extent: {}x{}", render_context_extent.width, render_context_extent.height);
   render_context_extent = {options.width, options.height};
 
-  mr::RenderOptions render_options = mr::RenderOptions::None;
+  mr::RenderContextConfig config;
+
   if (options.disable_culling) {
-    render_options |= mr::RenderOptions::DisableCulling;
+    config.options |= mr::RenderOptions::DisableCulling;
   }
   if (options.disable_occlusion_culling) {
-    render_options |= mr::RenderOptions::DisableOcclusionCulling;
+    config.options |= mr::RenderOptions::DisableOcclusionCulling;
   }
   if (options.enable_vsync) {
-    render_options |= mr::RenderOptions::EnableVsync;
+    config.options |= mr::RenderOptions::EnableVsync;
   }
   if (options.enable_culling_stat) {
-    render_options |= mr::RenderOptions::EnableCullingStats;
+    config.options |= mr::RenderOptions::EnableCullingStats;
   }
   if (options.enable_culling_visualization) {
-    render_options |= mr::RenderOptions::EnableCullingVisualiztion;
+    config.options |= mr::RenderOptions::EnableCullingVisualiztion;
   }
   if (options.read_gbuf) {
-    render_options |= mr::RenderOptions::CollectPosInstanceId;
+    config.options |= mr::RenderOptions::CollectPosInstanceId;
   }
   if (options.hash_coloring) {
-    render_options |= mr::RenderOptions::HashColoring;
+    config.options |= mr::RenderOptions::HashColoring;
   }
 
-  auto render_context = app.create_render_context(render_context_extent, render_options);
+  if (options.bounds_state.has_value()) {
+    config.bounds_state = options.bounds_state.value();
+  }
+  if (options.oc_bounds.has_value()) {
+    config.oc_bounds = options.oc_bounds.value();
+  }
+
+  auto render_context = app.create_render_context(render_context_extent, config);
 
   if (options.enable_bound_boxes) {
-    render_context->render_bounds_state(mr::RenderContext::RenderBoundsState::BoundBoxes);
+    render_context->render_bounds_state(mr::RenderBoundsState::BoundBoxes);
   }
 
   auto scene = render_context->create_scene();
@@ -85,9 +93,9 @@ int main(int argc, const char **argv)
     auto window = render_context->create_window({options.width, options.height});
     if (options.print_stat) {
       std::ofstream stat_file("stats.json");
-      app.start_render_loop(*render_context, scene, window, stat_file);
+      app.start_render_loop(*render_context, scene, window, stat_file, options.frames_number);
     } else {
-      app.start_render_loop(*render_context, scene, window);
+      app.start_render_loop(*render_context, scene, window, std::nullopt, options.frames_number);
     }
   } else if (options.mode == mr::CliOptions::Mode::Frames) {
     auto file_writer = render_context->create_file_writer({options.width, options.height});
@@ -95,14 +103,12 @@ int main(int argc, const char **argv)
                       options.dst_dir, "frame", options.frames_number);
   } else if (options.mode == mr::CliOptions::Mode::Bench) {
     std::fs::create_directory(options.stat_dir);
+    std::ofstream stat_file("stats.json"); // For bench stats are always enabled
     auto presenter = render_context->create_dummy_presenter({options.width, options.height});
-    for (uint32_t i = 0; i < options.frames_number; i++) {
+    for (uint32_t i = 0; options.frames_number.has_value() ? (i < options.frames_number) : true; i++) {
       scene->update();
       render_context->render(scene, *presenter);
-
-      auto &stat = render_context->stat();
-      std::ofstream log_file(std::format("{}/frame{}_stat.json", options.stat_dir.string().c_str(), i));
-      stat.write_to_json(log_file);
+      render_context->prev_stat().write_to_json(stat_file);
     }
   }
 }

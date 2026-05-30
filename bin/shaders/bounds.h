@@ -53,6 +53,24 @@ BoundSphere transform_bound_sphere(BoundSphere bs, mat4 transform)
   return res;
 }
 
+// Closest point on AABB surface to an arbitrary world-space point.
+// If the query point is outside the box, returns clamp(point, min, max).
+// Returns true if point is inside the box.
+bool closest_point_on_bound_box(vec3 point, BoundBox bb, out vec3 closest_point)
+{
+  vec3 bmin = bb.min.xyz;
+  vec3 bmax = bb.max.xyz;
+
+  bool inside = point.x >= bmin.x && point.x <= bmax.x &&
+                point.y >= bmin.y && point.y <= bmax.y &&
+                point.z >= bmin.z && point.z <= bmax.z;
+  if (inside) {
+    return true;
+  }
+  closest_point = clamp(point, bmin, bmax);
+  return false;
+}
+
 // TODO(dk6): Search in internet more optimize way to do it
 vec4 get_bound_box_screen_rectangle(BoundBox bb, mat4 proj)
 {
@@ -76,31 +94,31 @@ vec4 get_bound_box_screen_rectangle(BoundBox bb, mat4 proj)
     res.z = max(res.z, corners[i].x);
     res.w = max(res.w, corners[i].y);
   }
+
+  // Flip over Ox
+  float tmp = -res.y;
+  res.y = -res.w;
+  res.w = tmp;
+
+  // rectangle now in [-1; 1] screen coords, convert to [0; 1] texture coords
+  res = (res + vec4(1)) / 2;
+
   return res;
 }
 
-// Copied from niagara src
-// 2D Polyhedral Bounds of a Clipped, Perspective-Projected 3D Sphere. Michael Mara, Morgan McGuire. 2013
-bool get_bound_sphere_screen_rectangle2(vec3 c, float r, float znear, float P00, float P11, out vec4 aabb)
-{
-	if (c.z < r + znear) {
-		return false;
+bool is_bound_sphere_dont_clips_camera(vec3 c, float r, float znear) {
+  float depth = -c.z; // inverse view space - in opengl we watch at negative Oz
+  // Check near plane clips with sphere
+  if (depth < r + znear) {
+    return false;
   }
-	vec3 cr = c * r;
-	float czr2 = c.z * c.z - r * r;
 
-	float vx = sqrt(c.x * c.x + czr2);
-	float minx = (vx * c.x - cr.z) / (vx * c.z + cr.x);
-	float maxx = (vx * c.x + cr.z) / (vx * c.z - cr.x);
+  float czr2 = depth * depth - r * r;
+  if (czr2 <= 0.0) {
+    return false;
+  }
 
-	float vy = sqrt(c.y * c.y + czr2);
-	float miny = (vy * c.y - cr.z) / (vy * c.z + cr.y);
-	float maxy = (vy * c.y + cr.z) / (vy * c.z - cr.y);
-
-	aabb = vec4(minx * P00, miny * P11, maxx * P00, maxy * P11);
-	aabb = aabb.xwzy * vec4(0.5f, -0.5f, 0.5f, -0.5f) + vec4(0.5f); // clip space -> uv space
-
-	return true;
+  return true;
 }
 
 bool get_bound_sphere_screen_rectangle(vec3 c, float r, float znear, float P00, float P11, out vec4 aabb)
@@ -131,6 +149,42 @@ bool get_bound_sphere_screen_rectangle(vec3 c, float r, float znear, float P00, 
 
   // Clip space [-1,1] → UV space [0,1] (with reversing Y and flipping over Ox)
   aabb = aabb.xwzy * vec4(0.5, -0.5, 0.5, -0.5) + vec4(0.5);
+
+  return true;
+}
+
+// Get max of rectangle width and height
+float bounds_rectangle_max_dim(vec4 rectangle)
+{
+  return max(abs(rectangle.x - rectangle.z), abs(rectangle.y - rectangle.w));
+}
+
+// Choose bounds with minimum screen rectangle dimension (max of W/H) - it will be best for HiZ sampling
+// params: znear - projection distance,
+//         rectangle - screen rectangle (pos0.x, pos0.y, pos1.x, pos1.y)
+// returns: false if bound sphere is behind us - it is invisible
+bool get_best_screen_rectangle(BoundBox bb, BoundSphere bs, float znear, mat4 proj, mat4 vp,
+                               out vec4 rectangle, out bool is_bs)
+{
+  float p00 = proj[0][0], p11 = proj[1][1];
+  vec4 bs_rect;
+  if (!get_bound_sphere_screen_rectangle(bs.center, bs.radius, znear, p00, p11, bs_rect)) {
+    is_bs = true;
+    return false;
+  }
+
+  vec4 bb_rect = get_bound_box_screen_rectangle(bb, vp);
+
+  float bb_rect_size = bounds_rectangle_max_dim(bb_rect);
+  float bs_rect_size = bounds_rectangle_max_dim(bs_rect);
+
+  if (bb_rect_size < bs_rect_size) {
+    rectangle = bb_rect;
+    is_bs = false;
+  } else {
+    rectangle = bs_rect;
+    is_bs = true;
+  }
 
   return true;
 }
