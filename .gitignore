@@ -48,3 +48,8 @@ bin/models
 _deps
 CMakeUserPresets.json
 
+
+*.csv
+bench_results/
+bench_configs/
+
