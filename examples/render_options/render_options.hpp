@@ -35,6 +35,13 @@ inline namespace graphics {
     bool hash_coloring;
     std::optional<RenderBoundsState> bounds_state;
     std::optional<OcclusionCullingBounds> oc_bounds;
+    std::optional<OcclusionCullingType> oc_type;
+    bool msoc_with_hiz_coarse = false;
+    Extent msoc_tile_size = {8, 8};
+    uint32_t msoc_tiles_per_thread = 8;
+    bool oc_draw_always = false;
+    std::optional<uint32_t> save_gbuffer_frame;
+    std::optional<std::fs::path> save_gbuffer_image_path;
 
     static std::optional<CliOptions> parse(int argc, const char **argv);
 

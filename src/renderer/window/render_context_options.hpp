@@ -14,6 +14,8 @@ inline namespace graphics {
     EnableCullingVisualiztion = (1u << 4),
     CollectPosInstanceId =      (1u << 5),
     HashColoring =              (1u << 6),
+    MsocWithHizCoarseCheck =    (1u << 7),
+    OcDrawAlways =              (1u << 8),
   };
 
   constexpr static inline RenderOptions operator&(RenderOptions options, RenderOptions option) noexcept
@@ -55,14 +57,31 @@ inline namespace graphics {
   enum struct OcclusionCullingBounds : uint32_t {
     Box,
     Sphere,
-    DynamicBest,
+    DynamicBest, // smaller screen-rect of box/sphere (one HiZ/MSOC test)
+    Both,        // visible only if both box and sphere tests pass
     BoundsNumber,
   };
+
+  enum struct OcclusionCullingType : uint32_t {
+    TwoPhaseHiZ,
+    MaskedSoftware,
+    MsocAdaptiveTileSize,
+  };
+
+  constexpr bool uses_msoc_pipeline(OcclusionCullingType oc_type) noexcept
+  {
+    return oc_type == OcclusionCullingType::MaskedSoftware
+        || oc_type == OcclusionCullingType::MsocAdaptiveTileSize;
+  }
 
   struct RenderContextConfig {
     RenderOptions options = RenderOptions::None;
     RenderBoundsState bounds_state = RenderBoundsState::Disable;
     OcclusionCullingBounds oc_bounds = OcclusionCullingBounds::Box;
+    OcclusionCullingType oc_type = OcclusionCullingType::TwoPhaseHiZ;
+    Extent msoc_tile_size = {8, 8};
+    uint32_t msoc_tiles_per_thread = 8;
+    bool test_tile_early_exit = true;
     // Temporary workaround while instances buffers sizes are not dynamic
     uint32_t max_instance_number_per_object = 10;
   };

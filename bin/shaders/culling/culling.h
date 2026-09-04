@@ -4,6 +4,18 @@
 #include "types.h"
 #include "bounds.h"
 
+#ifndef HIZ_OC_TYPE
+#define HIZ_OC_TYPE 0
+#endif // HIZ_OC_TYPE
+
+#ifndef MSOC_OC_TYPE
+#define MSOC_OC_TYPE 1
+#endif // MSOC_OC_TYPE
+
+#ifndef MSOC_ADAPTIVE_TILE_SIZE_OC_TYPE
+#define MSOC_ADAPTIVE_TILE_SIZE_OC_TYPE 2
+#endif // MSOC_ADAPTIVE_TILE_SIZE_OC_TYPE
+
 struct IndirectCommand {
   uint index_count;
   uint instance_count;
@@ -58,6 +70,7 @@ struct CullingStats {
   uint total_objects_cnt;
   uint outside_frustum_objects_number;
   uint occluded_objects_cnt;
+  uint msoc_tiles_cnt;
 };
 #endif // COLLECT_CULLING_STAT
 

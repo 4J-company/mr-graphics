@@ -35,8 +35,29 @@ inline namespace graphics {
     };
 
     // TODO(dk6): destruct all this stuff in Scene destructor
+    struct MsocTileBuffers {
+      StorageBuffer tile_count_buffer;
+      StorageBuffer tile_dims_buffer;
+      StorageBuffer tile_offset_buffer;
+      StorageBuffer visible_flag_buffer;
+      StorageBuffer screen_rect_buffer;
+      StorageBuffer query_depth_buffer;
+
+      uint32_t tile_count_buffer_id = BindlessDescriptorSet::invalid_id;
+      uint32_t tile_dims_buffer_id = BindlessDescriptorSet::invalid_id;
+      uint32_t tile_offset_buffer_id = BindlessDescriptorSet::invalid_id;
+      uint32_t visible_flag_buffer_id = BindlessDescriptorSet::invalid_id;
+      uint32_t screen_rect_buffer_id = BindlessDescriptorSet::invalid_id;
+      uint32_t query_depth_buffer_id = BindlessDescriptorSet::invalid_id;
+
+      // 3 consecutive uint32 slots in scene counters buffer for vk::DispatchIndirectCommand
+      uint32_t msoc_dispatch_cmd_index = BindlessDescriptorSet::invalid_id;
+    };
+
     struct MeshesWithSamePipeline {
       std::vector<const Mesh *> meshes;
+
+      std::optional<MsocTileBuffers> msoc_buffers;
 
       // TODO(dk6): Use dynamic sizable VectorBuffer
       StorageBuffer instances_data_buffer; // Data for each drawed instance

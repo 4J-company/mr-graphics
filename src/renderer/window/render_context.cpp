@@ -9,6 +9,7 @@
 #include "resources/pipelines/graphics_pipeline.hpp"
 #include "vkfw/vkfw.hpp"
 #include "window/dummy_presenter.hpp"
+#include <fstream>
 #include <vulkan/vulkan_core.h>
 #include <vulkan/vulkan_enums.hpp>
 
@@ -16,6 +17,10 @@
 
 static mr::Extent calculate_depth_pyramid_extent(mr::Extent screen_extent) {
   return {std::bit_floor(screen_extent.width), std::bit_floor(screen_extent.height)};
+}
+
+static uint32_t msoc_tile_mip_level(uint32_t tile_size) {
+  return static_cast<uint32_t>(std::countr_zero(tile_size));
 }
 
 mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent, RenderContextConfig config)
@@ -36,6 +41,7 @@ mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent,
   , _culling_semaphore(_state->device().createSemaphoreUnique({}).value)
   , _late_culling_semaphore(_state->device().createSemaphoreUnique({}).value)
   , _visible_models_rendering_semaphore(_state->device().createSemaphoreUnique({}).value)
+  , _transfer_command_unit(*_state)
   , _extent(extent)
   , _depthbuffer(*_state, _extent)
   , _image_fence (_state->device().createFenceUnique({.flags = vk::FenceCreateFlagBits::eSignaled}).value)
@@ -48,6 +54,10 @@ mr::RenderContext::RenderContext(VulkanGlobalState *global_state, Extent extent,
   , _depth_pyramid(*_state, _depth_pyramid_extent, vk::Format::eR32Sfloat,
                    calculate_mips_levels_number(_depth_pyramid_extent))
 {
+  // Temporary restriction: MSOC shaders currently assume square power-of-two tiles.
+  ASSERT(_config.msoc_tile_size.width == _config.msoc_tile_size.height);
+  ASSERT(std::has_single_bit(_config.msoc_tile_size.width));
+
   std::println("render_bounds_state: {}", enum_cast(_render_bounds_state));
 
   if (is_render_option_enabled(_config.options, RenderOptions::DisableCulling) &&
@@ -206,6 +216,9 @@ void mr::RenderContext::init_culling()
   if (is_render_option_enabled(_config.options, RenderOptions::EnableCullingStats)) {
     defines.insert({"COLLECT_CULLING_STAT", "ON"});
   }
+  if (is_render_option_enabled(_config.options, RenderOptions::OcDrawAlways)) {
+    defines.insert({"OC_DRAW_ALWAYS", "ON"});
+  }
 
   std::array set_layouts {
     _converted_bindless_set_layout,
@@ -222,11 +235,11 @@ void mr::RenderContext::init_culling()
     *_state, "culling/instances_collect/mark_visible", defines);
   _instances_collect_mark_pipeline = ComputePipeline(*_state, _instances_collect_mark_shader, set_layouts);
   _instances_collect_scan_blocks_shader = ResourceManager<Shader>::get().create("InstancesCollectScanBlocksShader",
-    *_state, "culling/instances_collect/scan_blocks", defines);
+    *_state, "culling/exclusive_scan/scan_blocks", defines);
   _instances_collect_scan_blocks_pipeline =
     ComputePipeline(*_state, _instances_collect_scan_blocks_shader, set_layouts);
   _instances_collect_add_offsets_shader = ResourceManager<Shader>::get().create("InstancesCollectAddOffsetsShader",
-    *_state, "culling/instances_collect/add_offsets", defines);
+    *_state, "culling/exclusive_scan/add_offsets", defines);
   _instances_collect_add_offsets_pipeline =
     ComputePipeline(*_state, _instances_collect_add_offsets_shader, set_layouts);
 
@@ -290,14 +303,99 @@ void mr::RenderContext::init_culling()
 
   defines["MAX_DEPTH_PYRAMID_LEVELS"] = std::to_string(depth_pyramid_max_levels);
 
-  defines["BOUNDS_TYPE"] = std::to_string(enum_cast(_config.oc_bounds));
-  defines["BOUNDS_TYPE_BOXES"] = std::to_string(enum_cast(OcclusionCullingBounds::Box));
-  defines["BOUNDS_TYPE_SPHERES"] = std::to_string(enum_cast(OcclusionCullingBounds::Sphere));
-  defines["BOUNDS_TYPE_DYNAMIC_BEST"] = std::to_string(enum_cast(OcclusionCullingBounds::DynamicBest));
+  if (_config.oc_type == OcclusionCullingType::TwoPhaseHiZ) {
+    auto hiz_defines = defines;
+    hiz_defines["OC_TYPE"] = std::to_string(enum_cast(OcclusionCullingType::TwoPhaseHiZ));
+    hiz_defines["HIZ_OC_TYPE"] = std::to_string(enum_cast(OcclusionCullingType::TwoPhaseHiZ));
+    hiz_defines["MSOC_OC_TYPE"] = std::to_string(enum_cast(OcclusionCullingType::MaskedSoftware));
+    hiz_defines["MSOC_ADAPTIVE_TILE_SIZE_OC_TYPE"] =
+      std::to_string(enum_cast(OcclusionCullingType::MsocAdaptiveTileSize));
+    hiz_defines["BOUNDS_TYPE"] = std::to_string(enum_cast(_config.oc_bounds));
+    hiz_defines["BOUNDS_TYPE_BOXES"] = std::to_string(enum_cast(OcclusionCullingBounds::Box));
+    hiz_defines["BOUNDS_TYPE_SPHERES"] = std::to_string(enum_cast(OcclusionCullingBounds::Sphere));
+    hiz_defines["BOUNDS_TYPE_DYNAMIC_BEST"] = std::to_string(enum_cast(OcclusionCullingBounds::DynamicBest));
+    hiz_defines["BOUNDS_TYPE_BOTH"] = std::to_string(enum_cast(OcclusionCullingBounds::Both));
 
-  _late_instances_culling_shader = ResourceManager<Shader>::get().create("LateInstancesCullingShader",
-    *_state, "culling/late_instances_culling", defines);
-  _late_instances_culling_pipeline = ComputePipeline(*_state, _late_instances_culling_shader, set_layouts);
+    _late_instances_culling_shader = ResourceManager<Shader>::get().create("LateInstancesCullingShader",
+      *_state, "culling/late_instances_culling/hiz", hiz_defines);
+    _late_instances_culling_pipeline = ComputePipeline(*_state, _late_instances_culling_shader, set_layouts);
+  } else if (uses_msoc_pipeline(_config.oc_type)) {
+    auto msoc_defines = defines;
+    msoc_defines["OC_TYPE"] = std::to_string(enum_cast(_config.oc_type));
+    msoc_defines["HIZ_OC_TYPE"] = std::to_string(enum_cast(OcclusionCullingType::TwoPhaseHiZ));
+    msoc_defines["MSOC_OC_TYPE"] = std::to_string(enum_cast(OcclusionCullingType::MaskedSoftware));
+    msoc_defines["MSOC_ADAPTIVE_TILE_SIZE_OC_TYPE"] =
+      std::to_string(enum_cast(OcclusionCullingType::MsocAdaptiveTileSize));
+    msoc_defines["BOUNDS_TYPE"] = std::to_string(enum_cast(_config.oc_bounds));
+    msoc_defines["BOUNDS_TYPE_BOXES"] = std::to_string(enum_cast(OcclusionCullingBounds::Box));
+    msoc_defines["BOUNDS_TYPE_SPHERES"] = std::to_string(enum_cast(OcclusionCullingBounds::Sphere));
+    msoc_defines["BOUNDS_TYPE_DYNAMIC_BEST"] = std::to_string(enum_cast(OcclusionCullingBounds::DynamicBest));
+    msoc_defines["BOUNDS_TYPE_BOTH"] = std::to_string(enum_cast(OcclusionCullingBounds::Both));
+    msoc_defines["TILE_SIZE"] = std::to_string(_config.msoc_tile_size.width);
+    msoc_defines["TILES_PER_THREAD"] = std::to_string(_config.msoc_tiles_per_thread);
+
+    const bool msoc_coarse_hiz =
+      is_render_option_enabled(_config.options, RenderOptions::MsocWithHizCoarseCheck);
+    const bool msoc_adaptive_tile = _config.oc_type == OcclusionCullingType::MsocAdaptiveTileSize;
+
+    // Fixed MSOC tiles must match the mip texel grid; adaptive keeps exact AABB.
+    if (!msoc_adaptive_tile) {
+      msoc_defines["MSOC_SNAP_RECT_TO_TILE_GRID"] = "ON";
+    }
+
+    if (msoc_coarse_hiz) {
+      _msoc_tile_prep_coarse_hiz_shader = ResourceManager<Shader>::get().create("MsocTilePrepCoarseHizShader",
+        *_state, "culling/late_instances_culling/msoc/tile_prep_coarse_hiz", msoc_defines);
+      _msoc_tile_prep_coarse_hiz_pipeline =
+        ComputePipeline(*_state, _msoc_tile_prep_coarse_hiz_shader, set_layouts);
+    } else {
+      _msoc_tile_prep_shader = ResourceManager<Shader>::get().create("MsocTilePrepShader",
+        *_state, "culling/late_instances_culling/msoc/tile_prep", msoc_defines);
+      _msoc_tile_prep_pipeline = ComputePipeline(*_state, _msoc_tile_prep_shader, set_layouts);
+    }
+
+    if (!msoc_adaptive_tile) {
+      _msoc_tiled_sampler = Sampler(*_state, vk::Filter::eNearest, vk::SamplerMipmapMode::eNearest,
+                                    vk::SamplerAddressMode::eClampToEdge, 1);
+      const uint32_t tile_mip = msoc_tile_mip_level(_config.msoc_tile_size.width);
+      _msoc_tiled_depth_resource = ShaderPyramidImageLevelResource {
+        .image = &_depth_pyramid,
+        .mip_level = tile_mip,
+        .sampler = &_msoc_tiled_sampler,
+        .layout = vk::ImageLayout::eShaderReadOnlyOptimal,
+      };
+      _tiled_buffer_image_id = _bindless_set.register_resource(&_msoc_tiled_depth_resource);
+    }
+
+    auto msoc_tile_test_defines = msoc_defines;
+    if (_config.test_tile_early_exit) {
+      msoc_tile_test_defines["TEST_TILES_EARLY_EXIT"] = "ON";
+    }
+    if (msoc_coarse_hiz) {
+      msoc_tile_test_defines["MSOC_WITH_HIZ_COARSE_CHECK"] = "ON";
+    }
+
+    if (msoc_adaptive_tile) {
+      msoc_tile_test_defines["TILE_MIP_LEVEL"] =
+        std::to_string(msoc_tile_mip_level(_config.msoc_tile_size.width));
+      _msoc_tile_test_adaptive_shader = ResourceManager<Shader>::get().create("MsocTileTestAdaptiveShader",
+        *_state, "culling/late_instances_culling/msoc/tile_test_adaptive_size", msoc_tile_test_defines);
+      _msoc_tile_test_adaptive_pipeline =
+        ComputePipeline(*_state, _msoc_tile_test_adaptive_shader, set_layouts);
+    } else {
+      _msoc_tile_test_shader = ResourceManager<Shader>::get().create("MsocTileTestShader",
+        *_state, "culling/late_instances_culling/msoc/tile_test", msoc_tile_test_defines);
+      _msoc_tile_test_pipeline = ComputePipeline(*_state, _msoc_tile_test_shader, set_layouts);
+    }
+
+    _msoc_tile_apply_shader = ResourceManager<Shader>::get().create("MsocTileApplyShader",
+      *_state, "culling/late_instances_culling/msoc/tile_apply", msoc_defines);
+    _msoc_tile_apply_pipeline = ComputePipeline(*_state, _msoc_tile_apply_shader, set_layouts);
+
+    _msoc_tile_finalize_shader = ResourceManager<Shader>::get().create("MsocTileFinalizeShader",
+      *_state, "culling/late_instances_culling/msoc/tile_finalize", msoc_defines);
+    _msoc_tile_finalize_pipeline = ComputePipeline(*_state, _msoc_tile_finalize_shader, set_layouts);
+  }
 
   // ---------------------------
   // Stats
@@ -553,11 +651,8 @@ void mr::RenderContext::render_lights(const SceneHandle scene, Presenter &presen
   _lights_command_unit.end();
 }
 
-void mr::RenderContext::render_models(const SceneHandle scene, CommandUnit &cmd_unit)
+void mr::RenderContext::render_models(const SceneHandle scene, CommandUnit &cmd_unit, bool /*is_late_pass*/)
 {
-  cmd_unit->writeTimestamp(vk::PipelineStageFlagBits::eDrawIndirect,
-                                       _timestamps_query_pool.get(),
-                                       enum_cast(Timestamp::ModelsStart));
 
   std::array<vk::Buffer, 2> vertex_buffers {
     _positions_vertex_buffer.buffer(),
@@ -595,20 +690,16 @@ void mr::RenderContext::render_models(const SceneHandle scene, CommandUnit &cmd_
                                                    draw.draw_counter_index * sizeof(uint32_t),
                                                    max_draws_count, stride);
   }
-
-  cmd_unit->writeTimestamp(vk::PipelineStageFlagBits::eBottomOfPipe,
-                                       _timestamps_query_pool.get(),
-                                       enum_cast(Timestamp::ModelsEnd));
 }
 
-void mr::RenderContext::run_collect_exclusive_scan(CommandUnit &command_unit,
-                                                   std::span<const vk::DescriptorSet> culling_descriptor_sets,
-                                                   uint32_t max_draws_count,
-                                                   uint32_t draw_visibility_buffer_id,
-                                                   uint32_t draw_prefix_buffer_id,
-                                                   const StorageBuffer &draw_prefix_buffer,
-                                                   const std::array<uint32_t, 3> &scan_aux_buffer_ids,
-                                                   const std::array<StorageBuffer, 3> &scan_aux_buffers)
+void mr::RenderContext::run_exclusive_scan(CommandUnit &command_unit,
+                                           std::span<const vk::DescriptorSet> culling_descriptor_sets,
+                                           uint32_t elements_count,
+                                           uint32_t input_buffer_id,
+                                           uint32_t output_buffer_id,
+                                           const StorageBuffer &output_buffer,
+                                           const std::array<uint32_t, 3> &scan_aux_buffer_ids,
+                                           const std::array<StorageBuffer, 3> &scan_aux_buffers)
 {
   command_unit->bindPipeline(vk::PipelineBindPoint::eCompute, _instances_collect_scan_blocks_pipeline.pipeline());
   command_unit->bindDescriptorSets(vk::PipelineBindPoint::eCompute,
@@ -628,14 +719,14 @@ void mr::RenderContext::run_collect_exclusive_scan(CommandUnit &command_unit,
 
   std::array<ScanLevelState, 3> level_states {};
   uint32_t level = 0;
-  uint32_t level_input_buffer_id = draw_visibility_buffer_id;
-  uint32_t level_elements_count = max_draws_count;
+  uint32_t level_input_buffer_id = input_buffer_id;
+  uint32_t level_elements_count = elements_count;
   while (true) {
     auto &state = level_states[level];
     state.elements_count = level_elements_count;
     if (level == 0) {
-      state.output_buffer_id = draw_prefix_buffer_id;
-      state.output_buffer = &draw_prefix_buffer;
+      state.output_buffer_id = output_buffer_id;
+      state.output_buffer = &output_buffer;
       state.aux_buffer_id = scan_aux_buffer_ids[0];
       state.aux_buffer = &scan_aux_buffers[0];
     } else if (level == 1) {
@@ -736,6 +827,371 @@ void mr::RenderContext::run_collect_exclusive_scan(CommandUnit &command_unit,
 
     level--;
   }
+}
+
+void mr::RenderContext::run_msoc_tile_prep(const SceneHandle scene,
+                                           Scene::MeshesWithSamePipeline &draw,
+                                           uint32_t instances_number,
+                                           std::span<const vk::DescriptorSet> culling_descriptor_sets)
+{
+  ASSERT(draw.msoc_buffers.has_value());
+  auto &msoc = draw.msoc_buffers.value();
+
+  _late_culling_command_unit->bindPipeline(vk::PipelineBindPoint::eCompute, _msoc_tile_prep_pipeline.pipeline());
+  _late_culling_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eCompute,
+                                                 {_msoc_tile_prep_pipeline.layout()},
+                                                 bindless_set_number,
+                                                 culling_descriptor_sets,
+                                                 {});
+
+  uint32_t prep_push_constants[] {
+    draw.meshes_data_buffer_id,
+    draw.instances_data_buffer_id,
+    instances_number,
+    scene->_transforms_buffer_id,
+    scene->camera_buffer_id(),
+    scene->_bound_boxes_buffer_id,
+    scene->_bound_spheres_buffer_id,
+    _extent.width,
+    _extent.height,
+    msoc.tile_count_buffer_id,
+    msoc.tile_dims_buffer_id,
+    msoc.screen_rect_buffer_id,
+    msoc.query_depth_buffer_id,
+    _culling_stat_buffer_id,
+  };
+  _late_culling_command_unit->pushConstants(_msoc_tile_prep_pipeline.layout(),
+                                            vk::ShaderStageFlagBits::eCompute,
+                                            0, sizeof(prep_push_constants), prep_push_constants);
+  _late_culling_command_unit->dispatch(calculate_work_groups_number(instances_number, culling_work_group_size), 1, 1);
+
+  std::array<vk::BufferMemoryBarrier, 4> prep_barriers {
+    vk::BufferMemoryBarrier {
+      .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
+      .dstAccessMask = vk::AccessFlagBits::eShaderRead,
+      .buffer = msoc.tile_count_buffer.buffer(),
+      .offset = 0,
+      .size = msoc.tile_count_buffer.byte_size(),
+    },
+    vk::BufferMemoryBarrier {
+      .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
+      .dstAccessMask = vk::AccessFlagBits::eShaderRead,
+      .buffer = msoc.tile_dims_buffer.buffer(),
+      .offset = 0,
+      .size = msoc.tile_dims_buffer.byte_size(),
+    },
+    vk::BufferMemoryBarrier {
+      .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
+      .dstAccessMask = vk::AccessFlagBits::eShaderRead,
+      .buffer = msoc.screen_rect_buffer.buffer(),
+      .offset = 0,
+      .size = msoc.screen_rect_buffer.byte_size(),
+    },
+    vk::BufferMemoryBarrier {
+      .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
+      .dstAccessMask = vk::AccessFlagBits::eShaderRead,
+      .buffer = msoc.query_depth_buffer.buffer(),
+      .offset = 0,
+      .size = msoc.query_depth_buffer.byte_size(),
+    },
+  };
+  _late_culling_command_unit->pipelineBarrier(
+    vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eComputeShader, {},
+    {}, prep_barriers, {});
+}
+
+void mr::RenderContext::run_msoc_tile_prep_coarse_hiz(const SceneHandle scene,
+                                                      Scene::MeshesWithSamePipeline &draw,
+                                                      uint32_t instances_number,
+                                                      std::span<const vk::DescriptorSet> culling_descriptor_sets)
+{
+  ASSERT(draw.msoc_buffers.has_value());
+  auto &msoc = draw.msoc_buffers.value();
+
+  _late_culling_command_unit->bindPipeline(vk::PipelineBindPoint::eCompute,
+                                           _msoc_tile_prep_coarse_hiz_pipeline.pipeline());
+  _late_culling_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eCompute,
+                                                 {_msoc_tile_prep_coarse_hiz_pipeline.layout()},
+                                                 bindless_set_number,
+                                                 culling_descriptor_sets,
+                                                 {});
+
+  uint32_t prep_push_constants[] {
+    draw.meshes_data_buffer_id,
+    draw.instances_data_buffer_id,
+    instances_number,
+    scene->_transforms_buffer_id,
+    scene->camera_buffer_id(),
+    scene->_bound_boxes_buffer_id,
+    scene->_bound_spheres_buffer_id,
+    _extent.width,
+    _extent.height,
+    _depth_pyramid.mip_levels_number(),
+    _depth_pyramid_extent.width,
+    _depth_pyramid_extent.height,
+    _depth_pyramid_image_id,
+    _depth_pyramid_mips_scale_coefs_buffer_id,
+    msoc.tile_count_buffer_id,
+    msoc.tile_dims_buffer_id,
+    msoc.screen_rect_buffer_id,
+    msoc.query_depth_buffer_id,
+    _culling_stat_buffer_id,
+  };
+  _late_culling_command_unit->pushConstants(_msoc_tile_prep_coarse_hiz_pipeline.layout(),
+                                            vk::ShaderStageFlagBits::eCompute,
+                                            0, sizeof(prep_push_constants), prep_push_constants);
+  _late_culling_command_unit->dispatch(calculate_work_groups_number(instances_number, culling_work_group_size), 1, 1);
+
+  std::array<vk::BufferMemoryBarrier, 5> prep_barriers {
+    vk::BufferMemoryBarrier {
+      .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
+      .dstAccessMask = vk::AccessFlagBits::eShaderRead,
+      .buffer = msoc.tile_count_buffer.buffer(),
+      .offset = 0,
+      .size = msoc.tile_count_buffer.byte_size(),
+    },
+    vk::BufferMemoryBarrier {
+      .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
+      .dstAccessMask = vk::AccessFlagBits::eShaderRead,
+      .buffer = msoc.tile_dims_buffer.buffer(),
+      .offset = 0,
+      .size = msoc.tile_dims_buffer.byte_size(),
+    },
+    vk::BufferMemoryBarrier {
+      .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
+      .dstAccessMask = vk::AccessFlagBits::eShaderRead,
+      .buffer = msoc.screen_rect_buffer.buffer(),
+      .offset = 0,
+      .size = msoc.screen_rect_buffer.byte_size(),
+    },
+    vk::BufferMemoryBarrier {
+      .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
+      .dstAccessMask = vk::AccessFlagBits::eShaderRead,
+      .buffer = msoc.query_depth_buffer.buffer(),
+      .offset = 0,
+      .size = msoc.query_depth_buffer.byte_size(),
+    },
+    vk::BufferMemoryBarrier {
+      .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
+      .dstAccessMask = vk::AccessFlagBits::eShaderRead,
+      .buffer = draw.instances_data_buffer.buffer(),
+      .offset = 0,
+      .size = draw.instances_data_buffer.byte_size(),
+    },
+  };
+  _late_culling_command_unit->pipelineBarrier(
+    vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eComputeShader, {},
+    {}, prep_barriers, {});
+}
+
+void mr::RenderContext::run_msoc_tile_scan(const SceneHandle /*scene*/,
+                                           Scene::MeshesWithSamePipeline &draw,
+                                           uint32_t instances_number,
+                                           std::span<const vk::DescriptorSet> culling_descriptor_sets)
+{
+  ASSERT(draw.msoc_buffers.has_value());
+  auto &msoc = draw.msoc_buffers.value();
+
+  run_exclusive_scan(_late_culling_command_unit,
+                     culling_descriptor_sets,
+                     instances_number,
+                     msoc.tile_count_buffer_id,
+                     msoc.tile_offset_buffer_id,
+                     msoc.tile_offset_buffer,
+                     draw.scan_aux_buffer_ids,
+                     draw.scan_aux_buffers);
+
+  vk::BufferMemoryBarrier scan_barrier {
+    .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
+    .dstAccessMask = vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite,
+    .buffer = msoc.tile_offset_buffer.buffer(),
+    .offset = 0,
+    .size = msoc.tile_offset_buffer.byte_size(),
+  };
+  _late_culling_command_unit->pipelineBarrier(
+    vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eComputeShader, {},
+    {}, {scan_barrier}, {});
+}
+
+void mr::RenderContext::run_msoc_tile_finalize(const SceneHandle scene,
+                                               Scene::MeshesWithSamePipeline &draw,
+                                               uint32_t instances_number,
+                                               std::span<const vk::DescriptorSet> culling_descriptor_sets)
+{
+  ASSERT(draw.msoc_buffers.has_value());
+  auto &msoc = draw.msoc_buffers.value();
+
+  _late_culling_command_unit->bindPipeline(vk::PipelineBindPoint::eCompute, _msoc_tile_finalize_pipeline.pipeline());
+  _late_culling_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eCompute,
+                                                 {_msoc_tile_finalize_pipeline.layout()},
+                                                 bindless_set_number,
+                                                 culling_descriptor_sets,
+                                                 {});
+  uint32_t finalize_push_constants[] {
+    instances_number,
+    msoc.tile_count_buffer_id,
+    msoc.tile_offset_buffer_id,
+    scene->_counters_buffer_id,
+    msoc.msoc_dispatch_cmd_index,
+    _culling_stat_buffer_id,
+  };
+  _late_culling_command_unit->pushConstants(_msoc_tile_finalize_pipeline.layout(),
+                                            vk::ShaderStageFlagBits::eCompute,
+                                            0, sizeof(finalize_push_constants), finalize_push_constants);
+  _late_culling_command_unit->dispatch(1, 1, 1);
+
+  std::array<vk::BufferMemoryBarrier, 2> finalize_barriers {
+    vk::BufferMemoryBarrier {
+      .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
+      .dstAccessMask = vk::AccessFlagBits::eShaderRead,
+      .buffer = msoc.tile_offset_buffer.buffer(),
+      .offset = 0,
+      .size = msoc.tile_offset_buffer.byte_size(),
+    },
+    vk::BufferMemoryBarrier {
+      .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
+      .dstAccessMask = vk::AccessFlagBits::eIndirectCommandRead,
+      .buffer = scene->_counters_buffer.buffer(),
+      .offset = static_cast<vk::DeviceSize>(msoc.msoc_dispatch_cmd_index * sizeof(uint32_t)),
+      .size = sizeof(vk::DispatchIndirectCommand),
+    },
+  };
+  _late_culling_command_unit->pipelineBarrier(
+    vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eComputeShader, {},
+    {}, {finalize_barriers[0]}, {});
+  _late_culling_command_unit->pipelineBarrier(
+    vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eDrawIndirect, {},
+    {}, {finalize_barriers[1]}, {});
+}
+
+void mr::RenderContext::run_msoc_tile_test(const SceneHandle scene,
+                                           Scene::MeshesWithSamePipeline &draw,
+                                           uint32_t instances_number,
+                                           std::span<const vk::DescriptorSet> culling_descriptor_sets)
+{
+  ASSERT(draw.msoc_buffers.has_value());
+  auto &msoc = draw.msoc_buffers.value();
+
+  const bool msoc_adaptive_tile = _config.oc_type == OcclusionCullingType::MsocAdaptiveTileSize;
+
+  if (!msoc_adaptive_tile) {
+    _late_culling_command_unit->bindPipeline(vk::PipelineBindPoint::eCompute, _msoc_tile_test_pipeline.pipeline());
+    _late_culling_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eCompute,
+                                                   {_msoc_tile_test_pipeline.layout()},
+                                                   bindless_set_number,
+                                                   culling_descriptor_sets,
+                                                   {});
+    struct MsocTileTestPushConstants {
+      uint32_t instances_number;
+      uint32_t tiled_buffer_image_id;
+      float tiled_buffer_scale_x;
+      float tiled_buffer_scale_y;
+      uint32_t screen_width;
+      uint32_t screen_height;
+      uint32_t tile_offset_buffer_id;
+      uint32_t tile_dims_buffer_id;
+      uint32_t screen_rect_buffer_id;
+      uint32_t query_depth_buffer_id;
+      uint32_t visible_flag_buffer_id;
+    } test_push_constants {
+      .instances_number = instances_number,
+      .tiled_buffer_image_id = _tiled_buffer_image_id,
+      .tiled_buffer_scale_x = _tiled_buffer_scale[0],
+      .tiled_buffer_scale_y = _tiled_buffer_scale[1],
+      .screen_width = _extent.width,
+      .screen_height = _extent.height,
+      .tile_offset_buffer_id = msoc.tile_offset_buffer_id,
+      .tile_dims_buffer_id = msoc.tile_dims_buffer_id,
+      .screen_rect_buffer_id = msoc.screen_rect_buffer_id,
+      .query_depth_buffer_id = msoc.query_depth_buffer_id,
+      .visible_flag_buffer_id = msoc.visible_flag_buffer_id,
+    };
+    _late_culling_command_unit->pushConstants(_msoc_tile_test_pipeline.layout(),
+                                              vk::ShaderStageFlagBits::eCompute,
+                                              0, sizeof(test_push_constants), &test_push_constants);
+  } else {
+    _late_culling_command_unit->bindPipeline(vk::PipelineBindPoint::eCompute,
+                                             _msoc_tile_test_adaptive_pipeline.pipeline());
+    _late_culling_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eCompute,
+                                                   {_msoc_tile_test_adaptive_pipeline.layout()},
+                                                   bindless_set_number,
+                                                   culling_descriptor_sets,
+                                                   {});
+    struct MsocTileTestAdaptivePushConstants {
+      uint32_t instances_number;
+      uint32_t depth_pyramid_image_id;
+      uint32_t depth_pyramid_mips_scales_buffer_id;
+      uint32_t depth_pyramid_width;
+      uint32_t depth_pyramid_height;
+      uint32_t tile_offset_buffer_id;
+      uint32_t tile_dims_buffer_id;
+      uint32_t screen_rect_buffer_id;
+      uint32_t query_depth_buffer_id;
+      uint32_t visible_flag_buffer_id;
+    } test_push_constants {
+      .instances_number = instances_number,
+      .depth_pyramid_image_id = _depth_pyramid_image_id,
+      .depth_pyramid_mips_scales_buffer_id = _depth_pyramid_mips_scale_coefs_buffer_id,
+      .depth_pyramid_width = _depth_pyramid_extent.width,
+      .depth_pyramid_height = _depth_pyramid_extent.height,
+      .tile_offset_buffer_id = msoc.tile_offset_buffer_id,
+      .tile_dims_buffer_id = msoc.tile_dims_buffer_id,
+      .screen_rect_buffer_id = msoc.screen_rect_buffer_id,
+      .query_depth_buffer_id = msoc.query_depth_buffer_id,
+      .visible_flag_buffer_id = msoc.visible_flag_buffer_id,
+    };
+    _late_culling_command_unit->pushConstants(_msoc_tile_test_adaptive_pipeline.layout(),
+                                              vk::ShaderStageFlagBits::eCompute,
+                                              0, sizeof(test_push_constants), &test_push_constants);
+  }
+
+  _late_culling_command_unit->dispatchIndirect(
+    scene->_counters_buffer.buffer(),
+    static_cast<vk::DeviceSize>(msoc.msoc_dispatch_cmd_index * sizeof(uint32_t)));
+
+  vk::BufferMemoryBarrier test_barrier {
+    .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
+    .dstAccessMask = vk::AccessFlagBits::eShaderRead,
+    .buffer = msoc.visible_flag_buffer.buffer(),
+    .offset = 0,
+    .size = msoc.visible_flag_buffer.byte_size(),
+  };
+  _late_culling_command_unit->pipelineBarrier(
+    vk::PipelineStageFlagBits::eComputeShader, vk::PipelineStageFlagBits::eComputeShader, {},
+    {}, {test_barrier}, {});
+}
+
+void mr::RenderContext::run_msoc_tile_apply(const SceneHandle scene,
+                                            Scene::MeshesWithSamePipeline &draw,
+                                            uint32_t instances_number,
+                                            std::span<const vk::DescriptorSet> culling_descriptor_sets)
+{
+  ASSERT(draw.msoc_buffers.has_value());
+  auto &msoc = draw.msoc_buffers.value();
+
+  _late_culling_command_unit->bindPipeline(vk::PipelineBindPoint::eCompute, _msoc_tile_apply_pipeline.pipeline());
+  _late_culling_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eCompute,
+                                                 {_msoc_tile_apply_pipeline.layout()},
+                                                 bindless_set_number,
+                                                 culling_descriptor_sets,
+                                                 {});
+  uint32_t apply_push_constants[] {
+    draw.meshes_data_buffer_id,
+    draw.instances_data_buffer_id,
+    instances_number,
+    scene->_counters_buffer_id,
+    scene->_transforms_buffer_id,
+    scene->camera_buffer_id(),
+    scene->_bound_boxes_buffer_id,
+    scene->_bound_spheres_buffer_id,
+    msoc.tile_count_buffer_id,
+    msoc.visible_flag_buffer_id,
+    _culling_stat_buffer_id,
+  };
+  _late_culling_command_unit->pushConstants(_msoc_tile_apply_pipeline.layout(),
+                                            vk::ShaderStageFlagBits::eCompute,
+                                            0, sizeof(apply_push_constants), apply_push_constants);
+  _late_culling_command_unit->dispatch(calculate_work_groups_number(instances_number, culling_work_group_size), 1, 1);
 }
 
 void mr::RenderContext::culling_geometry(const SceneHandle scene)
@@ -840,14 +1296,14 @@ void mr::RenderContext::culling_geometry(const SceneHandle scene)
                                              vk::PipelineStageFlagBits::eComputeShader,
                                              {}, {}, {mark_to_prefix_barrier}, {});
 
-      run_collect_exclusive_scan(_culling_command_unit,
-                                 std::span(culling_descriptor_sets),
-                                 max_draws_count,
-                                 draw.draw_visibility_buffer_id,
-                                 draw.draw_prefix_buffer_id,
-                                 draw.draw_prefix_buffer,
-                                 draw.scan_aux_buffer_ids,
-                                 draw.scan_aux_buffers);
+      run_exclusive_scan(_culling_command_unit,
+                         std::span(culling_descriptor_sets),
+                         max_draws_count,
+                         draw.draw_visibility_buffer_id,
+                         draw.draw_prefix_buffer_id,
+                         draw.draw_prefix_buffer,
+                         draw.scan_aux_buffer_ids,
+                         draw.scan_aux_buffers);
 
       vk::BufferMemoryBarrier prefix_to_count_barrier {
         .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
@@ -1004,12 +1460,6 @@ void mr::RenderContext::late_culling_geometry(const SceneHandle scene)
 
   build_depth_pyramid();
 
-  _late_culling_command_unit->resetQueryPool(_timestamps_query_pool.get(), enum_cast(Timestamp::LateCullingStart), 2);
-
-  _late_culling_command_unit->writeTimestamp(vk::PipelineStageFlagBits::eTopOfPipe,
-                                       _timestamps_query_pool.get(),
-                                       enum_cast(Timestamp::LateCullingStart));
-
   // ===== Fill all counters by zeroes =====
   _late_culling_command_unit->fillBuffer(scene->_counters_buffer.buffer(), 0, scene->_counters_buffer.byte_size(), 0);
   vk::BufferMemoryBarrier set_count_to_zero_barrier {
@@ -1041,44 +1491,119 @@ void mr::RenderContext::late_culling_geometry(const SceneHandle scene)
 
   // ===== Setup and call culling instances shader =====
   if (not is_render_option_enabled(_config.options, RenderOptions::DisableCulling)) {
-    _late_culling_command_unit->bindPipeline(vk::PipelineBindPoint::eCompute, _late_instances_culling_pipeline.pipeline());
+    _late_culling_command_unit->resetQueryPool(_timestamps_query_pool.get(),
+                                               enum_cast(Timestamp::LateCullingStart), 2);
+    if (uses_msoc_pipeline(_config.oc_type)) {
+      constexpr uint32_t msoc_timestamps_number =
+        enum_cast(Timestamp::MsocTileApplyEnd) - enum_cast(Timestamp::MsocTilePrepStart) + 1;
+      _late_culling_command_unit->resetQueryPool(_timestamps_query_pool.get(),
+                                                 enum_cast(Timestamp::MsocTilePrepStart),
+                                                 msoc_timestamps_number);
+    }
 
-    _late_culling_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eCompute,
-                                             {_late_instances_culling_pipeline.layout()},
-                                             bindless_set_number,
-                                             culling_descriptor_sets,
-                                             {});
-    // TODO(dk6): Maybe rework to run compute shaders once per frame
-    for (auto &[pipeline, draw] : scene->_draws) {
-      uint32_t instances_number = static_cast<uint32_t>(draw.instances_data_buffer_data.size());
-      uint32_t culling_push_contants[] {
-        draw.meshes_data_buffer_id,
-        draw.instances_data_buffer_id,
-        instances_number,
+    _late_culling_command_unit->writeTimestamp(vk::PipelineStageFlagBits::eComputeShader,
+                                               _timestamps_query_pool.get(),
+                                               enum_cast(Timestamp::LateCullingStart));
 
-        scene->_counters_buffer_id,
+    if (_config.oc_type == OcclusionCullingType::TwoPhaseHiZ) {
+      _late_culling_command_unit->bindPipeline(vk::PipelineBindPoint::eCompute, _late_instances_culling_pipeline.pipeline());
 
-        scene->_transforms_buffer_id,
+      _late_culling_command_unit->bindDescriptorSets(vk::PipelineBindPoint::eCompute,
+                                               {_late_instances_culling_pipeline.layout()},
+                                               bindless_set_number,
+                                               culling_descriptor_sets,
+                                               {});
+      // TODO(dk6): Maybe rework to run compute shaders once per frame
+      for (auto &[pipeline, draw] : scene->_draws) {
+        uint32_t instances_number = static_cast<uint32_t>(draw.instances_data_buffer_data.size());
+        uint32_t culling_push_contants[] {
+          draw.meshes_data_buffer_id,
+          draw.instances_data_buffer_id,
+          instances_number,
 
-        scene->camera_buffer_id(),
-        scene->_bound_boxes_buffer_id,
-        scene->_bound_spheres_buffer_id,
+          scene->_counters_buffer_id,
 
-        _depth_pyramid.mip_levels_number(),
-        _depth_pyramid_extent.width,
-        _depth_pyramid_extent.height,
+          scene->_transforms_buffer_id,
 
-        _depth_pyramid_image_id,
-        _depth_pyramid_mips_scale_coefs_buffer_id,
+          scene->camera_buffer_id(),
+          scene->_bound_boxes_buffer_id,
+          scene->_bound_spheres_buffer_id,
 
-        // if EnableCullingStats option not enabled this number is not initializated and must not be used in shader
-        _culling_stat_buffer_id,
-      };
-      _late_culling_command_unit->pushConstants(_late_instances_culling_pipeline.layout(),
-                                                vk::ShaderStageFlagBits::eCompute,
-                                                0, sizeof(culling_push_contants), culling_push_contants);
+          _depth_pyramid.mip_levels_number(),
+          _depth_pyramid_extent.width,
+          _depth_pyramid_extent.height,
 
-      _late_culling_command_unit->dispatch(calculate_work_groups_number(instances_number, culling_work_group_size), 1, 1);
+          _depth_pyramid_image_id,
+          _depth_pyramid_mips_scale_coefs_buffer_id,
+
+          // if EnableCullingStats option not enabled this number is not initializated and must not be used in shader
+          _culling_stat_buffer_id,
+        };
+        _late_culling_command_unit->pushConstants(_late_instances_culling_pipeline.layout(),
+                                                  vk::ShaderStageFlagBits::eCompute,
+                                                  0, sizeof(culling_push_contants), culling_push_contants);
+
+        _late_culling_command_unit->dispatch(calculate_work_groups_number(instances_number, culling_work_group_size), 1, 1);
+      }
+    } else if (uses_msoc_pipeline(_config.oc_type)) {
+      _late_culling_command_unit->writeTimestamp(vk::PipelineStageFlagBits::eComputeShader,
+                                                 _timestamps_query_pool.get(),
+                                                 enum_cast(Timestamp::MsocTilePrepStart));
+      for (auto &[pipeline, draw] : scene->_draws) {
+        uint32_t instances_number = static_cast<uint32_t>(draw.instances_data_buffer_data.size());
+        ASSERT(draw.msoc_buffers.has_value());
+        auto &msoc = draw.msoc_buffers.value();
+        _late_culling_command_unit->fillBuffer(msoc.visible_flag_buffer.buffer(), 0,
+                                               msoc.visible_flag_buffer.byte_size(), 0);
+        vk::BufferMemoryBarrier zero_visible_flags_barrier {
+          .srcAccessMask = vk::AccessFlagBits::eTransferWrite,
+          .dstAccessMask = vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eShaderWrite,
+          .buffer = msoc.visible_flag_buffer.buffer(),
+          .offset = 0,
+          .size = msoc.visible_flag_buffer.byte_size(),
+        };
+        _late_culling_command_unit->pipelineBarrier(
+          vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eComputeShader, {},
+          {}, {zero_visible_flags_barrier}, {});
+
+        if (is_render_option_enabled(_config.options, RenderOptions::MsocWithHizCoarseCheck)) {
+          run_msoc_tile_prep_coarse_hiz(scene, draw, instances_number, culling_descriptor_sets);
+        } else {
+          run_msoc_tile_prep(scene, draw, instances_number, culling_descriptor_sets);
+        }
+      }
+      _late_culling_command_unit->writeTimestamp(vk::PipelineStageFlagBits::eComputeShader,
+                                                 _timestamps_query_pool.get(),
+                                                 enum_cast(Timestamp::MsocTileScanStart));
+      for (auto &[pipeline, draw] : scene->_draws) {
+        uint32_t instances_number = static_cast<uint32_t>(draw.instances_data_buffer_data.size());
+        run_msoc_tile_scan(scene, draw, instances_number, culling_descriptor_sets);
+      }
+      _late_culling_command_unit->writeTimestamp(vk::PipelineStageFlagBits::eComputeShader,
+                                                 _timestamps_query_pool.get(),
+                                                 enum_cast(Timestamp::MsocTileFinalizeStart));
+      for (auto &[pipeline, draw] : scene->_draws) {
+        uint32_t instances_number = static_cast<uint32_t>(draw.instances_data_buffer_data.size());
+        run_msoc_tile_finalize(scene, draw, instances_number, culling_descriptor_sets);
+      }
+      // Must match finalize's DrawIndirect barrier and tile_test dispatchIndirect.
+      _late_culling_command_unit->writeTimestamp(vk::PipelineStageFlagBits::eDrawIndirect,
+                                                 _timestamps_query_pool.get(),
+                                                 enum_cast(Timestamp::MsocTileTestStart));
+      for (auto &[pipeline, draw] : scene->_draws) {
+        uint32_t instances_number = static_cast<uint32_t>(draw.instances_data_buffer_data.size());
+        run_msoc_tile_test(scene, draw, instances_number, culling_descriptor_sets);
+      }
+      _late_culling_command_unit->writeTimestamp(vk::PipelineStageFlagBits::eComputeShader,
+                                                 _timestamps_query_pool.get(),
+                                                 enum_cast(Timestamp::MsocTileApplyStart));
+      for (auto &[pipeline, draw] : scene->_draws) {
+        uint32_t instances_number = static_cast<uint32_t>(draw.instances_data_buffer_data.size());
+        run_msoc_tile_apply(scene, draw, instances_number, culling_descriptor_sets);
+      }
+      _late_culling_command_unit->writeTimestamp(vk::PipelineStageFlagBits::eComputeShader,
+                                                 _timestamps_query_pool.get(),
+                                                 enum_cast(Timestamp::MsocTileApplyEnd));
     }
   }
 
@@ -1129,14 +1654,14 @@ void mr::RenderContext::late_culling_geometry(const SceneHandle scene)
                                                   vk::PipelineStageFlagBits::eComputeShader,
                                                   {}, {}, {mark_to_prefix_barrier}, {});
 
-      run_collect_exclusive_scan(_late_culling_command_unit,
-                                 std::span(culling_descriptor_sets),
-                                 max_draws_count,
-                                 draw.draw_visibility_buffer_id,
-                                 draw.draw_prefix_buffer_id,
-                                 draw.draw_prefix_buffer,
-                                 draw.scan_aux_buffer_ids,
-                                 draw.scan_aux_buffers);
+      run_exclusive_scan(_late_culling_command_unit,
+                         std::span(culling_descriptor_sets),
+                         max_draws_count,
+                         draw.draw_visibility_buffer_id,
+                         draw.draw_prefix_buffer_id,
+                         draw.draw_prefix_buffer,
+                         draw.scan_aux_buffer_ids,
+                         draw.scan_aux_buffers);
 
       vk::BufferMemoryBarrier prefix_to_count_barrier {
         .srcAccessMask = vk::AccessFlagBits::eShaderWrite,
@@ -1256,7 +1781,13 @@ void mr::RenderContext::late_culling_geometry(const SceneHandle scene)
 
   _late_culling_command_unit.add_wait_semaphore(_visible_models_rendering_semaphore.get(),
                                            vk::PipelineStageFlagBits::eComputeShader);
-  _late_culling_command_unit.add_signal_semaphore(_late_culling_semaphore.get());
+  // OcDrawAlways skips late render, which normally signals _models_render_finished_semaphore.
+  // Lights wait on that semaphore — signal it from late cull instead.
+  if (is_render_option_enabled(_config.options, RenderOptions::OcDrawAlways)) {
+    _late_culling_command_unit.add_signal_semaphore(_models_render_finished_semaphore.get());
+  } else {
+    _late_culling_command_unit.add_signal_semaphore(_late_culling_semaphore.get());
+  }
 
   vk::SubmitInfo culling_submit_info = _late_culling_command_unit.submit_info();
   _state->queue().submit(culling_submit_info);
@@ -1374,7 +1905,12 @@ void mr::RenderContext::render_geometry(const SceneHandle scene, bool is_late_pa
       // .pStencilAttachment = &depth_attachment_info,
     };
 
-    cmd_unit->resetQueryPool(_timestamps_query_pool.get(), enum_cast(Timestamp::ModelsStart), 2);
+    const auto models_start = is_late_pass ? Timestamp::ModelsLatePassStart : Timestamp::ModelsFirstPassStart;
+    const auto models_end = is_late_pass ? Timestamp::ModelsLatePassEnd : Timestamp::ModelsFirstPassEnd;
+    cmd_unit->resetQueryPool(_timestamps_query_pool.get(), enum_cast(models_start), 2);
+    cmd_unit->writeTimestamp(vk::PipelineStageFlagBits::eTopOfPipe,
+                             _timestamps_query_pool.get(),
+                             enum_cast(models_start));
 
     cmd_unit->beginRendering(&attachment_info);
 
@@ -1399,9 +1935,12 @@ void mr::RenderContext::render_geometry(const SceneHandle scene, bool is_late_pa
       render_bound_boxes(scene);
     }
 
-    render_models(scene, cmd_unit);
+    render_models(scene, cmd_unit, is_late_pass);
 
     cmd_unit->endRendering();
+    cmd_unit->writeTimestamp(vk::PipelineStageFlagBits::eBottomOfPipe,
+                             _timestamps_query_pool.get(),
+                             enum_cast(models_end));
   }
 
   TracyVkCollect(_models_tracy_gpu_context, cmd_unit.command_buffer());
@@ -1481,6 +2020,28 @@ void mr::RenderContext::build_depth_pyramid()
                                        enum_cast(Timestamp::BuildDepthPyramidEnd));
 }
 
+void mr::RenderContext::build_tiled_msoc_buffer()
+{
+  // MSOC currently aliases depth pyramid mip L via _msoc_tiled_depth_resource.
+  // Future: allocate StorageImage, run depth_build_tiled_buffer shader here,
+  // register as ShaderImageResource, assign _tiled_buffer_image_id.
+}
+
+void mr::RenderContext::sync_msoc_tiled_buffer_scale()
+{
+  if (!uses_msoc_pipeline(_config.oc_type)) {
+    return;
+  }
+
+  if (_config.oc_type == OcclusionCullingType::MsocAdaptiveTileSize) {
+    return;
+  }
+
+  const uint32_t mip = msoc_tile_mip_level(_config.msoc_tile_size.width);
+  _tiled_buffer_scale[0] = _depth_pyramid_mips_scale_coefs_buffer_data[2 * mip + 0];
+  _tiled_buffer_scale[1] = _depth_pyramid_mips_scale_coefs_buffer_data[2 * mip + 1];
+}
+
 void mr::RenderContext::resize(const mr::Extent &extent)
 {
   _extent = extent;
@@ -1505,6 +2066,8 @@ void mr::RenderContext::resize(const mr::Extent &extent)
     real.height /= 2;
     i += 2;
   }
+
+  sync_msoc_tiled_buffer_scale();
 }
 
 void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
@@ -1546,11 +2109,15 @@ void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
 
     late_culling_geometry(scene);
 
-    // ------------------------------------------------
-    // Rendering previously invisible models
-    // ------------------------------------------------
+    // OcDrawAlways: first pass already drew all in-frustum (like DisableOcclusionCulling).
+    // Late OC still runs to fill WAS_OCCLUDED bits for debug dump; skip late draw.
+    if (not is_render_option_enabled(_config.options, RenderOptions::OcDrawAlways)) {
+      // ------------------------------------------------
+      // Rendering previously invisible models
+      // ------------------------------------------------
 
-    render_geometry(scene, true);
+      render_geometry(scene, true);
+    }
   }
 
   // --------------------------------------------------------------------------
@@ -1582,17 +2149,24 @@ void mr::RenderContext::render(const SceneHandle scene, Presenter &presenter)
   vk::SubmitInfo light_submit_info = _lights_command_unit.submit_info();
   _state->queue().submit(light_submit_info, _image_fence.get());
 
-  presenter.present();
-
+  // Must run before present(): RenderDoc treats vkQueuePresentKHR as the frame
+  // boundary. Signaling _gbuffers_data_copy_ready before present and waiting
+  // after it splits a binary semaphore across frames → capture/replay hang.
   if (is_render_option_enabled(_config.options, RenderOptions::CollectPosInstanceId)) {
     auto &pos_gbuf = _gbuffers[enum_cast(GBuffer::Position)];
     _position_instance_copy_cmd_unit.begin();
     pos_gbuf.read_to_host_buffer(_position_instance_copy_cmd_unit, _position_instance_id_stage_buffer);
     _position_instance_copy_cmd_unit.end();
     _position_instance_copy_cmd_unit.add_wait_semaphore(_gbuffers_data_copy_ready_semaphore.get(),
-                                                         vk::PipelineStageFlagBits::eColorAttachmentOutput);
+                                                         vk::PipelineStageFlagBits::eTransfer);
     vk::SubmitInfo copy_gbuf_submit_info = _position_instance_copy_cmd_unit.submit_info();
     _state->queue().submit(copy_gbuf_submit_info, _position_instance_copy_fence.get());
+  }
+
+  presenter.present();
+
+  if (_dump_scene_objects.exchange(false)) {
+    dump_scene_objects_visibility(scene);
   }
 
   FrameMarkEnd(frame_name);
@@ -1614,14 +2188,10 @@ void mr::RenderContext::calculate_stat(SceneHandle scene,
 
   _prev_start_time = render_start_time;
 
-// #define QUERY_RES_WAIT
-#ifdef QUERY_RES_WAIT
-  struct QueryRes { uint64_t first; };
-  vk::QueryResultFlags query_res_flags = vk::QueryResultFlagBits::e64 | vk::QueryResultFlagBits::eWait;
-#else // QUERY_RES_WAIT
+  _state->device().waitForFences(_image_fence.get(), VK_TRUE, UINT64_MAX);
+
   using QueryRes = std::pair<uint64_t, uint32_t>;
   vk::QueryResultFlags query_res_flags = vk::QueryResultFlagBits::e64 | vk::QueryResultFlagBits::eWithAvailability;
-#endif // QUERY_RES_WAIT
 
   std::array<QueryRes, timestamps_number> timestamps;
   _state->device().getQueryPoolResults(_timestamps_query_pool.get(),
@@ -1631,36 +2201,48 @@ void mr::RenderContext::calculate_stat(SceneHandle scene,
                                        sizeof(timestamps[0]), // stride
                                        query_res_flags);
 
+  const auto timestamp_delta_ms = [&](Timestamp start, Timestamp end) -> double {
+    const auto &start_ts = timestamps[enum_cast(start)];
+    const auto &end_ts = timestamps[enum_cast(end)];
+    if (start_ts.second == 0 || end_ts.second == 0) {
+      return 0.0;
+    }
+    return static_cast<double>(end_ts.first - start_ts.first) * _timestamp_to_ms;
+  };
 
-// TODO(dk6): maybe validate results for not wait
-// #ifndef QUERY_RES_WAIT
-//   bool timestamps_valid = true;
-//   for (const auto& ts : timestamps) {
-//     if (ts.second == 0) { // Not available
-//       return;
-//     }
-//   }
-// #endif
-
-  _render_stat.culling_gpu_time_ms = (timestamps[enum_cast(Timestamp::CullingEnd)].first -
-                                      timestamps[enum_cast(Timestamp::CullingStart)].first) * _timestamp_to_ms;
-  _render_stat.models_gpu_time_ms = (timestamps[enum_cast(Timestamp::ModelsEnd)].first -
-                                     timestamps[enum_cast(Timestamp::ModelsStart)].first) * _timestamp_to_ms;
+  _render_stat.culling_gpu_time_ms = timestamp_delta_ms(Timestamp::CullingStart, Timestamp::CullingEnd);
+  _render_stat.models_first_pass_gpu_time_ms =
+    timestamp_delta_ms(Timestamp::ModelsFirstPassStart, Timestamp::ModelsFirstPassEnd);
+  _render_stat.models_late_pass_gpu_time_ms =
+    timestamp_delta_ms(Timestamp::ModelsLatePassStart, Timestamp::ModelsLatePassEnd);
+  _render_stat.models_gpu_time_ms =
+    _render_stat.models_first_pass_gpu_time_ms + _render_stat.models_late_pass_gpu_time_ms;
   _render_stat.build_depth_pyramid_gpu_time_ms =
-    (timestamps[enum_cast(Timestamp::BuildDepthPyramidEnd)].first -
-     timestamps[enum_cast(Timestamp::BuildDepthPyramidStart)].first) * _timestamp_to_ms;
-  _render_stat.late_culling_gpu_time_ms = (timestamps[enum_cast(Timestamp::LateCullingEnd)].first -
-                                           timestamps[enum_cast(Timestamp::LateCullingStart)].first) * _timestamp_to_ms;
-  _render_stat.shading_gpu_time_ms = (timestamps[enum_cast(Timestamp::ShadingEnd)].first -
-                                      timestamps[enum_cast(Timestamp::ShadingStart)].first) * _timestamp_to_ms;
+    timestamp_delta_ms(Timestamp::BuildDepthPyramidStart, Timestamp::BuildDepthPyramidEnd);
+  _render_stat.late_culling_gpu_time_ms =
+    timestamp_delta_ms(Timestamp::LateCullingStart, Timestamp::LateCullingEnd);
+  _render_stat.msoc_tile_prep_gpu_time_ms =
+    timestamp_delta_ms(Timestamp::MsocTilePrepStart, Timestamp::MsocTileScanStart);
+  _render_stat.msoc_tile_scan_gpu_time_ms =
+    timestamp_delta_ms(Timestamp::MsocTileScanStart, Timestamp::MsocTileFinalizeStart);
+  _render_stat.msoc_tile_finalize_gpu_time_ms =
+    timestamp_delta_ms(Timestamp::MsocTileFinalizeStart, Timestamp::MsocTileTestStart);
+  _render_stat.msoc_tile_test_gpu_time_ms =
+    timestamp_delta_ms(Timestamp::MsocTileTestStart, Timestamp::MsocTileApplyStart);
+  _render_stat.msoc_tile_apply_gpu_time_ms =
+    timestamp_delta_ms(Timestamp::MsocTileApplyStart, Timestamp::MsocTileApplyEnd);
+  _render_stat.occlusion_culling_gpu_time_ms =
+    _render_stat.build_depth_pyramid_gpu_time_ms + _render_stat.late_culling_gpu_time_ms;
+  _render_stat.shading_gpu_time_ms = timestamp_delta_ms(Timestamp::ShadingStart, Timestamp::ShadingEnd);
+  _render_stat.render_gpu_time_ms = timestamp_delta_ms(Timestamp::CullingStart, Timestamp::ShadingEnd);
+  _render_stat.gpu_measured_stages_ms = _render_stat.culling_gpu_time_ms +
+                                        _render_stat.models_gpu_time_ms +
+                                        _render_stat.occlusion_culling_gpu_time_ms +
+                                        _render_stat.shading_gpu_time_ms;
 
-  // TODO(dk6): calculate using formula end(timestamps) - start(timestamps)
-  // _render_stat.render_gpu_time_ms = _render_stat.models_gpu_time_ms + _render_stat.shading_gpu_time_ms;
-  _render_stat.render_gpu_time_ms = (timestamps[enum_cast(Timestamp::TimestampsNumber) - 1].first -
-                                     timestamps[0].first) * _timestamp_to_ms;
-
-  _render_stat.gpu_time_ms = (timestamps[0].first - _prev_first_timestamp) * _timestamp_to_ms;
-  _prev_first_timestamp = timestamps[0].first;
+  _render_stat.gpu_time_ms = (timestamps[enum_cast(Timestamp::CullingStart)].first - _prev_first_timestamp)
+                             * _timestamp_to_ms;
+  _prev_first_timestamp = timestamps[enum_cast(Timestamp::CullingStart)].first;
   _render_stat.gpu_fps = 1000 / _render_stat.gpu_time_ms;
 
   _render_stat.triangles_number = scene->_triangles_number.load();
@@ -1671,6 +2253,7 @@ void mr::RenderContext::calculate_stat(SceneHandle scene,
     auto data = _culling_stat_stage_buffer.copy();
     const CullingStats *stat = reinterpret_cast<const CullingStats *>(data.data());
     _render_stat.total_objects_number = stat->total_objects_number;
+    _render_stat.msoc_tiles_number = stat->msoc_tiles_number;
     _render_stat.outside_frustum_objects_number = stat->outside_frustum_objects_number;
     _render_stat.occluded_objects_number = stat->occluded_objects_number;
     _render_stat.visible_objects_number =
@@ -1734,9 +2317,134 @@ std::optional<mr::Vec4f> mr::RenderContext::get_position_id_pixel(uint32_t x, ui
   return Vec4f(data[idx], data[idx + 1], data[idx + 2], data[idx + 3]);
 }
 
+bool mr::RenderContext::save_gbuffer_to_file(const std::filesystem::path &filename)
+{
+  if (not is_render_option_enabled(_config.options, RenderOptions::CollectPosInstanceId)) {
+    MR_ERROR("save_gbuffer_to_file requires CollectPosInstanceId (--read-gbuf)");
+    return false;
+  }
+
+  _state->device().waitForFences({_position_instance_copy_fence.get()},
+                                 vk::True, std::numeric_limits<uint64_t>::max());
+
+  auto &pos_gbuf = _gbuffers[enum_cast(GBuffer::Position)];
+  auto [w, h, _z] = pos_gbuf.extent();
+  const size_t expected_bytes = format_byte_size(pos_gbuf.format()) * static_cast<size_t>(w) * h;
+  assert(_position_instance_id_stage_buffer.byte_size() == expected_bytes);
+  assert(format_byte_size(pos_gbuf.format()) == sizeof(float) * 4);
+
+  auto pixels = _position_instance_id_stage_buffer.copy();
+  assert(pixels.size() == expected_bytes);
+
+  std::ofstream out(filename, std::ios::binary);
+  if (not out) {
+    MR_ERROR("save_gbuffer_to_file: failed to open '{}'", filename.string());
+    return false;
+  }
+
+  const uint32_t width = w;
+  const uint32_t height = h;
+  out.write(reinterpret_cast<const char *>(&width), sizeof(width));
+  out.write(reinterpret_cast<const char *>(&height), sizeof(height));
+  out.write(reinterpret_cast<const char *>(pixels.data()), static_cast<std::streamsize>(pixels.size()));
+  if (not out) {
+    MR_ERROR("save_gbuffer_to_file: failed to write '{}'", filename.string());
+    return false;
+  }
+  return true;
+}
+
+bool mr::RenderContext::dump_scene_objects_visibility(SceneHandle scene,
+                                                      const std::filesystem::path &filename)
+{
+  if (not is_render_option_enabled(_config.options, RenderOptions::CollectPosInstanceId)) {
+    MR_ERROR("dump_scene_objects_visibility requires CollectPosInstanceId (--read-gbuf)");
+    return false;
+  }
+  ASSERT(scene != nullptr);
+
+  constexpr uint32_t instance_in_frustum_bit = 0;
+  constexpr uint32_t instance_was_occluded_bit = 1;
+  constexpr uint32_t invalid_id = std::numeric_limits<uint32_t>::max();
+
+  _state->device().waitForFences({_position_instance_copy_fence.get()},
+                                 vk::True, std::numeric_limits<uint64_t>::max());
+
+  _position_instance_id_data = _position_instance_id_stage_buffer.copy();
+  const float *gbuf = reinterpret_cast<const float *>(_position_instance_id_data.data());
+  auto &pos_gbuf = _gbuffers[enum_cast(GBuffer::Position)];
+  auto [w, h, _z] = pos_gbuf.extent();
+  boost::unordered_set<uint32_t> really_visible;
+  const uint32_t pixels = w * h;
+  for (uint32_t i = 0; i < pixels; i++) {
+    uint32_t id = std::bit_cast<uint32_t>(gbuf[i * 4 + 3]);
+    if (id != invalid_id) {
+      really_visible.insert(id);
+    }
+  }
+
+  struct Row {
+    uint32_t id;
+    uint32_t visible;
+    uint32_t really_visible;
+  };
+  std::vector<Row> rows;
+  rows.reserve(really_visible.size() + 1024);
+  std::vector<uint32_t> false_cull_ids;
+
+  for (auto &[pipeline, draw] : scene->_draws) {
+    const uint32_t instances_number = static_cast<uint32_t>(draw.instances_data_buffer_data.size());
+    if (instances_number == 0) {
+      continue;
+    }
+    const size_t bytes = sizeof(Scene::MeshInstanceCullingData) * instances_number;
+    HostBuffer stage(*_state, bytes, vk::BufferUsageFlagBits::eTransferDst);
+
+    _transfer_command_unit.begin();
+    bufcopy(_transfer_command_unit,
+            BufferRegion{draw.instances_data_buffer, 0, bytes},
+            BufferRegion{stage, 0, bytes});
+    _transfer_command_unit.end();
+    UniqueFenceGuard(_state->device(), _transfer_command_unit.submit(*_state));
+
+    auto raw = stage.copy();
+    const auto *instances = reinterpret_cast<const Scene::MeshInstanceCullingData *>(raw.data());
+    for (uint32_t i = 0; i < instances_number; i++) {
+      const uint32_t id = instances[i].transform_index;
+      const uint32_t bits = instances[i].visible_last_frame;
+      const bool in_frustum = (bits & (1u << instance_in_frustum_bit)) != 0;
+      const bool was_occluded = (bits & (1u << instance_was_occluded_bit)) != 0;
+      const uint32_t visible = (in_frustum && not was_occluded) ? 1u : 0u;
+      const uint32_t on_screen = really_visible.contains(id) ? 1u : 0u;
+      rows.push_back(Row{id, visible, on_screen});
+      if (visible == 0 && on_screen == 1) {
+        false_cull_ids.push_back(id);
+      }
+    }
+  }
+
+  std::println(std::cerr, "false culls: {}", false_cull_ids.size());
+  for (uint32_t id : false_cull_ids) {
+    std::println(std::cerr, "{}", id);
+  }
+
+  std::ofstream out(filename);
+  if (not out) {
+    MR_ERROR("dump_scene_objects_visibility: failed to open '{}'", filename.string());
+    return false;
+  }
+  std::println(out, "id,visible,really_visible");
+  for (const auto &row : rows) {
+    std::println(out, "{},{},{}", row.id, row.visible, row.really_visible);
+  }
+  MR_INFO("Wrote {} rows to {}", rows.size(), filename.string());
+  return true;
+}
+
 void mr::RenderStat::write_to_json(std::ostream &out) const noexcept
 {
-  double triangles_per_second = triangles_number / (gpu_time_ms / 1000);
+  const double render_gpu_time_s = std::max(render_gpu_time_ms / 1000.0, 1e-9);
+  double triangles_per_second = triangles_number / render_gpu_time_s;
   std::println(out, "{{");
   std::println(out, "  \"frame_number\": {},", frame_number);
   std::println(out, "  \"cpu_fps\": {:.2f},", cpu_fps);
@@ -1747,7 +2455,16 @@ void mr::RenderStat::write_to_json(std::ostream &out) const noexcept
   std::println(out, "  \"culling_gpu_time_ms\": {:.3f},", culling_gpu_time_ms);
   std::println(out, "  \"build_depth_pyramid_gpu_time_ms\": {:.3f},", build_depth_pyramid_gpu_time_ms);
   std::println(out, "  \"late_culling_gpu_time_ms\": {:.3f},", late_culling_gpu_time_ms);
+  std::println(out, "  \"msoc_tile_prep_gpu_time_ms\": {:.3f},", msoc_tile_prep_gpu_time_ms);
+  std::println(out, "  \"msoc_tile_scan_gpu_time_ms\": {:.3f},", msoc_tile_scan_gpu_time_ms);
+  std::println(out, "  \"msoc_tile_finalize_gpu_time_ms\": {:.3f},", msoc_tile_finalize_gpu_time_ms);
+  std::println(out, "  \"msoc_tile_test_gpu_time_ms\": {:.3f},", msoc_tile_test_gpu_time_ms);
+  std::println(out, "  \"msoc_tile_apply_gpu_time_ms\": {:.3f},", msoc_tile_apply_gpu_time_ms);
+  std::println(out, "  \"occlusion_culling_gpu_time_ms\": {:.3f},", occlusion_culling_gpu_time_ms);
   std::println(out, "  \"gpu_rendering_time_ms\": {:.2f},", render_gpu_time_ms);
+  std::println(out, "  \"gpu_measured_stages_ms\": {:.2f},", gpu_measured_stages_ms);
+  std::println(out, "  \"gpu_models_first_pass_time_ms\": {:.2f},", models_first_pass_gpu_time_ms);
+  std::println(out, "  \"gpu_models_late_pass_time_ms\": {:.2f},", models_late_pass_gpu_time_ms);
   std::println(out, "  \"gpu_models_time_ms\": {:.2f},", models_gpu_time_ms);
   std::println(out, "  \"gpu_shading_time_ms\": {:.2f},", shading_gpu_time_ms);
   std::println(out, "  \"triangles_per_second\": {:.3f},", triangles_per_second);
@@ -1757,6 +2474,7 @@ void mr::RenderStat::write_to_json(std::ostream &out) const noexcept
 
   // These all value can be 0
   std::println(out, "  \"total_objects_number\": {},", total_objects_number);
+  std::println(out, "  \"msoc_tiles_number\": {},", msoc_tiles_number);
   std::println(out, "  \"outside_frustum_objects_number\": {},", outside_frustum_objects_number);
   std::println(out, "  \"visible_objects_number\": {},", visible_objects_number);
   std::println(out, "  \"occluded_objects_number\": {},", occluded_objects_number);

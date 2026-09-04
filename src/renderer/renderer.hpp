@@ -32,6 +32,12 @@ inline namespace graphics {
                            std::optional<std::reference_wrapper<std::ostream>> stat_log_stream = std::nullopt,
                            std::optional<uint32_t> frame_number = std::nullopt) const noexcept;
 
+    void start_render_loop(RenderContext &render_context, SceneHandle scene, WindowHandle window,
+                           std::optional<std::reference_wrapper<std::ostream>> stat_log_stream,
+                           std::optional<uint32_t> frame_number,
+                           std::optional<uint32_t> save_gbuffer_frame,
+                           std::optional<std::fs::path> save_gbuffer_path) const noexcept;
+
     void render_frames(RenderContext &render_context,
                        SceneHandle scene,
                        FileWriterHandle file_writer,
