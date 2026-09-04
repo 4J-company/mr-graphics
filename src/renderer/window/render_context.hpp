@@ -32,9 +32,18 @@ inline namespace graphics {
     double culling_gpu_time_ms = 0;
     double late_culling_gpu_time_ms = 0;
     double build_depth_pyramid_gpu_time_ms = 0;
+    double occlusion_culling_gpu_time_ms = 0;
+    double msoc_tile_prep_gpu_time_ms = 0;
+    double msoc_tile_scan_gpu_time_ms = 0;
+    double msoc_tile_finalize_gpu_time_ms = 0;
+    double msoc_tile_test_gpu_time_ms = 0;
+    double msoc_tile_apply_gpu_time_ms = 0;
     double render_gpu_time_ms = 0;
+    double models_first_pass_gpu_time_ms = 0;
+    double models_late_pass_gpu_time_ms = 0;
     double models_gpu_time_ms = 0;
     double shading_gpu_time_ms = 0;
+    double gpu_measured_stages_ms = 0;
 
     double gpu_time_ms = 0;
     double gpu_fps = 0;
@@ -49,6 +58,7 @@ inline namespace graphics {
 
     // This field fills if EnableCullingStat option is enabled
     uint32_t total_objects_number = 0;
+    uint32_t msoc_tiles_number = 0;
     uint32_t outside_frustum_objects_number = 0;
     uint32_t occluded_objects_number = 0;
     uint32_t visible_objects_number = 0; // extra information
@@ -96,12 +106,20 @@ inline namespace graphics {
     enum struct Timestamp : uint32_t {
       CullingStart,
       CullingEnd,
-      ModelsStart,
-      ModelsEnd,
+      ModelsFirstPassStart,
+      ModelsFirstPassEnd,
       BuildDepthPyramidStart,
       BuildDepthPyramidEnd,
       LateCullingStart,
       LateCullingEnd,
+      MsocTilePrepStart,
+      MsocTileScanStart,
+      MsocTileFinalizeStart,
+      MsocTileTestStart,
+      MsocTileApplyStart,
+      MsocTileApplyEnd,
+      ModelsLatePassStart,
+      ModelsLatePassEnd,
       ShadingStart,
       ShadingEnd,
       TimestampsNumber,
@@ -129,6 +147,7 @@ inline namespace graphics {
       uint32_t total_objects_number = 0;
       uint32_t outside_frustum_objects_number = 0;
       uint32_t occluded_objects_number = 0;
+      uint32_t msoc_tiles_number = 0;
     };
 
   private:
@@ -157,6 +176,7 @@ inline namespace graphics {
     InplaceVector<ColorAttachmentImage, gbuffers_number> _gbuffers;
     DepthImage _depthbuffer;
     ShaderImageResource _depthbuffer_resource;
+    uint32_t _depth_image_attacment_id = BindlessDescriptorSet::invalid_id;
 
     // semaphores for waiting swapchain image is ready before light pass
     InplaceVector<vk::UniqueSemaphore, max_images_number> _image_available_semaphore;
@@ -207,6 +227,19 @@ inline namespace graphics {
     ShaderHandle _late_instances_culling_shader;
     ComputePipeline _late_instances_culling_pipeline;
 
+    ShaderHandle _msoc_tile_prep_shader;
+    ComputePipeline _msoc_tile_prep_pipeline;
+    ShaderHandle _msoc_tile_prep_coarse_hiz_shader;
+    ComputePipeline _msoc_tile_prep_coarse_hiz_pipeline;
+    ShaderHandle _msoc_tile_test_shader;
+    ComputePipeline _msoc_tile_test_pipeline;
+    ShaderHandle _msoc_tile_test_adaptive_shader;
+    ComputePipeline _msoc_tile_test_adaptive_pipeline;
+    ShaderHandle _msoc_tile_apply_shader;
+    ComputePipeline _msoc_tile_apply_pipeline;
+    ShaderHandle _msoc_tile_finalize_shader;
+    ComputePipeline _msoc_tile_finalize_pipeline;
+
     // --- Collecting world coordinates and instances id ---
     vk::UniqueSemaphore _gbuffers_data_copy_ready_semaphore;
     CommandUnit _position_instance_copy_cmd_unit;
@@ -222,6 +255,7 @@ inline namespace graphics {
     // --- This used if EnableCullingVisualization option is enabled ---
     std::atomic_bool _save_culling_visualization = false;
     std::atomic_bool _clear_culling_visualization = false;
+    std::atomic_bool _dump_scene_objects = false;
     ShaderHandle _copy_visibility_states_shader;
     ComputePipeline _copy_visibility_states_pipeline;
     ShaderHandle _copy_on_screen_shader;
@@ -232,6 +266,9 @@ inline namespace graphics {
     ShaderHandle _clear_on_screen_state_shader;
     ComputePipeline _clear_on_screen_state_pipeline;
 
+    // ------------------------------------------------------------------------
+    // Depth pyramid data
+    // ------------------------------------------------------------------------
     Extent _depth_pyramid_extent;
     PyramidImage _depth_pyramid;
     ShaderImageResource _depth_pyramid_resource;
@@ -241,9 +278,16 @@ inline namespace graphics {
     InplaceVector<DepthPyramidMip, depth_pyramid_max_levels> _depth_pyramid_mips;
     uint32_t _depth_pyramid_image_id = BindlessDescriptorSet::invalid_id;
     Sampler _depth_sampler;
-    uint32_t _depth_image_attacment_id = BindlessDescriptorSet::invalid_id;
     ComputePipeline _depth_pyramid_pipeline;
     ShaderHandle _depth_pyramid_shader;
+
+    // ------------------------------------------------------------------------
+    // MSOC tiled buffer data
+    // ------------------------------------------------------------------------
+    Sampler _msoc_tiled_sampler;
+    ShaderPyramidImageLevelResource _msoc_tiled_depth_resource;
+    uint32_t _tiled_buffer_image_id = BindlessDescriptorSet::invalid_id;
+    std::array<float, 2> _tiled_buffer_scale {};
 
     // TODO(dk6): rework it to MarkerSystem
     ShaderHandle _bound_boxes_draw_shader;
@@ -287,6 +331,12 @@ inline namespace graphics {
     void save_visibility() noexcept { _save_culling_visualization = true; }
     void clear_visibility() noexcept { _clear_culling_visualization = true; }
 
+    void request_dump_scene_objects() noexcept { _dump_scene_objects = true; }
+
+    // Requires CollectPosInstanceId. Writes id,visible,really_visible CSV.
+    bool dump_scene_objects_visibility(SceneHandle scene,
+                                       const std::filesystem::path &filename = "scene_objects_dump.csv");
+
     IndexHeapBuffer & index_buffer() noexcept { return _index_buffer; }
     VertexBuffersArray add_vertex_buffers(CommandUnit &command_unit, std::span<const std::span<const std::byte>> vbufs_data) noexcept;
     void delete_vertex_buffers(std::span<const VertexBufferDescription> vbufs) noexcept;
@@ -313,6 +363,10 @@ inline namespace graphics {
 
     std::optional<Vec4f> get_position_id_pixel(uint32_t x, uint32_t y) const noexcept;
 
+    // Requires CollectPosInstanceId. Writes .gbuf: uint32 w,h + float32 RGBA LE.
+    // Call after render(); waits copy fence but does not reset it.
+    bool save_gbuffer_to_file(const std::filesystem::path &filename);
+
   private:
     void init_lights_render_data();
     void init_bindless_rendering();
@@ -321,24 +375,54 @@ inline namespace graphics {
     void init_bound_box_rendering();
 
     // TODO(dk6): move bound boxes rendering in separate function instead this flag
-    void render_geometry(const SceneHandle scene, bool is_late_pass);
     void culling_geometry(const SceneHandle scene);
     void late_culling_geometry(const SceneHandle scene);
+    void run_msoc_tile_prep(const SceneHandle scene,
+                            Scene::MeshesWithSamePipeline &draw,
+                            uint32_t instances_number,
+                            std::span<const vk::DescriptorSet> culling_descriptor_sets);
+    void run_msoc_tile_prep_coarse_hiz(const SceneHandle scene,
+                                       Scene::MeshesWithSamePipeline &draw,
+                                       uint32_t instances_number,
+                                       std::span<const vk::DescriptorSet> culling_descriptor_sets);
+    void run_msoc_tile_scan(const SceneHandle scene,
+                            Scene::MeshesWithSamePipeline &draw,
+                            uint32_t instances_number,
+                            std::span<const vk::DescriptorSet> culling_descriptor_sets);
+    void run_msoc_tile_finalize(const SceneHandle scene,
+                                Scene::MeshesWithSamePipeline &draw,
+                                uint32_t instances_number,
+                                std::span<const vk::DescriptorSet> culling_descriptor_sets);
+    void run_msoc_tile_test(const SceneHandle scene,
+                            Scene::MeshesWithSamePipeline &draw,
+                            uint32_t instances_number,
+                            std::span<const vk::DescriptorSet> culling_descriptor_sets);
+    void run_msoc_tile_apply(const SceneHandle scene,
+                             Scene::MeshesWithSamePipeline &draw,
+                             uint32_t instances_number,
+                             std::span<const vk::DescriptorSet> culling_descriptor_sets);
+
     void build_depth_pyramid();
+    void build_tiled_msoc_buffer();
+    void sync_msoc_tiled_buffer_scale();
+
     void render_bound_boxes(const SceneHandle scene);
-    void render_models(const SceneHandle scene, CommandUnit &cmd_unit);
+
+    void render_geometry(const SceneHandle scene, bool is_late_pass);
+
+    void render_models(const SceneHandle scene, CommandUnit &cmd_unit, bool is_late_pass);
     void render_lights(const SceneHandle scene, Presenter &presenter);
 
     void update_bound_boxes_data();
     void update_camera_buffer(UniformBuffer &uniform_buffer);
-    void run_collect_exclusive_scan(CommandUnit &command_unit,
-                                    std::span<const vk::DescriptorSet> culling_descriptor_sets,
-                                    uint32_t max_draws_count,
-                                    uint32_t draw_visibility_buffer_id,
-                                    uint32_t draw_prefix_buffer_id,
-                                    const StorageBuffer &draw_prefix_buffer,
-                                    const std::array<uint32_t, 3> &scan_aux_buffer_ids,
-                                    const std::array<StorageBuffer, 3> &scan_aux_buffers);
+    void run_exclusive_scan(CommandUnit &command_unit,
+                          std::span<const vk::DescriptorSet> culling_descriptor_sets,
+                          uint32_t elements_count,
+                          uint32_t input_buffer_id,
+                          uint32_t output_buffer_id,
+                          const StorageBuffer &output_buffer,
+                          const std::array<uint32_t, 3> &scan_aux_buffer_ids,
+                          const std::array<StorageBuffer, 3> &scan_aux_buffers);
 
     void calculate_stat(SceneHandle scene,
                         ClockT::time_point render_start_time,

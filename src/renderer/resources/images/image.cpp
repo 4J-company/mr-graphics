@@ -275,6 +275,7 @@ mr::HostBuffer mr::Image::read_to_host_buffer(CommandUnit &command_unit) noexcep
 {
   auto stage_buffer = HostBuffer(*_state, _size, vk::BufferUsageFlagBits::eTransferDst,
                                  vk::MemoryPropertyFlagBits::eHostCached);
+  read_to_host_buffer(command_unit, stage_buffer);
   return stage_buffer;
 }
 
