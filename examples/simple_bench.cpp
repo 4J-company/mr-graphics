@@ -52,11 +52,17 @@ int main(int argc, const char **argv)
   if (options.enable_culling_visualization) {
     config.options |= mr::RenderOptions::EnableCullingVisualiztion;
   }
-  if (options.read_gbuf) {
+  if (options.read_gbuf || options.save_gbuffer_frame.has_value()) {
     config.options |= mr::RenderOptions::CollectPosInstanceId;
   }
   if (options.hash_coloring) {
     config.options |= mr::RenderOptions::HashColoring;
+  }
+  if (options.msoc_with_hiz_coarse) {
+    config.options |= mr::RenderOptions::MsocWithHizCoarseCheck;
+  }
+  if (options.oc_draw_always) {
+    config.options |= mr::RenderOptions::OcDrawAlways;
   }
 
   if (options.bounds_state.has_value()) {
@@ -65,6 +71,11 @@ int main(int argc, const char **argv)
   if (options.oc_bounds.has_value()) {
     config.oc_bounds = options.oc_bounds.value();
   }
+  if (options.oc_type.has_value()) {
+    config.oc_type = options.oc_type.value();
+  }
+  config.msoc_tile_size = options.msoc_tile_size;
+  config.msoc_tiles_per_thread = options.msoc_tiles_per_thread;
   uint32_t models_number = options.bench_instances_number.value_or(1'000);
   config.max_instance_number_per_object = models_number;
 
@@ -123,12 +134,21 @@ int main(int argc, const char **argv)
     scene->camera().cam().projection() = *options.projection;
   }
 
+  if (options.mode == mr::CliOptions::Mode::Frames) {
+    auto file_writer = render_context->create_file_writer({options.width, options.height});
+    app.render_frames(*render_context, scene, file_writer,
+                      options.dst_dir, "frame", options.frames_number);
+    return 0;
+  }
+
   auto window = render_context->create_window({options.width, options.height});
   if (options.print_stat) {
     std::ofstream stat_file("stats.json");
-    app.start_render_loop(*render_context, scene, window, stat_file, options.frames_number);
+    app.start_render_loop(*render_context, scene, window, stat_file, options.frames_number,
+                          options.save_gbuffer_frame, options.save_gbuffer_image_path);
   } else {
-    app.start_render_loop(*render_context, scene, window, std::nullopt, options.frames_number);
+    app.start_render_loop(*render_context, scene, window, std::nullopt, options.frames_number,
+                          options.save_gbuffer_frame, options.save_gbuffer_image_path);
   }
 }
 
