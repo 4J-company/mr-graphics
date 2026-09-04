@@ -64,10 +64,12 @@ void main()
   }
 
   MeshInstanceCullingData instance_data = instances_datas[id];
+#ifndef OC_DRAW_ALWAYS
   if (IS_INSTANCE_WAS_OCCLUDED(instance_data.visibility_bits)) {
     instances_datas[id].visibility_bits = SET_INSTANCE_FRUSTUM_CALCULATED(instance_data.visibility_bits, false);
     return; // rendering only previously visible objects
   }
+#endif // OC_DRAW_ALWAYS
 
   MeshCullingData mesh_data = meshes_datas[instance_data.mesh_culling_data_index];
 

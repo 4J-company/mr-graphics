@@ -53,3 +53,5 @@ CMakeUserPresets.json
 bench_results/
 bench_configs/
 
+__pycache__/
+

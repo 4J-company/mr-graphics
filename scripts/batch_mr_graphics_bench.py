@@ -8,6 +8,8 @@ Warmup frames discarded; remaining frames averaged (arithmetic mean).
 Preset accuracy adds --read-gbuf (needed for occlusion_culling_accuracy ground truth).
 Preset perf omits --read-gbuf for lighter GPU/CPU work.
 
+Use --disable-occlusion-culling for reference really_visible (skips late HiZ/MSOC pass).
+
 Scenes with bench-instances-number (in JSON or via --bench-instances-number) use simple-bench;
 others use mr-graphics-example.
 
@@ -35,6 +37,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 STATS_JSON = "stats.json"
+REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 @dataclass(frozen=True)
@@ -43,7 +46,7 @@ class Scene:
     model_file: str
     camera: str | None = None
     proj: str | None = None
-    resolution: str = "1280x720"
+    resolution: str = "1920x1080"
     bench_instances_number: int | None = None
     warmup: int | None = None
     measure: int | None = None
@@ -79,7 +82,7 @@ def load_scenes(path: Path) -> list[Scene]:
         if proj is not None and not isinstance(proj, str):
             raise ValueError(f"{path}: scene[{i}] field 'proj' must be a string")
 
-        resolution = item.get("resolution", "1280x720")
+        resolution = item.get("resolution", "1920x1080")
         if not isinstance(resolution, str):
             raise ValueError(f"{path}: scene[{i}] field 'resolution' must be a string")
 
@@ -192,6 +195,11 @@ _AGG_KEYS_IN_ORDER: tuple[str, ...] = (
     "culling_gpu_time_ms",
     "build_depth_pyramid_gpu_time_ms",
     "late_culling_gpu_time_ms",
+    "msoc_tile_prep_gpu_time_ms",
+    "msoc_tile_scan_gpu_time_ms",
+    "msoc_tile_finalize_gpu_time_ms",
+    "msoc_tile_test_gpu_time_ms",
+    "msoc_tile_apply_gpu_time_ms",
     "gpu_rendering_time_ms",
     "gpu_models_time_ms",
     "gpu_shading_time_ms",
@@ -200,6 +208,7 @@ _AGG_KEYS_IN_ORDER: tuple[str, ...] = (
     "triangles_number",
     "vertexes_number",
     "total_objects_number",
+    "msoc_tiles_number",
     "outside_frustum_objects_number",
     "visible_objects_number",
     "occluded_objects_number",
@@ -258,8 +267,18 @@ def aggregate_frames(records: list[dict[str, Any]], warmup: int, measure: int) -
     return out
 
 
+def resolve_bench_config(path: Path, repo_root: Path = REPO_ROOT) -> Path:
+    p = path.expanduser()
+    if p.is_file():
+        return p.resolve()
+    candidate = repo_root / "bench_configs" / p.name
+    if candidate.is_file():
+        return candidate.resolve()
+    raise FileNotFoundError(f"Bench config not found: {path} (also tried {candidate})")
+
+
 def default_exe_path() -> Path:
-    return (Path(__file__).resolve().parent.parent / "build/Release/examples/mr-graphics-example").resolve()
+    return (REPO_ROOT / "build/Release/examples/mr-graphics-example").resolve()
 
 
 def default_simple_bench_exe(example_exe: Path) -> Path:
@@ -272,6 +291,11 @@ def _append_common_bench_flags(
     preset: str,
     frames: int,
     oc_bounds: str | None,
+    oc_type: str | None,
+    msoc_tile_size: str | None = None,
+    msoc_tiles_per_thread: int | None = None,
+    msoc_with_hiz_coarse: bool = False,
+    disable_occlusion_culling: bool = False,
 ) -> None:
     argv.extend(
         [
@@ -290,6 +314,16 @@ def _append_common_bench_flags(
         raise ValueError(f"Unknown preset: {preset}")
     if oc_bounds is not None:
         argv.append(f"--oc-bounds={oc_bounds}")
+    if oc_type is not None:
+        argv.append(f"--oc-type={oc_type}")
+    if msoc_tile_size is not None:
+        argv.append(f"--msoc-tile-size={msoc_tile_size}")
+    if msoc_tiles_per_thread is not None:
+        argv.append(f"--msoc-tiles-per-thread={msoc_tiles_per_thread}")
+    if msoc_with_hiz_coarse:
+        argv.append("--msoc-with-hiz-coarse")
+    if disable_occlusion_culling:
+        argv.append("--disable-occlusion-culling")
 
 
 def build_argv(
@@ -303,10 +337,17 @@ def build_argv(
     xvfb: bool,
     global_bench_instances: int | None,
     oc_bounds: str | None = None,
+    oc_type: str | None = None,
+    msoc_tile_size: str | None = None,
+    msoc_tiles_per_thread: int | None = None,
+    msoc_with_hiz_coarse: bool = False,
+    disable_occlusion_culling: bool = False,
+    resolution: str | None = None,
 ) -> tuple[list[str], Path]:
     frames = warmup + measure
     bench_instances = effective_bench_instances(scene, global_bench_instances)
     use_simple_bench = bench_instances is not None
+    res = resolution if resolution is not None else scene.resolution
 
     argv: list[str] = []
     if xvfb:
@@ -315,9 +356,12 @@ def build_argv(
     if use_simple_bench:
         exe = simple_bench_exe
         argv.extend([str(exe), str(model_path)])
-        _append_common_bench_flags(argv, scene, preset, frames, oc_bounds)
+        _append_common_bench_flags(
+            argv, scene, preset, frames, oc_bounds, oc_type, msoc_tile_size, msoc_tiles_per_thread,
+            msoc_with_hiz_coarse, disable_occlusion_culling,
+        )
         argv.append(f"--bench-instances-number={bench_instances}")
-        argv.append(f"--resolution={scene.resolution}")
+        argv.append(f"--resolution={res}")
     else:
         exe = example_exe
         argv.extend(
@@ -327,8 +371,11 @@ def build_argv(
                 str(model_path),
             ]
         )
-        _append_common_bench_flags(argv, scene, preset, frames, oc_bounds)
-        argv.append(f"--resolution={scene.resolution}")
+        _append_common_bench_flags(
+            argv, scene, preset, frames, oc_bounds, oc_type, msoc_tile_size, msoc_tiles_per_thread,
+            msoc_with_hiz_coarse, disable_occlusion_culling,
+        )
+        argv.append(f"--resolution={res}")
 
     return argv, exe
 
@@ -339,7 +386,7 @@ def main() -> int:
         "--scenes",
         type=Path,
         required=True,
-        help="JSON file with scene definitions (see scripts/default_scenes.json)",
+        help="JSON scene config (path or name under bench_configs/)",
     )
     p.add_argument("--exe", type=Path, default=default_exe_path(), help="mr-graphics-example binary")
     p.add_argument(
@@ -369,9 +416,47 @@ def main() -> int:
     p.add_argument("--xvfb", action=argparse.BooleanOptionalAction, default=True, help="Wrap with xvfb-run -a")
     p.add_argument(
         "--oc-bounds",
-        choices=("Box", "Sphere", "DynamicBest"),
+        choices=("Box", "Sphere", "DynamicBest", "Both"),
+        action="append",
         default=None,
-        help="Occlusion culling bounds type",
+        help="Occlusion culling bounds type (repeat for interleaved scene×bound runs)",
+    )
+    p.add_argument(
+        "--oc-type",
+        choices=("hiz", "HiZ", "msoc", "MSOC", "msoc-adaptive-tile-size", "msoc-adaptive",
+                 "MsocAdaptiveTileSize", "msoc-hiz-hybrid", "MsocHizHybrid"),
+        default=None,
+        help="Occlusion culling type: HiZ, MSOC, or msoc-adaptive-tile-size (alias: msoc-adaptive)",
+    )
+    p.add_argument(
+        "--msoc-with-hiz-coarse",
+        action="store_true",
+        default=False,
+        help="Enable coarse HiZ prep pass before MSOC tile tests",
+    )
+    p.add_argument(
+        "--msoc-tile-size",
+        type=str,
+        default=None,
+        help="MSOC tile size, e.g. '[8, 8]'",
+    )
+    p.add_argument(
+        "--msoc-tiles-per-thread",
+        type=int,
+        default=None,
+        help="MSOC tiles processed per thread",
+    )
+    p.add_argument(
+        "--disable-occlusion-culling",
+        action="store_true",
+        default=False,
+        help="Disable two-phase occlusion culling (reference ground-truth image)",
+    )
+    p.add_argument(
+        "--resolution",
+        type=str,
+        default=None,
+        help="Override scene resolution (e.g. 1920x1080); default: per-scene or 1920x1080",
     )
     args = p.parse_args()
 
@@ -383,12 +468,16 @@ def main() -> int:
     )
 
     try:
-        bench_scenes = load_scenes(args.scenes.resolve())
+        scenes_path = resolve_bench_config(args.scenes)
+        bench_scenes = load_scenes(scenes_path)
+    except FileNotFoundError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
     except (OSError, json.JSONDecodeError, ValueError) as e:
         print(f"Error loading scenes from {args.scenes}: {e}", file=sys.stderr)
         return 1
 
-    base_columns = ["scene_name", "preset", "camera_hash8", "camera", "model_path"]
+    base_columns = ["scene_name", "preset", "oc_bounds", "camera_hash8", "camera", "model_path"]
 
     mean_columns = [f"mean_{k}" for k in _AGG_KEYS_IN_ORDER]
     ix_outside = mean_columns.index("mean_outside_frustum_objects_number") + 1
@@ -399,112 +488,135 @@ def main() -> int:
     args.out.parent.mkdir(parents=True, exist_ok=True)
     n_ok = 0
     n_fail = 0
+    oc_bounds_list: list[str | None] = list(args.oc_bounds) if args.oc_bounds else [None]
     total_scenes = len(bench_scenes)
+    total_runs = total_scenes * len(oc_bounds_list)
 
     with args.out.open("w", newline="", encoding="utf-8") as fcsv:
         w = csv.DictWriter(fcsv, fieldnames=fieldnames, extrasaction="ignore")
         w.writeheader()
 
         if not args.dry_run:
+            bounds_label = ",".join(b or "default" for b in oc_bounds_list)
             print(
-                f"mr-graphics bench: {total_scenes} scenes, preset={args.preset}, "
-                f"{args.warmup + args.measure} frames per scene "
-                f"(warmup {args.warmup}, measure {args.measure})",
+                f"mr-graphics bench: {total_scenes} scenes × {len(oc_bounds_list)} bound(s) "
+                f"[{bounds_label}], preset={args.preset}, "
+                f"{args.warmup + args.measure} frames per run "
+                f"(warmup {args.warmup}, measure {args.measure})"
+                + ("; interleaved scene×bound" if len(oc_bounds_list) > 1 else ""),
                 file=sys.stderr,
             )
 
-        for idx, s in enumerate(bench_scenes, start=1):
+        run_idx = 0
+        for s in bench_scenes:
             model = resolve_model_path(s, args.assets_base.resolve())
             cam_h = camera_hash8(s.scene_id, s.camera)
             scene_name = f"{s.scene_id}_{cam_h}"
             warmup, measure = effective_frames(s, args.warmup, args.measure)
 
-            argv, run_exe = build_argv(
-                example_exe,
-                simple_bench_exe,
-                s,
-                model,
-                args.preset,
-                warmup,
-                measure,
-                args.xvfb,
-                args.bench_instances_number,
-                args.oc_bounds,
-            )
-            cwd = run_exe.parent
-            stats_path = cwd / STATS_JSON
-
-            if args.dry_run:
-                print(" ".join(shlex.quote(x) for x in argv))
-                continue
-
-            print(
-                f"[{idx}/{total_scenes}] run: {scene_name} ({model.name}), "
-                f"warmup={warmup}, measure={measure}, please wait",
-                file=sys.stderr,
-            )
-            stats_path.unlink(missing_ok=True)
-
-            try:
-                proc = subprocess.run(
-                    argv,
-                    cwd=str(cwd),
-                    capture_output=True,
-                    text=True,
-                    timeout=args.timeout,
-                    check=False,
+            for oc_bound in oc_bounds_list:
+                run_idx += 1
+                argv, run_exe = build_argv(
+                    example_exe,
+                    simple_bench_exe,
+                    s,
+                    model,
+                    args.preset,
+                    warmup,
+                    measure,
+                    args.xvfb,
+                    args.bench_instances_number,
+                    oc_bound,
+                    args.oc_type,
+                    args.msoc_tile_size,
+                    args.msoc_tiles_per_thread,
+                    args.msoc_with_hiz_coarse,
+                    args.disable_occlusion_culling,
+                    args.resolution,
                 )
-            except subprocess.TimeoutExpired:
-                n_fail += 1
-                print(f"[{idx}/{total_scenes}] TIMEOUT preset={args.preset} {scene_name}", file=sys.stderr)
-                continue
+                cwd = run_exe.parent
+                stats_path = cwd / STATS_JSON
+                bound_tag = oc_bound or "default"
 
-            if proc.returncode != 0:
-                n_fail += 1
-                err_tail = (proc.stderr or "")[-800:]
+                if args.dry_run:
+                    print(" ".join(shlex.quote(x) for x in argv))
+                    continue
+
                 print(
-                    f"[{idx}/{total_scenes}] FAIL rc={proc.returncode} preset={args.preset} {scene_name}\n{err_tail}",
+                    f"[{run_idx}/{total_runs}] run: {scene_name} oc_bounds={bound_tag} ({model.name}), "
+                    f"warmup={warmup}, measure={measure}, please wait",
                     file=sys.stderr,
                 )
-                continue
+                stats_path.unlink(missing_ok=True)
 
-            if not stats_path.is_file():
-                n_fail += 1
+                try:
+                    proc = subprocess.run(
+                        argv,
+                        cwd=str(cwd),
+                        capture_output=True,
+                        text=True,
+                        timeout=args.timeout,
+                        check=False,
+                    )
+                except subprocess.TimeoutExpired:
+                    n_fail += 1
+                    print(
+                        f"[{run_idx}/{total_runs}] TIMEOUT preset={args.preset} "
+                        f"{scene_name} oc_bounds={bound_tag}",
+                        file=sys.stderr,
+                    )
+                    continue
+
+                if proc.returncode != 0:
+                    n_fail += 1
+                    err_tail = (proc.stderr or "")[-800:]
+                    print(
+                        f"[{run_idx}/{total_runs}] FAIL rc={proc.returncode} preset={args.preset} "
+                        f"{scene_name} oc_bounds={bound_tag}\n{err_tail}",
+                        file=sys.stderr,
+                    )
+                    continue
+
+                if not stats_path.is_file():
+                    n_fail += 1
+                    print(
+                        f"[{run_idx}/{total_runs}] FAIL missing {stats_path} preset={args.preset} "
+                        f"{scene_name} oc_bounds={bound_tag}",
+                        file=sys.stderr,
+                    )
+                    continue
+
+                raw = stats_path.read_text(encoding="utf-8")
+                try:
+                    records = parse_concat_json_objects(raw)
+                    agg = aggregate_frames(records, warmup, measure)
+                except ValueError as e:
+                    n_fail += 1
+                    print(
+                        f"[{run_idx}/{total_runs}] FAIL stats preset={args.preset} "
+                        f"{scene_name} oc_bounds={bound_tag}: {e}",
+                        file=sys.stderr,
+                    )
+                    continue
+
                 print(
-                    f"[{idx}/{total_scenes}] FAIL missing {stats_path} preset={args.preset} {scene_name}",
+                    f"[{run_idx}/{total_runs}] done: {scene_name} oc_bounds={bound_tag} ({model.name}), "
+                    f"{total_runs - run_idx} run(s) left",
                     file=sys.stderr,
                 )
-                continue
 
-            raw = stats_path.read_text(encoding="utf-8")
-            try:
-                records = parse_concat_json_objects(raw)
-                agg = aggregate_frames(records, warmup, measure)
-            except ValueError as e:
-                n_fail += 1
-                print(
-                    f"[{idx}/{total_scenes}] FAIL stats preset={args.preset} {scene_name}: {e}",
-                    file=sys.stderr,
-                )
-                continue
-
-            print(
-                f"[{idx}/{total_scenes}] done: {scene_name} ({model.name}), "
-                f"{total_scenes - idx} scene(s) left",
-                file=sys.stderr,
-            )
-
-            row: dict[str, Any] = {
-                "scene_name": scene_name,
-                "preset": args.preset,
-                "camera_hash8": cam_h,
-                "camera": s.camera or "",
-                "model_path": str(model),
-            }
-            row.update({k: format_csv_numeric(agg[k]) for k in mean_columns})
-            w.writerow(row)
-            fcsv.flush()
-            n_ok += 1
+                row: dict[str, Any] = {
+                    "scene_name": scene_name,
+                    "preset": args.preset,
+                    "oc_bounds": bound_tag,
+                    "camera_hash8": cam_h,
+                    "camera": s.camera or "",
+                    "model_path": str(model),
+                }
+                row.update({k: format_csv_numeric(agg[k]) for k in mean_columns})
+                w.writerow(row)
+                fcsv.flush()
+                n_ok += 1
 
     if not args.dry_run:
         print(f"Wrote {args.out}  ok={n_ok}  fail={n_fail}", file=sys.stderr)

@@ -38,6 +38,15 @@ static std::optional<mr::math::Camera<float>::Projection> parse_projection(const
   return mr::math::Camera<float>::Projection(45_deg, near, far);
 }
 
+static std::optional<mr::Extent> parse_msoc_tile_size(const std::string &s)
+{
+  uint32_t width, height;
+  if (sscanf(s.c_str(), "[ %u , %u ]", &width, &height) != 2) {
+    return std::nullopt;
+  }
+  return mr::Extent{width, height};
+}
+
 static std::optional<mr::CliOptions::Mode> parse_mode(std::string_view s)
 {
   if (s == "default") {
@@ -122,7 +131,28 @@ std::optional<mr::CliOptions> mr::CliOptions::parse(int argc, const char **argv)
      "Render bounds state, can be: Disable, BoundBoxes, BoundRectangles")
     ("oc-bounds",
      po::value<std::string>(),
-     "Occlusion culling bounds for test, can be: Box, Sphere, Dynamic")
+     "Occlusion culling bounds: Box, Sphere, DynamicBest, Both")
+    ("oc-type",
+     po::value<std::string>(),
+     "Occlusion culling type: HiZ, MSOC, msoc-adaptive-tile-size")
+    ("msoc-with-hiz-coarse",
+     po::bool_switch()->default_value(false),
+     "Enable coarse HiZ prep pass before MSOC tile tests")
+    ("msoc-tile-size",
+     po::value<std::string>()->default_value("[8, 8]"),
+     "MSOC tile size in format '[tilew, tileh]' (default: [8, 8])")
+    ("msoc-tiles-per-thread",
+     po::value<uint32_t>()->default_value(8),
+     "MSOC tiles processed per thread (default: 8)")
+    ("oc-draw-always",
+     po::bool_switch()->default_value(false),
+     "Run occlusion culling but still draw culled instances (debug)")
+    ("save-gbuffer-frame",
+     po::value<uint32_t>(),
+     "1-based frame index to dump Position gbuffer (.gbuf)")
+    ("save-gbuffer-image-path",
+     po::value<std::string>(),
+     "Output path for gbuffer dump (use with --save-gbuffer-frame)")
   ;
 
   po::positional_options_description pos_desc;
@@ -172,6 +202,8 @@ std::optional<mr::CliOptions> mr::CliOptions::parse(int argc, const char **argv)
   options.enable_culling_visualization = vm["enable-culling-visualization"].as<bool>();
   options.read_gbuf = vm["read-gbuf"].as<bool>();
   options.hash_coloring = vm["hash-coloring"].as<bool>();
+  options.msoc_with_hiz_coarse = vm["msoc-with-hiz-coarse"].as<bool>();
+  options.oc_draw_always = vm["oc-draw-always"].as<bool>();
 
   auto mode_str = vm["mode"].as<std::string>();
   auto mode_opt = parse_mode(mode_str);
@@ -254,6 +286,7 @@ std::optional<mr::CliOptions> mr::CliOptions::parse(int argc, const char **argv)
       {"Box", mr::graphics::OcclusionCullingBounds::Box},
       {"Sphere", mr::graphics::OcclusionCullingBounds::Sphere},
       {"DynamicBest", mr::graphics::OcclusionCullingBounds::DynamicBest},
+      {"Both", mr::graphics::OcclusionCullingBounds::Both},
     };
     auto value = vm["oc-bounds"].as<std::string>();
     auto it = bounds_states.find(value);
@@ -261,6 +294,56 @@ std::optional<mr::CliOptions> mr::CliOptions::parse(int argc, const char **argv)
       options.oc_bounds = it->second;
     } else {
       MR_ERROR("Invalid 'render-bounds-state' value: '{}'", value);
+    }
+  }
+
+  if (vm.count("oc-type")) {
+    std::flat_map<std::string_view, mr::graphics::OcclusionCullingType> oc_types {
+      {"HiZ", mr::graphics::OcclusionCullingType::TwoPhaseHiZ},
+      {"MSOC", mr::graphics::OcclusionCullingType::MaskedSoftware},
+      {"MsocAdaptiveTileSize", mr::graphics::OcclusionCullingType::MsocAdaptiveTileSize},
+      {"hiz", mr::graphics::OcclusionCullingType::TwoPhaseHiZ},
+      {"msoc", mr::graphics::OcclusionCullingType::MaskedSoftware},
+      {"msoc-adaptive-tile-size", mr::graphics::OcclusionCullingType::MsocAdaptiveTileSize},
+      {"msoc-adaptive", mr::graphics::OcclusionCullingType::MsocAdaptiveTileSize},
+      // Deprecated aliases
+      {"MsocHizHybrid", mr::graphics::OcclusionCullingType::MsocAdaptiveTileSize},
+      {"msoc-hiz-hybrid", mr::graphics::OcclusionCullingType::MsocAdaptiveTileSize},
+    };
+    auto value = vm["oc-type"].as<std::string>();
+    auto it = oc_types.find(value);
+    if (it != oc_types.end()) {
+      options.oc_type = it->second;
+    } else {
+      MR_ERROR("Invalid 'oc-type' value: '{}'", value);
+    }
+  }
+
+  {
+    std::string tile_size_str = vm["msoc-tile-size"].as<std::string>();
+    auto tile_size_opt = parse_msoc_tile_size(tile_size_str);
+    if (!tile_size_opt) {
+      std::println(std::cerr, "Error: Invalid msoc-tile-size format: {}", tile_size_str);
+      std::println(std::cerr, "Expected format: '[tilew, tileh]' (e.g., [8, 8])");
+      return std::nullopt;
+    }
+    options.msoc_tile_size = *tile_size_opt;
+  }
+
+  options.msoc_tiles_per_thread = vm["msoc-tiles-per-thread"].as<uint32_t>();
+
+  const bool has_save_frame = vm.count("save-gbuffer-frame") > 0;
+  const bool has_save_path = vm.count("save-gbuffer-image-path") > 0;
+  if (has_save_frame != has_save_path) {
+    std::println(std::cerr, "Error: --save-gbuffer-frame and --save-gbuffer-image-path must be set together");
+    return std::nullopt;
+  }
+  if (has_save_frame) {
+    options.save_gbuffer_frame = vm["save-gbuffer-frame"].as<uint32_t>();
+    options.save_gbuffer_image_path = vm["save-gbuffer-image-path"].as<std::string>();
+    if (options.save_gbuffer_frame.value() == 0) {
+      std::println(std::cerr, "Error: --save-gbuffer-frame must be >= 1");
+      return std::nullopt;
     }
   }
 
@@ -309,6 +392,26 @@ void mr::CliOptions::print() const noexcept
 
   if (oc_bounds) {
     std::println("Occlusion culling bounds: {}", enum_cast(*oc_bounds));
+  }
+
+  if (oc_type) {
+    std::string_view oc_type_name = "MSOC";
+    if (*oc_type == OcclusionCullingType::TwoPhaseHiZ) {
+      oc_type_name = "HiZ";
+    } else if (*oc_type == OcclusionCullingType::MsocAdaptiveTileSize) {
+      oc_type_name = "MsocAdaptiveTileSize";
+    }
+    std::println("Occlusion culling type: {}", oc_type_name);
+  }
+
+  std::println("MSOC tile size: [{}, {}]", msoc_tile_size.width, msoc_tile_size.height);
+  std::println("MSOC tiles per thread: {}", msoc_tiles_per_thread);
+  std::println("MSOC coarse HiZ prep: {}", msoc_with_hiz_coarse ? "ENABLED" : "DISABLED");
+  std::println("OC draw always: {}", oc_draw_always ? "ENABLED" : "DISABLED");
+
+  if (save_gbuffer_frame) {
+    std::println("Save gbuffer frame: {}", *save_gbuffer_frame);
+    std::println("Save gbuffer path: {}", save_gbuffer_image_path->string());
   }
 
   std::println("Model files ({}):", models.size());

@@ -42,6 +42,14 @@ void main()
     OutColorTrans = vec4(0.1, 0.5, 0, 1) * coef;
     return;
   } else if (IS_INSTANCE_WAS_OCCLUDED(visible_at_stash)) {
+#ifdef OC_DRAW_ALWAYS
+    // False cull: OC marked occluded, but instance still won pixels (only meaningful with draw-always)
+    if (IS_INSTANCE_ON_SCREEN(visible_at_stash)) {
+      OutNIsShade = vec4(normal, is_shade);
+      OutColorTrans = vec4(1, 0, 0, 1) * coef;
+      return;
+    }
+#endif // OC_DRAW_ALWAYS
     OutNIsShade = vec4(normal, is_shade);
     OutColorTrans = vec4(0, 0, 1, 1) * coef;
     return;

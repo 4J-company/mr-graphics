@@ -95,7 +95,8 @@ mr::ModelHandle mr::Scene::create_model(std::fs::path filename) noexcept
       draw.instances_data_buffer = StorageBuffer(_parent->vulkan_state(),
                                                 sizeof(MeshInstanceCullingData) * max_scene_instances,
                                                 vk::BufferUsageFlagBits::eStorageBuffer |
-                                                vk::BufferUsageFlagBits::eTransferDst);
+                                                vk::BufferUsageFlagBits::eTransferDst |
+                                                vk::BufferUsageFlagBits::eTransferSrc);
       draw.meshes_data_buffer = StorageBuffer(_parent->vulkan_state(),
                                            sizeof(MeshCullingData) * max_scene_instances,
                                            vk::BufferUsageFlagBits::eStorageBuffer |
@@ -117,6 +118,33 @@ mr::ModelHandle mr::Scene::create_model(std::fs::path filename) noexcept
       }
 
       draw.draw_counter_index = _current_counter_index++;
+
+      if (uses_msoc_pipeline(_parent->config().oc_type)) {
+        MsocTileBuffers msoc {};
+        const auto storage = vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst;
+        msoc.tile_count_buffer = StorageBuffer(_parent->vulkan_state(),
+                                               sizeof(uint32_t) * max_scene_instances, storage);
+        msoc.tile_dims_buffer = StorageBuffer(_parent->vulkan_state(),
+                                              sizeof(uint32_t) * 2 * max_scene_instances, storage);
+        msoc.tile_offset_buffer = StorageBuffer(_parent->vulkan_state(),
+                                                sizeof(uint32_t) * (max_scene_instances + 1), storage);
+        msoc.visible_flag_buffer = StorageBuffer(_parent->vulkan_state(),
+                                                 sizeof(uint32_t) * max_scene_instances, storage);
+        msoc.screen_rect_buffer = StorageBuffer(_parent->vulkan_state(),
+                                                sizeof(float) * 4 * max_scene_instances, storage);
+        msoc.query_depth_buffer = StorageBuffer(_parent->vulkan_state(),
+                                                sizeof(float) * max_scene_instances, storage);
+        msoc.msoc_dispatch_cmd_index = _current_counter_index;
+        _current_counter_index += 3;
+
+        msoc.tile_count_buffer_id = _parent->bindless_set().register_resource(&msoc.tile_count_buffer);
+        msoc.tile_dims_buffer_id = _parent->bindless_set().register_resource(&msoc.tile_dims_buffer);
+        msoc.tile_offset_buffer_id = _parent->bindless_set().register_resource(&msoc.tile_offset_buffer);
+        msoc.visible_flag_buffer_id = _parent->bindless_set().register_resource(&msoc.visible_flag_buffer);
+        msoc.screen_rect_buffer_id = _parent->bindless_set().register_resource(&msoc.screen_rect_buffer);
+        msoc.query_depth_buffer_id = _parent->bindless_set().register_resource(&msoc.query_depth_buffer);
+        draw.msoc_buffers = std::move(msoc);
+      }
 
       draw.instances_data_buffer_id = _parent->bindless_set().register_resource(&draw.instances_data_buffer);
       draw.meshes_data_buffer_id = _parent->bindless_set().register_resource(&draw.meshes_data_buffer);
@@ -331,6 +359,14 @@ void mr::Scene::update(OptionalInputStateReference input_state_ref) noexcept
     if (input_state.key_tapped(vkfw::Key::e0)) {
       auto cam_pos = _camera.cam().position();
       _camera.cam().set(cam_pos, Vec3f{0});
+    }
+
+    if (input_state.key_tapped(vkfw::Key::eF)) {
+      if (is_render_option_enabled(_parent->options(), RenderOptions::CollectPosInstanceId)) {
+        _parent->request_dump_scene_objects();
+      } else {
+        std::println(std::cerr, "dump scene objects / false-cull viz requires --read-gbuf");
+      }
     }
 
     if (input_state.key_tapped(vkfw::Key::eB)) {

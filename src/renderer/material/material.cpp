@@ -143,5 +143,8 @@ boost::unordered_map<std::string, std::string> mr::MaterialBuilder::generate_sha
   if (is_render_option_enabled(_scene->render_context().options(), RenderOptions::EnableCullingVisualiztion)) {
     defines["ENABLE_CULLING_VISUALIZATION"] = "ON";
   }
+  if (is_render_option_enabled(_scene->render_context().options(), RenderOptions::OcDrawAlways)) {
+    defines["OC_DRAW_ALWAYS"] = "ON";
+  }
   return defines;
 }
