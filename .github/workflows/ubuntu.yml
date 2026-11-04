@@ -60,11 +60,15 @@ jobs:
       uses: conan-io/setup-conan@v1
       with:
         cache_packages: true
+        home: ${{ runner.temp }}/conan-home
 
     - name: Setup local Conan index
       shell: bash
       run: |
         git clone --depth 1 https://github.com/4J-company/conan-center-index.git
+        # TODO: upstream the .lib fix (Dbghelp/Shlwapi) into 4J-company/conan-center-index
+        # (recipes/openusd/all/conanfile.py) and delete this patch. Local apply is a one-run workaround.
+        git -C conan-center-index apply "${GITHUB_WORKSPACE}/.github/patches/openusd-windows-system-libs.patch"
         conan remote add 4J-company ./conan-center-index --type local-recipes-index
 
     - name: Build
@@ -80,9 +84,12 @@ jobs:
           COMPILER=gcc
           VERSION="$(g++ -dumpversion | cut -d. -f1)"
         fi
+        # -s is host-only. mold is a tool_requires and sees the build profile,
+        # whose detected cppstd is gnu17. mold 2.42 needs C++20.
         conan build . -b missing \
           -s compiler="${COMPILER}" \
           -s compiler.version="${VERSION}" \
           -s compiler.libcxx=libstdc++11 \
           -s compiler.cppstd=23 \
+          -s:b compiler.cppstd=20 \
           -s build_type=${{ matrix.build_type }}

@@ -47,11 +47,21 @@ jobs:
       uses: conan-io/setup-conan@v1
       with:
         cache_packages: true
+        home: ${{ runner.temp }}/conan-home
+
+    # SDK already lives in VULKAN_SDK. Debug OpenUSD needs the build tree's disk back.
+    - name: Free Vulkan build tree
+      shell: pwsh
+      run: |
+        if (Test-Path _vulkan_build) { Remove-Item -Recurse -Force _vulkan_build }
 
     - name: Setup local Conan index
       shell: bash
       run: |
         git clone --depth 1 https://github.com/4J-company/conan-center-index.git
+        # TODO: upstream the .lib fix (Dbghelp/Shlwapi) into 4J-company/conan-center-index
+        # (recipes/openusd/all/conanfile.py) and delete this patch. Local apply is a one-run workaround.
+        git -C conan-center-index apply "${GITHUB_WORKSPACE}/.github/patches/openusd-windows-system-libs.patch"
         conan remote add 4J-company ./conan-center-index --type local-recipes-index
 
     - name: Build

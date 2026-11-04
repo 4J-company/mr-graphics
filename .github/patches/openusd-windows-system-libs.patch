@@ -1,0 +1,21 @@
+diff --git a/recipes/openusd/all/conanfile.py b/recipes/openusd/all/conanfile.py
+--- a/recipes/openusd/all/conanfile.py
++++ b/recipes/openusd/all/conanfile.py
+@@ -372,7 +372,7 @@
+     if not label or "::" in label:
+         return label
+     norm = label.replace("\\", "/")
+-    if "/" not in norm and not norm.endswith((".so", ".dylib", ".dll", ".a")):
++    if "/" not in norm and not norm.endswith((".so", ".dylib", ".dll", ".a", ".lib")):
+         return label
+     base = Path(norm).name
+     if not base:
+@@ -381,7 +381,7 @@
+     m = re.match(r"^(lib.+)\.so(?:\.\d+)*$", base)
+     if m:
+         return m.group(1)
+-    if base.endswith((".so", ".dylib", ".dll", ".a")):
++    if base.endswith((".so", ".dylib", ".dll", ".a", ".lib")):
+         return Path(base).stem
+     return label
+ 
