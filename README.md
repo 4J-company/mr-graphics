@@ -43,13 +43,33 @@ git clone https://github.com/4J-company/mr-graphics.git
 cd mr-graphics
 ```
 
-### Build the Project with Conan
+### Build the Project
+
+A manual build uses Conan and CPM. To build, run:
 
 ```bash
 conan build -b missing .
 ```
 
 By default, this builds in Release mode. To build in Debug mode, append `-s build_type=Debug` to the build command.
+
+#### Docker image
+
+A Docker image with all build dependencies already installed is available. The Makefile is the interface for it. To build the project, run:
+
+```bash
+make build
+```
+
+This downloads a Docker image of about 3 GB. At about 4 MB/s that takes 20–30 minutes.
+
+For more information about the Docker image, run:
+
+```bash
+make help
+```
+
+The Docker image is currently supported only on Linux. A Windows image will be supported later.
 
 ## Running Examples
 

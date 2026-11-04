@@ -30,7 +30,7 @@ class MrGraphicsRecipe(ConanFile):
 
         self.requires("glfw/3.4")
 
-        self.requires("mr-math/1.1.6")
+        self.requires("mr-math/1.1.7")
         self.requires("mr-utils/1.1.2")
         self.requires("mr-importer/3.4.0")
 

@@ -1,0 +1,130 @@
+name: Ubuntu CI (full build)
+
+# Spare copy of the workflow that installs Vulkan, Conan and CCI on the
+# runner and builds dependencies itself. Push and pull_request are
+# commented out so it does not start on its own.
+on:
+  workflow_dispatch:
+  # push:
+  #   branches: [ "master", "develop" ]
+  # pull_request:
+  #   branches: [ "master", "develop" ]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-26.04]
+        build_type: [Release, Debug]
+        cpp_compiler: [g++, clang++]
+
+    env:
+      CONAN_NON_INTERACTIVE: 1
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup ccache
+      uses: Chocobo1/setup-ccache-action@v1
+
+    - name: Set up cache
+      id: cache-cpm
+      uses: actions/cache@v4
+      with:
+        path: ~/cpm-cache
+        key: ${{ runner.os }}-cpm-${{ hashFiles('**/') }}
+        restore-keys: |
+          ${{ runner.os }}-cpm-a
+
+    # Download VulkanAPI
+    - name: Setup Vulkan
+      uses: humbletim/setup-vulkan-sdk@523828e49cd4afabce369c39c7ee6543a2b7a735
+      with:
+        vulkan-query-version: latest
+        vulkan-components: Vulkan-Headers Vulkan-Loader SPIRV-Headers SPIRV-Cross SPIRV-Tools SPIRV-Reflect Glslang
+        vulkan-use-cache: true
+
+    # Download GLFW dependencies
+    - name: Setup GLFW deps
+      run: |
+        sudo sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources
+        sudo apt-get update
+        sudo apt-get build-dep glfw3
+
+    - name: Setup Mold
+      run: |
+        sudo sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources
+        sudo apt-get update
+        sudo apt-get install mold
+
+    - name: Install Conan
+      uses: conan-io/setup-conan@v1
+      with:
+        cache_packages: true
+        home: ${{ runner.temp }}/conan-home
+
+    - name: Setup local Conan index
+      shell: bash
+      run: |
+        git clone --depth 1 https://github.com/4J-company/conan-center-index.git
+        conan remote add 4J-company ./conan-center-index --type local-recipes-index
+
+    - name: Build
+      shell: bash
+      run: |
+        set -euo pipefail
+        export DEBIAN_FRONTEND=noninteractive
+        export CPM_SOURCE_CACHE="${HOME}/cpm-cache"
+        mkdir -p "${CPM_SOURCE_CACHE}"
+
+        EXTRA_CONF=()
+        if [ "${{ matrix.cpp_compiler }}" = "clang++" ]; then
+          COMPILER=clang
+          VERSION="$(clang++ -dumpversion | cut -d. -f1)"
+          # ccache puts /usr/lib/ccache first, so plain `c++` is g++.
+          # Clang settings still inject -stdlib=libstdc++, which g++ rejects.
+          EXTRA_CONF+=(-c "tools.build:compiler_executables={'c': 'clang', 'cpp': 'clang++'}")
+        else
+          COMPILER=gcc
+          VERSION="$(g++ -dumpversion | cut -d. -f1)"
+        fi
+
+        # act on a shared machine: cap jobs so two matrix legs do not exhaust RAM.
+        # GitHub runners leave this unset and keep Conan's default (nproc).
+        if [ -n "${ACT_BUILD_JOBS:-}" ]; then
+          EXTRA_CONF+=(-c "tools.build:jobs=${ACT_BUILD_JOBS}")
+        fi
+
+        # download.open-mpi.org (hwloc tarball) sometimes stalls past the
+        # default requests timeout. The recipe then gives up after 2 tries.
+        # core.* is rejected by -c, so it has to live in global.conf.
+        if [ -z "${CONAN_HOME:-}" ]; then
+          echo "CONAN_HOME is unset" >&2
+          exit 1
+        fi
+        mkdir -p "${CONAN_HOME}"
+        printf 'core.net.http:timeout=300\n' >> "${CONAN_HOME}/global.conf"
+        EXTRA_CONF+=(-c tools.files.download:retry=5)
+        EXTRA_CONF+=(-c tools.files.download:retry_wait=5)
+
+        # -s is host-only. mold is a tool_requires and sees the build profile,
+        # whose detected cppstd is gnu17. mold 2.42 needs C++20.
+        # cpptrace adds a CXX_MODULES file set on Clang >= 16 and GCC >= 15.
+        # Unix Makefiles cannot build that file set; turning scan off is not enough.
+        # GCC 15 on Ubuntu 26.04 defines __AVX__. basisu_kernels_sse.cpp errors unless AVX is off.
+        # Scoped to ktx: astcenc inside it passes -mavx2 later, so that TU still builds.
+        conan build . -b missing \
+          -s compiler="${COMPILER}" \
+          -s compiler.version="${VERSION}" \
+          -s compiler.libcxx=libstdc++11 \
+          -s compiler.cppstd=23 \
+          -s:b compiler.cppstd=20 \
+          -s build_type=${{ matrix.build_type }} \
+          -c tools.system.package_manager:mode=install \
+          -c tools.system.package_manager:sudo=True \
+          -c "tools.cmake.cmaketoolchain:extra_variables={'CMAKE_CXX_SCAN_FOR_MODULES': 'OFF', 'CPPTRACE_DISABLE_CXX_20_MODULES': 'ON'}" \
+          -c "ktx/*:tools.build:cxxflags=['-mno-avx', '-mno-avx2', '-mno-avx512f']" \
+          "${EXTRA_CONF[@]}"
