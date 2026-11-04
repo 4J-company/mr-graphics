@@ -78,9 +78,13 @@ jobs:
         export DEBIAN_FRONTEND=noninteractive
         export CPM_SOURCE_CACHE="${HOME}/cpm-cache"
         mkdir -p "${CPM_SOURCE_CACHE}"
+        EXTRA_CONF=()
         if [ "${{ matrix.cpp_compiler }}" = "clang++" ]; then
           COMPILER=clang
           VERSION="$(clang++ -dumpversion | cut -d. -f1)"
+          # ccache puts /usr/lib/ccache first, so plain `c++` is g++.
+          # Clang settings still inject -stdlib=libstdc++, which g++ rejects.
+          EXTRA_CONF+=(-c "tools.build:compiler_executables={'c': 'clang', 'cpp': 'clang++'}")
         else
           COMPILER=gcc
           VERSION="$(g++ -dumpversion | cut -d. -f1)"
@@ -95,4 +99,5 @@ jobs:
           -s:b compiler.cppstd=20 \
           -s build_type=${{ matrix.build_type }} \
           -c tools.system.package_manager:mode=install \
-          -c tools.system.package_manager:sudo=True
+          -c tools.system.package_manager:sudo=True \
+          "${EXTRA_CONF[@]}"
