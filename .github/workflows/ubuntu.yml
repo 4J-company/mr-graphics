@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04]
+        os: [ubuntu-26.04]
         build_type: [Release, Debug]
         cpp_compiler: [g++, clang++]
 
@@ -91,6 +91,7 @@ jobs:
         fi
         # -s is host-only. mold is a tool_requires and sees the build profile,
         # whose detected cppstd is gnu17. mold 2.42 needs C++20.
+        # Clang + C++23 makes CMake scan for modules. Unix Makefiles cannot, so cpptrace configure dies.
         conan build . -b missing \
           -s compiler="${COMPILER}" \
           -s compiler.version="${VERSION}" \
@@ -100,4 +101,5 @@ jobs:
           -s build_type=${{ matrix.build_type }} \
           -c tools.system.package_manager:mode=install \
           -c tools.system.package_manager:sudo=True \
+          -c "tools.cmake.cmaketoolchain:extra_variables={'CMAKE_CXX_SCAN_FOR_MODULES': 'OFF'}" \
           "${EXTRA_CONF[@]}"
