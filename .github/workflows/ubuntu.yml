@@ -75,6 +75,7 @@ jobs:
       shell: bash
       run: |
         set -euo pipefail
+        export DEBIAN_FRONTEND=noninteractive
         export CPM_SOURCE_CACHE="${HOME}/cpm-cache"
         mkdir -p "${CPM_SOURCE_CACHE}"
         if [ "${{ matrix.cpp_compiler }}" = "clang++" ]; then
@@ -92,4 +93,6 @@ jobs:
           -s compiler.libcxx=libstdc++11 \
           -s compiler.cppstd=23 \
           -s:b compiler.cppstd=20 \
-          -s build_type=${{ matrix.build_type }}
+          -s build_type=${{ matrix.build_type }} \
+          -c tools.system.package_manager:mode=install \
+          -c tools.system.package_manager:sudo=True
