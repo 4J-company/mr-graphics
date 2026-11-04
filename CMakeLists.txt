@@ -30,6 +30,11 @@ file(GLOB_RECURSE HEADERS
   ${CMAKE_CURRENT_LIST_DIR}/*.hpp
 )
 
+# CI clones 4J-company/conan-center-index into the workspace. Its recipe
+# test_package sources are not part of this library.
+list(FILTER SOURCES EXCLUDE REGEX "[/\\\\]conan-center-index[/\\\\]")
+list(FILTER HEADERS EXCLUDE REGEX "[/\\\\]conan-center-index[/\\\\]")
+
 add_library(${MR_GRAPHICS_LIB_NAME} ${SOURCES} ${HEADERS})
 
 option(BUILD_EXAMPLES "Build examples" ON)

@@ -21,6 +21,25 @@ CPMAddPackage("gh:bemanproject/inplace_vector#72e9bab")
 CPMAddPackage("gh:GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator@3.3.0")
 
 if (${vkfw_ADDED})
+  # VKFW_INLINE carries [[msvc::forceinline]] / [[gnu::always_inline]]. On the two
+  # variables below it sits after constexpr, so GCC 15 rejects it ("attributes in
+  # middle of decl-specifiers") and MSVC rejects forceinline on a non-function.
+  # TODO: drop this once Cvelth/vkfw stops marking these variables VKFW_INLINE.
+  set(_vkfw_header "${vkfw_SOURCE_DIR}/include/vkfw/vkfw.hpp")
+  file(READ "${_vkfw_header}" _vkfw_text)
+  set(_vkfw_orig "${_vkfw_text}")
+  string(REPLACE
+    "VKFW_CONSTEXPR VKFW_INLINE unsigned AnyPosition"
+    "VKFW_CONSTEXPR inline unsigned AnyPosition"
+    _vkfw_text "${_vkfw_text}")
+  string(REPLACE
+    "VKFW_CONSTEXPR VKFW_INLINE Nullopt nullopt"
+    "VKFW_CONSTEXPR inline Nullopt nullopt"
+    _vkfw_text "${_vkfw_text}")
+  if(NOT _vkfw_text STREQUAL _vkfw_orig)
+    file(WRITE "${_vkfw_header}" "${_vkfw_text}")
+  endif()
+
   add_library(libvkfw INTERFACE "")
   target_link_libraries(libvkfw INTERFACE glfw)
   target_include_directories(libvkfw INTERFACE ${vkfw_SOURCE_DIR}/include)

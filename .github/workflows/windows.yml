@@ -1,30 +1,30 @@
 name: Windows CI
 
+# Disabled until Windows can be run locally. Manual dispatch only,
+# so a push or PR does not start this workflow.
 on:
-  push:
-    branches: [ "master", "develop"  ]
-  pull_request:
-    branches: [ "master", "develop" ]
+  workflow_dispatch:
+  # push:
+  #   branches: [ "master", "develop" ]
+  # pull_request:
+  #   branches: [ "master", "develop" ]
 
 jobs:
   build:
     runs-on: ${{ matrix.os }}
 
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         os: [windows-latest]
         build_type: [Release, Debug]
         c_compiler: [cl]
 
+    env:
+      CONAN_NON_INTERACTIVE: 1
+
     steps:
     - uses: actions/checkout@v4
-
-    - name: Set reusable strings
-      id: strings
-      shell: bash
-      run: |
-        echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
 
     - name: Setup ccache
       uses: Chocobo1/setup-ccache-action@v1
@@ -46,14 +46,44 @@ jobs:
         vulkan-components: Vulkan-Headers Vulkan-Loader SPIRV-Headers SPIRV-Cross SPIRV-Tools SPIRV-Reflect Glslang
         vulkan-use-cache: true
 
-    - name: Configure CMake
-      run: >
-        cmake -B ${{ steps.strings.outputs.build-output-dir }}
-        -DCPM_SOURCE_CACHE=~/cpm-cache
-        -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
-        -DCMAKE_C_COMPILER=${{ matrix.cpp_compiler }}
-        -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
-        -S ${{ github.workspace }}
+    - name: Install Conan
+      uses: conan-io/setup-conan@v1
+      with:
+        cache_packages: true
+        home: ${{ runner.temp }}/conan-home
+
+    # SDK already lives in VULKAN_SDK. Debug OpenUSD needs the build tree's disk back.
+    - name: Free Vulkan build tree
+      shell: pwsh
+      run: |
+        if (Test-Path _vulkan_build) { Remove-Item -Recurse -Force _vulkan_build }
+
+    - name: Setup local Conan index
+      shell: bash
+      run: |
+        git clone --depth 1 https://github.com/4J-company/conan-center-index.git
+        # TODO: upstream into 4J-company/conan-center-index (recipes/openusd/all/conanfile.py)
+        # and delete this patch. Local apply is a one-run workaround.
+        # Windows graphviz labels import libs as *.lib. Stem them, map usd_<target>.lib
+        # back to the CMake target, and treat Dbghelp/Shlwapi/Ws2_32 as system libs.
+        git -C conan-center-index apply "${GITHUB_WORKSPACE}/.github/patches/openusd-windows-system-libs.patch"
+        conan remote add 4J-company ./conan-center-index --type local-recipes-index
 
     - name: Build
-      run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
+      shell: pwsh
+      run: |
+        $env:CPM_SOURCE_CACHE = Join-Path $env:USERPROFILE "cpm-cache"
+        New-Item -ItemType Directory -Force -Path $env:CPM_SOURCE_CACHE | Out-Null
+        $show = conan profile show | Out-String
+        if ($show -notmatch '(?m)^compiler\.version=(\S+)') { throw "Conan profile has no compiler.version" }
+        $ver = $Matches[1]
+        $runtime = "dynamic"
+        if ($show -match '(?m)^compiler\.runtime=(\S+)') { $runtime = $Matches[1] }
+        Write-Host "msvc version=$ver runtime=$runtime build=${{ matrix.build_type }}"
+        conan build . -b missing `
+          -s compiler=msvc `
+          -s compiler.version=$ver `
+          -s compiler.runtime=$runtime `
+          -s compiler.runtime_type=${{ matrix.build_type }} `
+          -s compiler.cppstd=23 `
+          -s build_type=${{ matrix.build_type }}
