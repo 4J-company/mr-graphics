@@ -19,3 +19,47 @@ diff --git a/recipes/openusd/all/conanfile.py b/recipes/openusd/all/conanfile.py
          return Path(base).stem
      return label
  
+@@ -469,6 +469,10 @@
+         "Shlwapi.lib",
+         "Dbghelp",
+         "Dbghelp.lib",
++        "Ws2_32",
++        "Ws2_32.lib",
++        "ws2_32",
++        "ws2_32.lib",
+     }
+     ext_dep_map = cmake_to_conan_targets | {
+         "libICE":  "xorg::ice",
+@@ -520,6 +524,15 @@
+             return False
+         return True
+ 
++    # Graphviz on Windows labels an edge with the import library (usd_arch.lib).
++    # After stemming that is usd_arch, but the CMake target / component is arch.
++    component_names = set(merged)
++    win_system_lib_aliases = {
++        "Dbghelp_lib": "Dbghelp",
++        "Shlwapi_lib": "Shlwapi",
++        "Ws2_32_lib": "Ws2_32",
++        "ws2_32_lib": "ws2_32",
++    }
+     components = {}
+     for component, deps in merged.items():
+         if "::" in component or component in ext_dep_map:
+@@ -534,7 +547,16 @@
+         for dep in deps:
+             if dep.endswith(".so"):
+                 dep = Path(dep).stem
++            dep = win_system_lib_aliases.get(dep, dep)
++            if (
++                dep.startswith("usd_")
++                and dep not in component_names
++                and dep[4:] in component_names
++            ):
++                dep = dep[4:]
+             if dep in known_system_libs:
++                if dep.endswith(".lib"):
++                    dep = dep[:-4]
+                 system_libs.append(dep)
+             else:
+                 dep = ext_dep_map.get(dep, dep)

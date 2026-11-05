@@ -66,8 +66,10 @@ jobs:
       shell: bash
       run: |
         git clone --depth 1 https://github.com/4J-company/conan-center-index.git
-        # TODO: upstream the .lib fix (Dbghelp/Shlwapi) into 4J-company/conan-center-index
-        # (recipes/openusd/all/conanfile.py) and delete this patch. Local apply is a one-run workaround.
+        # TODO: upstream into 4J-company/conan-center-index (recipes/openusd/all/conanfile.py)
+        # and delete this patch. Local apply is a one-run workaround.
+        # Windows graphviz labels import libs as *.lib. Stem them, map usd_<target>.lib
+        # back to the CMake target, and treat Dbghelp/Shlwapi/Ws2_32 as system libs.
         git -C conan-center-index apply "${GITHUB_WORKSPACE}/.github/patches/openusd-windows-system-libs.patch"
         conan remote add 4J-company ./conan-center-index --type local-recipes-index
 
@@ -91,7 +93,10 @@ jobs:
         fi
         # -s is host-only. mold is a tool_requires and sees the build profile,
         # whose detected cppstd is gnu17. mold 2.42 needs C++20.
-        # Clang + C++23 makes CMake scan for modules. Unix Makefiles cannot, so cpptrace configure dies.
+        # cpptrace adds a CXX_MODULES file set on Clang >= 16 and GCC >= 15.
+        # Unix Makefiles cannot build that file set; turning scan off is not enough.
+        # GCC 15 on Ubuntu 26.04 defines __AVX__. basisu_kernels_sse.cpp errors unless AVX is off.
+        # Scoped to ktx: astcenc inside it passes -mavx2 later, so that TU still builds.
         conan build . -b missing \
           -s compiler="${COMPILER}" \
           -s compiler.version="${VERSION}" \
@@ -101,5 +106,6 @@ jobs:
           -s build_type=${{ matrix.build_type }} \
           -c tools.system.package_manager:mode=install \
           -c tools.system.package_manager:sudo=True \
-          -c "tools.cmake.cmaketoolchain:extra_variables={'CMAKE_CXX_SCAN_FOR_MODULES': 'OFF'}" \
+          -c "tools.cmake.cmaketoolchain:extra_variables={'CMAKE_CXX_SCAN_FOR_MODULES': 'OFF', 'CPPTRACE_DISABLE_CXX_20_MODULES': 'ON'}" \
+          -c "ktx/*:tools.build:cxxflags=['-mno-avx', '-mno-avx2', '-mno-avx512f']" \
           "${EXTRA_CONF[@]}"
