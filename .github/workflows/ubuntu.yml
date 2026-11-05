@@ -70,6 +70,8 @@ jobs:
         # and delete this patch. Local apply is a one-run workaround.
         # Windows graphviz labels import libs as *.lib. Stem them, map usd_<target>.lib
         # back to the CMake target, and treat Dbghelp/Shlwapi/Ws2_32 as system libs.
+        # Also rewrite Clang -Wl,-force_load (Apple ld64) to --whole-archive. Linux ld.bfd
+        # parses -force_load as -f and errors: "-f may not be used without -shared".
         git -C conan-center-index apply "${GITHUB_WORKSPACE}/.github/patches/openusd-windows-system-libs.patch"
         conan remote add 4J-company ./conan-center-index --type local-recipes-index
 
