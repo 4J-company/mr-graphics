@@ -66,6 +66,10 @@ jobs:
         # Also rewrite Clang -Wl,-force_load (Apple ld64) to --whole-archive. Linux ld.bfd
         # parses -force_load as -f and errors: "-f may not be used without -shared".
         git -C conan-center-index apply "${GITHUB_WORKSPACE}/.github/patches/openusd-windows-system-libs.patch"
+        # TODO: upstream the alignas rewrite into 4J-company/mr-math and delete this patch.
+        # The recipe file is CRLF in git; strip CR so the LF patch matches.
+        sed -i 's/\r$//' conan-center-index/recipes/mr-math/all/conanfile.py
+        git -C conan-center-index apply "${GITHUB_WORKSPACE}/.github/patches/mr-math-alignas.patch"
         conan remote add 4J-company ./conan-center-index --type local-recipes-index
 
     - name: Build
