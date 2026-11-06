@@ -73,6 +73,9 @@ jobs:
         # Also rewrite Clang -Wl,-force_load (Apple ld64) to --whole-archive. Linux ld.bfd
         # parses -force_load as -f and errors: "-f may not be used without -shared".
         git -C conan-center-index apply "${GITHUB_WORKSPACE}/.github/patches/openusd-windows-system-libs.patch"
+        # Clang + libstdc++ destroys unique_ptr<UsdPrimDefinition> while the
+        # type is still incomplete. Move those lookups out of the header.
+        git -C conan-center-index apply "${GITHUB_WORKSPACE}/.github/patches/openusd-clang-prim-definition.patch"
         # TODO: upstream the alignas rewrite into 4J-company/mr-math and delete this patch.
         # The recipe file is CRLF in git; strip CR so the LF patch matches.
         sed -i 's/\r$//' conan-center-index/recipes/mr-math/all/conanfile.py
@@ -97,6 +100,22 @@ jobs:
           COMPILER=gcc
           VERSION="$(g++ -dumpversion | cut -d. -f1)"
         fi
+        # act on a shared machine: cap jobs so two matrix legs do not exhaust RAM.
+        # GitHub runners leave this unset and keep Conan's default (nproc).
+        if [ -n "${ACT_BUILD_JOBS:-}" ]; then
+          EXTRA_CONF+=(-c "tools.build:jobs=${ACT_BUILD_JOBS}")
+        fi
+        # download.open-mpi.org (hwloc tarball) sometimes stalls past the
+        # default requests timeout. The recipe then gives up after 2 tries.
+        # core.* is rejected by -c, so it has to live in global.conf.
+        if [ -z "${CONAN_HOME:-}" ]; then
+          echo "CONAN_HOME is unset" >&2
+          exit 1
+        fi
+        mkdir -p "${CONAN_HOME}"
+        printf 'core.net.http:timeout=300\n' >> "${CONAN_HOME}/global.conf"
+        EXTRA_CONF+=(-c tools.files.download:retry=5)
+        EXTRA_CONF+=(-c tools.files.download:retry_wait=5)
         # -s is host-only. mold is a tool_requires and sees the build profile,
         # whose detected cppstd is gnu17. mold 2.42 needs C++20.
         # cpptrace adds a CXX_MODULES file set on Clang >= 16 and GCC >= 15.
