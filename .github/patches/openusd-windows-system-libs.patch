@@ -1,0 +1,88 @@
+diff --git a/recipes/openusd/all/conanfile.py b/recipes/openusd/all/conanfile.py
+--- a/recipes/openusd/all/conanfile.py
++++ b/recipes/openusd/all/conanfile.py
+@@ -158,6 +158,22 @@
+                         'if (EXISTS $ENV{VULKAN_SDK})', "if (FALSE)")
+         replace_in_file(self, os.path.join("cmake", "defaults", "Packages.cmake"),
+                         'message(FATAL_ERROR "VULKAN_SDK not valid")', "")
++        # Linux ld.bfd reads -Wl,-force_load as its -f option ("-f may not be used
++        # without -shared"). -force_load is Apple ld64. Clang on Linux needs
++        # the same --whole-archive pair as GCC. Keep -force_load for Apple ld64.
++        replace_in_file(
++            self,
++            os.path.join("cmake", "macros", "Private.cmake"),
++            '''            elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
++                list(APPEND final -Wl,-force_load ${lib})
++                add_dependencies(${NAME} ${lib})''',
++            '''            elseif(APPLE AND "${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
++                list(APPEND final -Wl,-force_load ${lib})
++                add_dependencies(${NAME} ${lib})
++            elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
++                list(APPEND final -Wl,--whole-archive ${lib} -Wl,--no-whole-archive)
++                add_dependencies(${NAME} ${lib})''',
++        )
+ 
+     def generate(self):
+         tc = CMakeToolchain(self)
+@@ -372,7 +388,7 @@
+     if not label or "::" in label:
+         return label
+     norm = label.replace("\\", "/")
+-    if "/" not in norm and not norm.endswith((".so", ".dylib", ".dll", ".a")):
++    if "/" not in norm and not norm.endswith((".so", ".dylib", ".dll", ".a", ".lib")):
+         return label
+     base = Path(norm).name
+     if not base:
+@@ -381,7 +397,7 @@
+     m = re.match(r"^(lib.+)\.so(?:\.\d+)*$", base)
+     if m:
+         return m.group(1)
+-    if base.endswith((".so", ".dylib", ".dll", ".a")):
++    if base.endswith((".so", ".dylib", ".dll", ".a", ".lib")):
+         return Path(base).stem
+     return label
+ 
+@@ -469,6 +485,10 @@
+         "Shlwapi.lib",
+         "Dbghelp",
+         "Dbghelp.lib",
++        "Ws2_32",
++        "Ws2_32.lib",
++        "ws2_32",
++        "ws2_32.lib",
+     }
+     ext_dep_map = cmake_to_conan_targets | {
+         "libICE":  "xorg::ice",
+@@ -520,6 +540,15 @@
+             return False
+         return True
+ 
++    # Graphviz on Windows labels an edge with the import library (usd_arch.lib).
++    # After stemming that is usd_arch, but the CMake target / component is arch.
++    component_names = set(merged)
++    win_system_lib_aliases = {
++        "Dbghelp_lib": "Dbghelp",
++        "Shlwapi_lib": "Shlwapi",
++        "Ws2_32_lib": "Ws2_32",
++        "ws2_32_lib": "ws2_32",
++    }
+     components = {}
+     for component, deps in merged.items():
+         if "::" in component or component in ext_dep_map:
+@@ -534,7 +563,16 @@
+         for dep in deps:
+             if dep.endswith(".so"):
+                 dep = Path(dep).stem
++            dep = win_system_lib_aliases.get(dep, dep)
++            if (
++                dep.startswith("usd_")
++                and dep not in component_names
++                and dep[4:] in component_names
++            ):
++                dep = dep[4:]
+             if dep in known_system_libs:
++                if dep.endswith(".lib"):
++                    dep = dep[:-4]
+                 system_libs.append(dep)
+             else:
+                 dep = ext_dep_map.get(dep, dep)

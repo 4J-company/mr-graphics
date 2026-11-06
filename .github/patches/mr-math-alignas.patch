@@ -1,0 +1,23 @@
+diff --git a/recipes/mr-math/all/conanfile.py b/recipes/mr-math/all/conanfile.py
+--- a/recipes/mr-math/all/conanfile.py
++++ b/recipes/mr-math/all/conanfile.py
+@@ -6,7 +6,8 @@
+ from conan.tools.cmake import CMakeToolchain
+ from conan.tools.cmake import CMake
+ from conan.tools.build import check_min_cppstd
+-from conan.tools.files import copy, rmdir, get
++from conan.tools.files import copy, rmdir, get, replace_in_file
++from pathlib import Path
+ from conan.api.conan_api import ConanAPI
+ class MrMath(ConanFile):
+     name = "mr-math"
+@@ -97,3 +98,9 @@
+ 
+     def source(self):
+         get(self, **self.conan_data["sources"][self.version])
++        # Clang rejects alignas(T) / alignas(float) when a member
++        # (stdx::fixed_size_simd) is aligned more strictly than T.
++        # TODO: upstream into 4J-company/mr-math and delete this rewrite.
++        for header in Path(self.source_folder).rglob("*.hpp"):
++            replace_in_file(self, str(header), "alignas(T) ", "", strict=False)
++            replace_in_file(self, str(header), "alignas(float) ", "", strict=False)

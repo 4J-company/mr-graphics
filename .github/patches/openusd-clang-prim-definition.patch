@@ -1,0 +1,60 @@
+--- a/recipes/openusd/all/conanfile.py	2026-11-06 14:55:07.000000000 +0300
++++ b/recipes/openusd/all/conanfile.py	2026-11-06 15:21:22.668948904 +0300
+@@ -175,6 +175,57 @@
+                 add_dependencies(${NAME} ${lib})''',
+         )
+ 
++        # Clang + libstdc++ instantiates unique_ptr<UsdPrimDefinition>'s
++        # destructor from the inline map lookups while that type is still
++        # incomplete (schemaRegistry.h only forward-declares it). GCC does
++        # not. Define the lookups in the cpp, which includes primDefinition.h.
++        # TODO: upstream into 4J-company/conan-center-index and delete this.
++        replace_in_file(
++            self,
++            os.path.join("pxr", "usd", "usd", "schemaRegistry.h"),
++            """    const UsdPrimDefinition* FindConcretePrimDefinition(
++        const TfToken &typeName) const {
++        const auto it = _concreteTypedPrimDefinitions.find(typeName);
++        return it != _concreteTypedPrimDefinitions.end() ? 
++            it->second.get() : nullptr;
++    }""",
++            """    const UsdPrimDefinition* FindConcretePrimDefinition(
++        const TfToken &typeName) const;""",
++        )
++        replace_in_file(
++            self,
++            os.path.join("pxr", "usd", "usd", "schemaRegistry.h"),
++            """    const UsdPrimDefinition *FindAppliedAPIPrimDefinition(
++        const TfToken &typeName) const {
++        const auto it = _appliedAPIPrimDefinitions.find(typeName);
++        return it != _appliedAPIPrimDefinitions.end() ?
++            it->second.primDef.get() : nullptr;
++    }""",
++            """    const UsdPrimDefinition *FindAppliedAPIPrimDefinition(
++        const TfToken &typeName) const;""",
++        )
++        replace_in_file(
++            self,
++            os.path.join("pxr", "usd", "usd", "schemaRegistry.cpp"),
++            "PXR_NAMESPACE_CLOSE_SCOPE\n",
++            """const UsdPrimDefinition*
++UsdSchemaRegistry::FindConcretePrimDefinition(const TfToken &typeName) const
++{
++    const auto it = _concreteTypedPrimDefinitions.find(typeName);
++    return it != _concreteTypedPrimDefinitions.end() ? it->second.get() : nullptr;
++}
++
++const UsdPrimDefinition*
++UsdSchemaRegistry::FindAppliedAPIPrimDefinition(const TfToken &typeName) const
++{
++    const auto it = _appliedAPIPrimDefinitions.find(typeName);
++    return it != _appliedAPIPrimDefinitions.end() ? it->second.primDef.get() : nullptr;
++}
++
++PXR_NAMESPACE_CLOSE_SCOPE
++""",
++        )
++
+     def generate(self):
+         tc = CMakeToolchain(self)
+         # Use variables in documented in https://github.com/PixarAnimationStudios/OpenUSD/blob/release/BUILDING.md
